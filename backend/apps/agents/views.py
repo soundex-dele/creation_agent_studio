@@ -6,13 +6,24 @@ from django.db.models import OuterRef, Q, Subquery
 from django.db.models.deletion import ProtectedError
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import AgentCategory, Agent, AgentDeployment
+from .models import AgentCategory, Agent
+from modules.catalog.errors import (
+    DeploymentRollbackUnavailable, DeploymentVersionConflict,
+    InvalidDeploymentRevision,
+)
+from modules.catalog.models import (
+    AgentDeployment, AgentDraft, AgentRevision, DeploymentEnvironment,
+)
+from modules.catalog.services import (
+    publish_agent, rollback_agent_deployment, switch_agent_deployment,
+)
 from .serializers import (
     AgentCategorySerializer,
     AgentListSerializer,
     AgentDetailSerializer,
     AgentExecutionSerializer,
     ExecuteAgentSerializer, AgentWriteSerializer, AgentDeploymentSerializer,
+    AgentRevisionSerializer,
 )
 from .services.agent_service import AgentService
 from .filters import AgentFilter
@@ -110,6 +121,50 @@ class AgentViewSet(viewsets.ModelViewSet):
         self.require_agent_role(request, agent, tuple(dict(Membership.Role.choices)))
         return Response(AgentDeploymentSerializer(agent.deployments.all(), many=True).data)
 
+    @action(detail=True, methods=['get', 'post'])
+    def versions(self, request, pk=None):
+        agent = self.get_object()
+        from apps.enterprise.models import Membership
+        self.require_agent_role(request, agent, (
+            Membership.Role.OWNER, Membership.Role.ADMIN,
+            Membership.Role.DEVELOPER, Membership.Role.OPERATOR,
+            Membership.Role.AUDITOR, Membership.Role.VIEWER,
+        ))
+        if request.method == 'GET':
+            return Response(AgentRevisionSerializer(
+                agent.revisions.order_by('-revision_no'), many=True).data)
+
+        self.require_agent_role(request, agent, (
+            Membership.Role.OWNER, Membership.Role.ADMIN,
+            Membership.Role.DEVELOPER,
+        ))
+        draft = AgentDraft.objects.filter(agent=agent).first()
+        if draft is None:
+            return Response({'detail': 'Agent draft is missing.'}, status=409)
+        reserved = {'expected_draft_version', 'release_notes', 'content'}
+        supplied = request.data.get('content')
+        if supplied is None:
+            supplied = {
+                key: value for key, value in request.data.items()
+                if key not in reserved
+            }
+        if supplied:
+            if not isinstance(supplied, dict):
+                return Response({'content': 'Must be a JSON object.'}, status=400)
+            draft.content = {**draft.content, **supplied}
+            draft.version += 1
+            draft.updated_by = request.user
+            draft.save(update_fields=[
+                'content', 'version', 'updated_by', 'updated_at',
+            ])
+        revision = publish_agent(
+            agent=agent,
+            actor=request.user,
+            expected_draft_version=draft.version,
+            release_notes=request.data.get('release_notes', ''),
+        )
+        return Response(AgentRevisionSerializer(revision).data, status=201)
+
     @action(detail=True, methods=['post'])
     def deploy(self, request, pk=None):
         agent = self.get_object()
@@ -117,13 +172,54 @@ class AgentViewSet(viewsets.ModelViewSet):
         self.require_agent_role(request, agent, (
             Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.OPERATOR))
         environment = request.data.get('environment', 'development')
-        if environment not in dict(AgentDeployment.Environment.choices):
+        if environment not in dict(DeploymentEnvironment.choices):
             return Response({'environment': 'Invalid deployment environment.'}, status=400)
-        deployment, _ = AgentDeployment.objects.update_or_create(
-            agent=agent, environment=environment,
-            defaults={'deployed_by': request.user,
-                      'config_overrides': request.data.get('config_overrides') or {}},
-        )
+        revision_id = request.data.get('revision_id') or request.data.get('version_id')
+        if not revision_id:
+            revision_id = AgentRevision.objects.filter(
+                agent=agent).order_by('-revision_no').values_list('id', flat=True).first()
+        if not revision_id:
+            return Response({'detail': 'Publish an Agent revision first.'}, status=409)
+        current = AgentDeployment.objects.filter(
+            agent=agent, environment=environment).first()
+        expected_version = request.data.get(
+            'expected_version', current.version if current else 0)
+        try:
+            deployment = switch_agent_deployment(
+                agent=agent,
+                actor=request.user,
+                environment=environment,
+                revision_id=revision_id,
+                expected_version=int(expected_version),
+                config_override=(request.data.get('config_override')
+                                 or request.data.get('config_overrides') or {}),
+            )
+        except (DeploymentVersionConflict, InvalidDeploymentRevision) as exc:
+            return Response({'detail': str(exc)}, status=409)
+        return Response(AgentDeploymentSerializer(deployment).data)
+
+    @action(detail=True, methods=['post'])
+    def rollback(self, request, pk=None):
+        agent = self.get_object()
+        from apps.enterprise.models import Membership
+        self.require_agent_role(request, agent, (
+            Membership.Role.OWNER, Membership.Role.ADMIN,
+            Membership.Role.OPERATOR,
+        ))
+        environment = request.data.get('environment', 'development')
+        current = AgentDeployment.objects.filter(
+            agent=agent, environment=environment).first()
+        expected_version = request.data.get(
+            'expected_version', current.version if current else 0)
+        try:
+            deployment = rollback_agent_deployment(
+                agent=agent,
+                actor=request.user,
+                environment=environment,
+                expected_version=int(expected_version),
+            )
+        except (DeploymentRollbackUnavailable, DeploymentVersionConflict) as exc:
+            return Response({'detail': str(exc)}, status=409)
         return Response(AgentDeploymentSerializer(deployment).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

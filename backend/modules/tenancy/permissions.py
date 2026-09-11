@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-from .models import Membership, Organization
+from apps.enterprise.models import Membership, Organization
 
 
 ROLE_LEVEL = {
@@ -14,7 +14,7 @@ ROLE_LEVEL = {
 
 
 def resolve_path_organization(request, organization_id):
-    """Resolve a V2 organization without revealing inaccessible tenants."""
+    """Resolve an organization without revealing inaccessible tenants."""
 
     if not request.user or not request.user.is_authenticated:
         return None
@@ -29,7 +29,7 @@ def resolve_path_organization(request, organization_id):
 
 
 class HasPathOrganization(BasePermission):
-    """Require active access to the organization encoded in the V2 URL."""
+    """Require active access to the organization encoded in the URL."""
 
     def has_permission(self, request, view):
         organization_id = view.kwargs.get("organization_id")

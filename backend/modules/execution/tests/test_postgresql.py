@@ -37,11 +37,11 @@ def test_postgresql_rls_filters_runs_for_non_bypass_role():
         definition_snapshot={},
         input_data={},
     )
-    role = f"v2_rls_test_{uuid.uuid4().hex}"
+    role = f"rls_test_{uuid.uuid4().hex}"
     with connection.cursor() as cursor:
         cursor.execute(f'CREATE ROLE "{role}"')
         cursor.execute(f'GRANT USAGE ON SCHEMA public TO "{role}"')
-        cursor.execute(f'GRANT SELECT ON v2_runs TO "{role}"')
+        cursor.execute(f'GRANT SELECT ON runs TO "{role}"')
     try:
         with transaction.atomic():
             with connection.cursor() as cursor:
@@ -50,7 +50,7 @@ def test_postgresql_rls_filters_runs_for_non_bypass_role():
                     "SELECT set_config('app.organization_id', %s, true)",
                     [str(first.id)],
                 )
-                cursor.execute("SELECT id FROM v2_runs ORDER BY id")
+                cursor.execute("SELECT id FROM runs ORDER BY id")
                 visible_ids = [row[0] for row in cursor.fetchall()]
                 cursor.execute("RESET ROLE")
         assert visible_ids == [first_run.id]
@@ -61,22 +61,22 @@ def test_postgresql_rls_filters_runs_for_non_bypass_role():
 
 
 @pytest.mark.django_db
-def test_postgresql_v2_tables_have_tenant_policies():
+def test_postgresql_tenant_tables_have_policies():
     if connection.vendor != "postgresql":
         pytest.skip("PostgreSQL-only RLS contract")
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT tablename FROM pg_policies "
-            "WHERE schemaname = current_schema() AND policyname = 'v2_tenant_isolation'"
+            "WHERE schemaname = current_schema() AND policyname = 'tenant_isolation'"
         )
         policy_tables = {row[0] for row in cursor.fetchall()}
     assert {
-        "v2_organizations",
-        "v2_applications",
-        "v2_runs",
-        "v2_run_attempts",
-        "v2_run_leases",
-        "v2_run_events",
+        "application_revisions",
+        "application_deployments",
+        "runs",
+        "run_attempts",
+        "run_leases",
+        "run_events",
     } <= policy_tables
 
 

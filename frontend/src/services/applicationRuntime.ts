@@ -5,7 +5,7 @@ import axiosInstance from './axios';
 
 export type DeploymentEnvironment = 'development' | 'staging' | 'production';
 
-export interface V2RunResource {
+export interface RunResource {
   id: string;
   organization_id: string;
   status: string;
@@ -17,7 +17,7 @@ export interface V2RunResource {
   stream_url: string;
 }
 
-export interface V2RunArtifact {
+export interface RunArtifact {
   id: string;
   run_id: string;
   kind: string;
@@ -28,7 +28,7 @@ export interface V2RunArtifact {
   created_at: string;
 }
 
-export interface V2ApplicationRuntimeDescriptor {
+export interface ApplicationRuntimeDescriptor {
   organization_id: string;
   application_id: string;
   name: string;
@@ -61,16 +61,20 @@ export function createApplicationRuntimeClient({
   applicationId,
   environment = 'production',
 }: RuntimeClientOptions) {
-  const root = `/v2/organizations/${organizationId}`;
+  const root = `/organizations/${organizationId}`;
   return {
+    organizationId,
+    applicationId,
+    environment,
+
     startRun: async (
       input: Record<string, unknown>,
       idempotencyKey: string,
-    ): Promise<V2RunResource> => axiosInstance.post(
+    ): Promise<RunResource> => axiosInstance.post(
       `${root}/applications/${applicationId}/runs`,
       { environment, input },
       { headers: { 'Idempotency-Key': idempotencyKey } },
-    ) as Promise<V2RunResource>,
+    ) as Promise<RunResource>,
 
     subscribeRun: (
       runId: string,
@@ -95,8 +99,8 @@ export function createApplicationRuntimeClient({
       command,
     ) as Promise<Record<string, unknown>>,
 
-    listArtifacts: async (runId: string): Promise<CursorPage<V2RunArtifact>> =>
-      axiosInstance.get(`${root}/runs/${runId}/artifacts`) as Promise<CursorPage<V2RunArtifact>>,
+    listArtifacts: async (runId: string): Promise<CursorPage<RunArtifact>> =>
+      axiosInstance.get(`${root}/runs/${runId}/artifacts`) as Promise<CursorPage<RunArtifact>>,
 
     getArtifactAccess: async (
       runId: string,
@@ -112,11 +116,11 @@ export async function loadApplicationRuntime(
   organizationId: string,
   applicationId: string,
   environment: DeploymentEnvironment = 'production',
-): Promise<V2ApplicationRuntimeDescriptor> {
+): Promise<ApplicationRuntimeDescriptor> {
   return axiosInstance.get(
-    `/v2/organizations/${organizationId}/applications/${applicationId}/runtime`,
+    `/organizations/${organizationId}/applications/${applicationId}/runtime`,
     { params: { environment } },
-  ) as Promise<V2ApplicationRuntimeDescriptor>;
+  ) as Promise<ApplicationRuntimeDescriptor>;
 }
 
 export type ApplicationRuntimeClient = ReturnType<typeof createApplicationRuntimeClient>;

@@ -1,1 +1,1 @@
-"""Durable V2 execution plane."""
+"""Durable execution plane for every application runtime."""

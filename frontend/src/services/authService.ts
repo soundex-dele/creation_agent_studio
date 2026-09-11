@@ -11,7 +11,7 @@ export const authService = {
     password: string;
     password_confirm: string;
   }) => {
-    return axiosInstance.post('/auth/registration/', data);
+    return axiosInstance.post('/auth/register/', data);
   },
 
   logout: async (refreshToken: string) => {

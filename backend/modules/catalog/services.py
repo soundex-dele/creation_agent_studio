@@ -17,6 +17,7 @@ from .errors import (
 )
 
 from .models import (
+    AgentDeployment,
     AgentDraft,
     AgentRevision,
     ApplicationDeployment,
@@ -155,6 +156,79 @@ def publish_application(*, application, actor, expected_draft_version, release_n
         expected_draft_version=expected_draft_version,
         release_notes=release_notes,
     )
+
+
+def switch_agent_deployment(
+    *, agent, actor, environment, revision_id, expected_version, config_override=None
+):
+    revision = AgentRevision.objects.filter(
+        pk=revision_id,
+        organization_id=agent.organization_id,
+        agent=agent,
+    ).first()
+    if revision is None:
+        raise InvalidDeploymentRevision(
+            "The revision does not belong to this agent and organization."
+        )
+    config_override = config_override or {}
+    with transaction.atomic():
+        deployment = AgentDeployment.objects.select_for_update().filter(
+            agent=agent,
+            organization_id=agent.organization_id,
+            environment=environment,
+        ).first()
+        current_version = deployment.version if deployment else 0
+        if current_version != expected_version:
+            raise DeploymentVersionConflict(
+                f"Deployment version changed: expected {expected_version}, "
+                f"found {current_version}"
+            )
+        if deployment is None:
+            return AgentDeployment.objects.create(
+                organization_id=agent.organization_id,
+                agent=agent,
+                environment=environment,
+                revision=revision,
+                config_override=config_override,
+                updated_by=actor,
+            )
+        previous_revision_id = (
+            deployment.revision_id
+            if deployment.revision_id != revision.id
+            else deployment.previous_revision_id
+        )
+        deployment.revision = revision
+        deployment.previous_revision_id = previous_revision_id
+        deployment.config_override = config_override
+        deployment.version += 1
+        deployment.updated_by = actor
+        deployment.save()
+        return deployment
+
+
+def rollback_agent_deployment(*, agent, actor, environment, expected_version):
+    with transaction.atomic():
+        deployment = AgentDeployment.objects.select_for_update().filter(
+            agent=agent,
+            organization_id=agent.organization_id,
+            environment=environment,
+        ).first()
+        if deployment is None or deployment.previous_revision_id is None:
+            raise DeploymentRollbackUnavailable(
+                "No previous revision is available for this deployment."
+            )
+        if deployment.version != expected_version:
+            raise DeploymentVersionConflict(
+                f"Deployment version changed: expected {expected_version}, "
+                f"found {deployment.version}"
+            )
+        current_revision_id = deployment.revision_id
+        deployment.revision_id = deployment.previous_revision_id
+        deployment.previous_revision_id = current_revision_id
+        deployment.version += 1
+        deployment.updated_by = actor
+        deployment.save()
+        return deployment
 
 
 def _deployment_revision(*, application, revision_id):

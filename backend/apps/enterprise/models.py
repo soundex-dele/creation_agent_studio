@@ -18,6 +18,16 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+class OrganizationQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if user.is_superuser:
+            return self
+        return self.filter(
+            memberships__user=user,
+            memberships__is_active=True,
+        ).distinct()
+
+
 class Organization(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=160)
@@ -26,6 +36,8 @@ class Organization(TimeStampedModel):
                               related_name='owned_organizations')
     is_active = models.BooleanField(default=True)
     settings = models.JSONField(default=dict, blank=True)
+
+    objects = OrganizationQuerySet.as_manager()
 
     class Meta:
         db_table = 'organizations'

@@ -16,7 +16,7 @@ def validate_json_object(value, field_name):
 
 class ApplicationSerializer(serializers.ModelSerializer):
     organization_id = serializers.UUIDField(read_only=True)
-    owner_id = serializers.ReadOnlyField()
+    owner_id = serializers.ReadOnlyField(source="created_by_id")
 
     class Meta:
         model = Application
@@ -34,6 +34,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
 
 class CreateApplicationSerializer(serializers.Serializer):
+    category_id = serializers.IntegerField(required=False, allow_null=True)
     name = serializers.CharField(max_length=160)
     slug = serializers.SlugField(max_length=120)
     description = serializers.CharField(required=False, allow_blank=True, default="")
@@ -44,7 +45,7 @@ class CreateApplicationSerializer(serializers.Serializer):
 
 
 class ApplicationDraftSerializer(serializers.ModelSerializer):
-    application_id = serializers.UUIDField(read_only=True)
+    application_id = serializers.IntegerField(read_only=True)
     organization_id = serializers.UUIDField(read_only=True)
     updated_by_id = serializers.ReadOnlyField()
 
@@ -76,7 +77,7 @@ class PublishApplicationSerializer(serializers.Serializer):
 
 
 class ApplicationRevisionSerializer(serializers.ModelSerializer):
-    application_id = serializers.UUIDField(read_only=True)
+    application_id = serializers.IntegerField(read_only=True)
     organization_id = serializers.UUIDField(read_only=True)
     created_by_id = serializers.ReadOnlyField()
 
@@ -97,7 +98,7 @@ class ApplicationRevisionSerializer(serializers.ModelSerializer):
 
 
 class ApplicationDeploymentSerializer(serializers.ModelSerializer):
-    application_id = serializers.UUIDField(read_only=True)
+    application_id = serializers.IntegerField(read_only=True)
     organization_id = serializers.UUIDField(read_only=True)
     revision_id = serializers.UUIDField(read_only=True)
     previous_revision_id = serializers.UUIDField(read_only=True, allow_null=True)

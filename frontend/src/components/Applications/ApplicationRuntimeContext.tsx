@@ -4,7 +4,7 @@ import {
   createApplicationRuntimeClient,
   type ApplicationRuntimeClient,
   type DeploymentEnvironment,
-} from '@/services/applicationRuntimeV2';
+} from '@/services/applicationRuntime';
 
 
 const RuntimeContext = createContext<ApplicationRuntimeClient | null>(null);

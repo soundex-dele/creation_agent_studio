@@ -3,15 +3,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
-class RetryPolicyV1(BaseModel):
+class RetryPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     max_attempts: int = Field(default=3, ge=1, le=100)
     retry_safe: bool = True
 
 
-class ApplicationDefinitionV1(BaseModel):
-    """Minimum portable execution contract for Application Revision schema v1."""
+class ApplicationDefinition(BaseModel):
+    """Portable execution contract for an Application Revision."""
 
     model_config = ConfigDict(extra="allow", strict=True)
 
@@ -20,7 +20,7 @@ class ApplicationDefinitionV1(BaseModel):
     executor_protocol_version: int = Field(default=1, ge=1)
     renderer_key: str | None = Field(default=None, min_length=1, max_length=160)
     renderer_schema_version: int = Field(default=1, ge=1)
-    retry_policy: RetryPolicyV1 = Field(default_factory=RetryPolicyV1)
+    retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     input_schema: dict[str, Any] = Field(default_factory=dict)
     output_schema: dict[str, Any] = Field(default_factory=dict)
     default_config: dict[str, Any] = Field(default_factory=dict)
@@ -36,7 +36,7 @@ class ApplicationDefinitionV1(BaseModel):
 def validate_application_definition(content, *, schema_version=1):
     if schema_version != 1:
         raise ValueError(f"Unsupported Application definition schema version: {schema_version}")
-    return ApplicationDefinitionV1.model_validate(content)
+    return ApplicationDefinition.model_validate(content)
 
 
 def application_definition_errors(exc: ValidationError):

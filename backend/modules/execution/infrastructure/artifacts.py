@@ -5,7 +5,7 @@ from django.core import signing
 from django.utils.module_loading import import_string
 
 
-ARTIFACT_TOKEN_SALT = "creation-agent-studio.v2.artifact-access"
+ARTIFACT_TOKEN_SALT = "creation-agent-studio.artifact-access"
 
 
 class ArtifactObjectUnavailable(Exception):

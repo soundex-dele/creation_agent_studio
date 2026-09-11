@@ -18,6 +18,7 @@ from modules.catalog.models import (
     ApplicationRevision,
     DeploymentEnvironment,
 )
+from apps.applications.models import ApplicationCategory
 from modules.catalog.services import (
     canonical_content_hash,
     publish_application,
@@ -128,18 +129,46 @@ class OrganizationApplicationsView(ProblemDetailsAPIView):
         serializer.is_valid(raise_exception=True)
         try:
             with transaction.atomic():
+                category_id = serializer.validated_data.get("category_id")
+                if category_id is not None:
+                    category = ApplicationCategory.objects.filter(
+                        pk=category_id
+                    ).first()
+                    if category is None:
+                        return _problem(
+                            request,
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            code="application_category_not_found",
+                            title="Application category not found",
+                            detail="The requested application category does not exist.",
+                        )
+                else:
+                    category, _ = ApplicationCategory.objects.get_or_create(
+                        slug="uncategorized",
+                        defaults={
+                            "name": "Uncategorized",
+                            "description": "Applications without an explicit category.",
+                        },
+                    )
+                content = serializer.validated_data["content"]
                 application = Application.objects.create(
                     organization=request.organization,
-                    owner=request.user,
+                    created_by=request.user,
+                    category=category,
                     name=serializer.validated_data["name"],
                     slug=serializer.validated_data["slug"],
                     description=serializer.validated_data["description"],
+                    executor_key=str(content.get("executor_key") or ""),
+                    renderer_key=str(content.get("renderer_key") or ""),
+                    input_schema=content.get("input_schema") or {},
+                    output_schema=content.get("output_schema") or {},
+                    default_config=content.get("default_config") or {},
                 )
                 draft = ApplicationDraft.objects.create(
                     organization=request.organization,
                     application=application,
                     updated_by=request.user,
-                    content=serializer.validated_data["content"],
+                    content=content,
                 )
         except IntegrityError:
             return _problem(

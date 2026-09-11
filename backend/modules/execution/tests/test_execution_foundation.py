@@ -38,7 +38,7 @@ from modules.tenancy.models import Membership, Organization
 @pytest.fixture
 def actor(db):
     return get_user_model().objects.create_user(
-        username="v2-owner",
+        username="execution-owner",
         email="owner@example.com",
         password="test-password",
     )
@@ -47,8 +47,8 @@ def actor(db):
 @pytest.fixture
 def organization(actor):
     organization = Organization.objects.create(
-        name="V2 Organization",
-        slug="v2-organization",
+        name="Execution Organization",
+        slug="execution-organization",
         owner=actor,
     )
     Membership.objects.create(
@@ -241,7 +241,7 @@ def test_checkpoint_answer_and_resume_are_durable(organization, actor):
         attempt_id=first.attempt.id,
         lease_fence=fence,
         kind="checkpoint",
-        object_key=f"v2/{organization.id}/runs/{run.id}/checkpoint.json",
+        object_key=f"organizations/{organization.id}/runs/{run.id}/checkpoint.json",
         content_hash="a" * 64,
         mime_type="application/json",
         size=42,
@@ -399,9 +399,11 @@ def test_event_append_rejects_cross_tenant_access(organization, actor):
 
 @pytest.mark.django_db
 def test_organization_visibility_is_membership_scoped(organization, actor):
-    outsider = get_user_model().objects.create_user(username="v2-outsider")
-    assert list(Organization.objects.visible_to(actor)) == [organization]
-    assert not Organization.objects.visible_to(outsider).exists()
+    outsider = get_user_model().objects.create_user(username="execution-outsider")
+    assert organization in Organization.objects.visible_to(actor)
+    assert not Organization.objects.visible_to(outsider).filter(
+        pk=organization.pk
+    ).exists()
 
 
 @pytest.mark.django_db

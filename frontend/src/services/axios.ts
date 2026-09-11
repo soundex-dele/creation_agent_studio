@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { message } from 'antd';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { API_BASE_URL } from './apiBaseUrl';
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

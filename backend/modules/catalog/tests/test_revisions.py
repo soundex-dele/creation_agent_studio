@@ -6,6 +6,7 @@ from django.db import DatabaseError, transaction
 from modules.catalog.models import Agent, AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash, publish_agent
 from modules.tenancy.models import Organization
+from apps.agents.models import AgentCategory
 
 
 @pytest.fixture
@@ -24,11 +25,17 @@ def catalog_organization(catalog_owner):
 
 @pytest.fixture
 def agent_with_draft(catalog_organization, catalog_owner):
+    category, _ = AgentCategory.objects.get_or_create(
+        slug="catalog-tests", defaults={"name": "Catalog Tests"}
+    )
     agent = Agent.objects.create(
         organization=catalog_organization,
-        owner=catalog_owner,
+        created_by=catalog_owner,
+        category=category,
         name="Writer",
         slug="writer",
+        description="Writer agent",
+        system_prompt="Write clearly.",
     )
     draft = AgentDraft.objects.create(
         organization=catalog_organization,

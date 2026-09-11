@@ -1,78 +1,12 @@
-import uuid
+"""Shared tenant primitives.
 
-from django.conf import settings
+There is deliberately no second Organization model in the execution stack.
+The enterprise control-plane Organization and Membership are the canonical
+tenant identity for every product and durable-execution resource.
+"""
 from django.db import models
 
-
-class OrganizationQuerySet(models.QuerySet):
-    def visible_to(self, user):
-        if user.is_superuser:
-            return self
-        return self.filter(
-            memberships__user=user,
-            memberships__is_active=True,
-        ).distinct()
-
-
-class Organization(models.Model):
-    """A hard tenant boundary for every V2 business resource."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=160)
-    slug = models.SlugField(max_length=100, unique=True)
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="v2_owned_organizations",
-    )
-    is_active = models.BooleanField(default=True)
-    settings = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    objects = OrganizationQuerySet.as_manager()
-
-    class Meta:
-        db_table = "v2_organizations"
-        ordering = ("name", "id")
-
-    def __str__(self):
-        return self.name
-
-
-class Membership(models.Model):
-    class Role(models.TextChoices):
-        OWNER = "owner", "Owner"
-        ADMIN = "admin", "Administrator"
-        DEVELOPER = "developer", "Developer"
-        OPERATOR = "operator", "Operator"
-        AUDITOR = "auditor", "Auditor"
-        VIEWER = "viewer", "Viewer"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        related_name="memberships",
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="v2_organization_memberships",
-    )
-    role = models.CharField(max_length=20, choices=Role.choices)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "v2_organization_memberships"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("organization", "user"),
-                name="v2_unique_organization_membership",
-            )
-        ]
+from apps.enterprise.models import Membership, Organization
 
 
 class TenantOwnedQuerySet(models.QuerySet):
@@ -83,7 +17,7 @@ class TenantOwnedQuerySet(models.QuerySet):
 
 
 class TenantOwnedModel(models.Model):
-    """Base model whose default manager exposes an explicit tenant scope."""
+    """Base model with an explicit canonical organization scope."""
 
     organization = models.ForeignKey(
         Organization,
@@ -95,3 +29,11 @@ class TenantOwnedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+__all__ = [
+    "Membership",
+    "Organization",
+    "TenantOwnedModel",
+    "TenantOwnedQuerySet",
+]

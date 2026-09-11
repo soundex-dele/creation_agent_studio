@@ -7,6 +7,7 @@ from .models import (
     ApplicationSkillBinding, ChatApplicationProfile, GuidedOption,
     GuidedPrompt, GuidedQuestion, Skill,
 )
+from modules.catalog.models import ApplicationDraft
 
 
 class ApplicationCategorySerializer(serializers.ModelSerializer):
@@ -96,6 +97,7 @@ class ApplicationSkillBindingSerializer(serializers.ModelSerializer):
 
 class ApplicationRuntimeSerializer(serializers.ModelSerializer):
     application_id = serializers.IntegerField(source='id', read_only=True)
+    organization_id = serializers.UUIDField(read_only=True, allow_null=True)
     application_slug = serializers.CharField(source='slug', read_only=True)
     application_name = serializers.CharField(source='name', read_only=True)
     application_description = serializers.CharField(source='description', read_only=True)
@@ -109,7 +111,7 @@ class ApplicationRuntimeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = [
-            'id', 'application_id', 'application_slug', 'application_name',
+            'id', 'application_id', 'organization_id', 'application_slug', 'application_name',
             'application_description', 'application_icon', 'application_color',
             'kind', 'renderer_key', 'executor_key', 'input_schema', 'output_schema',
             'default_config', 'chat_profile', 'agent_bindings', 'skill_bindings',
@@ -204,6 +206,7 @@ class ApplicationWriteSerializer(serializers.ModelSerializer):
         self._replace_nested(application, **nested)
         from .services import validate_application
         validate_application(application)
+        self._sync_runtime_draft(application)
         return application
 
     @transaction.atomic
@@ -213,7 +216,44 @@ class ApplicationWriteSerializer(serializers.ModelSerializer):
         self._replace_nested(application, replace_only_present=True, **nested)
         from .services import validate_application
         validate_application(application)
+        self._sync_runtime_draft(application)
         return application
+
+    def _sync_runtime_draft(self, application):
+        """Persist the editable runtime definition for the canonical app."""
+        if application.organization_id is None:
+            return
+        default_config = application.default_config or {}
+        content = {
+            'executor_kind': default_config.get('executor_kind') or (
+                'agent' if application.kind == Application.Kind.CHAT else 'media'
+            ),
+            'executor_key': application.executor_key,
+            'executor_protocol_version': 1,
+            'renderer_key': application.renderer_key or None,
+            'renderer_schema_version': 1,
+            'retry_policy': default_config.get('retry_policy') or {
+                'max_attempts': 3,
+                'retry_safe': True,
+            },
+            'input_schema': application.input_schema or {},
+            'output_schema': application.output_schema or {},
+            'default_config': default_config,
+        }
+        actor = self.context['request'].user
+        draft = ApplicationDraft.objects.filter(application=application).first()
+        if draft is None:
+            ApplicationDraft.objects.create(
+                organization=application.organization,
+                application=application,
+                content=content,
+                updated_by=actor,
+            )
+            return
+        draft.content = content
+        draft.version += 1
+        draft.updated_by = actor
+        draft.save(update_fields=['content', 'version', 'updated_by', 'updated_at'])
 
     @staticmethod
     def _pop_nested(validated_data):

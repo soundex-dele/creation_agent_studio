@@ -79,7 +79,7 @@ def _parse_non_negative_int(request, name, default):
 
 def _compacted_problem(request, snapshot):
     snapshot_url = reverse(
-        "v2-execution:run-event-snapshot",
+        "execution:run-event-snapshot",
         kwargs={
             "organization_id": snapshot.organization_id,
             "run_id": snapshot.run_id,
@@ -249,7 +249,7 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
         )
         if access_url is None:
             content_url = reverse(
-                "v2-execution:run-artifact-content",
+                "execution:run-artifact-content",
                 kwargs={
                     "organization_id": organization_id,
                     "run_id": run_id,
@@ -511,11 +511,11 @@ class OrganizationApplicationRunsView(ProblemDetailsAPIView):
             )
 
         detail_url = reverse(
-            "v2-execution:run-detail",
+            "execution:run-detail",
             kwargs={"organization_id": organization_id, "run_id": run.id},
         )
         stream_url = reverse(
-            "v2-execution:run-stream",
+            "execution:run-stream",
             kwargs={"organization_id": organization_id, "run_id": run.id},
         )
         body = RunSerializer(run).data

@@ -22,19 +22,19 @@ import {
 import { useRunStream } from '@/hooks/useRunStream';
 import {
   loadApplicationRuntime,
-  type V2ApplicationRuntimeDescriptor,
-  type V2RunArtifact,
-  type V2RunResource,
-} from '@/services/applicationRuntimeV2';
+  type ApplicationRuntimeDescriptor,
+  type RunArtifact,
+  type RunResource,
+} from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
 
-function RuntimeConsole({ descriptor }: { descriptor: V2ApplicationRuntimeDescriptor }) {
+function RuntimeConsole({ descriptor }: { descriptor: ApplicationRuntimeDescriptor }) {
   const runtime = useApplicationRuntime();
   const [inputText, setInputText] = useState('{}');
-  const [run, setRun] = useState<V2RunResource | null>(null);
+  const [run, setRun] = useState<RunResource | null>(null);
   const [starting, setStarting] = useState(false);
-  const [artifacts, setArtifacts] = useState<V2RunArtifact[]>([]);
+  const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
   const projection = useRunStream({
     organizationId: descriptor.organization_id,
     runId: run?.id ?? null,
@@ -129,10 +129,10 @@ function RuntimeConsole({ descriptor }: { descriptor: V2ApplicationRuntimeDescri
 }
 
 
-export default function V2ApplicationRuntimePage() {
+export default function DurableApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
-  const [descriptor, setDescriptor] = useState<V2ApplicationRuntimeDescriptor | null>(null);
+  const [descriptor, setDescriptor] = useState<ApplicationRuntimeDescriptor | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setDescriptor(null);
@@ -146,7 +146,7 @@ export default function V2ApplicationRuntimePage() {
       .catch((reason) => setError(reason instanceof Error ? reason.message : '加载失败'));
   }, [applicationId, organizationId]);
 
-  if (error) return <Alert type="error" showIcon message="无法加载 V2 Application" description={error} />;
+  if (error) return <Alert type="error" showIcon message="无法加载 Application" description={error} />;
   if (!descriptor) return <div style={{ display: 'grid', placeItems: 'center', minHeight: 320 }}><Spin /></div>;
   return (
     <ApplicationRuntimeProvider

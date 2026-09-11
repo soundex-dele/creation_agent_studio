@@ -4,6 +4,7 @@ from rest_framework.test import APIClient
 
 from modules.catalog.models import Application, ApplicationRevision
 from modules.tenancy.models import Membership, Organization
+from apps.applications.models import ApplicationCategory
 
 
 @pytest.fixture
@@ -34,12 +35,12 @@ def catalog_api_client(catalog_api_owner):
 
 
 def _applications_url(organization):
-    return f"/api/v2/organizations/{organization.id}/applications"
+    return f"/api/organizations/{organization.id}/applications"
 
 
 def _application_url(organization, application, suffix=""):
     return (
-        f"/api/v2/organizations/{organization.id}/applications/"
+        f"/api/organizations/{organization.id}/applications/"
         f"{application.id}{suffix}"
     )
 
@@ -50,7 +51,7 @@ def _create_application(client, organization, slug="video-editor"):
         {
             "name": "Video Editor",
             "slug": slug,
-            "description": "A V2 application",
+            "description": "A versioned application",
             "content": {
                 "executor_kind": "media",
                 "executor_key": "video-editor",
@@ -83,7 +84,7 @@ def test_create_application_atomically_creates_versioned_draft(
 
     assert response.data["organization_id"] == str(catalog_api_organization.id)
     assert response.data["draft"]["version"] == 1
-    assert response.data["draft"]["application_id"] == str(application.id)
+    assert response.data["draft"]["application_id"] == application.id
     assert response.data["draft"]["content"]["executor_key"] == "video-editor"
 
     duplicate = catalog_api_client.post(
@@ -110,7 +111,7 @@ def test_draft_update_uses_optimistic_version(
 
     updated = catalog_api_client.put(
         url,
-        {"expected_version": 1, "content": {"executor_key": "editor-v2"}},
+        {"expected_version": 1, "content": {"executor_key": "editor-next"}},
         format="json",
     )
     stale = catalog_api_client.put(
@@ -124,7 +125,7 @@ def test_draft_update_uses_optimistic_version(
     assert stale.status_code == 409
     assert stale.data["code"] == "draft_version_conflict"
     application.draft.refresh_from_db()
-    assert application.draft.content == {"executor_key": "editor-v2"}
+    assert application.draft.content == {"executor_key": "editor-next"}
 
 
 @pytest.mark.django_db
@@ -194,7 +195,7 @@ def test_deployment_switch_and_rollback_are_versioned(
             "expected_version": 1,
             "content": {
                 "executor_kind": "media",
-                "executor_key": "video-editor-v2",
+                "executor_key": "video-editor-next",
             },
         },
         format="json",
@@ -360,9 +361,13 @@ def test_catalog_resources_are_scoped_to_path_organization(
     )
     foreign_application = Application.objects.create(
         organization=other,
-        owner=catalog_api_owner,
+        created_by=catalog_api_owner,
+        category=ApplicationCategory.objects.get_or_create(
+            slug="uncategorized", defaults={"name": "Uncategorized"}
+        )[0],
         name="Foreign",
         slug="foreign",
+        description="Foreign application",
     )
 
     response = catalog_api_client.get(

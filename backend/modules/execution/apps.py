@@ -38,11 +38,11 @@ def configure_sqlite_connection(sender, connection, **kwargs):
 class ExecutionConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "modules.execution"
-    label = "v2_execution"
-    verbose_name = "V2 Execution"
+    label = "execution"
+    verbose_name = "Durable Execution"
 
     def ready(self):
         connection_created.connect(
             configure_sqlite_connection,
-            dispatch_uid="v2_execution.configure_sqlite_connection",
+            dispatch_uid="execution.configure_sqlite_connection",
         )

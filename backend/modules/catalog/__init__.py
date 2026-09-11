@@ -1,1 +1,1 @@
-"""Immutable executable definitions for the V2 catalog."""
+"""Draft, revision and deployment lifecycle for product entities."""

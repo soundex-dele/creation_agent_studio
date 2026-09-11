@@ -81,7 +81,7 @@ class CreateConversationTest(TestCase):
         with TemporaryDirectory() as directory:
             selected = Path(directory) / 'selected'
             selected.mkdir()
-            with override_settings(APP_RUNNER_ALLOWED_ROOTS=[directory]):
+            with override_settings(APPLICATION_RUNTIME_ALLOWED_ROOTS=[directory]):
                 response = self.client.post(
                     '/api/conversations/',
                     {'working_directory': str(selected)},
@@ -94,7 +94,7 @@ class CreateConversationTest(TestCase):
 
     def test_create_rejects_a_system_directory_outside_allowed_roots(self):
         with TemporaryDirectory() as allowed, TemporaryDirectory() as outside:
-            with override_settings(APP_RUNNER_ALLOWED_ROOTS=[allowed]):
+            with override_settings(APPLICATION_RUNTIME_ALLOWED_ROOTS=[allowed]):
                 response = self.client.post(
                     '/api/conversations/',
                     {'working_directory': outside},

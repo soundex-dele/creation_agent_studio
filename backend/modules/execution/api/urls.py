@@ -14,11 +14,11 @@ from .views import (
 )
 
 
-app_name = "v2-execution"
+app_name = "execution"
 
 urlpatterns = [
     path(
-        "applications/<uuid:application_id>/runs",
+        "applications/<int:application_id>/runs",
         OrganizationApplicationRunsView.as_view(),
         name="application-runs",
     ),

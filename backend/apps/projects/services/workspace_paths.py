@@ -74,7 +74,7 @@ def validate_system_working_directory(raw_path: str) -> str:
     target = Path(raw_path).expanduser().resolve(strict=False)
     roots = [
         Path(root).expanduser().resolve(strict=False)
-        for root in settings.APP_RUNNER_ALLOWED_ROOTS
+        for root in settings.APPLICATION_RUNTIME_ALLOWED_ROOTS
     ]
     if not roots:
         raise ValueError('系统目录选择未启用。')

@@ -349,19 +349,21 @@ def dispatch_automation(trigger, user, payload=None):
             trace.output = execution.output_data or {}
             trace.error = execution.error_message
         elif trigger.target_type == 'application':
-            from django.conf import settings
             from apps.applications.models import Application
-            from apps.app_runner.job_manager import job_manager
-            from apps.app_runner.models import Job
+            from modules.execution.application.start_runs import start_application_run
             application = Application.objects.get(
                 id=trigger.target_id, organization=trigger.organization)
-            job = Job.objects.create(
-                app_slug=application.slug, organization=trigger.organization,
-                owner=user, config=payload)
-            if settings.APP_RUNNER_INLINE_EXECUTION:
-                job_manager.start(job)
+            run, _ = start_application_run(
+                organization_id=trigger.organization_id,
+                application_id=application.id,
+                actor=user,
+                environment='production',
+                input_data=payload,
+                priority=0,
+                idempotency_key=f'automation:{trigger.id}:{timezone.now().isoformat()}',
+            )
             trace.status = RunTrace.Status.QUEUED
-            trace.output = {'job_id': str(job.id)}
+            trace.output = {'run_id': str(run.id)}
         else:
             raise ValueError('Unsupported automation target type.')
     except Exception as exc:

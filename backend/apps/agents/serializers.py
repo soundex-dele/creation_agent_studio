@@ -3,8 +3,9 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from .models import (
-    Agent, AgentCategory, AgentDeployment, AgentExecution, AgentSkillBinding,
+    Agent, AgentCategory, AgentExecution, AgentSkillBinding,
 )
+from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 
 
 def _agent_permissions(agent, request):
@@ -103,10 +104,11 @@ class AgentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agent
         fields = [
-            'category', 'name', 'slug', 'description', 'icon', 'system_prompt',
+            'id', 'category', 'name', 'slug', 'description', 'icon', 'system_prompt',
             'model_config', 'tool_config', 'skill_config', 'knowledge_config',
             'guardrail_config', 'workflow_config', 'skill_ids', 'is_public',
         ]
+        read_only_fields = ['id']
 
     def validate_workflow_config(self, value):
         from .workflow import validate_workflow
@@ -140,6 +142,7 @@ class AgentWriteSerializer(serializers.ModelSerializer):
         skill_ids = validated_data.pop('skill_ids', [])
         agent = super().create(validated_data)
         self._replace_skills(agent, skill_ids)
+        self._sync_draft(agent)
         return agent
 
     @transaction.atomic
@@ -148,7 +151,36 @@ class AgentWriteSerializer(serializers.ModelSerializer):
         agent = super().update(instance, validated_data)
         if skill_ids is not None:
             self._replace_skills(agent, skill_ids)
+        self._sync_draft(agent)
         return agent
+
+    def _sync_draft(self, agent):
+        """Keep the one editable runtime draft beside the canonical Agent."""
+        if agent.organization_id is None:
+            return
+        content = {
+            'system_prompt': agent.system_prompt,
+            'model_config': agent.model_config,
+            'tool_config': agent.tool_config,
+            'skill_config': agent.skill_config,
+            'knowledge_config': agent.knowledge_config,
+            'guardrail_config': agent.guardrail_config,
+            'workflow_config': agent.workflow_config,
+        }
+        draft = AgentDraft.objects.filter(agent=agent).first()
+        actor = self.context['request'].user
+        if draft is None:
+            AgentDraft.objects.create(
+                organization=agent.organization,
+                agent=agent,
+                content=content,
+                updated_by=actor,
+            )
+            return
+        draft.content = content
+        draft.version += 1
+        draft.updated_by = actor
+        draft.save(update_fields=['content', 'version', 'updated_by', 'updated_at'])
 
     @staticmethod
     def _replace_skills(agent, skill_ids):
@@ -164,8 +196,21 @@ class AgentWriteSerializer(serializers.ModelSerializer):
 class AgentDeploymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentDeployment
-        fields = ['id', 'environment', 'config_overrides', 'deployed_by', 'deployed_at']
-        read_only_fields = ['id', 'deployed_by', 'deployed_at']
+        fields = [
+            'id', 'environment', 'revision_id', 'previous_revision_id',
+            'config_override', 'version', 'updated_by_id', 'updated_at',
+        ]
+        read_only_fields = fields
+
+
+class AgentRevisionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgentRevision
+        fields = [
+            'id', 'revision_no', 'schema_version', 'content', 'content_hash',
+            'release_notes', 'created_by_id', 'created_at',
+        ]
+        read_only_fields = fields
 
 
 class AgentExecutionSerializer(serializers.ModelSerializer):

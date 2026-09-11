@@ -5,6 +5,7 @@ import uuid
 
 from django.db import models
 from apps.users.models import User
+from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class ApplicationCategory(models.Model):
@@ -36,7 +37,7 @@ class Application(models.Model):
         related_name='applications'
     )
     name = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True, max_length=100)
+    slug = models.SlugField(max_length=100)
     description = models.TextField()
     icon = models.CharField(max_length=50, blank=True)
     # Accent color (hex, e.g. '#2e1a1a') used by the frontend thumbnail gradient.
@@ -46,6 +47,7 @@ class Application(models.Model):
     screenshots = models.JSONField(default=list, blank=True)
     usage_count = models.IntegerField(default=0)
     is_public = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(
         'enterprise.Organization', on_delete=models.CASCADE, null=True, blank=True,
@@ -61,9 +63,14 @@ class Application(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = TenantOwnedQuerySet.as_manager()
+
     class Meta:
         ordering = ['category__order', 'name']
         db_table = 'applications'
+        constraints = [models.UniqueConstraint(
+            fields=['organization', 'slug'],
+            name='unique_application_slug_per_org')]
 
     def __str__(self):
         return self.name
@@ -104,6 +111,8 @@ class Skill(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = TenantOwnedQuerySet.as_manager()
 
     class Meta:
         db_table = 'skills'

@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 
 
 class ProblemDetailsAPIView(APIView):
-    """Render DRF authentication and permission failures as V2 problems."""
+    """Render DRF authentication and permission failures as problem details."""
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)

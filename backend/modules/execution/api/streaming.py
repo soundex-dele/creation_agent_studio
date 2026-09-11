@@ -7,7 +7,7 @@ from channels.layers import get_channel_layer
 
 from modules.execution.api.serializers import RunEventSerializer
 from modules.execution.models import Run, RunEvent
-from modules.tenancy.models import Organization
+from apps.enterprise.models import Organization
 from modules.tenancy.database import tenant_database_context
 
 
@@ -54,9 +54,9 @@ async def stream_run_events(
 
     channel_layer = get_channel_layer()
     channel_name = None
-    group_name = f"v2-run-{run_id}"
+    group_name = f"run-{run_id}"
     if channel_layer is not None:
-        channel_name = await channel_layer.new_channel("v2-run-stream.")
+        channel_name = await channel_layer.new_channel("run-stream.")
         await channel_layer.group_add(group_name, channel_name)
 
     cursor = after

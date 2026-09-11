@@ -1,12 +1,6 @@
 /** Fetch-based SSE client for Codex-shaped agent turns. */
 import type { AgentProtocolEvent } from './agentProtocol';
-
-// Transitional aliases for extensions that still import the old public names.
-export type {
-  AgentOption as GraphFlowOption,
-  AgentQuestion as GraphFlowQuestion,
-  AgentToolCall as GraphFlowToolCall,
-} from './agentProtocol';
+import { API_BASE_URL } from './apiBaseUrl';
 
 export interface SSEDoneEvent {
   type: 'done';
@@ -35,8 +29,7 @@ export function streamChat(
 ): AbortController {
   const controller = new AbortController();
   const authToken = localStorage.getItem('token') || getStoredToken();
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const url = `${baseUrl}/conversations/${conversationId}/stream/`;
+  const url = `${API_BASE_URL}/conversations/${conversationId}/stream/`;
 
   fetch(url, {
     method: 'POST',
@@ -123,9 +116,8 @@ async function postAgentAction(
   body: Record<string, unknown>,
 ): Promise<void> {
   const authToken = localStorage.getItem('token') || getStoredToken();
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const response = await fetch(
-    `${baseUrl}/conversations/${conversationId}/${action}/`,
+    `${API_BASE_URL}/conversations/${conversationId}/${action}/`,
     {
       method: 'POST',
       headers: {

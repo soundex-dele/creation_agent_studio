@@ -1,4 +1,5 @@
 import type { RunEventEnvelope, RunEventSnapshotEnvelope } from '@/entities/run';
+import { API_BASE_URL } from './apiBaseUrl';
 
 export interface RunEventsPage {
   results: RunEventEnvelope[];
@@ -208,8 +209,8 @@ function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
 export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const controller = new AbortController();
   const fetchImpl = options.fetchImpl ?? fetch;
-  const baseUrl = options.baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? '';
-  const root = `${baseUrl}/v2/organizations/${options.organizationId}/runs/${options.runId}`;
+  const baseUrl = options.baseUrl ?? API_BASE_URL;
+  const root = `${baseUrl}/organizations/${options.organizationId}/runs/${options.runId}`;
   const authToken = options.authToken === undefined ? storedToken() : options.authToken;
   const headers = {
     Accept: 'text/event-stream',

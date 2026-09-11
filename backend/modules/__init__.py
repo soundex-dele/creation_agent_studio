@@ -1,1 +1,1 @@
-"""Creation Agent Studio V2 business modules."""
+"""Versioning and durable-execution modules for the product domain."""

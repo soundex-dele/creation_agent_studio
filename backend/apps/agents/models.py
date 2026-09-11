@@ -3,6 +3,7 @@ Models for agents app.
 """
 from django.db import models
 from apps.users.models import User
+from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class AgentCategory(models.Model):
@@ -29,11 +30,12 @@ class Agent(models.Model):
         related_name='agents'
     )
     name = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True, max_length=100)
+    slug = models.SlugField(max_length=100)
     description = models.TextField()
     icon = models.CharField(max_length=50, blank=True)
     system_prompt = models.TextField()
     is_public = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(
         'enterprise.Organization', on_delete=models.CASCADE, null=True, blank=True,
@@ -48,9 +50,13 @@ class Agent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = TenantOwnedQuerySet.as_manager()
+
     class Meta:
         ordering = ['category__order', 'name']
         db_table = 'agents'
+        constraints = [models.UniqueConstraint(
+            fields=['organization', 'slug'], name='unique_agent_slug_per_org')]
 
     def __str__(self):
         return self.name
@@ -80,25 +86,6 @@ class AgentExecution(models.Model):
 
     def __str__(self):
         return f'{self.agent.name} - {self.get_status_display()}'
-
-
-class AgentDeployment(models.Model):
-    class Environment(models.TextChoices):
-        DEVELOPMENT = 'development', 'Development'
-        STAGING = 'staging', 'Staging'
-        PRODUCTION = 'production', 'Production'
-
-    id = models.UUIDField(primary_key=True, default=__import__('uuid').uuid4, editable=False)
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='deployments')
-    environment = models.CharField(max_length=20, choices=Environment.choices)
-    config_overrides = models.JSONField(default=dict, blank=True)
-    deployed_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    deployed_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'agent_deployments'
-        constraints = [models.UniqueConstraint(
-            fields=['agent', 'environment'], name='unique_agent_environment')]
 
 
 class AgentSkillBinding(models.Model):

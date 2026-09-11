@@ -43,8 +43,12 @@ class ActiveChild:
     exited_at: float | None = None
 
 
-class SQLiteExecutionCoordinator:
-    """Own SQLite execution writes while adapters run in isolated children."""
+class ExecutionCoordinator:
+    """Run leased executions while adapters execute in isolated children.
+
+    SQLite uses one file-locked coordinator. PostgreSQL may run many instances;
+    row locking, skip-locked claiming and lease fencing provide coordination.
+    """
 
     def __init__(
         self,
@@ -85,7 +89,9 @@ class SQLiteExecutionCoordinator:
             "executor_key": claimed.run.executor_key,
             "definition_snapshot": claimed.run.definition_snapshot,
             "input": claimed.run.input,
-            "allowed_roots": list(getattr(settings, "APP_RUNNER_ALLOWED_ROOTS", [])),
+            "allowed_roots": list(
+                getattr(settings, "APPLICATION_RUNTIME_ALLOWED_ROOTS", [])
+            ),
             "checkpoint": (
                 {
                     "artifact_id": str(checkpoint.id),
@@ -122,7 +128,7 @@ class SQLiteExecutionCoordinator:
                 cancel_event,
                 self.adapter_entries[claimed.run.executor_key],
             ),
-            name=f"v2-{self.worker_pool}-{claimed.run.id}",
+            name=f"run-{self.worker_pool}-{claimed.run.id}",
         )
         process.start()
         self._active[claimed.attempt.id] = ActiveChild(
@@ -334,3 +340,8 @@ class SQLiteExecutionCoordinator:
                 active.process.join(timeout=1)
             active.messages.close()
             self._active.pop(attempt_id, None)
+
+
+# Compatibility import for callers written before the local/cluster paths were
+# unified. New code should use ExecutionCoordinator.
+SQLiteExecutionCoordinator = ExecutionCoordinator

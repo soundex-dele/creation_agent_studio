@@ -1,1 +1,1 @@
-"""HTTP API for the V2 catalog control plane."""
+"""HTTP API for the versioned catalog control plane."""

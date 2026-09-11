@@ -4,25 +4,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from apps.agents.models import Agent
+from apps.applications.models import Application, Skill
 from modules.tenancy.models import TenantOwnedModel
-
-
-class StableDefinition(TenantOwnedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="+",
-    )
-    name = models.CharField(max_length=160)
-    slug = models.SlugField(max_length=120)
-    description = models.TextField(blank=True, default="")
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
 
 
 class DefinitionDraft(TenantOwnedModel):
@@ -67,50 +51,28 @@ class ImmutableRevision(TenantOwnedModel):
         raise ValidationError("Published revisions are immutable")
 
 
-class Agent(StableDefinition):
-    class Meta:
-        db_table = "v2_agents"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("organization", "slug"),
-                name="v2_unique_agent_slug",
-            )
-        ]
-
-
 class AgentDraft(DefinitionDraft):
     agent = models.OneToOneField(Agent, on_delete=models.CASCADE, related_name="draft")
 
     class Meta:
-        db_table = "v2_agent_drafts"
+        db_table = "agent_drafts"
 
 
 class AgentRevision(ImmutableRevision):
     agent = models.ForeignKey(Agent, on_delete=models.PROTECT, related_name="revisions")
 
     class Meta:
-        db_table = "v2_agent_revisions"
+        db_table = "agent_revisions"
         ordering = ("agent_id", "revision_no")
         constraints = [
             models.UniqueConstraint(
                 fields=("agent", "revision_no"),
-                name="v2_unique_agent_revision_number",
+                name="unique_agent_revision_number",
             ),
             models.UniqueConstraint(
                 fields=("agent", "content_hash"),
-                name="v2_unique_agent_revision_content",
+                name="unique_agent_revision_content",
             ),
-        ]
-
-
-class Skill(StableDefinition):
-    class Meta:
-        db_table = "v2_skills"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("organization", "slug"),
-                name="v2_unique_skill_slug",
-            )
         ]
 
 
@@ -118,35 +80,24 @@ class SkillDraft(DefinitionDraft):
     skill = models.OneToOneField(Skill, on_delete=models.CASCADE, related_name="draft")
 
     class Meta:
-        db_table = "v2_skill_drafts"
+        db_table = "skill_drafts"
 
 
 class SkillRevision(ImmutableRevision):
     skill = models.ForeignKey(Skill, on_delete=models.PROTECT, related_name="revisions")
 
     class Meta:
-        db_table = "v2_skill_revisions"
+        db_table = "skill_revisions"
         ordering = ("skill_id", "revision_no")
         constraints = [
             models.UniqueConstraint(
                 fields=("skill", "revision_no"),
-                name="v2_unique_skill_revision_number",
+                name="unique_skill_revision_number",
             ),
             models.UniqueConstraint(
                 fields=("skill", "content_hash"),
-                name="v2_unique_skill_revision_content",
+                name="unique_skill_revision_content",
             ),
-        ]
-
-
-class Application(StableDefinition):
-    class Meta:
-        db_table = "v2_applications"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("organization", "slug"),
-                name="v2_unique_application_slug",
-            )
         ]
 
 
@@ -158,7 +109,7 @@ class ApplicationDraft(DefinitionDraft):
     )
 
     class Meta:
-        db_table = "v2_application_drafts"
+        db_table = "application_drafts"
 
 
 class ApplicationRevision(ImmutableRevision):
@@ -169,16 +120,16 @@ class ApplicationRevision(ImmutableRevision):
     )
 
     class Meta:
-        db_table = "v2_application_revisions"
+        db_table = "application_revisions"
         ordering = ("application_id", "revision_no")
         constraints = [
             models.UniqueConstraint(
                 fields=("application", "revision_no"),
-                name="v2_unique_application_revision_number",
+                name="unique_application_revision_number",
             ),
             models.UniqueConstraint(
                 fields=("application", "content_hash"),
-                name="v2_unique_application_revision_content",
+                name="unique_application_revision_content",
             ),
         ]
 
@@ -207,11 +158,11 @@ class AgentDeployment(TenantOwnedModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "v2_agent_deployments"
+        db_table = "agent_deployments"
         constraints = [
             models.UniqueConstraint(
                 fields=("agent", "environment"),
-                name="v2_unique_agent_deployment_environment",
+                name="unique_agent_deployment_environment",
             )
         ]
 
@@ -242,10 +193,10 @@ class ApplicationDeployment(TenantOwnedModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "v2_application_deployments"
+        db_table = "application_deployments"
         constraints = [
             models.UniqueConstraint(
                 fields=("application", "environment"),
-                name="v2_unique_application_deployment_environment",
+                name="unique_application_deployment_environment",
             )
         ]

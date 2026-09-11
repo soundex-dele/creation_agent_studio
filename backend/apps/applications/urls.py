@@ -10,6 +10,7 @@ from .runtime_skill_views import (
     RuntimeSkillCollectionView,
     RuntimeSkillDetailView,
 )
+from .runtime_files import list_runtime_directories, scan_runtime_folder
 
 router = DefaultRouter()
 router.register(r'categories', ApplicationCategoryViewSet, basename='application_category')
@@ -19,6 +20,10 @@ router.register(r'', ApplicationViewSet, basename='application')
 urlpatterns = [
     # Explicit path BEFORE the router include so it wins over /apps/<slug>/.
     path('image-generate/', generate_image),
+    path('runtime-files/list/', list_runtime_directories,
+         name='runtime-file-directory-list'),
+    path('runtime-files/scan/', scan_runtime_folder,
+         name='runtime-file-scan'),
     path('runtime-skills/', RuntimeSkillCollectionView.as_view(),
          name='runtime-skill-list'),
     path('runtime-skills/<str:provider>/<str:slug>/',

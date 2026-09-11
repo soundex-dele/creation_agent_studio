@@ -56,11 +56,10 @@ INSTALLED_APPS = [
     'apps.conversations',
     'apps.projects',
     'apps.marketplace',
-    'apps.app_runner',
     'apps.enterprise',
     'apps.workflows',
 
-    # V2 modules are built alongside V1 until the destructive cutover.
+    # Versioning, tenancy helpers and durable execution extend the product apps.
     'modules.tenancy.apps.TenancyConfig',
     'modules.catalog.apps.CatalogConfig',
     'modules.execution.apps.ExecutionConfig',
@@ -156,7 +155,10 @@ SQLITE_SYNCHRONOUS = config('SQLITE_SYNCHRONOUS', default='FULL')
 # selects only a key; it can never inject an arbitrary Python import path.
 EXECUTION_CHILD_ADAPTERS = config(
     'EXECUTION_CHILD_ADAPTERS',
-    default='{}',
+    default=(
+        '{"media":{"batch-transcribe":'
+        '"modules.execution.runtime.builtin:execute_batch_transcribe"}}'
+    ),
     cast=json.loads,
 )
 
@@ -392,12 +394,11 @@ AGENT_WORKSPACE_ROOT = Path(config(
     'AGENT_WORKSPACE_ROOT', default=str(BASE_DIR / 'agent_workspaces')))
 
 # Server-side applications may only browse and process paths below these roots.
-APP_RUNNER_ALLOWED_ROOTS = [
-    item.strip() for item in config('APP_RUNNER_ALLOWED_ROOTS', default='').split(',')
+APPLICATION_RUNTIME_ALLOWED_ROOTS = [
+    item.strip() for item in config(
+        'APPLICATION_RUNTIME_ALLOWED_ROOTS', default='').split(',')
     if item.strip()
 ]
-APP_RUNNER_INLINE_EXECUTION = config(
-    'APP_RUNNER_INLINE_EXECUTION', default=DEBUG, cast=bool)
 
 # Image Generation Configuration (OpenAI-compatible / DALL-E style)
 # Used by the AI 绘画 (image-genie) app. Leave IMAGE_API_KEY empty to disable.

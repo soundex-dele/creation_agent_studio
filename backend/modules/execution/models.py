@@ -42,7 +42,7 @@ class Run(TenantOwnedModel):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        related_name="v2_runs",
+        related_name="execution_runs",
     )
     executor_kind = models.CharField(
         max_length=20,
@@ -92,12 +92,12 @@ class Run(TenantOwnedModel):
     objects = RunQuerySet.as_manager()
 
     class Meta:
-        db_table = "v2_runs"
+        db_table = "runs"
         ordering = ("-priority", "created_at", "id")
         constraints = [
             models.CheckConstraint(
                 check=models.Q(max_attempts__gte=1),
-                name="v2_run_max_attempts_at_least_one",
+                name="run_max_attempts_at_least_one",
             ),
             models.CheckConstraint(
                 check=(
@@ -114,13 +114,13 @@ class Run(TenantOwnedModel):
                         & models.Q(pending_input_expires_at__isnull=True)
                     )
                 ),
-                name="v2_run_pending_input_consistent",
+                name="run_pending_input_consistent",
             ),
         ]
         indexes = [
             models.Index(
                 fields=("executor_kind", "status", "-priority", "created_at"),
-                name="v2_run_claim_idx",
+                name="run_claim_idx",
             )
         ]
 
@@ -157,17 +157,17 @@ class RunAttempt(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "v2_run_attempts"
+        db_table = "run_attempts"
         ordering = ("run_id", "attempt_no")
         constraints = [
             models.UniqueConstraint(
                 fields=("run", "attempt_no"),
-                name="v2_unique_run_attempt_number",
+                name="unique_run_attempt_number",
             ),
             models.UniqueConstraint(
                 fields=("run",),
                 condition=models.Q(finished_at__isnull=True),
-                name="v2_one_active_attempt_per_run",
+                name="one_active_attempt_per_run",
             ),
         ]
 
@@ -188,11 +188,11 @@ class RunLease(models.Model):
     released_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "v2_run_leases"
+        db_table = "run_leases"
         constraints = [
             models.UniqueConstraint(
                 fields=("attempt", "epoch"),
-                name="v2_unique_attempt_lease_epoch",
+                name="unique_attempt_lease_epoch",
             )
         ]
 
@@ -214,18 +214,18 @@ class RunEvent(TenantOwnedModel):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        db_table = "v2_run_events"
+        db_table = "run_events"
         ordering = ("run_id", "sequence")
         constraints = [
             models.UniqueConstraint(
                 fields=("run", "sequence"),
-                name="v2_unique_run_event_sequence",
+                name="unique_run_event_sequence",
             )
         ]
         indexes = [
             models.Index(
                 fields=("run", "sequence"),
-                name="v2_run_event_cursor_idx",
+                name="run_event_cursor_idx",
             )
         ]
 
@@ -246,11 +246,11 @@ class RunEventSnapshot(TenantOwnedModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "v2_run_event_snapshots"
+        db_table = "run_event_snapshots"
         constraints = [
             models.CheckConstraint(
                 check=models.Q(through_sequence__gte=1),
-                name="v2_run_snapshot_sequence_positive",
+                name="run_snapshot_sequence_positive",
             )
         ]
 
@@ -271,7 +271,7 @@ class RunCommand(TenantOwnedModel):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        related_name="v2_run_commands",
+        related_name="run_commands",
     )
     idempotency_key = models.CharField(max_length=160)
     request_fingerprint = models.CharField(max_length=64)
@@ -280,12 +280,12 @@ class RunCommand(TenantOwnedModel):
     consumed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "v2_run_commands"
+        db_table = "run_commands"
         ordering = ("created_at", "id")
         constraints = [
             models.UniqueConstraint(
                 fields=("organization", "created_by", "type", "idempotency_key"),
-                name="v2_unique_run_command_idempotency",
+                name="unique_run_command_idempotency",
             )
         ]
 
@@ -309,11 +309,11 @@ class RunArtifact(TenantOwnedModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "v2_run_artifacts"
+        db_table = "run_artifacts"
         constraints = [
             models.UniqueConstraint(
                 fields=("run", "object_key", "content_hash"),
-                name="v2_unique_run_artifact_content",
+                name="unique_run_artifact_content",
             )
         ]
 
@@ -328,7 +328,7 @@ class IdempotencyRecord(TenantOwnedModel):
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="v2_idempotency_records",
+        related_name="idempotency_records",
     )
     operation = models.CharField(max_length=160)
     key = models.CharField(max_length=160)
@@ -344,10 +344,10 @@ class IdempotencyRecord(TenantOwnedModel):
     expires_at = models.DateTimeField(db_index=True)
 
     class Meta:
-        db_table = "v2_idempotency_records"
+        db_table = "idempotency_records"
         constraints = [
             models.UniqueConstraint(
                 fields=("organization", "actor", "operation", "key"),
-                name="v2_unique_idempotency_scope",
+                name="unique_idempotency_scope",
             )
         ]

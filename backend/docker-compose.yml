@@ -8,7 +8,6 @@ services:
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
-      APP_RUNNER_INLINE_EXECUTION: "False"
       DB_HOST: postgres
       REDIS_HOST: redis
     ports:
@@ -24,14 +23,13 @@ services:
       timeout: 5s
       retries: 5
 
-  worker:
+  execution-worker:
     build: .
     restart: unless-stopped
-    command: python manage.py run_job_worker
+    command: python manage.py run_execution_coordinator --worker-pool ${EXECUTION_WORKER_POOL:-media}
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
-      APP_RUNNER_INLINE_EXECUTION: "False"
       DB_HOST: postgres
       REDIS_HOST: redis
     depends_on:
@@ -47,7 +45,6 @@ services:
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
-      APP_RUNNER_INLINE_EXECUTION: "False"
       DB_HOST: postgres
       REDIS_HOST: redis
     depends_on:

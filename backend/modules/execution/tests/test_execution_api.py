@@ -29,13 +29,14 @@ from modules.execution.application.event_retention import compact_run_events
 from modules.execution.application.runs import append_event_and_transition
 from modules.execution.models import IdempotencyRecord, Run, RunArtifact
 from modules.tenancy.models import Membership, Organization
+from apps.applications.models import ApplicationCategory
 
 
 @pytest.fixture
 def api_actor(db):
     return get_user_model().objects.create_user(
-        username="v2-api-owner",
-        email="v2-api-owner@example.com",
+        username="execution-api-owner",
+        email="execution-api-owner@example.com",
         password="test-password",
     )
 
@@ -43,8 +44,8 @@ def api_actor(db):
 @pytest.fixture
 def api_organization(api_actor):
     organization = Organization.objects.create(
-        name="V2 API Organization",
-        slug="v2-api-organization",
+        name="Execution API Organization",
+        slug="execution-api-organization",
         owner=api_actor,
     )
     Membership.objects.create(
@@ -77,11 +78,16 @@ def authenticated_client(api_actor):
 
 @pytest.fixture
 def deployed_application(api_actor, api_organization):
+    category, _ = ApplicationCategory.objects.get_or_create(
+        slug="execution-tests", defaults={"name": "Execution Tests"}
+    )
     application = Application.objects.create(
         organization=api_organization,
-        owner=api_actor,
-        name="Batch Transcribe V2",
-        slug="batch-transcribe-v2",
+        created_by=api_actor,
+        category=category,
+        name="Batch Transcribe",
+        slug="batch-transcribe-runtime",
+        description="Batch transcription application",
     )
     content = {
         "executor_kind": "media",
@@ -107,7 +113,7 @@ def deployed_application(api_actor, api_organization):
 
 
 def _run_url(organization, run, suffix=""):
-    return f"/api/v2/organizations/{organization.id}/runs/{run.id}{suffix}"
+    return f"/api/organizations/{organization.id}/runs/{run.id}{suffix}"
 
 
 @pytest.fixture
@@ -256,7 +262,7 @@ def test_compacted_event_cursor_returns_snapshot_recovery_contract(
 
 @pytest.mark.django_db
 def test_run_detail_rejects_non_member(api_organization, api_run):
-    outsider = get_user_model().objects.create_user(username="v2-api-outsider")
+    outsider = get_user_model().objects.create_user(username="execution-api-outsider")
     client = APIClient()
     client.force_authenticate(outsider)
 
@@ -481,7 +487,7 @@ def test_start_application_run_pins_deployed_revision_and_replays(
     authenticated_client, api_actor, api_organization, deployed_application
 ):
     url = (
-        f"/api/v2/organizations/{api_organization.id}/applications/"
+        f"/api/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
     body = {"environment": "production", "input": {"files": ["one.mp4"]}}
@@ -519,7 +525,7 @@ def test_start_application_run_rejects_changed_idempotent_request(
     authenticated_client, api_organization, deployed_application
 ):
     url = (
-        f"/api/v2/organizations/{api_organization.id}/applications/"
+        f"/api/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
     headers = {"HTTP_IDEMPOTENCY_KEY": "start-reused"}
@@ -547,7 +553,7 @@ def test_start_application_run_requires_idempotency_key(
     authenticated_client, api_organization, deployed_application
 ):
     url = (
-        f"/api/v2/organizations/{api_organization.id}/applications/"
+        f"/api/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
 
@@ -561,7 +567,7 @@ def test_start_application_run_requires_idempotency_key(
 def test_viewer_cannot_start_or_cancel_runs(
     api_organization, deployed_application, api_run
 ):
-    viewer = get_user_model().objects.create_user(username="v2-api-viewer")
+    viewer = get_user_model().objects.create_user(username="execution-api-viewer")
     Membership.objects.create(
         organization=api_organization,
         user=viewer,
@@ -570,7 +576,7 @@ def test_viewer_cannot_start_or_cancel_runs(
     client = APIClient()
     client.force_authenticate(viewer)
     start_url = (
-        f"/api/v2/organizations/{api_organization.id}/applications/"
+        f"/api/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
 

@@ -47,11 +47,11 @@ const ApplicationRuntime: React.FC<Props> = ({ application: runtime, projectId, 
         </div>
       );
   }
-  if (runtime.organization_id && runtime.v2_application_id) {
+  if (runtime.organization_id) {
     return (
       <ApplicationRuntimeProvider
         organizationId={runtime.organization_id}
-        applicationId={runtime.v2_application_id}
+        applicationId={String(runtime.application_id)}
         environment={runtime.environment}
       >
         {content}

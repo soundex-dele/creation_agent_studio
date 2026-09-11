@@ -29,5 +29,5 @@ export const api = {
 
   // User APIs
   getUser: () =>
-    axiosInstance.get('/user'),
+    axiosInstance.get('/auth/me/'),
 }

@@ -1,1 +1,1 @@
-"""Tenant ownership and membership for the V2 API."""
+"""Shared tenant query and database-isolation helpers."""

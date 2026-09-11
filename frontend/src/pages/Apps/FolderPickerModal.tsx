@@ -28,7 +28,7 @@ interface Props {
 
 /**
  * Server-side folder browser. The browser can't read real filesystem paths, so
- * we navigate the backend's (= localhost) filesystem via /app-runner/fs/list/
+ * we navigate the configured application runtime roots through the backend
  * and hand the picked real absolute path back to the caller.
  *
  * Click a row to descend; "选择此文件夹" confirms the folder currently in view.
@@ -41,7 +41,7 @@ const FolderPickerModal: React.FC<Props> = ({ open, onClose, onSelect }) => {
   const load = useCallback(async (p: string) => {
     setLoading(true);
     try {
-      const resp = await api.get<ListResp>('/app-runner/fs/list/', { path: p });
+      const resp = await api.get<ListResp>('/apps/runtime-files/list/', { path: p });
       setData(resp);
       setJump(resp.path);
     } catch (e: any) {

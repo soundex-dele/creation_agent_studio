@@ -54,17 +54,16 @@ urlpatterns += [
     path('api/agent/v2/', include('apps.conversations.agent_urls')),
     path('api/projects/', include('apps.projects.urls')),
     path('api/marketplace/', include('apps.marketplace.urls')),
-    path('api/app-runner/', include('apps.app_runner.urls')),
     path('api/enterprise/', include('apps.enterprise.urls')),
     path('api/workflows/', include('apps.workflows.urls')),
 
-    # V2 is intentionally namespaced by an explicit organization boundary.
+    # Versioned definitions and durable Runs share the canonical organization.
     path(
-        'api/v2/organizations/<uuid:organization_id>/',
+        'api/organizations/<uuid:organization_id>/',
         include('modules.catalog.api.urls'),
     ),
     path(
-        'api/v2/organizations/<uuid:organization_id>/',
+        'api/organizations/<uuid:organization_id>/',
         include('modules.execution.api.urls'),
     ),
 ]

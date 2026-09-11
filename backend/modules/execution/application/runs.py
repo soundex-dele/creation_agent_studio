@@ -56,7 +56,7 @@ def _publish_event_notification(run_id, sequence):
         return
     try:
         async_to_sync(layer.group_send)(
-            f"v2-run-{run_id}",
+            f"run-{run_id}",
             {
                 "type": "run.event.available",
                 "run_id": str(run_id),

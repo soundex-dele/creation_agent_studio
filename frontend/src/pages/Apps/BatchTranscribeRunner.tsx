@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Input, Select, Progress, Table, Spin, Result } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Input, Select, Progress, Table, Spin, Result, message } from 'antd';
 import { ArrowLeftOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
-import { useJob } from '@/hooks/useJob';
+import { useRunStream } from '@/hooks/useRunStream';
 import { api } from '@/services/api';
 import type { AppItem } from '@/types';
+import { useApplicationRuntime } from '@/components/Applications/ApplicationRuntimeContext';
 import FolderPickerModal from './FolderPickerModal';
 import './BatchTranscribeRunner.css';
 
@@ -19,7 +20,12 @@ interface BatchTranscribeRunnerProps {
 const BatchTranscribeRunner: React.FC<BatchTranscribeRunnerProps> = ({ application, embedded }) => {
   const navigate = useNavigate();
   const { loadApp } = useAppStore();
-  const { state, start, stop } = useJob(SLUG);
+  const runtime = useApplicationRuntime();
+  const [runId, setRunId] = useState<string | null>(null);
+  const projection = useRunStream({
+    organizationId: runtime.organizationId,
+    runId,
+  });
 
   const [app, setApp] = useState<AppItem | null>(application ?? null);
   const [loadingApp, setLoadingApp] = useState(!application);
@@ -42,7 +48,7 @@ const BatchTranscribeRunner: React.FC<BatchTranscribeRunnerProps> = ({ applicati
   const scan = async (p: string = folder) => {
     const target = p.trim();
     if (!target) return;
-    const data = await api.post<{ videos: { name: string }[] }>('/app-runner/fs/scan/', { path: target });
+    const data = await api.post<{ videos: { name: string }[] }>('/apps/runtime-files/scan/', { path: target });
     setVideos(data.videos);
   };
 
@@ -54,8 +60,24 @@ const BatchTranscribeRunner: React.FC<BatchTranscribeRunnerProps> = ({ applicati
     </div>
   );
 
-  const isRunning = state.status === 'running';
-  const pct = state.progress.total ? Math.round((state.progress.current / state.progress.total) * 100) : 0;
+  const status = projection.state.status ?? (runId ? 'queued' : 'idle');
+  const isRunning = Boolean(
+    runId && ['queued', 'running', 'cancelling'].includes(status),
+  );
+  const progressCurrent = Number(projection.state.progress?.current ?? 0);
+  const progressTotal = Number(projection.state.progress?.total ?? 0);
+  const pct = progressTotal > 0
+    ? Math.min(100, Math.round((progressCurrent / progressTotal) * 100))
+    : 0;
+  const items = useMemo(() => Object.entries(projection.state.tools).map(([id, tool]) => ({
+    id,
+    name: String(tool.name ?? id),
+    status: tool.event_type === 'tool.completed'
+      ? 'done'
+      : tool.event_type === 'tool.failed' ? 'error' : 'running',
+    result: String(tool.result ?? ''),
+    error: String(tool.error ?? ''),
+  })), [projection.state.tools]);
 
   return (
     <div className="bt-runner animate-fade-in">
@@ -86,26 +108,43 @@ const BatchTranscribeRunner: React.FC<BatchTranscribeRunnerProps> = ({ applicati
             onClick={async () => {
               setSubmitting(true);
               try {
-                await start({ folder: folder.trim(), model, language });
+                const run = await runtime.startRun(
+                  { folder: folder.trim(), model, language },
+                  crypto.randomUUID(),
+                );
+                setRunId(run.id);
+              } catch (error) {
+                message.error(error instanceof Error ? error.message : '启动转录失败');
               } finally {
                 setSubmitting(false);
               }
             }}>
             开始转录
           </Button>
-          <Button danger disabled={!isRunning} onClick={stop}>停止</Button>
+          <Button danger disabled={!isRunning || !runId} onClick={async () => {
+            if (!runId) return;
+            try {
+              await runtime.sendCommand(runId, {
+                type: 'cancel',
+                idempotency_key: crypto.randomUUID(),
+                payload: { reason: 'user_requested' },
+              });
+            } catch (error) {
+              message.error(error instanceof Error ? error.message : '停止转录失败');
+            }
+          }}>停止</Button>
         </div>
         {videos.length > 0 && <div className="bt-runner-hint">找到 {videos.length} 个视频文件</div>}
       </div>
 
       <div className="bt-runner-progress">
-        <Progress percent={pct} status={state.status === 'error' ? 'exception' : isRunning ? 'active' : 'normal'} />
-        <span className="bt-runner-status">{state.status}</span>
+        <Progress percent={pct} status={status === 'failed' ? 'exception' : isRunning ? 'active' : 'normal'} />
+        <span className="bt-runner-status">{status}</span>
       </div>
 
       <Table
         size="small" rowKey="id" pagination={false}
-        dataSource={state.items}
+        dataSource={items}
         columns={[
           { title: '文件名', dataIndex: 'name' },
           { title: '状态', dataIndex: 'status', width: 100 },
@@ -115,7 +154,9 @@ const BatchTranscribeRunner: React.FC<BatchTranscribeRunnerProps> = ({ applicati
       />
 
       <div className="bt-runner-log">
-        {state.logs.map((l, i) => (<div key={i} className={`bt-runner-log-line lvl-${l.level}`}>{l.msg}</div>))}
+        {projection.state.output.split('\n').filter(Boolean).map((line, index) => (
+          <div key={index} className="bt-runner-log-line lvl-info">{line}</div>
+        ))}
       </div>
 
       <FolderPickerModal

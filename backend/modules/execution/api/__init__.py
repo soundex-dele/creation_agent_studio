@@ -1,1 +1,1 @@
-"""HTTP adapters for the V2 execution module."""
+"""HTTP adapters for the durable execution module."""
