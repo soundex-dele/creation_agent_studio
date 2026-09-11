@@ -1,6 +1,7 @@
 """
 Base settings for Creation Agent Studio backend.
 """
+import json
 from pathlib import Path
 from decouple import config
 
@@ -14,6 +15,13 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production'
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+
+DATABASE_ENGINE = config('DATABASE_ENGINE', default='postgresql').strip().lower()
+REDIS_ENABLED = config(
+    'REDIS_ENABLED',
+    default=DATABASE_ENGINE in {'postgres', 'postgresql'},
+    cast=bool,
+)
 
 # Application definition
 INSTALLED_APPS = [
@@ -51,6 +59,11 @@ INSTALLED_APPS = [
     'apps.app_runner',
     'apps.enterprise',
     'apps.workflows',
+
+    # V2 modules are built alongside V1 until the destructive cutover.
+    'modules.tenancy.apps.TenancyConfig',
+    'modules.catalog.apps.CatalogConfig',
+    'modules.execution.apps.ExecutionConfig',
 ]
 
 MIDDLEWARE = [
@@ -61,6 +74,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'modules.tenancy.middleware.TenantDatabaseContextMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -90,39 +104,93 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 ASGI_APPLICATION = 'backend.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [(config('REDIS_HOST', default='localhost'),
-                       int(config('REDIS_PORT', default='6379')))],
+if REDIS_ENABLED:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [(config('REDIS_HOST', default='localhost'),
+                           int(config('REDIS_PORT', default='6379')))],
+            },
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='creation_studio'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-}
-
-# Cache (Redis)
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': f"redis://{config('REDIS_HOST', default='localhost')}:{config('REDIS_PORT', default='6379')}/1",
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+if DATABASE_ENGINE in {'sqlite', 'sqlite3'}:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': Path(config('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3'))),
+            'OPTIONS': {
+                'timeout': config('SQLITE_BUSY_TIMEOUT_SECONDS', default=5, cast=int),
+            },
         }
     }
-}
+elif DATABASE_ENGINE in {'postgres', 'postgresql'}:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='creation_studio'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default='postgres'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
+else:
+    raise ValueError(
+        f'Unsupported DATABASE_ENGINE={DATABASE_ENGINE!r}; expected sqlite or postgresql')
+
+SQLITE_BUSY_TIMEOUT_MS = config(
+    'SQLITE_BUSY_TIMEOUT_MS', default=5000, cast=int)
+SQLITE_SYNCHRONOUS = config('SQLITE_SYNCHRONOUS', default='FULL')
+
+# Server-controlled executor key -> child entrypoint registry. Revision content
+# selects only a key; it can never inject an arbitrary Python import path.
+EXECUTION_CHILD_ADAPTERS = config(
+    'EXECUTION_CHILD_ADAPTERS',
+    default='{}',
+    cast=json.loads,
+)
+
+RUN_EVENT_RETENTION_DAYS = config(
+    'RUN_EVENT_RETENTION_DAYS', default=30, cast=int)
+RUN_EVENT_COMPACTION_BATCH_SIZE = config(
+    'RUN_EVENT_COMPACTION_BATCH_SIZE', default=500, cast=int)
+
+ARTIFACT_ROOT = Path(config(
+    'ARTIFACT_ROOT', default=str(BASE_DIR / 'artifacts')))
+ARTIFACT_ACCESS_TTL_SECONDS = config(
+    'ARTIFACT_ACCESS_TTL_SECONDS', default=300, cast=int)
+ARTIFACT_ACCESS_URL_FACTORY = config(
+    'ARTIFACT_ACCESS_URL_FACTORY', default='')
+
+# Cache and event notifications. SQLite Local defaults to in-process adapters;
+# database polling remains the execution/event delivery fallback.
+if REDIS_ENABLED:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': f"redis://{config('REDIS_HOST', default='localhost')}:{config('REDIS_PORT', default='6379')}/1",
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            }
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'creation-agent-studio-local',
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

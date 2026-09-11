@@ -16,6 +16,7 @@ import AppsPage from '@/pages/Apps/AppsPage';
 import AppDetailPage from '@/pages/Apps/AppDetailPage';
 import ChatApplicationEditPage from '@/pages/Apps/ChatApplicationEditPage';
 import ApplicationRuntimePage from '@/pages/Apps/ApplicationRuntimePage';
+import V2ApplicationRuntimePage from '@/pages/Apps/V2ApplicationRuntimePage';
 import WorkspacePage from '@/pages/Workspace/WorkspacePage';
 import WorkflowsPage from '@/pages/Workflows/WorkflowsPage';
 import WorkflowEditorPage from '@/pages/Workflows/WorkflowEditorPage';
@@ -111,6 +112,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <MainLayout hideSidebar hideHeader>
           <ApplicationRuntimePage />
+        </MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/v2/applications/:applicationId/run',
+    element: (
+      <ProtectedRoute>
+        <MainLayout hideSidebar>
+          <V2ApplicationRuntimePage />
         </MainLayout>
       </ProtectedRoute>
     ),

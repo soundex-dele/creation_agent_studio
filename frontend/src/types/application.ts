@@ -65,6 +65,9 @@ export interface ChatApplicationProfile {
 export interface ApplicationRuntime {
   id: number;
   application_id: number;
+  organization_id?: string;
+  v2_application_id?: string;
+  environment?: 'development' | 'staging' | 'production';
   application_slug: string;
   application_name: string;
   application_description: string;

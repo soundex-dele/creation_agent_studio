@@ -2,7 +2,7 @@
 
 > 一个 AI 驱动的内容/视频创作平台：用智能体（Agent）+ 创作模板（Template）把「文案、脚本、排版、配乐、直播话术、数据分析」等创作流程串联起来，并通过对话（Conversation）与 LLM 实时协作。
 
-> V2 前后端架构重设计见 [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md)。该方案采用模块化单体、独立执行 Worker 与统一 Run Event 协议，并包含渐进迁移计划和验收标准。
+> V2 前后端架构重设计见 [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md)。该方案采用模块化单体、不可变 Revision 与统一 Run Event 协议，支持 SQLite 单机模式和 PostgreSQL 集群模式，并按破坏性重建方式整体切换。
 >
 > “一个应用一个界面”、聊天应用问题库、Agent/Skill 引用和多应用工作流设计见 [docs/APPLICATION_AND_WORKFLOW_V2.md](docs/APPLICATION_AND_WORKFLOW_V2.md)。
 
@@ -51,7 +51,7 @@
 | Web 框架 | Django 5.0.1 |
 | REST API | Django REST Framework 3.14 |
 | 鉴权 | djangorestframework-simplejwt、dj-rest-auth、django-allauth |
-| 数据库 | PostgreSQL 14（开发可回退 SQLite） |
+| 数据库 | SQLite（Local Profile）/ PostgreSQL 14（Cluster Profile） |
 | 缓存 | Redis 7（django-redis） |
 | API 文档 | drf-yasg（Swagger / ReDoc） |
 | 过滤 | django-filter、DRF Search/Ordering |
@@ -144,7 +144,7 @@ cd backend
 docker compose up -d          # 启动 postgres:14 与 redis:7
 ```
 
-> 💡 不想用 Docker？开发环境默认会回退到 SQLite（见 [settings/development.py](backend/backend/settings/development.py)），可跳过数据库与 Redis 直接跑。
+> 💡 不想用 Docker？SQLite 是正式支持的 Local Profile，可跳过数据库与 Redis。复制 `.env.example` 后将 `DATABASE_ENGINE=sqlite`、`REDIS_ENABLED=False`。
 
 ### 2. 启动后端
 
@@ -161,6 +161,13 @@ cp .env.example .env             # 按需修改（见「环境变量」）
 python manage.py migrate
 python manage.py seed_mock_data  # 灌入演示数据（分类/智能体/模板/示例对话）
 python manage.py runserver 0.0.0.0:8080
+```
+
+SQLite Local 的执行平面在另一个终端启动。Coordinator 会取得数据库旁的独占锁，并将服务端注册的 Adapter 放入受控子进程；未在 `EXECUTION_CHILD_ADAPTERS` 注册的 `executor_key` 不会被领取：
+
+```bash
+cd backend
+python manage.py run_execution_coordinator --worker-pool media
 ```
 
 后端默认监听 **8080** 端口（与前端 Vite 代理一致）。打开 `http://localhost:8080/swagger/` 查看 API 文档。
@@ -195,7 +202,14 @@ SECRET_KEY=replace-with-at-least-50-random-characters
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
-# 数据库（base 配置使用 PostgreSQL；development 默认回退 SQLite）
+# 数据库 Profile；Local 使用 sqlite，Cluster 使用 postgresql
+DATABASE_ENGINE=sqlite
+SQLITE_PATH=./db.sqlite3
+SQLITE_BUSY_TIMEOUT_SECONDS=5
+SQLITE_BUSY_TIMEOUT_MS=5000
+SQLITE_SYNCHRONOUS=FULL
+
+# PostgreSQL Cluster（DATABASE_ENGINE=postgresql 时使用）
 DB_NAME=creation_studio
 DB_USER=postgres
 DB_PASSWORD=postgres
@@ -205,7 +219,8 @@ DB_PORT=5432
 # 演示数据密码；留空时 seed_mock_data 自动生成随机值
 DEMO_USER_PASSWORD=
 
-# Redis
+# Redis；SQLite Local 可设为 False，事件流仍会从数据库补拉
+REDIS_ENABLED=False
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
@@ -260,6 +275,41 @@ VITE_API_BASE_URL=/api        # 走 Vite 代理；生产构建时改为后端真
 ## API 概览
 
 所有接口前缀 `/api/`，除标注外均需 `Authorization: Bearer <JWT>`。完整交互文档见 `/swagger/` 与 `/redoc/`。
+
+### V2 Catalog 与 Execution `/api/v2/organizations/{organization_id}/`
+
+- `GET|POST applications` — 游标分页查询应用或原子创建 Application + Draft。
+- `GET|PUT applications/{application_id}/draft` — 读取或按 `expected_version` 覆盖更新 Draft。
+- `GET|POST applications/{application_id}/revisions` — 查询 Revision 或按 Draft 版本发布；相同内容发布幂等。
+- `GET applications/{application_id}/runtime?environment=production` — 解析 Deployment 并返回固定 Revision 运行描述。
+- `GET|PUT applications/{application_id}/deployments/{environment}` — 查询、创建或按版本切换 Deployment。
+- `POST applications/{application_id}/deployments/{environment}/rollback` — 原子交换当前和上一 Revision。
+- `POST applications/{application_id}/runs` — 从指定环境的 Deployment 创建固定 Revision 的 Run；必须提供 `Idempotency-Key`。
+- `GET runs/{run_id}` — 查询 Run 当前投影。
+- `GET runs/{run_id}/events?after={sequence}&limit=100` — 按 sequence 断点重放事件。
+- `GET runs/{run_id}/stream` — 可恢复 SSE；支持 `Last-Event-ID`。
+- `GET runs/{run_id}/attempts`、`GET runs/{run_id}/artifacts` — 查询执行尝试和产物。
+- `GET runs/{run_id}/artifacts/{artifact_id}/access` — 获取短期 Artifact 访问 URL；列表不返回 object key。
+- `GET runs/{run_id}/snapshot` — 读取事件压缩后的客户端恢复投影。
+- `POST runs/{run_id}/commands` — 提交 `cancel | answer | grant_permission | deny_permission` 持久化命令。
+
+Catalog 写操作要求 Developer；生产 Deployment 的切换与回滚要求 Admin。Draft 和 Deployment
+都采用乐观版本，冲突返回 `409`。Draft 可暂存不完整内容，但发布时必须通过 Application
+definition schema v1 校验。
+
+终态 Run 的历史事件可通过以下命令按保留期分批压缩。客户端使用过旧 cursor 时收到
+`410 event_history_compacted`，应加载响应中的 snapshot URL 后从 `resume_after` 续流：
+
+```powershell
+.\venv\Scripts\python.exe manage.py compact_run_events --before-days 30 --batch-size 500
+```
+
+PostgreSQL migration 会为全部 V2 租户表启用 RLS。生产环境应使用不具备 `BYPASSRLS` 的 API
+数据库角色；跨租户领取 Run 的 Cluster Worker 使用独立且具备 `BYPASSRLS` 的受控角色。
+
+前端通用 V2 运行台位于 `/v2/applications/{application_id}/run`。它只通过
+`ApplicationRuntimeProvider` 暴露的 start/subscribe/command/artifact 能力运行应用，支持 SSE
+断线重连、缺口补拉和事件压缩 snapshot 恢复；不会调用旧 App Runner 或转录实现。
 
 ### 认证 `/api/auth/`
 

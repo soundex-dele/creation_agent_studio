@@ -31,8 +31,10 @@ venv/
 # Django runtime data
 *.sqlite3
 *.sqlite3-journal
+*.coordinator.lock
 staticfiles/
 media/
+artifacts/
 agent_workspaces/
 logs/
 *.log

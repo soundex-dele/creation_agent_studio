@@ -25,21 +25,39 @@ INTERNAL_IPS = [
     'localhost',
 ]
 
-# Database (use SQLite for quick development if needed)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# SQLite is the supported default Local profile. Set DATABASE_ENGINE=postgresql
+# to exercise the Cluster profile with the base settings values.
+DATABASE_ENGINE = config('DATABASE_ENGINE', default='sqlite').strip().lower()
+REDIS_ENABLED = config(
+    'REDIS_ENABLED',
+    default=DATABASE_ENGINE in {'postgres', 'postgresql'},
+    cast=bool,
+)
+if DATABASE_ENGINE in {'sqlite', 'sqlite3'}:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': Path(config('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3'))),
+            'OPTIONS': {
+                'timeout': config('SQLITE_BUSY_TIMEOUT_SECONDS', default=5, cast=int),
+            },
+        }
     }
-}
 
-# Development and tests are self-contained; production uses Redis from base.py.
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'creation-agent-studio-development',
+if not REDIS_ENABLED:
+    # SQLite Local and tests are self-contained; DB polling is the cross-process
+    # event fallback when no shared Redis channel layer exists.
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'creation-agent-studio-development',
+        }
     }
-}
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 # More verbose logging
 LOGGING['root']['level'] = 'DEBUG'

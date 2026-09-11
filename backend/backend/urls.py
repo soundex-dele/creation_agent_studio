@@ -57,6 +57,16 @@ urlpatterns += [
     path('api/app-runner/', include('apps.app_runner.urls')),
     path('api/enterprise/', include('apps.enterprise.urls')),
     path('api/workflows/', include('apps.workflows.urls')),
+
+    # V2 is intentionally namespaced by an explicit organization boundary.
+    path(
+        'api/v2/organizations/<uuid:organization_id>/',
+        include('modules.catalog.api.urls'),
+    ),
+    path(
+        'api/v2/organizations/<uuid:organization_id>/',
+        include('modules.execution.api.urls'),
+    ),
 ]
 
 # Serve media files in development

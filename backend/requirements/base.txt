@@ -3,7 +3,7 @@ djangorestframework==3.14.0
 django-cors-headers==4.3.1
 dj-rest-auth==5.0.2
 django-allauth==0.61.1
-psycopg2-binary==2.9.9
+psycopg[binary]==3.2.10
 redis==5.0.1
 python-decouple==3.8
 drf-yasg==1.21.7
@@ -14,3 +14,4 @@ pydantic==2.13.4
 channels==4.1.0
 daphne==4.1.2
 channels_redis==4.2.1
+django-filter==23.5
