@@ -21,10 +21,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     def get_conversation_id(self, obj):
         # Standalone application history must identify the exact conversation
         # it opens. Workflow-step conversations are restored through their run.
-        conversation = next((
-            item for item in obj.conversations.all()
-            if item.workflow_step_run_id is None
-        ), None)
+        conversation = next(iter(obj.conversations.all()), None)
         return conversation.id if conversation else None
 
     def get_source(self, obj):

@@ -71,10 +71,10 @@ def enforce_quota(organization):
         created_at__year=now.year,
         created_at__month=now.month,
     ).aggregate(tokens=Sum('total_tokens'), cost=Sum('cost'))
-    running = RunTrace.objects.filter(
-        organization=organization,
-        status__in=[RunTrace.Status.QUEUED, RunTrace.Status.RUNNING,
-                    RunTrace.Status.WAITING],
+    from modules.execution.models import Run
+    running = Run.objects.for_organization(organization.id).filter(
+        status__in=[Run.Status.QUEUED, Run.Status.RUNNING,
+                    Run.Status.WAITING_INPUT, Run.Status.CANCELLING],
     ).count()
     if quota.hard_limit and (totals['tokens'] or 0) >= quota.monthly_token_limit:
         raise Throttled(detail='Monthly token quota exceeded.')
@@ -329,9 +329,11 @@ def enforce_skill_policy(organization, skills):
     return skills
 
 
-def dispatch_automation(trigger, user, payload=None):
+def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
     from .models import RunTrace
     payload = payload or {}
+    occurrence = scheduled_for or timezone.now()
+    occurrence_key = occurrence.replace(second=0, microsecond=0).isoformat()
     trace = RunTrace.objects.create(
         organization=trigger.organization, user=user, kind='automation',
         resource_id=str(trigger.id), status=RunTrace.Status.RUNNING,
@@ -339,15 +341,19 @@ def dispatch_automation(trigger, user, payload=None):
     try:
         if trigger.target_type == 'agent':
             from apps.agents.models import Agent
-            from apps.agents.services.agent_service import AgentService
+            from modules.execution.application.start_runs import start_agent_run
             agent = Agent.objects.get(id=trigger.target_id,
                                       organization=trigger.organization)
-            execution = AgentService.execute(agent, user, payload)
-            trace.status = (RunTrace.Status.SUCCEEDED
-                            if execution.status == 'completed'
-                            else RunTrace.Status.FAILED)
-            trace.output = execution.output_data or {}
-            trace.error = execution.error_message
+            run, _ = start_agent_run(
+                organization_id=trigger.organization_id,
+                agent_id=agent.id,
+                actor=user,
+                environment='production',
+                input_data=payload,
+                idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
+            )
+            trace.status = RunTrace.Status.QUEUED
+            trace.output = {'run_id': str(run.id)}
         elif trigger.target_type == 'application':
             from apps.applications.models import Application
             from modules.execution.application.start_runs import start_application_run
@@ -360,7 +366,7 @@ def dispatch_automation(trigger, user, payload=None):
                 environment='production',
                 input_data=payload,
                 priority=0,
-                idempotency_key=f'automation:{trigger.id}:{timezone.now().isoformat()}',
+                idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
             )
             trace.status = RunTrace.Status.QUEUED
             trace.output = {'run_id': str(run.id)}

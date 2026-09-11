@@ -2,8 +2,9 @@ import queue
 import threading
 
 import pytest
+from django.contrib.auth import get_user_model
 
-from modules.execution.infrastructure.coordinator import SQLiteExecutionCoordinator
+from modules.execution.infrastructure.coordinator import ExecutionCoordinator
 from modules.execution.models import Run
 from modules.execution.runtime.child import execute_child
 
@@ -27,6 +28,7 @@ def test_child_reports_invalid_adapter_without_database_access():
 @pytest.mark.django_db(transaction=True)
 def test_empty_coordinator_tick_reaps_then_checks_queue(monkeypatch):
     calls = []
+    get_user_model().objects.create_user(username="coordinator-owner")
 
     monkeypatch.setattr(
         "modules.execution.infrastructure.coordinator.reap_expired_leases",
@@ -36,7 +38,7 @@ def test_empty_coordinator_tick_reaps_then_checks_queue(monkeypatch):
         "modules.execution.infrastructure.coordinator.claim_next_run",
         lambda **kwargs: calls.append(("claim", kwargs)),
     )
-    coordinator = SQLiteExecutionCoordinator(
+    coordinator = ExecutionCoordinator(
         worker_id="test-coordinator",
         worker_pool=Run.ExecutorKind.MEDIA,
         max_children=1,
@@ -56,7 +58,7 @@ def test_coordinator_with_no_registered_adapters_does_not_claim(monkeypatch):
         "modules.execution.infrastructure.coordinator.claim_next_run",
         lambda **kwargs: pytest.fail("coordinator must not claim without adapters"),
     )
-    coordinator = SQLiteExecutionCoordinator(
+    coordinator = ExecutionCoordinator(
         worker_id="test-coordinator",
         worker_pool=Run.ExecutorKind.AGENT,
     )

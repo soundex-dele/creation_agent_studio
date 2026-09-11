@@ -1,22 +1,22 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from apps.enterprise.permissions import resolve_organization
-from core.llm.factory import build_image_provider
+from apps.enterprise.models import Membership
+from apps.enterprise.permissions import OrganizationRolePermission, resolve_organization
 from .filters import ApplicationFilter
 from .models import (
     Application, ApplicationCategory, GuidedPrompt, Skill,
 )
 from .serializers import (
     ApplicationCategorySerializer, ApplicationDetailSerializer,
-    ApplicationListSerializer, ApplicationWriteSerializer,
-    ComposeGuidedPromptSerializer, GenerateImageSerializer, SkillSerializer,
+    ApplicationListSerializer,
+    ComposeGuidedPromptSerializer, SkillSerializer,
 )
 from .services import compose_guided_prompt
 
@@ -34,15 +34,13 @@ class ApplicationCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
 
 
-class ApplicationViewSet(viewsets.ModelViewSet):
+class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only discovery surface; Catalog owns all Application writes."""
+    permission_classes = [AllowAny]
     filter_backends = [SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'description']
     filterset_class = ApplicationFilter
     lookup_field = 'slug'
-
-    def get_permissions(self):
-        return ([AllowAny()] if self.action in ('list', 'retrieve')
-                else [IsAuthenticated()])
 
     def get_queryset(self):
         queryset = _runtime_prefetch(Application.objects.all())
@@ -54,22 +52,9 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         return queryset.filter(is_public=True)
 
     def get_serializer_class(self):
-        if self.action in ('create', 'update', 'partial_update'):
-            return ApplicationWriteSerializer
         if self.action == 'retrieve':
             return ApplicationDetailSerializer
         return ApplicationListSerializer
-
-    def perform_create(self, serializer):
-        serializer.save(
-            created_by=self.request.user,
-            organization=resolve_organization(self.request, required=False))
-
-    def perform_update(self, serializer):
-        if (serializer.instance.created_by_id != self.request.user.id
-                and not self.request.user.is_superuser):
-            raise PermissionDenied('只有应用所有者可以编辑。')
-        serializer.save()
 
     @action(detail=True, methods=['post'], url_path='compose-prompt')
     def compose_prompt(self, request, pk=None):
@@ -86,7 +71,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
 
 
 class SkillViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, OrganizationRolePermission]
     serializer_class = SkillSerializer
     lookup_field = 'slug'
 
@@ -100,24 +85,32 @@ class SkillViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user,
                         organization=resolve_organization(
                             self.request, required=False))
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def generate_image(request):
-    serializer = GenerateImageSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    provider = build_image_provider()
-    if provider is None:
-        return Response(
-            {'detail': '图片生成服务未配置，请在后端 .env 设置 IMAGE_API_KEY。'},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    kwargs = {}
-    if serializer.validated_data.get('size'):
-        kwargs['size'] = serializer.validated_data['size']
-    result = provider.generate(serializer.validated_data['prompt'], **kwargs)
-    if not result.success:
-        return Response({'detail': result.error or '图片生成失败。'},
-                        status=status.HTTP_502_BAD_GATEWAY)
-    image_url = result.url or (
-        f'data:image/png;base64,{result.base64}' if result.base64 else '')
-    return Response({'success': True, 'image_url': image_url,
-                     'revised_prompt': result.revised_prompt})
+
+    def perform_update(self, serializer):
+        skill = serializer.instance
+        membership = getattr(self.request, 'organization_membership', None)
+        if (
+            skill.owner_id != self.request.user.id
+            and not self.request.user.is_superuser
+            and not (
+                membership
+                and membership.organization_id == skill.organization_id
+                and membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN)
+            )
+        ):
+            raise PermissionDenied('无权修改该 Skill。')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        membership = getattr(self.request, 'organization_membership', None)
+        if (
+            instance.owner_id != self.request.user.id
+            and not self.request.user.is_superuser
+            and not (
+                membership
+                and membership.organization_id == instance.organization_id
+                and membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN)
+            )
+        ):
+            raise PermissionDenied('无权删除该 Skill。')
+        instance.delete()

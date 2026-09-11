@@ -4,7 +4,6 @@ import { ChatContainer } from '@/components/Chat';
 import WorkspaceFilesPanel from '@/components/Workspace/WorkspaceFilesPanel';
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles';
 import { useConversationStore } from '@/stores/useConversationStore';
-import '@/components/Applications/ChatApplicationView.css';
 
 const HomePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();

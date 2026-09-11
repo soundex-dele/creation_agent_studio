@@ -14,7 +14,17 @@ export interface RunResource {
   definition_snapshot: Record<string, unknown>;
   input: Record<string, unknown>;
   output_summary: Record<string, unknown>;
-  stream_url: string;
+  source_type?: string;
+  source_id?: string;
+  executor_kind?: string;
+  executor_key?: string;
+  created_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  pending_input_request_id?: string | null;
+  pending_input_kind?: string;
+  error_code?: string;
+  error_message?: string;
 }
 
 export interface RunArtifact {

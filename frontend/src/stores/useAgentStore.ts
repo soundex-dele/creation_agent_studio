@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
+import type { RunResource } from '@/services/applicationRuntime';
 
 interface AgentCategory {
   id: number;
@@ -23,27 +24,18 @@ export interface Agent {
   created_at: string;
 }
 
-interface AgentExecution {
-  id: number;
-  agent_name: string;
-  input_data: any;
-  output_data: any;
-  status: string;
-  created_at: string;
-}
-
 interface AgentState {
   categories: AgentCategory[];
   agents: Agent[];
   selectedCategory: string | null;
   searchQuery: string;
-  executions: AgentExecution[];
+  executions: RunResource[];
   isLoading: boolean;
   loadCategories: () => Promise<void>;
   loadAgents: (category?: string) => Promise<void>;
   selectCategory: (slug: string | null) => void;
   setSearchQuery: (query: string) => void;
-  executeAgent: (agentId: number, inputData: any) => Promise<AgentExecution>;
+  executeAgent: (agentId: number, inputData: any) => Promise<RunResource>;
   loadMyExecutions: () => Promise<void>;
 }
 

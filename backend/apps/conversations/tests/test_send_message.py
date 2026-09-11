@@ -1,72 +1,36 @@
-"""Tests for the non-streaming send_message endpoint."""
-from unittest.mock import MagicMock, patch
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message
-from core.agent_engine.models import LLMResponse, TokenUsage
-
-User = get_user_model()
+from modules.execution.models import Run
 
 
-class SendMessageTest(TestCase):
+class DurableConversationRunTest(TestCase):
     def setUp(self):
+        self.user = get_user_model().objects.create_user(username="chat-user")
+        self.organization = self.user.owned_organizations.get()
         self.client = APIClient()
-        self.user = User.objects.create_user(username='u2', password='p')
-        self.client.force_authenticate(user=self.user)
-        self.conversation = Conversation.objects.create(user=self.user, title='T')
+        self.client.force_authenticate(self.user)
+        self.headers = {"HTTP_X_ORGANIZATION_ID": str(self.organization.id)}
+        self.conversation = Conversation.objects.create(
+            user=self.user,
+            organization=self.organization,
+            title="Chat",
+        )
 
-    @patch('apps.conversations.views.build_agent_engine')
-    def test_send_message_returns_assistant_content(self, mock_factory):
-        engine = MagicMock()
-        engine.complete.return_value = LLMResponse(
-            content='reply', usage=TokenUsage(), model='deepseek-chat')
-        mock_factory.return_value = engine
-
-        url = f'/api/conversations/{self.conversation.id}/send_message/'
-        response = self.client.post(url, {'content': 'hello'})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['assistant_message']['content'], 'reply')
-
-        assistant_msgs = Message.objects.filter(
-            conversation=self.conversation, role='assistant')
-        self.assertEqual(assistant_msgs.count(), 1)
-        self.assertEqual(assistant_msgs.first().content, 'reply')
-
-    @patch('apps.conversations.views.build_agent_engine')
-    def test_send_message_llm_failure_returns_500(self, mock_factory):
-        engine = MagicMock()
-        engine.complete.return_value = LLMResponse(
-            content='', usage=TokenUsage(), model='deepseek-chat',
-            success=False, error='nope')
-        mock_factory.return_value = engine
-
-        url = f'/api/conversations/{self.conversation.id}/send_message/'
-        response = self.client.post(url, {'content': 'hello'})
-
-        self.assertEqual(response.status_code, 500)
-
-    @patch('apps.conversations.views.build_agent_engine')
-    def test_send_message_uses_bound_agent_system_prompt(self, mock_factory):
-        """send_message 使用对话所绑定 agent 的 system_prompt（而非全局默认）。"""
-        engine = MagicMock()
-        engine.complete.return_value = LLMResponse(
-            content='reply', usage=TokenUsage(), model='deepseek-chat')
-        mock_factory.return_value = engine
-
-        category = AgentCategory.objects.create(name='C', slug='cat-c')
-        agent = Agent.objects.create(
-            name='A', slug='agent-a', description='d',
-            system_prompt='你是专属助手', category=category, created_by=self.user)
-        conv = Conversation.objects.create(user=self.user, title='T', agent=agent)
-
-        url = f'/api/conversations/{conv.id}/send_message/'
-        self.client.post(url, {'content': 'hi'})
-
-        sent_messages = engine.complete.call_args[0][0]
-        self.assertEqual(sent_messages[0],
-                         {'role': 'system', 'content': '你是专属助手'})
+    def test_send_message_creates_run_instead_of_synchronous_execution(self):
+        response = self.client.post(
+            f"/api/conversations/{self.conversation.id}/send_message/",
+            {"content": "hello"},
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        self.assertEqual(run.source_type, "conversation")
+        self.assertEqual(run.source_id, str(self.conversation.id))
+        self.assertEqual(run.executor_kind, Run.ExecutorKind.AGENT)
+        self.assertTrue(Message.objects.filter(
+            conversation=self.conversation, role="user", content="hello"
+        ).exists())

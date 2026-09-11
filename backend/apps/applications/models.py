@@ -70,7 +70,10 @@ class Application(models.Model):
         db_table = 'applications'
         constraints = [models.UniqueConstraint(
             fields=['organization', 'slug'],
-            name='unique_application_slug_per_org')]
+            name='unique_application_slug_per_org'),
+            models.UniqueConstraint(
+                fields=['slug'], condition=models.Q(organization__isnull=True),
+                name='unique_global_application_slug')]
 
     def __str__(self):
         return self.name
@@ -118,7 +121,10 @@ class Skill(models.Model):
         db_table = 'skills'
         ordering = ['name']
         constraints = [models.UniqueConstraint(
-            fields=['organization', 'slug'], name='unique_skill_slug_per_org')]
+            fields=['organization', 'slug'], name='unique_skill_slug_per_org'),
+            models.UniqueConstraint(
+                fields=['slug'], condition=models.Q(organization__isnull=True),
+                name='unique_global_skill_slug')]
 
     def __str__(self):
         return self.name

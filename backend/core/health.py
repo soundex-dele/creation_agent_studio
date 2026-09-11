@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
@@ -21,6 +22,11 @@ def readiness(request):
         checks['redis'] = cache.get('readiness-check') == 'ok'
     except Exception:
         pass
+    for worker_pool in settings.REQUIRED_EXECUTION_WORKER_POOLS:
+        checks[f'worker:{worker_pool}'] = bool(
+            cache.get(f'execution-worker:{worker_pool}'))
+    if settings.REQUIRE_AUTOMATION_SCHEDULER:
+        checks['scheduler'] = bool(cache.get('automation-scheduler'))
     status_code = 200 if all(checks.values()) else 503
     return JsonResponse({'status': 'ready' if status_code == 200 else 'not_ready',
                          'checks': checks}, status=status_code)

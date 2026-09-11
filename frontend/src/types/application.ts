@@ -102,24 +102,3 @@ export interface Workflow {
   created_at?: string;
   updated_at?: string;
 }
-
-export interface WorkflowStepRun {
-  id: string;
-  status: 'idle' | 'active' | 'completed';
-  state: Record<string, unknown>;
-  last_opened_at?: string;
-  completed_at?: string;
-  step: WorkflowStep;
-}
-
-export interface WorkflowRun {
-  id: string;
-  workflow: string;
-  workflow_name: string;
-  project_id: number;
-  status: 'active' | 'completed' | 'archived';
-  selected_step_id?: string;
-  step_runs: WorkflowStepRun[];
-  created_at?: string;
-  updated_at?: string;
-}

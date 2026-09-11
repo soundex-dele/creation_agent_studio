@@ -67,6 +67,12 @@ function toolId(event: RunEventEnvelope): string {
   );
 }
 
+function outputText(payload: Record<string, unknown>): string {
+  const value = payload.text ?? payload.output ?? payload.result ?? '';
+  if (typeof value === 'string') return value;
+  return value === '' ? '' : JSON.stringify(value, null, 2);
+}
+
 function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventState {
   const next: RunEventState = {
     ...state,
@@ -81,7 +87,7 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
       next.output += String(event.payload.text ?? '');
       break;
     case 'output.snapshot':
-      next.output = String(event.payload.text ?? event.payload.output ?? '');
+      next.output = outputText(event.payload);
       break;
     case 'progress.updated':
       next.progress = { ...event.payload };

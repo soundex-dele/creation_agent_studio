@@ -17,7 +17,7 @@ from modules.execution.application.errors import (
     IdempotencyKeyReused,
     InvalidExecutionDefinition,
 )
-from modules.execution.application.start_runs import start_application_run
+from modules.execution.application.start_runs import start_agent_run, start_application_run
 from modules.execution.infrastructure.artifacts import (
     ArtifactObjectUnavailable,
     UnsafeArtifactObjectKey,
@@ -46,6 +46,7 @@ from .serializers import (
     RunEventSnapshotSerializer,
     RunSerializer,
     StartApplicationRunSerializer,
+    StartAgentRunSerializer,
     SubmitRunCommandSerializer,
 )
 from .streaming import stream_run_events
@@ -121,6 +122,30 @@ class OrganizationRunView(ProblemDetailsAPIView):
                 detail="The requested run does not exist or is not accessible.",
             )
         return Response(RunSerializer(run).data)
+
+
+class OrganizationRunsView(ProblemDetailsAPIView):
+    """Canonical Run history for every executor kind."""
+
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    allowed_source_types = {"application", "agent", "conversation", "workflow"}
+
+    def get(self, request, organization_id):
+        runs = Run.objects.for_organization(organization_id).select_related(
+            "current_attempt"
+        ).order_by("-created_at")
+        source_type = request.query_params.get("source_type")
+        if source_type:
+            if source_type not in self.allowed_source_types:
+                return _problem(
+                    request,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    code="invalid_run_source_type",
+                    title="Invalid Run source type",
+                    detail="source_type must be application, agent, conversation, or workflow.",
+                )
+            runs = runs.filter(source_type=source_type)
+        return Response(RunSerializer(runs[:100], many=True).data)
 
 
 class OrganizationRunEventsView(ProblemDetailsAPIView):
@@ -522,6 +547,52 @@ class OrganizationApplicationRunsView(ProblemDetailsAPIView):
         body["stream_url"] = request.build_absolute_uri(stream_url)
         response = Response(body, status=status.HTTP_202_ACCEPTED)
         response["Location"] = request.build_absolute_uri(detail_url)
+        if replayed:
+            response["Idempotent-Replay"] = "true"
+        return response
+
+
+class OrganizationAgentRunsView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    minimum_role = Membership.Role.OPERATOR
+
+    def post(self, request, organization_id, agent_id):
+        serializer = StartAgentRunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
+        if not idempotency_key or len(idempotency_key) > 160:
+            return _problem(
+                request,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="invalid_idempotency_key",
+                title="Invalid idempotency key",
+                detail="Idempotency-Key must contain between 1 and 160 characters.",
+            )
+        try:
+            run, replayed = start_agent_run(
+                organization_id=organization_id,
+                agent_id=agent_id,
+                actor=request.user,
+                environment=serializer.validated_data["environment"],
+                input_data=serializer.validated_data["input"],
+                priority=serializer.validated_data["priority"],
+                idempotency_key=idempotency_key,
+            )
+        except IdempotencyKeyReused as exc:
+            return _problem(request, status_code=409, code=exc.code,
+                            title="Idempotency key reused", detail=str(exc))
+        except DeploymentUnavailable as exc:
+            return _problem(request, status_code=409, code=exc.code,
+                            title="Deployment unavailable", detail=str(exc))
+        except InvalidExecutionDefinition as exc:
+            return _problem(request, status_code=422, code=exc.code,
+                            title="Invalid execution definition", detail=str(exc))
+        body = RunSerializer(run).data
+        body["stream_url"] = request.build_absolute_uri(reverse(
+            "execution:run-stream",
+            kwargs={"organization_id": organization_id, "run_id": run.id},
+        ))
+        response = Response(body, status=status.HTTP_202_ACCEPTED)
         if replayed:
             response["Idempotent-Replay"] = "true"
         return response

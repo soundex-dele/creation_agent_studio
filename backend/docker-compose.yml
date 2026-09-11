@@ -10,6 +10,8 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
       REDIS_HOST: redis
+      REQUIRED_EXECUTION_WORKER_POOLS: agent,media,workflow
+      REQUIRE_AUTOMATION_SCHEDULER: "true"
     ports:
       - "8080:8080"
     depends_on:
@@ -23,10 +25,10 @@ services:
       timeout: 5s
       retries: 5
 
-  execution-worker:
+  agent-worker:
     build: .
     restart: unless-stopped
-    command: python manage.py run_execution_coordinator --worker-pool ${EXECUTION_WORKER_POOL:-media}
+    command: python manage.py run_execution_coordinator --worker-pool agent
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
@@ -37,6 +39,51 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "agent"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  media-worker:
+    build: .
+    restart: unless-stopped
+    command: python manage.py run_execution_coordinator --worker-pool media
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "media"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  workflow-worker:
+    build: .
+    restart: unless-stopped
+    command: python manage.py run_execution_coordinator --worker-pool workflow
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "workflow"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   scheduler:
     build: .
@@ -52,19 +99,28 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--scheduler"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:14
     restart: unless-stopped
     container_name: creation_studio_postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:?DB_NAME must be configured}
-      POSTGRES_USER: ${DB_USER:?DB_USER must be configured}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be configured}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD must be configured}
+      APP_DB_NAME: ${DB_NAME:?DB_NAME must be configured}
+      APP_DB_USER: ${DB_USER:?DB_USER must be configured}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be configured}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-app-db.sh:/docker-entrypoint-initdb.d/10-app-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s

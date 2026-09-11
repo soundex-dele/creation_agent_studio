@@ -2,7 +2,7 @@ import React from 'react';
 import { Avatar, Typography } from 'antd';
 import { RobotOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
-import type { AgentToolCall } from '@/services/agentProtocol';
+import type { AgentToolCall } from '@/entities/run';
 import './MessageList.css';
 
 const { Text } = Typography;

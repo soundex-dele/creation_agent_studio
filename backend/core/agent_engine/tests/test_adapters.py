@@ -3,16 +3,14 @@ import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from unittest import TestCase, skipUnless
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.test import override_settings
 
-from core.agent_engine.adapters.base import AgentAdapter, EventType
+from core.agent_engine.adapters.base import AgentAdapter
 from core.agent_engine.adapters.codex import (
     CodexAdapter,
-    CodexSession,
     load_codex_sdk,
     resolve_codex_binary,
 )
@@ -29,9 +27,6 @@ class StubAdapter(AgentAdapter):
 
     def complete(self, messages, **options):
         return LLMResponse(content="ok", usage=TokenUsage(), model="stub")
-
-    def create_session(self, key, **options):
-        return SimpleNamespace(key=key, **options)
 
 
 class AdapterRegistryTest(TestCase):
@@ -117,52 +112,3 @@ class CodexIntegrationTest(TestCase):
                 resolved = resolve_codex_binary()
 
         self.assertEqual(resolved, binary.resolve())
-
-    def test_session_normalizes_text_tool_usage_and_completion_events(self):
-        delta = SimpleNamespace(
-            method="item/agentMessage/delta",
-            payload=SimpleNamespace(delta="hello", item_id="message-1", turn_id="turn-1"),
-        )
-        tool_item = SimpleNamespace(
-            type="commandExecution",
-            id="tool-1",
-            command="pwd",
-            cwd="D:/workspace",
-            aggregated_output="D:/workspace",
-            status=SimpleNamespace(value="completed"),
-        )
-        tool_start = SimpleNamespace(
-            method="item/started",
-            payload=SimpleNamespace(item=SimpleNamespace(root=tool_item), turn_id="turn-1"),
-        )
-        usage = SimpleNamespace(
-            method="thread/tokenUsage/updated",
-            payload=SimpleNamespace(token_usage=SimpleNamespace(last=SimpleNamespace(
-                input_tokens=2, output_tokens=3, total_tokens=5,
-            ))),
-        )
-        completed = SimpleNamespace(
-            method="turn/completed",
-            payload=SimpleNamespace(turn=SimpleNamespace(
-                id="turn-1", status=SimpleNamespace(value="completed"), error=None,
-            )),
-        )
-        turn = MagicMock()
-        turn.stream.return_value = iter([delta, tool_start, usage, completed])
-        thread = MagicMock(id="thread-1")
-        thread.turn.return_value = turn
-        client = MagicMock()
-        session = CodexSession(key="key", client=client, thread=thread, model="")
-
-        session.submit("hi")
-        events = [session.wait_for_event(timeout=1) for _ in range(3)]
-
-        self.assertEqual(
-            [(event.type, event.content) for event in events],
-            [
-                (EventType.PROGRESS, "hello"),
-                (EventType.TOOL_START, ""),
-                (EventType.COMPLETED, ""),
-            ],
-        )
-        self.assertEqual(events[-1].usage["total_tokens"], 5)

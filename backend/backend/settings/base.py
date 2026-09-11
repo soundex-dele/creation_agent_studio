@@ -156,11 +156,24 @@ SQLITE_SYNCHRONOUS = config('SQLITE_SYNCHRONOUS', default='FULL')
 EXECUTION_CHILD_ADAPTERS = config(
     'EXECUTION_CHILD_ADAPTERS',
     default=(
-        '{"media":{"batch-transcribe":'
-        '"modules.execution.runtime.builtin:execute_batch_transcribe"}}'
+        '{"agent":{"agent-completion":'
+        '"modules.execution.runtime.builtin:execute_agent_completion"},'
+        '"media":{"batch-transcribe":'
+        '"modules.execution.runtime.builtin:execute_batch_transcribe"},'
+        '"workflow":{"workflow-sequential":'
+        '"modules.execution.runtime.builtin:execute_workflow"}}'
     ),
     cast=json.loads,
 )
+EXECUTION_EVENT_QUEUE_SIZE = config(
+    'EXECUTION_EVENT_QUEUE_SIZE', default=1000, cast=int)
+REQUIRED_EXECUTION_WORKER_POOLS = tuple(
+    value.strip()
+    for value in config('REQUIRED_EXECUTION_WORKER_POOLS', default='').split(',')
+    if value.strip()
+)
+REQUIRE_AUTOMATION_SCHEDULER = config(
+    'REQUIRE_AUTOMATION_SCHEDULER', default=False, cast=bool)
 
 RUN_EVENT_RETENTION_DAYS = config(
     'RUN_EVENT_RETENTION_DAYS', default=30, cast=int)

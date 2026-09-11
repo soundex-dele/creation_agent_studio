@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from django.db import connection, transaction
 
@@ -18,8 +19,16 @@ class TenantDatabaseContextMiddleware:
 
     def __call__(self, request):
         match = ORGANIZATION_PATH.match(request.path)
-        if match is None or connection.vendor != "postgresql":
+        organization_id = (
+            match.group("organization_id") if match is not None
+            else request.headers.get("X-Organization-ID")
+        )
+        try:
+            organization_id = uuid.UUID(str(organization_id))
+        except (TypeError, ValueError):
+            organization_id = None
+        if organization_id is None or connection.vendor != "postgresql":
             return self.get_response(request)
         with transaction.atomic():
-            set_local_organization(match.group("organization_id"))
+            set_local_organization(organization_id)
             return self.get_response(request)

@@ -14,8 +14,6 @@ import TemplatesPage from '@/pages/Templates/TemplatesPage';
 import TemplateDetailPage from '@/pages/Templates/TemplateDetailPage';
 import AppsPage from '@/pages/Apps/AppsPage';
 import AppDetailPage from '@/pages/Apps/AppDetailPage';
-import ChatApplicationEditPage from '@/pages/Apps/ChatApplicationEditPage';
-import ApplicationRuntimePage from '@/pages/Apps/ApplicationRuntimePage';
 import DurableApplicationRuntimePage from '@/pages/Apps/DurableApplicationRuntimePage';
 import WorkspacePage from '@/pages/Workspace/WorkspacePage';
 import WorkflowsPage from '@/pages/Workflows/WorkflowsPage';
@@ -107,31 +105,11 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: '/apps/:id/run',
-    element: (
-      <ProtectedRoute>
-        <MainLayout hideSidebar hideHeader>
-          <ApplicationRuntimePage />
-        </MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: '/applications/:applicationId/run',
     element: (
       <ProtectedRoute>
         <MainLayout hideSidebar>
           <DurableApplicationRuntimePage />
-        </MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/apps/:id/edit',
-    element: (
-      <ProtectedRoute>
-        <MainLayout>
-          <ChatApplicationEditPage />
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -155,7 +133,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><MainLayout hideSidebar><WorkflowEditorPage /></MainLayout></ProtectedRoute>,
   },
   {
-    path: '/workflow-runs/:runId',
+    path: '/runs/:runId',
     element: <ProtectedRoute><MainLayout hideSidebar hideHeader><WorkflowRunnerPage /></MainLayout></ProtectedRoute>,
   },
   {

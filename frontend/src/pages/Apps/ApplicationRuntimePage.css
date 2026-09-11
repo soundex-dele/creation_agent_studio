@@ -1,6 +1,0 @@
-.application-runtime-page { height: 100vh; display: flex; flex-direction: column; background: var(--bg-primary); }
-.application-runtime-header { height: 58px; flex: 0 0 58px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
-.application-runtime-icon { font-size: 22px; }
-.application-runtime-version { color: var(--text-secondary); font-size: 12px; }
-.application-runtime-main { flex: 1; min-height: 0; overflow: hidden; }
-.application-runtime-loading { height: 100vh; display: grid; place-items: center; }

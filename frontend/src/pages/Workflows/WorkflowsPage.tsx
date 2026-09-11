@@ -5,7 +5,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
-import type { Workflow, WorkflowRun } from '@/types';
+import type { Workflow } from '@/types';
+import type { RunResource } from '@/services/applicationRuntime';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -13,8 +15,9 @@ const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
 
 const WorkflowsPage = () => {
   const navigate = useNavigate();
+  const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [runs, setRuns] = useState<WorkflowRun[]>([]);
+  const [runs, setRuns] = useState<RunResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -24,7 +27,11 @@ const WorkflowsPage = () => {
     try {
       const [workflowResponse, runResponse] = await Promise.all([
         api.get<Workflow[] | { results?: Workflow[] }>('/workflows/'),
-        api.get<WorkflowRun[] | { results?: WorkflowRun[] }>('/workflows/runs/'),
+        organizationId
+          ? api.get<RunResource[]>(`/organizations/${organizationId}/runs`, {
+              source_type: 'workflow',
+            })
+          : Promise.resolve([]),
       ]);
       setWorkflows(unwrap(workflowResponse));
       setRuns(unwrap(runResponse));
@@ -33,7 +40,7 @@ const WorkflowsPage = () => {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [organizationId]);
 
   const create = async () => {
     if (!name.trim()) return;
@@ -48,7 +55,7 @@ const WorkflowsPage = () => {
   const start = async (workflow: Workflow) => {
     try {
       const run = await api.post<{ id: string }>(`/workflows/${workflow.id}/start/`);
-      navigate(`/workflow-runs/${run.id}`);
+      navigate(`/runs/${run.id}`);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '工作流启动失败');
     }
@@ -82,32 +89,35 @@ const WorkflowsPage = () => {
           <section className="workflow-history">
             <div className="workflow-history-heading">
               <div><HistoryOutlined /><h2>执行历史</h2></div>
-              <span>重新打开时仅恢复聊天应用的对话</span>
+              <span>所有状态来自统一 Run 事件流</span>
             </div>
             {runs.length === 0 ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无执行历史" />
             ) : (
               <div className="workflow-history-list">
                 {runs.map((run) => {
-                  const completed = run.step_runs.filter(
-                    (stepRun) => stepRun.status === 'completed').length;
+                  const definition = run.definition_snapshot as {
+                    workflow_name?: string;
+                    workflow_steps?: unknown[];
+                  };
                   return (
                     <button
                       key={run.id}
                       className="workflow-history-item"
-                      onClick={() => navigate(`/workflow-runs/${run.id}`)}
+                      onClick={() => navigate(`/runs/${run.id}`)}
                     >
                       <span className="workflow-history-icon"><HistoryOutlined /></span>
                       <span className="workflow-history-copy">
-                        <strong>{run.workflow_name}</strong>
-                        <small>{new Date(run.updated_at || run.created_at || '').toLocaleString()}</small>
+                        <strong>{definition.workflow_name || `Workflow ${run.source_id || ''}`}</strong>
+                        <small>{new Date(run.created_at || '').toLocaleString()}</small>
                       </span>
                       <span className="workflow-history-progress">
-                        {completed}/{run.step_runs.length} 个应用
+                        {definition.workflow_steps?.length || 0} 个应用
                       </span>
                       <span className={`workflow-history-status workflow-history-status--${run.status}`}>
-                        {run.status === 'completed' ? '已完成'
-                          : run.status === 'archived' ? '已归档' : '进行中'}
+                        {run.status === 'succeeded' ? '已完成'
+                          : run.status === 'failed' ? '失败'
+                            : run.status === 'cancelled' ? '已取消' : '进行中'}
                       </span>
                     </button>
                   );

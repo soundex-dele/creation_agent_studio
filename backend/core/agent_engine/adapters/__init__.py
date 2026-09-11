@@ -1,11 +1,5 @@
 """Built-in and extension-facing agent adapters."""
-from .base import (
-    AgentAdapter,
-    AgentEvent,
-    EventType,
-    OperationStatus,
-    ProgressCategory,
-)
+from .base import AgentAdapter
 from .registry import (
     adapter_registry,
     get_agent_adapter,
@@ -25,10 +19,6 @@ _register_builtins()
 
 __all__ = [
     "AgentAdapter",
-    "AgentEvent",
-    "EventType",
-    "OperationStatus",
-    "ProgressCategory",
     "adapter_registry",
     "get_agent_adapter",
     "register_agent_adapter",

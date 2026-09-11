@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Result, Spin, Tag } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import type { AppItem } from '@/types';
@@ -60,7 +60,7 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
-    navigate(`/apps/${app.id}/run`);
+    navigate(`/applications/${app.applicationId}/run`);
   };
 
   return (
@@ -101,11 +101,6 @@ const AppDetailPage: React.FC = () => {
           </div>
 
           <div className="app-detail-actions">
-            {app.kind === 'chat' && app.canEdit && (
-              <Button size="large" icon={<EditOutlined />} onClick={() => navigate(`/apps/${app.id}/edit`)}>
-                编辑配置
-              </Button>
-            )}
             <Button type="primary" size="large" icon={<PlayCircleOutlined />} onClick={handleOpen}>
               打开应用
             </Button>

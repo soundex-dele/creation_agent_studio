@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     OrganizationApplicationRunsView,
+    OrganizationAgentRunsView,
     OrganizationRunArtifactsView,
     OrganizationRunArtifactAccessView,
     OrganizationRunEventSnapshotView,
@@ -10,6 +11,7 @@ from .views import (
     OrganizationRunEventsView,
     OrganizationRunStreamView,
     OrganizationRunView,
+    OrganizationRunsView,
     RunArtifactContentView,
 )
 
@@ -17,6 +19,12 @@ from .views import (
 app_name = "execution"
 
 urlpatterns = [
+    path("runs", OrganizationRunsView.as_view(), name="run-list"),
+    path(
+        "agents/<int:agent_id>/runs",
+        OrganizationAgentRunsView.as_view(),
+        name="agent-runs",
+    ),
     path(
         "applications/<int:application_id>/runs",
         OrganizationApplicationRunsView.as_view(),

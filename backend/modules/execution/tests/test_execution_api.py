@@ -116,6 +116,23 @@ def _run_url(organization, run, suffix=""):
     return f"/api/organizations/{organization.id}/runs/{run.id}{suffix}"
 
 
+def test_run_list_uses_canonical_history_and_source_filter(
+    authenticated_client, api_organization, api_run,
+):
+    response = authenticated_client.get(
+        f"/api/organizations/{api_organization.id}/runs",
+        {"source_type": "application"},
+    )
+    assert response.status_code == 200
+    assert [item["id"] for item in response.data] == [str(api_run.id)]
+
+    invalid = authenticated_client.get(
+        f"/api/organizations/{api_organization.id}/runs",
+        {"source_type": "legacy-job"},
+    )
+    assert invalid.status_code == 400
+
+
 @pytest.fixture
 def api_artifact(api_run, api_organization):
     return RunArtifact.objects.create(

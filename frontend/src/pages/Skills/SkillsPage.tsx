@@ -1,134 +1,104 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Button,
-  Empty,
-  Form,
-  Input,
-  List,
-  Modal,
-  Segmented,
-  Select,
-  Spin,
-  Tag,
-  Tooltip,
-  message,
+  Button, Card, Empty, Form, Input, List, Modal, Select, Space, Spin, Tag, message,
 } from 'antd';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  FileTextOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SaveOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
-import {
-  runtimeSkillApi,
-  type RuntimeSkillDetail,
-  type RuntimeSkillRoot,
-  type RuntimeSkillSummary,
-  type SkillProvider,
-} from '@/services/runtimeSkills';
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+
+import { api } from '@/services/api';
 import './SkillsPage.css';
 
-type ProviderFilter = 'all' | SkillProvider;
+interface SkillResource {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  visibility: 'private' | 'organization' | 'public';
+  source_type: 'bundled' | 'upload' | 'git' | 'registry';
+  source_uri: string;
+  artifact_key: string;
+  manifest: Record<string, unknown>;
+  content_hash: string;
+  is_active: boolean;
+  updated_at: string;
+}
 
-const providerColor: Record<SkillProvider, string> = {
-  codex: 'gold',
-  graphflow: 'purple',
-};
+type SkillForm = Pick<
+  SkillResource,
+  'slug' | 'name' | 'description' | 'visibility' | 'source_type' | 'source_uri' | 'artifact_key'
+> & { manifest_text?: string };
+
+const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
+  Array.isArray(value) ? value : value.results ?? [];
 
 const errorText = (error: any, fallback: string) =>
   error?.response?.data?.detail || error?.message || fallback;
 
 const SkillsPage = () => {
-  const [roots, setRoots] = useState<RuntimeSkillRoot[]>([]);
-  const [skills, setSkills] = useState<RuntimeSkillSummary[]>([]);
-  const [canManage, setCanManage] = useState(false);
+  const [skills, setSkills] = useState<SkillResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [selectedKey, setSelectedKey] = useState('');
-  const [detail, setDetail] = useState<RuntimeSkillDetail | null>(null);
-  const [provider, setProvider] = useState<ProviderFilter>('all');
   const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [content, setContent] = useState('');
+  const [editing, setEditing] = useState<SkillResource | null>(null);
   const [saving, setSaving] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createForm] = Form.useForm();
+  const [form] = Form.useForm<SkillForm>();
 
-  const loadSkills = useCallback(async (preferredKey?: string) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await runtimeSkillApi.list();
-      setRoots(response.roots);
-      setSkills(response.skills);
-      setCanManage(response.canManage);
-      const wanted = preferredKey || selectedKey;
-      const next = response.skills.some(
-        (skill) => `${skill.provider}:${skill.slug}` === wanted,
-      ) ? wanted : response.skills[0]
-        ? `${response.skills[0].provider}:${response.skills[0].slug}`
-        : '';
-      setSelectedKey(next);
-      if (!next) setDetail(null);
+      const response = await api.get<SkillResource[] | { results?: SkillResource[] }>(
+        '/apps/skills/',
+      );
+      setSkills(unwrap(response));
     } catch (error) {
       message.error(errorText(error, '加载技能失败'));
     } finally {
       setLoading(false);
     }
-  }, [selectedKey]);
-
-  useEffect(() => {
-    void loadSkills();
-    // Initial discovery only; later refreshes are explicit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!selectedKey) return;
-    const separator = selectedKey.indexOf(':');
-    const selectedProvider = selectedKey.slice(0, separator) as SkillProvider;
-    const slug = selectedKey.slice(separator + 1);
-    setDetailLoading(true);
-    setEditing(false);
-    runtimeSkillApi.get(selectedProvider, slug)
-      .then((value) => {
-        setDetail(value);
-        setContent(value.content);
-      })
-      .catch((error) => {
-        setDetail(null);
-        message.error(errorText(error, '加载技能详情失败'));
-      })
-      .finally(() => setDetailLoading(false));
-  }, [selectedKey]);
+  useEffect(() => { void load(); }, [load]);
 
-  const filteredSkills = useMemo(() => {
+  const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return skills.filter((skill) => {
-      if (provider !== 'all' && skill.provider !== provider) return false;
-      if (!keyword) return true;
-      return [skill.name, skill.slug, skill.description]
-        .some((value) => value.toLowerCase().includes(keyword));
-    });
-  }, [provider, query, skills]);
+    if (!keyword) return skills;
+    return skills.filter((skill) => [skill.name, skill.slug, skill.description]
+      .some((value) => value.toLowerCase().includes(keyword)));
+  }, [query, skills]);
+
+  const openEditor = (skill?: SkillResource) => {
+    setEditing(skill || ({ id: '' } as SkillResource));
+    form.setFieldsValue(skill ? {
+      ...skill,
+      manifest_text: JSON.stringify(skill.manifest || {}, null, 2),
+    } : {
+      visibility: 'organization',
+      source_type: 'upload',
+      manifest_text: '{}',
+    } as SkillForm);
+  };
 
   const save = async () => {
-    if (!detail || content === detail.content) {
-      setEditing(false);
+    if (!editing) return;
+    const values = await form.validateFields();
+    let manifest: Record<string, unknown>;
+    try {
+      manifest = JSON.parse(values.manifest_text || '{}');
+      if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+        throw new Error();
+      }
+    } catch {
+      message.error('Manifest 必须是 JSON 对象');
       return;
     }
+    const payload = { ...values, manifest } as Record<string, unknown>;
+    delete payload.manifest_text;
     setSaving(true);
     try {
-      const updated = await runtimeSkillApi.update(
-        detail.provider, detail.slug, content);
-      setDetail(updated);
-      setContent(updated.content);
-      setEditing(false);
-      message.success('技能已保存');
-      await loadSkills(`${updated.provider}:${updated.slug}`);
+      if (editing.id) await api.patch(`/apps/skills/${editing.slug}/`, payload);
+      else await api.post('/apps/skills/', payload);
+      message.success(editing.id ? '技能已更新' : '技能已创建');
+      setEditing(null);
+      form.resetFields();
+      await load();
     } catch (error) {
       message.error(errorText(error, '保存技能失败'));
     } finally {
@@ -136,43 +106,18 @@ const SkillsPage = () => {
     }
   };
 
-  const remove = () => {
-    if (!detail) return;
+  const remove = (skill: SkillResource) => {
     Modal.confirm({
-      title: `删除技能“${detail.name}”？`,
-      content: `将删除目录 ${detail.path} 及其中全部文件，此操作不可撤销。`,
+      title: `删除技能“${skill.name}”？`,
+      content: '被 Agent 或 Application 引用的技能将无法删除。',
       okText: '删除',
-      okButtonProps: { danger: true },
       cancelText: '取消',
+      okButtonProps: { danger: true },
       onOk: async () => {
-        try {
-          await runtimeSkillApi.remove(detail.provider, detail.slug);
-          message.success('技能已删除');
-          setDetail(null);
-          setSelectedKey('');
-          await loadSkills();
-        } catch (error) {
-          message.error(errorText(error, '删除技能失败'));
-          throw error;
-        }
+        await api.delete(`/apps/skills/${skill.slug}/`);
+        await load();
       },
     });
-  };
-
-  const create = async () => {
-    const values = await createForm.validateFields();
-    setCreating(true);
-    try {
-      const created = await runtimeSkillApi.create(values);
-      setCreateOpen(false);
-      createForm.resetFields();
-      message.success('技能已创建');
-      await loadSkills(`${created.provider}:${created.slug}`);
-    } catch (error) {
-      message.error(errorText(error, '创建技能失败'));
-    } finally {
-      setCreating(false);
-    }
   };
 
   return (
@@ -180,205 +125,88 @@ const SkillsPage = () => {
       <div className="skills-page-header">
         <div>
           <h1>技能管理</h1>
-          <p>查看和维护 Codex 与 GraphFlow 使用的文件系统技能。</p>
+          <p>唯一 Skill Catalog：Agent、Application 与运行快照均引用这里的资源。</p>
         </div>
-        <div className="skills-header-actions">
-          <Button icon={<ReloadOutlined />} onClick={() => void loadSkills()}>
-            刷新
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
+            新增技能
           </Button>
-          {canManage && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-              新增技能
-            </Button>
-          )}
-        </div>
+        </Space>
       </div>
-
-      <div className="skill-root-grid">
-        {roots.map((root) => (
-          <button
-            type="button"
-            key={root.provider}
-            className={`skill-root-card ${provider === root.provider ? 'active' : ''}`}
-            onClick={() => setProvider(
-              provider === root.provider ? 'all' : root.provider)}
-          >
-            <div className="skill-root-title">
-              <Tag color={providerColor[root.provider]}>{root.label}</Tag>
-              <strong>{root.skillCount} 个技能</strong>
-            </div>
-            <Tooltip title={root.path}>
-              <code>{root.path}</code>
-            </Tooltip>
-            <span className={root.exists ? 'root-ready' : 'root-missing'}>
-              {root.exists ? '目录可用' : '目录尚未创建'}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="skills-workbench">
-        <section className="skills-list-panel">
-          <div className="skills-list-toolbar">
-            <Input
-              allowClear
-              prefix={<SearchOutlined />}
-              placeholder="搜索技能"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <Segmented
-              block
-              value={provider}
-              onChange={(value) => setProvider(value as ProviderFilter)}
-              options={[
-                { label: '全部', value: 'all' },
-                { label: 'Codex', value: 'codex' },
-                { label: 'GraphFlow', value: 'graphflow' },
-              ]}
-            />
-          </div>
-          <Spin spinning={loading}>
-            <List
-              className="runtime-skill-list"
-              dataSource={filteredSkills}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无技能" /> }}
-              renderItem={(skill) => {
-                const key = `${skill.provider}:${skill.slug}`;
-                return (
-                  <List.Item
-                    className={selectedKey === key ? 'selected' : ''}
-                    onClick={() => setSelectedKey(key)}
-                  >
-                    <div className="runtime-skill-list-item">
-                      <div>
-                        <strong>{skill.name}</strong>
-                        <Tag color={providerColor[skill.provider]}>{skill.providerLabel}</Tag>
-                      </div>
-                      <code>{skill.slug}</code>
-                      <p>{skill.description || '暂无描述'}</p>
-                    </div>
-                  </List.Item>
-                );
-              }}
-            />
-          </Spin>
-        </section>
-
-        <section className="skill-detail-panel">
-          <Spin spinning={detailLoading}>
-            {!detail ? (
-              <div className="skill-detail-empty">
-                <Empty description="选择一个技能查看详情" />
-              </div>
-            ) : (
-              <>
-                <div className="skill-detail-header">
-                  <div>
-                    <div className="skill-detail-title">
-                      <h2>{detail.name}</h2>
-                      <Tag color={providerColor[detail.provider]}>{detail.providerLabel}</Tag>
-                    </div>
-                    <p>{detail.description || '暂无描述'}</p>
-                  </div>
-                  {canManage && (
-                    <div className="skill-detail-actions">
-                      {editing ? (
-                        <>
-                          <Button onClick={() => {
-                            setContent(detail.content);
-                            setEditing(false);
-                          }}>取消</Button>
-                          <Button
-                            type="primary"
-                            icon={<SaveOutlined />}
-                            loading={saving}
-                            onClick={() => void save()}
-                          >保存</Button>
-                        </>
-                      ) : (
-                        <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-                          编辑
-                        </Button>
-                      )}
-                      <Button danger icon={<DeleteOutlined />} onClick={remove}>
-                        删除
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="skill-path-row">
-                  <FileTextOutlined />
-                  <code>{detail.entrypoint}</code>
-                </div>
-
-                <div className="skill-content-editor">
-                  <div className="skill-section-label">SKILL.md</div>
-                  {editing ? (
-                    <Input.TextArea
-                      value={content}
-                      onChange={(event) => setContent(event.target.value)}
-                      autoSize={false}
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <pre>{detail.content}</pre>
-                  )}
-                </div>
-
-                <div className="skill-files">
-                  <div className="skill-section-label">技能文件（{detail.fileCount}）</div>
-                  <div className="skill-file-list">
-                    {detail.files.map((file) => (
-                      <div key={file.path}>
-                        <span>{file.path}</span>
-                        <small>{file.size.toLocaleString()} B</small>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
+      <Input.Search
+        allowClear
+        placeholder="搜索技能"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        style={{ maxWidth: 420, marginBottom: 20 }}
+      />
+      <Spin spinning={loading}>
+        {filtered.length === 0 ? <Empty description="暂无技能" /> : (
+          <List
+            grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 3 }}
+            dataSource={filtered}
+            renderItem={(skill) => (
+              <List.Item>
+                <Card
+                  title={skill.name}
+                  extra={<Tag>{skill.visibility}</Tag>}
+                  actions={[
+                    <EditOutlined key="edit" onClick={() => openEditor(skill)} />,
+                    <DeleteOutlined key="delete" onClick={() => remove(skill)} />,
+                  ]}
+                >
+                  <p>{skill.description || '暂无描述'}</p>
+                  <Space wrap>
+                    <Tag color="blue">{skill.slug}</Tag>
+                    <Tag>{skill.source_type}</Tag>
+                    {!skill.is_active && <Tag color="default">已停用</Tag>}
+                  </Space>
+                </Card>
+              </List.Item>
             )}
-          </Spin>
-        </section>
-      </div>
-
+          />
+        )}
+      </Spin>
       <Modal
-        title="新增运行时技能"
-        open={createOpen}
-        okText="创建"
+        title={editing?.id ? '编辑技能' : '新增技能'}
+        open={editing !== null}
+        okText="保存"
         cancelText="取消"
-        onOk={create}
-        confirmLoading={creating}
-        onCancel={() => {
-          setCreateOpen(false);
-          createForm.resetFields();
-        }}
+        confirmLoading={saving}
+        onOk={() => void save()}
+        onCancel={() => { setEditing(null); form.resetFields(); }}
         destroyOnClose
       >
-        <Form form={createForm} layout="vertical" initialValues={{ provider: 'codex' }}>
-          <Form.Item name="provider" label="运行时" rules={[{ required: true }]}>
-            <Select options={[
-              { label: 'Codex', value: 'codex' },
-              { label: 'GraphFlow', value: 'graphflow' },
-            ]} />
+        <Form form={form} layout="vertical">
+          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+            <Input />
           </Form.Item>
-          <Form.Item
-            name="slug"
-            label="目录名称"
-            rules={[
-              { required: true, message: '请输入目录名称' },
-              { pattern: /^[A-Za-z0-9][A-Za-z0-9._-]*$/, message: '目录名称格式不正确' },
-            ]}
-          >
-            <Input placeholder="my-skill" />
+          <Form.Item name="slug" label="Slug" rules={[{ required: true }]}>
+            <Input disabled={Boolean(editing?.id)} />
           </Form.Item>
-          <Form.Item name="name" label="技能名称">
-            <Input placeholder="我的技能" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="说明技能适用的任务和触发条件" />
+          <Form.Item name="description" label="描述"><Input.TextArea rows={3} /></Form.Item>
+          <Space size="middle" style={{ display: 'flex' }}>
+            <Form.Item name="visibility" label="可见性" rules={[{ required: true }]}>
+              <Select style={{ width: 150 }} options={[
+                { value: 'private', label: '私有' },
+                { value: 'organization', label: '组织' },
+                { value: 'public', label: '公开' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="source_type" label="来源" rules={[{ required: true }]}>
+              <Select style={{ width: 150 }} options={[
+                { value: 'bundled', label: '内置' },
+                { value: 'upload', label: '上传' },
+                { value: 'git', label: 'Git' },
+                { value: 'registry', label: '注册中心' },
+              ]} />
+            </Form.Item>
+          </Space>
+          <Form.Item name="source_uri" label="来源 URI"><Input /></Form.Item>
+          <Form.Item name="artifact_key" label="Artifact Key"><Input /></Form.Item>
+          <Form.Item name="manifest_text" label="Manifest JSON">
+            <Input.TextArea rows={8} spellCheck={false} />
           </Form.Item>
         </Form>
       </Modal>

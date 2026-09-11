@@ -51,7 +51,6 @@ urlpatterns += [
     path('api/apps/', include('apps.applications.urls')),
     path('api/templates/', include('apps.templates.urls')),
     path('api/conversations/', include('apps.conversations.urls')),
-    path('api/agent/v2/', include('apps.conversations.agent_urls')),
     path('api/projects/', include('apps.projects.urls')),
     path('api/marketplace/', include('apps.marketplace.urls')),
     path('api/enterprise/', include('apps.enterprise.urls')),

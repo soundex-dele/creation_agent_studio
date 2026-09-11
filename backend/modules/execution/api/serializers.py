@@ -163,3 +163,17 @@ class StartApplicationRunSerializer(serializers.Serializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("input must be a JSON object")
         return value
+
+
+class StartAgentRunSerializer(serializers.Serializer):
+    environment = serializers.ChoiceField(
+        choices=DeploymentEnvironment.choices,
+        default=DeploymentEnvironment.PRODUCTION,
+    )
+    input = serializers.JSONField()
+    priority = serializers.IntegerField(default=0, min_value=-100, max_value=100)
+
+    def validate_input(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("input must be a JSON object")
+        return value

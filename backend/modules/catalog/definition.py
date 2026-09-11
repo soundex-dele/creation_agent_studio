@@ -24,6 +24,9 @@ class ApplicationDefinition(BaseModel):
     input_schema: dict[str, Any] = Field(default_factory=dict)
     output_schema: dict[str, Any] = Field(default_factory=dict)
     default_config: dict[str, Any] = Field(default_factory=dict)
+    dependencies: dict[str, list[dict[str, Any]]] = Field(
+        default_factory=lambda: {"agents": [], "skills": []}
+    )
 
     @field_validator("executor_key", "renderer_key")
     @classmethod

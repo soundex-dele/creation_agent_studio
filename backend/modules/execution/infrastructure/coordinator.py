@@ -4,9 +4,11 @@ import time
 from dataclasses import dataclass
 
 from django.conf import settings
-from django.db import connections
+from django.core.cache import cache
+from django.db import connections, transaction
 from django.utils import timezone
 
+from apps.enterprise.models import Organization
 from modules.execution.application.errors import LeaseLost
 from modules.execution.application.reaper import (
     expire_waiting_inputs,
@@ -21,6 +23,7 @@ from modules.execution.application.runs import (
 from modules.execution.infrastructure.claim import claim_next_run, renew_lease
 from modules.execution.models import Run, RunCommand
 from modules.execution.runtime.child import execute_child
+from modules.tenancy.database import tenant_database_context
 
 
 ADAPTER_EVENT_TYPES = {
@@ -74,6 +77,7 @@ class ExecutionCoordinator:
         self._context = process_context or multiprocessing.get_context("spawn")
         self._active = {}
         self._stopping = False
+        self._next_maintenance_at = 0.0
 
     @property
     def active_count(self):
@@ -88,6 +92,9 @@ class ExecutionCoordinator:
             "organization_id": str(claimed.run.organization_id),
             "executor_key": claimed.run.executor_key,
             "definition_snapshot": claimed.run.definition_snapshot,
+            "effective_config": claimed.run.definition_snapshot.get(
+                "effective_config", {}
+            ),
             "input": claimed.run.input,
             "allowed_roots": list(
                 getattr(settings, "APPLICATION_RUNTIME_ALLOWED_ROOTS", [])
@@ -116,7 +123,9 @@ class ExecutionCoordinator:
         }
 
     def _start_claimed(self, claimed):
-        messages = self._context.Queue()
+        messages = self._context.Queue(
+            maxsize=int(getattr(settings, "EXECUTION_EVENT_QUEUE_SIZE", 1000))
+        )
         cancel_event = self._context.Event()
         # A spawned child must never inherit a live SQLite connection.
         connections.close_all()
@@ -151,6 +160,27 @@ class ExecutionCoordinator:
         fence = self._fence(active)
         outcome = message.get("outcome")
         if outcome == "succeeded":
+            output = message.get("output") or {}
+            schema = (
+                claimed.run.definition_snapshot.get("content", {})
+                .get("output_schema", {})
+            )
+            if schema:
+                try:
+                    from jsonschema.validators import validator_for
+                    validator_type = validator_for(schema)
+                    validator_type.check_schema(schema)
+                    validator_type(schema).validate(output)
+                except Exception as exc:
+                    fail_attempt(
+                        run_id=claimed.run.id,
+                        organization_id=claimed.run.organization_id,
+                        attempt_id=claimed.attempt.id,
+                        lease_fence=fence,
+                        error_code="invalid_executor_output",
+                        error_message=str(exc),
+                    )
+                    return
             run_status = Run.objects.filter(pk=claimed.run.id).values_list(
                 "status", flat=True
             ).first()
@@ -159,14 +189,19 @@ class ExecutionCoordinator:
                 if run_status == Run.Status.CANCELLING
                 else Run.Status.SUCCEEDED
             )
-            finish_attempt(
-                run_id=claimed.run.id,
-                organization_id=claimed.run.organization_id,
-                attempt_id=claimed.attempt.id,
-                lease_fence=fence,
-                outcome=terminal,
-                output_summary=message.get("output") or {},
-            )
+            with transaction.atomic():
+                finish_attempt(
+                    run_id=claimed.run.id,
+                    organization_id=claimed.run.organization_id,
+                    attempt_id=claimed.attempt.id,
+                    lease_fence=fence,
+                    outcome=terminal,
+                    output_summary=output,
+                )
+                if terminal == Run.Status.SUCCEEDED:
+                    from modules.execution.application.projections import project_terminal_run
+                    project_terminal_run(claimed.run.id, output)
+            self._record_usage(claimed, output, "success")
         elif outcome == "cancelled":
             finish_attempt(
                 run_id=claimed.run.id,
@@ -185,6 +220,25 @@ class ExecutionCoordinator:
                 error_code=message.get("error_code") or "child_process_failed",
                 error_message=message.get("error_message") or "Execution child failed",
             )
+            self._record_usage(claimed, {}, "failed")
+
+    @staticmethod
+    def _record_usage(claimed, output, status):
+        from apps.enterprise.services import record_usage
+
+        record_usage(
+            organization=claimed.run.organization,
+            user=claimed.run.owner,
+            resource_type="run",
+            resource_id=claimed.run.id,
+            usage=output.get("usage") or {},
+            model=str(output.get("model") or ""),
+            status=status,
+            metadata={
+                "executor_kind": claimed.run.executor_kind,
+                "executor_key": claimed.run.executor_key,
+            },
+        )
 
     def _handle_message(self, active, message):
         if message.get("kind") == "event":
@@ -285,35 +339,55 @@ class ExecutionCoordinator:
     def _claim_available(self):
         if not self.adapter_entries:
             return
-        while not self._stopping and self.active_count < self.max_children:
-            claimed = claim_next_run(
-                worker_id=self.worker_id,
-                worker_pool=self.worker_pool,
-                lease_seconds=self.lease_seconds,
-                executor_keys=tuple(self.adapter_entries),
-            )
-            if claimed is None:
-                return
-            try:
-                self._start_claimed(claimed)
-            except Exception as exc:
-                fail_attempt(
-                    run_id=claimed.run.id,
-                    organization_id=claimed.run.organization_id,
-                    attempt_id=claimed.attempt.id,
-                    lease_fence=LeaseFence(
-                        token=claimed.lease.token,
-                        epoch=claimed.lease.epoch,
-                    ),
-                    error_code="child_process_start_failed",
-                    error_message=str(exc),
-                )
+        organization_ids = list(
+            Organization.objects.filter(is_active=True).values_list("id", flat=True)
+        )
+        made_progress = True
+        while made_progress and not self._stopping and self.active_count < self.max_children:
+            made_progress = False
+            for organization_id in organization_ids:
+                if self.active_count >= self.max_children:
+                    break
+                with tenant_database_context(organization_id):
+                    claimed = claim_next_run(
+                        worker_id=self.worker_id,
+                        worker_pool=self.worker_pool,
+                        lease_seconds=self.lease_seconds,
+                        executor_keys=tuple(self.adapter_entries),
+                    )
+                if claimed is None:
+                    continue
+                made_progress = True
+                try:
+                    self._start_claimed(claimed)
+                except Exception as exc:
+                    with tenant_database_context(organization_id):
+                        fail_attempt(
+                            run_id=claimed.run.id,
+                            organization_id=claimed.run.organization_id,
+                            attempt_id=claimed.attempt.id,
+                            lease_fence=LeaseFence(
+                                token=claimed.lease.token,
+                                epoch=claimed.lease.epoch,
+                            ),
+                            error_code="child_process_start_failed",
+                            error_message=str(exc),
+                        )
 
     def tick(self, *, allow_claim=True):
-        reap_expired_leases(limit=100)
-        expire_waiting_inputs(limit=100)
+        now = time.monotonic()
+        if now >= self._next_maintenance_at:
+            for organization_id in Organization.objects.filter(
+                is_active=True
+            ).values_list("id", flat=True):
+                with tenant_database_context(organization_id):
+                    reap_expired_leases(limit=100)
+                    expire_waiting_inputs(limit=100)
+            cache.set(f"execution-worker:{self.worker_pool}", self.worker_id, 15)
+            self._next_maintenance_at = now + 5
         for attempt_id, active in list(self._active.items()):
-            self._service_child(attempt_id, active)
+            with tenant_database_context(active.claimed.run.organization_id):
+                self._service_child(attempt_id, active)
         if allow_claim:
             self._claim_available()
 
@@ -340,8 +414,3 @@ class ExecutionCoordinator:
                 active.process.join(timeout=1)
             active.messages.close()
             self._active.pop(attempt_id, None)
-
-
-# Compatibility import for callers written before the local/cluster paths were
-# unified. New code should use ExecutionCoordinator.
-SQLiteExecutionCoordinator = ExecutionCoordinator

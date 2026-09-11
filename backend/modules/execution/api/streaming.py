@@ -15,6 +15,9 @@ class StreamAccessLost(Exception):
     pass
 
 
+TERMINAL_EVENT_TYPES = {"run.succeeded", "run.failed", "run.cancelled"}
+
+
 def encode_event(event):
     envelope = RunEventSerializer(event).data
     data = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
@@ -79,12 +82,18 @@ async def stream_run_events(
                     cursor = event.sequence
                     last_write = time.monotonic()
                     yield encode_event(event)
+                    if event.type in TERMINAL_EVENT_TYPES:
+                        return
                 # Drain the factual database before waiting on notifications.
                 if len(events) == batch_size:
                     continue
 
             elapsed = time.monotonic() - last_write
-            wait_seconds = min(poll_interval, max(0.0, heartbeat_interval - elapsed))
+            wait_seconds = (
+                min(poll_interval, max(0.0, heartbeat_interval - elapsed))
+                if channel_name is None
+                else max(0.0, heartbeat_interval - elapsed)
+            )
             if channel_name is None:
                 await asyncio.sleep(wait_seconds)
             else:

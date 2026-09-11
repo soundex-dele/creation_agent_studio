@@ -50,3 +50,25 @@ export interface RunEventSnapshotEnvelope {
   created_at: string;
   updated_at: string;
 }
+
+export interface AgentQuestionOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface AgentQuestion {
+  header: string;
+  question: string;
+  kind: 'question' | 'permission';
+  options: AgentQuestionOption[];
+}
+
+export interface AgentToolCall {
+  id: string;
+  name: string;
+  input?: string;
+  result?: string;
+  status: string;
+  error_message?: string;
+}

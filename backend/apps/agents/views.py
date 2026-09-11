@@ -6,6 +6,7 @@ from django.db.models import OuterRef, Q, Subquery
 from django.db.models.deletion import ProtectedError
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from uuid import uuid4
 from .models import AgentCategory, Agent
 from modules.catalog.errors import (
     DeploymentRollbackUnavailable, DeploymentVersionConflict,
@@ -21,11 +22,12 @@ from .serializers import (
     AgentCategorySerializer,
     AgentListSerializer,
     AgentDetailSerializer,
-    AgentExecutionSerializer,
     ExecuteAgentSerializer, AgentWriteSerializer, AgentDeploymentSerializer,
     AgentRevisionSerializer,
 )
-from .services.agent_service import AgentService
+from modules.execution.api.serializers import RunSerializer
+from modules.execution.application.start_runs import start_agent_run
+from modules.execution.models import Run
 from .filters import AgentFilter
 
 class AgentCategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -225,20 +227,28 @@ class AgentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def execute(self, request, pk=None):
         agent = self.get_object()
+        from apps.enterprise.models import Membership
+        self.require_agent_role(request, agent, (
+            Membership.Role.OWNER, Membership.Role.ADMIN,
+            Membership.Role.OPERATOR, Membership.Role.DEVELOPER,
+        ))
         serializer = ExecuteAgentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        execution = AgentService.execute(
-            agent=agent,
-            user=request.user,
-            input_data=serializer.validated_data['input_data']
+        run, _ = start_agent_run(
+            organization_id=agent.organization_id,
+            agent_id=agent.id,
+            actor=request.user,
+            environment=request.data.get('environment', 'production'),
+            input_data=serializer.validated_data['input_data'],
+            idempotency_key=(
+                request.headers.get('Idempotency-Key') or str(uuid4())
+            ),
         )
-        return Response(
-            AgentExecutionSerializer(execution).data,
-            status=status.HTTP_200_OK if execution.status == 'completed' else status.HTTP_202_ACCEPTED
-        )
+        return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=False, methods=['get'])
     def my_executions(self, request):
-        executions = request.user.agent_executions.all()[:20]
-        serializer = AgentExecutionSerializer(executions, many=True)
-        return Response(serializer.data)
+        runs = Run.objects.filter(
+            owner=request.user, executor_kind=Run.ExecutorKind.AGENT
+        ).order_by('-created_at')[:20]
+        return Response(RunSerializer(runs, many=True).data)

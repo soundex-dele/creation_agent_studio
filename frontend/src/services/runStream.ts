@@ -40,6 +40,12 @@ export interface RunStreamHandle {
   done: Promise<void>;
 }
 
+const TERMINAL_RUN_EVENTS = new Set([
+  'run.succeeded',
+  'run.failed',
+  'run.cancelled',
+]);
+
 function assertEnvelope(value: unknown): RunEventEnvelope {
   if (!value || typeof value !== 'object') throw new Error('Invalid RunEvent payload');
   const event = value as Partial<RunEventEnvelope>;
@@ -289,6 +295,10 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
           });
           for (const event of frames.push(decoded, complete)) {
             await sequencer.accept(event);
+            if (TERMINAL_RUN_EVENTS.has(event.type)) {
+              controller.abort();
+              break;
+            }
           }
         }
         options.onConnectionChange?.(false);

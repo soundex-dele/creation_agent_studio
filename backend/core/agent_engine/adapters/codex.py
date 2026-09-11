@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import sys
 import threading
-import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -19,13 +18,7 @@ from django.conf import settings
 
 from ..messages import format_messages_for_query
 from ..models import LLMResponse, TokenUsage
-from .base import (
-    AgentAdapter,
-    AgentEvent,
-    EventType,
-    OperationStatus,
-    ProgressCategory,
-)
+from .base import AgentAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -452,16 +445,6 @@ def _enum_value(value) -> str:
     return str(getattr(value, "value", value) or "")
 
 
-def _json_value(value) -> str:
-    if value is None:
-        return ""
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json", by_alias=True, exclude_none=True)
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False, default=str)
-
-
 def _usage_payload(token_usage) -> dict:
     if token_usage is None:
         return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -499,229 +482,6 @@ def _approval_mode(sdk):
         return values[configured]
     except KeyError as exc:
         raise ValueError("CODEX_APPROVAL_MODE must be auto_review or deny_all") from exc
-
-
-class CodexSession:
-    """Bridge a Codex thread's push stream to the runtime polling contract."""
-
-    adapter_name = "codex"
-    content_mode = "delta"
-
-    def __init__(self, *, key: str, client, thread, model: str) -> None:
-        self.key = key
-        self._client = client
-        self._thread = thread
-        self._model = model
-        self.agent_id = thread.id
-        self.created_at = time.monotonic()
-        self.last_used_at = self.created_at
-        self.stream_lock = threading.Lock()
-        self.configuration_key: tuple = ()
-        self.is_new = True
-        self._events: queue.Queue[AgentEvent] = queue.Queue()
-        self._turn = None
-        self._worker: Optional[threading.Thread] = None
-        self._usage: Optional[dict] = None
-        self._item_content: dict[str, str] = {}
-
-    def submit(
-        self,
-        text: str,
-        *,
-        system_prompt: str = "",
-        preload_skills: Optional[list[str]] = None,
-    ) -> None:
-        if self._worker is not None and self._worker.is_alive():
-            raise RuntimeError("This Codex session already has an active turn")
-        skill_hint = ""
-        if preload_skills:
-            skill_hint = "Selected skills: " + ", ".join(preload_skills) + "\n\n"
-        self._item_content = {}
-        self._usage = None
-        self._turn = self._thread.turn(skill_hint + text, model=self._model or None)
-        self._worker = threading.Thread(target=self._consume_turn, daemon=True)
-        self._worker.start()
-        self.last_used_at = time.monotonic()
-
-    def _consume_turn(self) -> None:
-        terminal_seen = False
-        try:
-            for notification in self._turn.stream():
-                event = self._normalize_notification(notification)
-                if event is None:
-                    continue
-                if event.type in (EventType.COMPLETED, EventType.FAILED, EventType.CANCELLED):
-                    terminal_seen = True
-                self._events.put(event)
-        except Exception as exc:
-            logger.exception("Codex turn failed for session %s", self.key)
-            self._events.put(
-                AgentEvent(
-                    type=EventType.FAILED,
-                    agent_id=self.agent_id,
-                    error_code="codex_error",
-                    error_message=str(exc),
-                )
-            )
-        finally:
-            if not terminal_seen:
-                self._events.put(
-                    AgentEvent(
-                        type=EventType.FAILED,
-                        agent_id=self.agent_id,
-                        error_code="stream_closed",
-                        error_message="Codex event stream closed before completion",
-                    )
-                )
-
-    def _normalize_notification(self, notification) -> Optional[AgentEvent]:
-        method = notification.method
-        payload = notification.payload
-        if method == "item/agentMessage/delta":
-            delta = payload.delta or ""
-            item_id = getattr(payload, "item_id", "")
-            self._item_content[item_id] = self._item_content.get(item_id, "") + delta
-            return AgentEvent(
-                type=EventType.PROGRESS,
-                agent_id=self.agent_id,
-                content=delta,
-                progress_category=ProgressCategory.CONTENT,
-                query_id=getattr(payload, "turn_id", ""),
-                request_id=item_id,
-            )
-        if method == "thread/tokenUsage/updated":
-            self._usage = _usage_payload(payload.token_usage)
-            return None
-        if method in ("item/started", "item/completed"):
-            item = getattr(payload.item, "root", payload.item)
-            item_type = getattr(item, "type", "")
-            if item_type == "agentMessage" and method == "item/completed":
-                final_text = getattr(item, "text", "") or ""
-                item_id = getattr(item, "id", "")
-                if final_text and not self._item_content.get(item_id):
-                    self._item_content[item_id] = final_text
-                    return AgentEvent(
-                        type=EventType.PROGRESS,
-                        agent_id=self.agent_id,
-                        content=final_text,
-                        progress_category=ProgressCategory.CONTENT,
-                        query_id=getattr(payload, "turn_id", ""),
-                        request_id=getattr(item, "id", ""),
-                    )
-                return None
-            tool_call = self._tool_call(item, started=method == "item/started")
-            if tool_call is not None:
-                return AgentEvent(
-                    type=(EventType.TOOL_START if method == "item/started" else EventType.TOOL_END),
-                    agent_id=self.agent_id,
-                    query_id=getattr(payload, "turn_id", ""),
-                    request_id=getattr(item, "id", ""),
-                    tool_call=tool_call,
-                )
-            return None
-        if method == "turn/completed":
-            turn = payload.turn
-            status = _enum_value(turn.status)
-            if status == "completed":
-                return AgentEvent(
-                    type=EventType.COMPLETED,
-                    agent_id=self.agent_id,
-                    query_id=turn.id,
-                    usage=self._usage or _usage_payload(None),
-                )
-            if status == "interrupted":
-                return AgentEvent(
-                    type=EventType.CANCELLED,
-                    agent_id=self.agent_id,
-                    query_id=turn.id,
-                )
-            error = getattr(turn, "error", None)
-            return AgentEvent(
-                type=EventType.FAILED,
-                agent_id=self.agent_id,
-                query_id=turn.id,
-                error_code="codex_turn_failed",
-                error_message=getattr(error, "message", "") or f"Codex turn {status}",
-            )
-        return None
-
-    def _tool_call(self, item, *, started: bool) -> Optional[dict]:
-        item_type = getattr(item, "type", "")
-        if item_type == "commandExecution":
-            return {
-                "id": item.id,
-                "name": "command",
-                "input": _json_value({"command": item.command, "cwd": str(item.cwd)}),
-                "result": "" if started else (item.aggregated_output or ""),
-                "status": "running" if started else _enum_value(item.status),
-                "error_message": "",
-            }
-        if item_type == "fileChange":
-            return {
-                "id": item.id,
-                "name": "apply_patch",
-                "input": _json_value(item.changes),
-                "result": "" if started else _enum_value(item.status),
-                "status": "running" if started else _enum_value(item.status),
-                "error_message": "",
-            }
-        if item_type in ("mcpToolCall", "dynamicToolCall"):
-            name = getattr(item, "tool", item_type)
-            server = getattr(item, "server", "")
-            if server:
-                name = f"{server}.{name}"
-            error = getattr(item, "error", None)
-            return {
-                "id": item.id,
-                "name": name,
-                "input": _json_value(getattr(item, "arguments", None)),
-                "result": "" if started else _json_value(getattr(item, "result", None)),
-                "status": "running" if started else _enum_value(item.status),
-                "error_message": _json_value(error),
-            }
-        if item_type == "webSearch":
-            return {
-                "id": item.id,
-                "name": "web_search",
-                "input": _json_value(getattr(item, "query", "")),
-                "result": "",
-                "status": "running" if started else "completed",
-                "error_message": "",
-            }
-        return None
-
-    def wait_for_event(self, timeout: float = 15.0) -> Optional[AgentEvent]:
-        try:
-            event = self._events.get(timeout=timeout)
-        except queue.Empty:
-            return None
-        self.last_used_at = time.monotonic()
-        return event
-
-    def resume(self, *, text: str = "", selections: Optional[list[str]] = None):
-        if self._turn is None:
-            raise RuntimeError("No active Codex turn to resume")
-        values = selections or []
-        response = text or (", ".join(values) if values else "Continue")
-        self._turn.steer(response)
-        self.last_used_at = time.monotonic()
-        return OperationStatus("accepted")
-
-    def cancel(self):
-        if self._turn is None or self._worker is None or not self._worker.is_alive():
-            return OperationStatus("not_running")
-        self._turn.interrupt()
-        self.last_used_at = time.monotonic()
-        return OperationStatus("accepted")
-
-    def close(self) -> None:
-        try:
-            self.cancel()
-        except Exception:
-            logger.debug("Codex cancellation failed during close", exc_info=True)
-        if self._worker is not None and self._worker.is_alive():
-            self._worker.join(timeout=2)
-        self._client.close()
 
 
 class CodexAdapter(AgentAdapter):
@@ -773,37 +533,3 @@ class CodexAdapter(AgentAdapter):
             success=success,
             error=(getattr(result.error, "message", None) if result.error else None),
         )
-
-    def create_session(
-        self,
-        key: str,
-        *,
-        system_prompt: str,
-        working_directory: str = "",
-        enable_permissions: Optional[bool] = None,
-        options: Optional[dict] = None,
-    ) -> CodexSession:
-        options = options or {}
-        model = options.get("model") or self.model
-        cwd = working_directory or settings.CODEX_WORKING_DIRECTORY
-        sdk, client = self._client(cwd=cwd)
-        try:
-            thread = client.thread_start(
-                approval_mode=(
-                    sdk.ApprovalMode.deny_all
-                    if enable_permissions
-                    else (
-                        sdk.ApprovalMode.auto_review
-                        if enable_permissions is False
-                        else _approval_mode(sdk)
-                    )
-                ),
-                base_instructions=system_prompt or None,
-                cwd=cwd,
-                model=model or None,
-                sandbox=_sandbox(sdk),
-            )
-        except Exception:
-            client.close()
-            raise
-        return CodexSession(key=key, client=client, thread=thread, model=model)

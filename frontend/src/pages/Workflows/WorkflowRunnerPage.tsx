@@ -1,92 +1,91 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Result, Spin, Tag, message } from 'antd';
-import { ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
-import ApplicationRuntime from '@/components/Applications/ApplicationRuntime';
+import { useEffect, useState } from 'react';
+import { Alert, Button, Card, Descriptions, List, Progress, Space, Spin, Tag, Typography } from 'antd';
+import { useParams } from 'react-router-dom';
+
+import { useRunStream } from '@/hooks/useRunStream';
 import { api } from '@/services/api';
-import type { WorkflowRun, WorkflowStepRun } from '@/types';
-import './Workflows.css';
+import type { RunResource } from '@/services/applicationRuntime';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
+
+const terminal = ['succeeded', 'failed', 'cancelled'];
 
 const WorkflowRunnerPage = () => {
   const { runId } = useParams<{ runId: string }>();
-  const navigate = useNavigate();
-  const [run, setRun] = useState<WorkflowRun | null>(null);
-  const [loading, setLoading] = useState(true);
+  const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
+  const [run, setRun] = useState<RunResource | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const projection = useRunStream({
+    organizationId: organizationId || '',
+    runId: runId || null,
+    enabled: Boolean(organizationId && runId),
+  });
 
-  const load = useCallback(async () => {
-    if (!runId) return;
-    setLoading(true);
-    try {
-      setRun(await api.get<WorkflowRun>(`/workflows/runs/${runId}/`));
-    } finally {
-      setLoading(false);
-    }
-  }, [runId]);
+  useEffect(() => {
+    if (!organizationId || !runId) return;
+    api.get<RunResource>(`/organizations/${organizationId}/runs/${runId}`)
+      .then(setRun)
+      .catch((reason: any) => setError(reason?.response?.data?.detail || 'Run 加载失败'));
+  }, [organizationId, runId]);
 
-  useEffect(() => { void load(); }, [load]);
-
-  const selected = useMemo(() => run?.step_runs.find(
-    (item) => item.step.id === run.selected_step_id) ?? run?.step_runs[0], [run]);
-
-  const selectStep = async (stepRun: WorkflowStepRun) => {
-    if (!run) return;
-    try {
-      setRun(await api.post<WorkflowRun>(
-        `/workflows/runs/${run.id}/select-step/`, { step_id: stepRun.step.id }));
-    } catch (error: any) {
-      message.error(error?.response?.data?.detail || '应用切换失败');
-    }
+  const cancel = async () => {
+    if (!organizationId || !runId) return;
+    await api.post(`/organizations/${organizationId}/runs/${runId}/commands`, {
+      type: 'cancel',
+      idempotency_key: crypto.randomUUID(),
+      payload: { reason: 'user_requested' },
+    });
   };
 
-  const complete = async () => {
-    if (!run || !selected) return;
-    setRun(await api.post<WorkflowRun>(
-      `/workflows/runs/${run.id}/complete-step/`, { step_id: selected.step.id }));
-    message.success('已标记完成，可继续选择其他应用');
-  };
+  if (error) return <Alert type="error" showIcon message={error} />;
+  if (!run) return <div style={{ display: 'grid', placeItems: 'center', minHeight: 320 }}><Spin /></div>;
 
-  if (loading) return <div className="workflow-run-loading"><Spin size="large" /></div>;
-  if (!run || !selected) return <Result status="404" title="工作流运行不存在" />;
+  const definition = run.definition_snapshot as {
+    workflow_name?: string;
+    workflow_steps?: Array<{ id: string; name: string }>;
+  };
+  const progress = projection.state.progress;
+  const current = Number(progress?.current ?? 0);
+  const total = Number(progress?.total ?? definition.workflow_steps?.length ?? 0);
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+  const status = projection.state.status || run.status;
 
   return (
-    <div className="workflow-runner">
-      <aside className="workflow-run-sidebar">
-        <div className="workflow-run-brand">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/workflows')} />
-          <div><strong>{run.workflow_name}</strong><span>人工选择应用执行</span></div>
-        </div>
-        <div className="workflow-run-steps">
-          {run.step_runs.map((stepRun, index) => (
-            <button key={stepRun.id}
-              className={`workflow-run-step ${selected.id === stepRun.id ? 'active' : ''}`}
-              onClick={() => selectStep(stepRun)}>
-              <span className="workflow-run-step-number">{index + 1}</span>
-              <span className="workflow-run-step-icon">{stepRun.step.application.application_icon}</span>
-              <span className="workflow-run-step-text">
-                <strong>{stepRun.step.name || stepRun.step.application.application_name}</strong>
-                <small>{stepRun.step.application.kind === 'chat' ? '聊天应用' : '任务应用'}</small>
-              </span>
-              {stepRun.status === 'completed' && <CheckOutlined className="workflow-step-done" />}
-            </button>
-          ))}
-        </div>
-      </aside>
-      <section className="workflow-run-content">
-        <header className="workflow-run-header">
-          <div>
-            <strong>{selected.step.name || selected.step.application.application_name}</strong>
-            <Tag>{selected.step.application.kind}</Tag>
-          </div>
-          <Button icon={<CheckOutlined />} onClick={complete}>标记完成</Button>
-        </header>
-        <main className="workflow-run-application">
-          <ApplicationRuntime key={selected.id}
-            application={selected.step.application}
-            projectId={run.project_id}
-            workflowStepRunId={selected.id} />
-        </main>
-      </section>
-    </div>
+    <Space direction="vertical" size="middle" style={{ width: '100%', padding: 24 }}>
+      <Card
+        title={definition.workflow_name || `Run ${run.id}`}
+        extra={<Space>
+          <Tag color={projection.connected ? 'processing' : 'default'}>{status}</Tag>
+          <Button danger disabled={terminal.includes(status)} onClick={cancel}>取消</Button>
+        </Space>}
+      >
+        <Descriptions size="small" column={2}>
+          <Descriptions.Item label="Run ID">{run.id}</Descriptions.Item>
+          <Descriptions.Item label="执行器">{run.executor_kind}/{run.executor_key}</Descriptions.Item>
+        </Descriptions>
+        {total > 0 && <Progress percent={percent} />}
+      </Card>
+      {projection.error && <Alert type="warning" showIcon message="事件流正在重连"
+        description={projection.error.message} />}
+      <Card title="输出">
+        <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
+          {projection.state.output || JSON.stringify(run.output_summary || {}, null, 2) || '等待输出…'}
+        </Typography.Paragraph>
+      </Card>
+      <Card title="步骤">
+        <List
+          dataSource={definition.workflow_steps || []}
+          locale={{ emptyText: '该 Run 没有步骤快照' }}
+          renderItem={(step, index) => (
+            <List.Item>
+              <List.Item.Meta
+                title={`${index + 1}. ${step.name}`}
+                description={index < current ? '已完成' : index === current ? '执行中' : '等待中'}
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </Space>
   );
 };
 

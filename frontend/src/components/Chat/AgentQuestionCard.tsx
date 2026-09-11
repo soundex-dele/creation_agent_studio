@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Input, Radio } from 'antd';
-import type { AgentQuestion } from '@/services/agentProtocol';
+import type { AgentQuestion } from '@/entities/run';
 
 const OTHER_VALUE = '__other__';
 

@@ -30,6 +30,7 @@ def enable_rls(apps, schema_editor):
     with schema_editor.connection.cursor() as cursor:
         for table in DIRECT_TABLES:
             cursor.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+            cursor.execute(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
             cursor.execute(
                 f'CREATE POLICY "tenant_isolation" ON "{table}" '
                 "USING (organization_id = NULLIF(current_setting("
@@ -39,6 +40,7 @@ def enable_rls(apps, schema_editor):
             )
         for table, expression in INDIRECT_POLICIES.items():
             cursor.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+            cursor.execute(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
             cursor.execute(
                 f'CREATE POLICY "tenant_isolation" ON "{table}" '
                 f"USING ({expression}) WITH CHECK ({expression})"

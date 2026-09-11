@@ -3,7 +3,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from .models import (
-    Agent, AgentCategory, AgentExecution, AgentSkillBinding,
+    Agent, AgentCategory, AgentSkillBinding,
 )
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 
@@ -211,15 +211,6 @@ class AgentRevisionSerializer(serializers.ModelSerializer):
             'release_notes', 'created_by_id', 'created_at',
         ]
         read_only_fields = fields
-
-
-class AgentExecutionSerializer(serializers.ModelSerializer):
-    agent_name = serializers.CharField(source='agent.name', read_only=True)
-
-    class Meta:
-        model = AgentExecution
-        fields = ['id', 'agent_name', 'input_data', 'output_data', 'status',
-                  'error_message', 'created_at']
 
 
 class ExecuteAgentSerializer(serializers.Serializer):

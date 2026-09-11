@@ -56,36 +56,13 @@ class Agent(models.Model):
         ordering = ['category__order', 'name']
         db_table = 'agents'
         constraints = [models.UniqueConstraint(
-            fields=['organization', 'slug'], name='unique_agent_slug_per_org')]
+            fields=['organization', 'slug'], name='unique_agent_slug_per_org'),
+            models.UniqueConstraint(
+                fields=['slug'], condition=models.Q(organization__isnull=True),
+                name='unique_global_agent_slug')]
 
     def __str__(self):
         return self.name
-
-
-class AgentExecution(models.Model):
-    """智能体执行记录"""
-    STATUS_CHOICES = [
-        ('pending', '等待中'),
-        ('running', '运行中'),
-        ('completed', '已完成'),
-        ('failed', '失败'),
-    ]
-
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='executions')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agent_executions')
-    input_data = models.JSONField(default=dict)
-    output_data = models.JSONField(default=dict, blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    error_message = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        db_table = 'agent_executions'
-
-    def __str__(self):
-        return f'{self.agent.name} - {self.get_status_display()}'
 
 
 class AgentSkillBinding(models.Model):

@@ -58,6 +58,7 @@ def install_guards(apps, schema_editor):
                     )
             for table in TENANT_TABLES:
                 cursor.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+                cursor.execute(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
                 cursor.execute(
                     f'CREATE POLICY "tenant_isolation" ON "{table}" '
                     "USING (organization_id = NULLIF(current_setting("

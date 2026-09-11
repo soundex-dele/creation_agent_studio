@@ -12,10 +12,14 @@ class ConversationSearchTest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(username='testuser', password='testpass')
         self.client.force_authenticate(user=self.user)
+        organization = self.user.organization_memberships.get().organization
 
-        Conversation.objects.create(user=self.user, title='咖啡制作技巧')
-        Conversation.objects.create(user=self.user, title='视频脚本生成')
-        Conversation.objects.create(user=self.user, title='旅行 Vlog 策划')
+        Conversation.objects.create(
+            user=self.user, organization=organization, title='咖啡制作技巧')
+        Conversation.objects.create(
+            user=self.user, organization=organization, title='视频脚本生成')
+        Conversation.objects.create(
+            user=self.user, organization=organization, title='旅行 Vlog 策划')
 
     def test_search_by_title(self):
         response = self.client.get('/api/conversations/', {'search': '咖啡'})
