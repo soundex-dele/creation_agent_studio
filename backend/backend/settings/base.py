@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'apps.marketplace',
     'apps.enterprise',
     'apps.workflows',
+    'apps.contacts',
 
     # Versioning, tenancy helpers and durable execution extend the product apps.
     'modules.tenancy.apps.TenancyConfig',

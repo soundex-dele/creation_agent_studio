@@ -60,6 +60,10 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
+    if (app.rendererKey === 'contacts') {
+      navigate(`/applications/${app.applicationId}/contacts`);
+      return;
+    }
     navigate(`/applications/${app.applicationId}/run`);
   };
 

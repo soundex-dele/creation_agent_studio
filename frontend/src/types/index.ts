@@ -20,6 +20,7 @@ export interface Agent {
 export * from './template'
 export * from './workflow'
 export * from './workspaceFiles'
+export * from './contact'
 
 // App Types
 export interface AppItem {

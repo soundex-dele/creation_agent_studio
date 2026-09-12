@@ -69,6 +69,10 @@ urlpatterns += [
         'api/organizations/<uuid:organization_id>/',
         include('modules.execution.api.urls'),
     ),
+    path(
+        'api/organizations/<uuid:organization_id>/',
+        include('apps.contacts.urls'),
+    ),
 ]
 
 # Serve media files in development

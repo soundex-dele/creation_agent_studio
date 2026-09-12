@@ -36,7 +36,10 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.enterprise.models",
         "apps.enterprise.tenancy",
     },
-    "modules/tenancy/single_tenant_urls.py": {"apps.enterprise.tenancy"},
+    "modules/tenancy/single_tenant_urls.py": {
+        "apps.contacts.urls",
+        "apps.enterprise.tenancy",
+    },
 }
 
 

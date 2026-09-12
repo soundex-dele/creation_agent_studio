@@ -20,6 +20,7 @@ const WorkflowEditorPage = lazy(() => import('@/pages/Workflows/WorkflowEditorPa
 const WorkflowRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowRunnerPage'));
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
+const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 
 const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
@@ -103,6 +104,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <MainLayout hideSidebar>
           {page(<DurableApplicationRuntimePage />)}
+        </MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/contacts',
+    element: (
+      <ProtectedRoute>
+        <MainLayout hideSidebar>
+          {page(<ContactsPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
