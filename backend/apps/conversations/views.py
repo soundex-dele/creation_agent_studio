@@ -9,8 +9,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.agents.models import Agent, AgentSkillBinding
-from apps.applications.models import Application, ApplicationSkillBinding, Skill
+from apps.agents.models import Agent
+from apps.agents.runtime import get_agent_definition
+from apps.applications.models import Application, Skill
+from apps.applications.serializers import application_definition
 from apps.enterprise.permissions import resolve_organization
 from apps.projects.models import Project
 from apps.projects.services.workspace_files import (
@@ -41,7 +43,7 @@ GENERAL_AGENT_SLUG = "general"
 
 def resolve_agent(agent_id, organization):
     visible = Agent.objects.filter(
-        Q(organization=organization) | Q(organization__isnull=True, is_public=True),
+        Q(organization=organization) | Q(is_public=True),
         is_active=True,
     )
     if agent_id is not None:
@@ -83,7 +85,7 @@ class ConversationViewSet(viewsets.ViewSet):
         application_id = request.query_params.get("application_id")
         project_id = request.query_params.get("project_id")
         if application_id:
-            queryset = queryset.filter(application_id=application_id)
+            queryset = queryset.filter(chat_application_id=application_id)
         if project_id:
             queryset = queryset.filter(project_id=project_id)
             process_id = request.query_params.get("process_id")
@@ -101,10 +103,18 @@ class ConversationViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         organization = resolve_organization(request)
+        if organization is None:
+            return Response(
+                {"detail": "当前用户没有可用的组织工作区。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         application = None
+        chat_application = None
+        chat_definition = None
         if data.get("application_id"):
             application = get_object_or_404(
-                Application.objects.filter(
+                Application.objects.select_related(
+                    "chat_application", "draft").filter(
                     Q(organization=organization)
                     | Q(organization__isnull=True, is_public=True),
                     is_active=True,
@@ -112,20 +122,28 @@ class ConversationViewSet(viewsets.ViewSet):
                 id=data["application_id"],
                 kind=Application.Kind.CHAT,
             )
+            chat_application = application.chat_application
+            chat_definition = application_definition(application)
         requested_agent_id = data.get("agent_id")
         if application is not None:
-            bindings = application.agent_bindings.select_related("agent")
-            binding = (
-                bindings.filter(agent_id=requested_agent_id).first()
-                if requested_agent_id
-                else bindings.filter(is_default=True).first()
-            )
+            bindings = chat_definition.get("agent_bindings", [])
+            binding = next((
+                item for item in bindings
+                if (item.get("agent_id") == requested_agent_id
+                    if requested_agent_id else item.get("is_default"))
+            ), None)
             if binding is None:
                 return Response(
                     {"agent_id": "该智能体不属于当前聊天应用。"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            agent = binding.agent
+            agent = get_object_or_404(
+                Agent.objects.filter(
+                    Q(organization=organization) | Q(is_public=True),
+                    is_active=True,
+                ),
+                id=binding["agent_id"],
+            )
         else:
             agent = resolve_agent(requested_agent_id, organization)
 
@@ -144,30 +162,56 @@ class ConversationViewSet(viewsets.ViewSet):
             )
 
         skill_sources = {}
-        for binding in AgentSkillBinding.objects.filter(
-            agent=agent,
-            mode__in=[AgentSkillBinding.Mode.REQUIRED, AgentSkillBinding.Mode.DEFAULT],
-        ):
+        for binding in get_agent_definition(agent).get("skill_bindings", []):
+            if binding.get("mode") not in ("required", "default"):
+                continue
             source = (
                 ConversationSkillBinding.Source.AGENT_REQUIRED
-                if binding.mode == AgentSkillBinding.Mode.REQUIRED
+                if binding.get("mode") == "required"
                 else ConversationSkillBinding.Source.AGENT_DEFAULT
             )
-            skill_sources[binding.skill_id] = (source, binding.config)
+            skill_sources[str(binding["skill_id"])] = (
+                source, binding.get("config", {}))
         if application:
-            for binding in ApplicationSkillBinding.objects.filter(
-                application=application,
-                mode__in=[
-                    ApplicationSkillBinding.Mode.REQUIRED,
-                    ApplicationSkillBinding.Mode.DEFAULT,
-                ],
-            ):
+            for binding in chat_definition.get("skill_bindings", []):
+                if binding.get("mode") not in ("required", "default"):
+                    continue
                 source = (
                     ConversationSkillBinding.Source.APP_REQUIRED
-                    if binding.mode == ApplicationSkillBinding.Mode.REQUIRED
+                    if binding.get("mode") == "required"
                     else ConversationSkillBinding.Source.APP_DEFAULT
                 )
-                skill_sources[binding.skill_id] = (source, binding.config)
+                skill_sources[str(binding["skill_id"])] = (
+                    source, binding.get("config", {}))
+        requested_skills = {str(item) for item in data.get("skill_ids", [])}
+        if requested_skills:
+            profile = (chat_definition or {}).get("chat_profile", {})
+            if application and not profile.get("allow_extra_skills", False):
+                allowed = {
+                    str(item["skill_id"])
+                    for item in chat_definition.get("skill_bindings", [])
+                }
+                if not requested_skills.issubset(allowed):
+                    return Response(
+                        {"skill_ids": "包含应用未授权的 Skill。"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            skills = list(Skill.objects.filter(
+                id__in=requested_skills,
+                is_active=True,
+            ).filter(
+                Q(visibility=Skill.Visibility.PUBLIC)
+                | Q(owner=request.user)
+                | Q(organization=organization)
+            ))
+            if len(skills) != len(requested_skills):
+                return Response(
+                    {"skill_ids": "包含无权使用的 Skill。"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            for skill in skills:
+                skill_sources[str(skill.id)] = (
+                    ConversationSkillBinding.Source.USER, {})
 
         with transaction.atomic():
             conversation = Conversation.objects.create(
@@ -175,7 +219,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 organization=organization,
                 title=data.get("title", ""),
                 agent=agent,
-                application=application,
+                chat_application=chat_application,
                 project=project,
                 process_id=data.get("process_id", "") or "",
                 working_directory=requested_directory,

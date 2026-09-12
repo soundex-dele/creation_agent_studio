@@ -14,8 +14,8 @@ class Conversation(models.Model):
     )
     title = models.CharField(max_length=200, blank=True)
     agent = models.ForeignKey('agents.Agent', on_delete=models.SET_NULL, null=True, blank=True, related_name='conversations')
-    application = models.ForeignKey(
-        'applications.Application', on_delete=models.PROTECT,
+    chat_application = models.ForeignKey(
+        'applications.ChatApplication', on_delete=models.PROTECT,
         null=True, blank=True, related_name='conversations')
     # Workspace (Project) this conversation belongs to. Legacy/global chats keep this null.
     project = models.ForeignKey(
@@ -34,6 +34,17 @@ class Conversation(models.Model):
     class Meta:
         ordering = ['-updated_at']
         db_table = 'conversations'
+
+    @property
+    def application_id(self):
+        return self.chat_application_id
+
+    @property
+    def application(self):
+        return (
+            self.chat_application.application
+            if self.chat_application_id else None
+        )
 
     def __str__(self):
         return self.title or f'对话 {self.id}'

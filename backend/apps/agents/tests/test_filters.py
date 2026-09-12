@@ -4,9 +4,10 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from apps.agents.models import AgentCategory, Agent
 from apps.applications.models import (
-    Application, ApplicationAgentBinding, ApplicationCategory, Skill,
+    Application, ApplicationCategory, ChatApplication, Skill,
 )
 from apps.enterprise.models import Membership
+from modules.catalog.models import AgentDraft, ApplicationDraft
 
 User = get_user_model()
 
@@ -25,7 +26,6 @@ class AgentFilterTest(TestCase):
             slug='video-script-generator',
             description='自动生成短视频脚本',
             category=self.cat_video,
-            system_prompt='You are a script writer.',
             is_public=True,
             created_by=self.user
         )
@@ -34,7 +34,6 @@ class AgentFilterTest(TestCase):
             slug='copywriting-assistant',
             description='生成种草推荐文案',
             category=self.cat_write,
-            system_prompt='You are a copywriter.',
             is_public=True,
             created_by=self.user
         )
@@ -114,10 +113,10 @@ class AgentFilterTest(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 201)
         agent = Agent.objects.get(slug='story-helper')
-        self.assertEqual(agent.system_prompt, '你是一位故事结构顾问。')
+        self.assertEqual(agent.draft.content['system_prompt'], '你是一位故事结构顾问。')
         self.assertEqual(
-            list(agent.skill_bindings.values_list('skill_id', flat=True)),
-            [skill.id],
+            agent.draft.content['skill_bindings'][0]['skill_id'],
+            str(skill.id),
         )
 
         detail = self.client.get(f'/api/agents/{agent.id}/')
@@ -131,8 +130,9 @@ class AgentFilterTest(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 200)
         agent.refresh_from_db()
-        self.assertEqual(agent.system_prompt, '你是一位资深故事结构顾问。')
-        self.assertFalse(agent.skill_bindings.exists())
+        agent.draft.refresh_from_db()
+        self.assertEqual(agent.draft.content['system_prompt'], '你是一位资深故事结构顾问。')
+        self.assertEqual(agent.draft.content['skill_bindings'], [])
 
         response = self.client.delete(f'/api/agents/{agent.id}/')
         self.assertEqual(response.status_code, 204)
@@ -165,7 +165,6 @@ class AgentFilterTest(TestCase):
             slug='bound-agent',
             description='x',
             category=self.cat_write,
-            system_prompt='x',
             created_by=self.user,
             organization=organization,
         )
@@ -178,9 +177,16 @@ class AgentFilterTest(TestCase):
             description='x',
             created_by=self.user,
             organization=organization,
+            kind=Application.Kind.CHAT,
         )
-        ApplicationAgentBinding.objects.create(
-            application=application, agent=agent, is_default=True)
+        ChatApplication.objects.create(application=application)
+        ApplicationDraft.objects.create(
+            organization=organization, application=application,
+            updated_by=self.user, content={
+                'kind': 'chat', 'executor_kind': 'agent',
+                'executor_key': 'chat', 'renderer_key': 'chat',
+                'agent_bindings': [{'agent_id': agent.id, 'is_default': True}],
+            })
 
         response = self.client.delete(f'/api/agents/{agent.id}/')
 

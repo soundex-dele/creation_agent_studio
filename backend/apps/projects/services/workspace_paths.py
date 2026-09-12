@@ -78,7 +78,7 @@ def conversation_working_directory(conversation) -> str:
         if (
             conversation.application_id
             and project.application_id is None
-            and not (project.structure or {}).get('workflow_id')
+            and not project.workflow_id
             and not project.working_directory
         ):
             project.application_id = conversation.application_id

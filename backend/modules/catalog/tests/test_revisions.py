@@ -35,7 +35,6 @@ def agent_with_draft(catalog_organization, catalog_owner):
         name="Writer",
         slug="writer",
         description="Writer agent",
-        system_prompt="Write clearly.",
     )
     draft = AgentDraft.objects.create(
         organization=catalog_organization,

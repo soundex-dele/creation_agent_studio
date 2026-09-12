@@ -18,7 +18,7 @@ from modules.catalog.models import (
     ApplicationRevision,
     DeploymentEnvironment,
 )
-from apps.applications.models import ApplicationCategory
+from apps.applications.models import ApplicationCategory, ChatApplication
 from modules.catalog.services import (
     canonical_content_hash,
     publish_application,
@@ -151,6 +151,7 @@ class OrganizationApplicationsView(ProblemDetailsAPIView):
                         },
                     )
                 content = serializer.validated_data["content"]
+                kind = content.get("kind", Application.Kind.CUSTOM)
                 application = Application.objects.create(
                     organization=request.organization,
                     created_by=request.user,
@@ -158,12 +159,10 @@ class OrganizationApplicationsView(ProblemDetailsAPIView):
                     name=serializer.validated_data["name"],
                     slug=serializer.validated_data["slug"],
                     description=serializer.validated_data["description"],
-                    executor_key=str(content.get("executor_key") or ""),
-                    renderer_key=str(content.get("renderer_key") or ""),
-                    input_schema=content.get("input_schema") or {},
-                    output_schema=content.get("output_schema") or {},
-                    default_config=content.get("default_config") or {},
+                    kind=kind,
                 )
+                if kind == Application.Kind.CHAT:
+                    ChatApplication.objects.create(application=application)
                 draft = ApplicationDraft.objects.create(
                     organization=request.organization,
                     application=application,

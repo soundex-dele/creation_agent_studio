@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from apps.applications.models import Application, ApplicationCategory
 from modules.catalog.models import (
     ApplicationDeployment,
+    ApplicationDraft,
     ApplicationRevision,
     DeploymentEnvironment,
 )
@@ -32,16 +33,22 @@ class WorkflowApiTest(TestCase):
                 created_by=self.user,
                 organization=self.organization,
                 kind=Application.Kind.TASK,
-                renderer_key="generic-task",
-                executor_key="batch-transcribe",
             )
             content = {
+                "kind": "task",
                 "executor_kind": "media",
                 "executor_key": "batch-transcribe",
+                "renderer_key": "generic-task",
                 "input_schema": {},
                 "output_schema": {},
                 "default_config": {},
             }
+            ApplicationDraft.objects.create(
+                organization=self.organization,
+                application=application,
+                updated_by=self.user,
+                content=content,
+            )
             revision = ApplicationRevision.objects.create(
                 organization=self.organization,
                 application=application,

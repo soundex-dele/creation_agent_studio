@@ -1,6 +1,7 @@
 import type { RunStreamHandle, RunStreamOptions } from './runStream';
 import { streamRunEvents } from './runStream';
 import { api } from './api';
+import type { ApplicationDefinition } from '@/types/application';
 
 
 export type DeploymentEnvironment = 'development' | 'staging' | 'production';
@@ -51,7 +52,7 @@ export interface ApplicationRuntimeDescriptor {
   revision_no: number;
   content_hash: string;
   schema_version: number;
-  definition: Record<string, unknown>;
+  definition: ApplicationDefinition;
 }
 
 export interface CursorPage<T> {

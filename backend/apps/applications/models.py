@@ -25,7 +25,7 @@ class ApplicationCategory(models.Model):
 
 
 class Application(models.Model):
-    """应用及其当前运行配置。"""
+    """Stable application identity and catalog metadata."""
 
     class Kind(models.TextChoices):
         CHAT = 'chat', '聊天应用'
@@ -55,11 +55,6 @@ class Application(models.Model):
     )
     kind = models.CharField(
         max_length=20, choices=Kind.choices, default=Kind.CUSTOM)
-    renderer_key = models.SlugField(max_length=100, blank=True)
-    executor_key = models.SlugField(max_length=100, blank=True)
-    input_schema = models.JSONField(default=dict, blank=True)
-    output_schema = models.JSONField(default=dict, blank=True)
-    default_config = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -130,141 +125,20 @@ class Skill(models.Model):
         return self.name
 
 
-class ChatApplicationProfile(models.Model):
-    class ConversationPolicy(models.TextChoices):
-        NEW_EACH_OPEN = 'new_each_open', '每次新建'
-        RESUME_LAST = 'resume_last', '继续最近对话'
-        CHOOSE_HISTORY = 'choose_history', '选择历史对话'
+class ChatApplication(models.Model):
+    """Marker subtype for applications whose definition follows the chat schema.
 
-    class StarterLayout(models.TextChoices):
-        CARDS = 'cards', '卡片'
-        LIST = 'list', '列表'
-        COMPACT = 'compact', '紧凑'
+    Runtime configuration deliberately lives in the catalog draft/revision, not
+    on this stable identity.  This keeps metadata and executable definitions
+    from becoming two independently editable sources of truth.
+    """
 
     application = models.OneToOneField(
-        Application, on_delete=models.CASCADE, related_name='chat_profile')
-    welcome_message = models.TextField(blank=True)
-    input_placeholder = models.CharField(max_length=200, blank=True)
-    empty_state_title = models.CharField(max_length=200, blank=True)
-    allow_agent_selection = models.BooleanField(default=False)
-    allow_skill_selection = models.BooleanField(default=True)
-    allow_extra_skills = models.BooleanField(default=False)
-    conversation_policy = models.CharField(
-        max_length=30, choices=ConversationPolicy.choices,
-        default=ConversationPolicy.CHOOSE_HISTORY)
-    starter_layout = models.CharField(
-        max_length=20, choices=StarterLayout.choices, default=StarterLayout.CARDS)
+        Application, on_delete=models.CASCADE, primary_key=True,
+        related_name='chat_application')
 
     class Meta:
-        db_table = 'chat_application_profiles'
+        db_table = 'chat_applications'
 
-
-class ApplicationSkillBinding(models.Model):
-    class Mode(models.TextChoices):
-        REQUIRED = 'required', '必需'
-        DEFAULT = 'default', '默认'
-        OPTIONAL = 'optional', '可选'
-
-    application = models.ForeignKey(
-        Application, on_delete=models.CASCADE, related_name='skill_bindings')
-    skill = models.ForeignKey(
-        Skill, on_delete=models.PROTECT, related_name='application_bindings')
-    mode = models.CharField(max_length=20, choices=Mode.choices, default=Mode.DEFAULT)
-    config = models.JSONField(default=dict, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = 'application_skill_bindings'
-        ordering = ['order', 'id']
-        constraints = [models.UniqueConstraint(
-            fields=['application', 'skill'],
-            name='unique_application_skill_binding')]
-
-
-class ApplicationAgentBinding(models.Model):
-    application = models.ForeignKey(
-        Application, on_delete=models.CASCADE, related_name='agent_bindings')
-    agent = models.ForeignKey(
-        'agents.Agent', on_delete=models.PROTECT, related_name='application_bindings')
-    label = models.CharField(max_length=120, blank=True)
-    is_default = models.BooleanField(default=False)
-    config_overrides = models.JSONField(default=dict, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = 'application_agent_bindings'
-        ordering = ['order', 'id']
-        constraints = [models.UniqueConstraint(
-            fields=['application', 'agent'],
-            name='unique_application_agent_binding')]
-
-
-class GuidedPrompt(models.Model):
-    class Action(models.TextChoices):
-        FILL = 'fill', '填入输入框'
-        PREVIEW = 'preview', '预览后发送'
-        SEND = 'send', '立即发送'
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    application = models.ForeignKey(
-        Application, on_delete=models.CASCADE, related_name='guided_prompts')
-    key = models.SlugField(max_length=100)
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50, blank=True)
-    prompt_template = models.TextField()
-    action = models.CharField(
-        max_length=20, choices=Action.choices, default=Action.PREVIEW)
-    is_featured = models.BooleanField(default=False)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = 'guided_prompts'
-        ordering = ['order', 'title']
-        constraints = [models.UniqueConstraint(
-            fields=['application', 'key'], name='unique_guided_prompt_key')]
-
-
-class GuidedQuestion(models.Model):
-    class Type(models.TextChoices):
-        TEXT = 'text', '文本'
-        SINGLE_CHOICE = 'single_choice', '单选'
-        MULTI_CHOICE = 'multi_choice', '多选'
-        NUMBER = 'number', '数字'
-        FILE = 'file', '文件'
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    guided_prompt = models.ForeignKey(
-        GuidedPrompt, on_delete=models.CASCADE, related_name='questions')
-    key = models.SlugField(max_length=100)
-    label = models.CharField(max_length=200)
-    help_text = models.TextField(blank=True)
-    type = models.CharField(max_length=30, choices=Type.choices)
-    placeholder = models.CharField(max_length=300, blank=True)
-    required = models.BooleanField(default=False)
-    default_value = models.JSONField(null=True, blank=True)
-    validation = models.JSONField(default=dict, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = 'guided_questions'
-        ordering = ['order', 'id']
-        constraints = [models.UniqueConstraint(
-            fields=['guided_prompt', 'key'], name='unique_guided_question_key')]
-
-
-class GuidedOption(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    question = models.ForeignKey(
-        GuidedQuestion, on_delete=models.CASCADE, related_name='options')
-    value = models.CharField(max_length=200)
-    label = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = 'guided_options'
-        ordering = ['order', 'id']
-        constraints = [models.UniqueConstraint(
-            fields=['question', 'value'], name='unique_guided_option_value')]
+    def __str__(self):
+        return self.application.name

@@ -31,10 +31,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         return Workflow.objects.filter(organization=organization).filter(
             Q(owner=self.request.user) | Q(is_public=True)
         ).annotate(step_count=Count("steps")).prefetch_related(
-            "steps__application__chat_profile",
-            "steps__application__agent_bindings__agent",
-            "steps__application__skill_bindings__skill",
-            "steps__application__guided_prompts__questions__options",
+            "steps__application__draft",
         )
 
     def get_serializer_class(self):

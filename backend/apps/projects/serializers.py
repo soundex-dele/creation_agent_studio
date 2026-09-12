@@ -25,7 +25,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return conversation.id if conversation else None
 
     def get_source(self, obj):
-        if (obj.structure or {}).get('workflow_id'):
+        if obj.workflow_id:
             return 'workflow'
         if obj.application_id:
             return 'application'
@@ -39,7 +39,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'status', 'thumbnail',
             'application_id', 'application_slug', 'application_kind', 'conversation_id',
-            'working_directory', 'source', 'created_at', 'updated_at',
+            'workflow_id', 'working_directory', 'source', 'created_at', 'updated_at',
         ]
         read_only_fields = ['application_id', 'working_directory']
 
@@ -53,7 +53,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'structure', 'status', 'thumbnail',
             'application_id', 'application_slug',
-            'working_directory', 'assets', 'created_at', 'updated_at',
+            'workflow_id', 'working_directory', 'assets', 'created_at', 'updated_at',
         ]
         read_only_fields = ['application_id', 'working_directory']
 

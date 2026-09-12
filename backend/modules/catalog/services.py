@@ -3,6 +3,7 @@ import json
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from django.db.models import Q
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
@@ -23,6 +24,7 @@ from .models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
+    ChatApplicationRevision,
     SkillDraft,
     SkillRevision,
 )
@@ -136,7 +138,7 @@ def publish_application(*, application, actor, expected_draft_version, release_n
     if draft is None:
         raise CatalogInvariantViolation("The application does not have a draft")
     try:
-        validate_application_definition(draft.content, schema_version=1)
+        parsed = validate_application_definition(draft.content, schema_version=1)
     except (PydanticValidationError, ValueError) as exc:
         errors = (
             application_definition_errors(exc)
@@ -147,7 +149,36 @@ def publish_application(*, application, actor, expected_draft_version, release_n
             "Application Draft does not satisfy definition schema version 1.",
             errors=errors,
         ) from exc
-    return _publish(
+    if parsed.kind != application.kind:
+        raise InvalidApplicationDefinition(
+            "Application kind and Draft definition kind must match.",
+            errors=[{"field": "kind", "code": "kind_mismatch", "message": "Stable identity and definition kind differ."}],
+        )
+    if application.kind == application.Kind.CHAT:
+        from apps.agents.models import Agent
+        from apps.applications.models import Skill
+        agent_ids = {binding.agent_id for binding in parsed.agent_bindings}
+        allowed_agents = set(Agent.objects.filter(
+            Q(organization=application.organization) | Q(is_public=True),
+            id__in=agent_ids, is_active=True,
+        ).values_list('id', flat=True))
+        if agent_ids != allowed_agents:
+            raise InvalidApplicationDefinition(
+                "Chat definition references unavailable agents.",
+                errors=[{"field": "agent_bindings", "code": "invalid_reference", "message": "Agent is unavailable in this organization."}],
+            )
+        skill_ids = {binding.skill_id for binding in parsed.skill_bindings}
+        allowed_skills = {str(value) for value in Skill.objects.filter(
+            Q(organization=application.organization) |
+            Q(visibility=Skill.Visibility.PUBLIC),
+            id__in=skill_ids, is_active=True,
+        ).values_list('id', flat=True)}
+        if skill_ids != allowed_skills:
+            raise InvalidApplicationDefinition(
+                "Chat definition references unavailable skills.",
+                errors=[{"field": "skill_bindings", "code": "invalid_reference", "message": "Skill is unavailable in this organization."}],
+            )
+    revision = _publish(
         definition=application,
         draft_model=ApplicationDraft,
         revision_model=ApplicationRevision,
@@ -156,6 +187,11 @@ def publish_application(*, application, actor, expected_draft_version, release_n
         expected_draft_version=expected_draft_version,
         release_notes=release_notes,
     )
+    if application.kind == application.Kind.CHAT:
+        if not hasattr(application, "chat_application"):
+            raise CatalogInvariantViolation("Chat application subtype is missing")
+        ChatApplicationRevision.objects.get_or_create(revision=revision)
+    return revision
 
 
 def switch_agent_deployment(
@@ -240,6 +276,22 @@ def _deployment_revision(*, application, revision_id):
     if revision is None:
         raise InvalidDeploymentRevision(
             "The revision does not belong to this application and organization."
+        )
+    try:
+        parsed = validate_application_definition(
+            revision.content, schema_version=revision.schema_version)
+    except (PydanticValidationError, ValueError) as exc:
+        raise InvalidDeploymentRevision(
+            "The revision does not contain a valid application definition."
+        ) from exc
+    if parsed.kind != application.kind:
+        raise InvalidDeploymentRevision(
+            "The revision kind does not match the application subtype."
+        )
+    if (application.kind == application.Kind.CHAT
+            and not hasattr(revision, "chat_revision")):
+        raise InvalidDeploymentRevision(
+            "Chat deployments require a ChatApplicationRevision."
         )
     return revision
 

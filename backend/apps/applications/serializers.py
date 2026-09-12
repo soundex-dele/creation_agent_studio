@@ -1,16 +1,42 @@
+from copy import deepcopy
+
+from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 
-from .models import (
-    Application,
-    ApplicationAgentBinding,
-    ApplicationCategory,
-    ApplicationSkillBinding,
-    ChatApplicationProfile,
-    GuidedOption,
-    GuidedPrompt,
-    GuidedQuestion,
-    Skill,
-)
+from apps.agents.models import Agent
+from modules.catalog.definition import validate_application_definition
+from modules.catalog.models import ApplicationDraft
+
+from .models import Application, ApplicationCategory, ChatApplication, Skill
+
+
+def application_definition(application, *, revision=None):
+    if revision is not None:
+        return deepcopy(revision.content)
+    draft = getattr(application, 'draft', None)
+    return deepcopy(draft.content) if draft is not None else {}
+
+
+def enrich_chat_definition(content):
+    result = deepcopy(content)
+    agent_ids = [item.get('agent_id') for item in result.get('agent_bindings', [])]
+    agents = Agent.objects.in_bulk(agent_ids)
+    for binding in result.get('agent_bindings', []):
+        agent = agents.get(binding.get('agent_id'))
+        if agent:
+            binding.update({
+                'agent_name': agent.name,
+                'agent_slug': agent.slug,
+                'agent_icon': agent.icon,
+            })
+    skill_ids = [item.get('skill_id') for item in result.get('skill_bindings', [])]
+    skills = {str(item.id): item for item in Skill.objects.filter(id__in=skill_ids)}
+    for binding in result.get('skill_bindings', []):
+        skill = skills.get(str(binding.get('skill_id')))
+        if skill:
+            binding.update({'skill_name': skill.name, 'skill_slug': skill.slug})
+    return result
 
 
 class ApplicationCategorySerializer(serializers.ModelSerializer):
@@ -18,7 +44,7 @@ class ApplicationCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ApplicationCategory
-        fields = ["id", "name", "slug", "description", "icon", "order", "app_count"]
+        fields = ['id', 'name', 'slug', 'description', 'icon', 'order', 'app_count']
 
     def get_app_count(self, obj):
         return obj.applications.filter(is_public=True).count()
@@ -28,133 +54,223 @@ class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill
         fields = [
-            "id", "slug", "name", "description", "visibility", "source_type",
-            "source_uri", "artifact_key", "manifest", "content_hash", "is_active",
-            "created_at", "updated_at",
+            'id', 'slug', 'name', 'description', 'visibility', 'source_type',
+            'source_uri', 'artifact_key', 'manifest', 'content_hash', 'is_active',
+            'created_at', 'updated_at',
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-
-class GuidedOptionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GuidedOption
-        fields = ["id", "value", "label", "description", "icon", "order"]
-        read_only_fields = ["id"]
-
-
-class GuidedQuestionSerializer(serializers.ModelSerializer):
-    options = GuidedOptionSerializer(many=True, required=False)
-
-    class Meta:
-        model = GuidedQuestion
-        fields = [
-            "id", "key", "label", "help_text", "type", "placeholder", "required",
-            "default_value", "validation", "order", "options",
-        ]
-        read_only_fields = ["id"]
-
-
-class GuidedPromptSerializer(serializers.ModelSerializer):
-    questions = GuidedQuestionSerializer(many=True, required=False)
-
-    class Meta:
-        model = GuidedPrompt
-        fields = [
-            "id", "key", "title", "description", "icon", "prompt_template",
-            "action", "is_featured", "order", "questions",
-        ]
-        read_only_fields = ["id"]
-
-
-class ChatApplicationProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatApplicationProfile
-        exclude = ["application"]
-
-
-class ApplicationAgentBindingSerializer(serializers.ModelSerializer):
-    agent_id = serializers.IntegerField()
-    agent_name = serializers.CharField(source="agent.name", read_only=True)
-    agent_slug = serializers.CharField(source="agent.slug", read_only=True)
-    agent_icon = serializers.CharField(source="agent.icon", read_only=True)
-
-    class Meta:
-        model = ApplicationAgentBinding
-        fields = [
-            "id", "agent_id", "agent_name", "agent_slug", "agent_icon", "label",
-            "is_default", "config_overrides", "order",
-        ]
-
-
-class ApplicationSkillBindingSerializer(serializers.ModelSerializer):
-    skill_id = serializers.UUIDField()
-    skill_name = serializers.CharField(source="skill.name", read_only=True)
-    skill_slug = serializers.CharField(source="skill.slug", read_only=True)
-
-    class Meta:
-        model = ApplicationSkillBinding
-        fields = [
-            "id", "skill_id", "skill_name", "skill_slug", "mode", "config", "order",
-        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class ApplicationRuntimeSerializer(serializers.ModelSerializer):
-    application_id = serializers.IntegerField(source="id", read_only=True)
+    application_id = serializers.IntegerField(source='id', read_only=True)
     organization_id = serializers.UUIDField(read_only=True, allow_null=True)
-    application_slug = serializers.CharField(source="slug", read_only=True)
-    application_name = serializers.CharField(source="name", read_only=True)
-    application_description = serializers.CharField(source="description", read_only=True)
-    application_icon = serializers.CharField(source="icon", read_only=True)
-    application_color = serializers.CharField(source="color", read_only=True)
-    chat_profile = ChatApplicationProfileSerializer(read_only=True)
-    agent_bindings = ApplicationAgentBindingSerializer(many=True, read_only=True)
-    skill_bindings = ApplicationSkillBindingSerializer(many=True, read_only=True)
-    guided_prompts = GuidedPromptSerializer(many=True, read_only=True)
+    application_slug = serializers.CharField(source='slug', read_only=True)
+    application_name = serializers.CharField(source='name', read_only=True)
+    application_description = serializers.CharField(source='description', read_only=True)
+    application_icon = serializers.CharField(source='icon', read_only=True)
+    application_color = serializers.CharField(source='color', read_only=True)
 
     class Meta:
         model = Application
         fields = [
-            "id", "application_id", "organization_id", "application_slug", "application_name",
-            "application_description", "application_icon", "application_color",
-            "kind", "renderer_key", "executor_key", "input_schema", "output_schema",
-            "default_config", "chat_profile", "agent_bindings", "skill_bindings",
-            "guided_prompts", "created_at", "updated_at",
+            'id', 'application_id', 'organization_id', 'application_slug',
+            'application_name', 'application_description', 'application_icon',
+            'application_color', 'kind', 'created_at', 'updated_at',
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        definition = application_definition(
+            instance, revision=self.context.get('revision'))
+        if instance.kind == Application.Kind.CHAT:
+            definition = enrich_chat_definition(definition)
+        data.update(definition)
+        return data
+
+
+class ApplicationWriteSerializer(serializers.ModelSerializer):
+    renderer_key = serializers.CharField(required=True)
+    executor_key = serializers.CharField(required=True)
+    input_schema = serializers.JSONField(required=False, default=dict)
+    output_schema = serializers.JSONField(required=False, default=dict)
+    default_config = serializers.JSONField(required=False, default=dict)
+    chat_profile = serializers.JSONField(required=False)
+    agent_bindings = serializers.ListField(
+        child=serializers.DictField(), required=False)
+    skill_bindings = serializers.ListField(
+        child=serializers.DictField(), required=False)
+    guided_prompts = serializers.ListField(
+        child=serializers.DictField(), required=False)
+
+    class Meta:
+        model = Application
+        fields = [
+            'id', 'category', 'name', 'slug', 'description', 'icon', 'color',
+            'tags', 'developer', 'screenshots', 'is_public', 'kind',
+            'renderer_key', 'executor_key', 'input_schema', 'output_schema',
+            'default_config', 'chat_profile', 'agent_bindings', 'skill_bindings',
+            'guided_prompts',
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, attrs):
+        kind = attrs.get('kind', getattr(self.instance, 'kind', Application.Kind.CUSTOM))
+        if self.instance is not None and kind != self.instance.kind:
+            raise serializers.ValidationError(
+                {'kind': '应用类型是稳定身份的一部分，不能就地变更。'})
+        definition = self._definition(attrs, kind)
+        try:
+            validate_application_definition(definition)
+        except Exception as exc:
+            raise serializers.ValidationError({'definition': str(exc)}) from exc
+        request = self.context['request']
+        from apps.enterprise.permissions import resolve_organization
+        organization = resolve_organization(request, required=False)
+        agent_ids = {item['agent_id'] for item in definition.get('agent_bindings', [])}
+        if agent_ids:
+            access = Q(is_public=True) | Q(created_by=request.user)
+            if organization is not None:
+                access |= Q(organization=organization)
+            allowed = set(Agent.objects.filter(
+                access, id__in=agent_ids).values_list('id', flat=True))
+            if allowed != agent_ids:
+                raise serializers.ValidationError(
+                    {'agent_bindings': '包含无权使用的智能体。'})
+        skill_ids = {item['skill_id'] for item in definition.get('skill_bindings', [])}
+        if skill_ids:
+            access = Q(visibility=Skill.Visibility.PUBLIC) | Q(owner=request.user)
+            if organization is not None:
+                access |= Q(organization=organization)
+            allowed = {str(value) for value in Skill.objects.filter(
+                access, is_active=True, id__in=skill_ids
+            ).values_list('id', flat=True)}
+            if allowed != skill_ids:
+                raise serializers.ValidationError(
+                    {'skill_bindings': '包含无权使用或已停用的 Skill。'})
+        attrs['_definition'] = definition
+        return attrs
+
+    def _definition(self, attrs, kind):
+        current = application_definition(self.instance) if self.instance else {}
+        definition = {
+            **current,
+            'kind': kind,
+            'executor_kind': ('agent' if kind == Application.Kind.CHAT
+                              else attrs.get('default_config', current.get('default_config', {})).get(
+                                  'executor_kind', current.get('executor_kind', 'media'))),
+            'executor_key': attrs.get('executor_key', current.get('executor_key')),
+            'executor_protocol_version': current.get('executor_protocol_version', 1),
+            'renderer_key': attrs.get('renderer_key', current.get('renderer_key')),
+            'renderer_schema_version': current.get('renderer_schema_version', 1),
+            'retry_policy': attrs.get('default_config', current.get('default_config', {})).get(
+                'retry_policy', current.get('retry_policy', {'max_attempts': 3, 'retry_safe': True})),
+            'input_schema': attrs.get('input_schema', current.get('input_schema', {})),
+            'output_schema': attrs.get('output_schema', current.get('output_schema', {})),
+            'default_config': attrs.get('default_config', current.get('default_config', {})),
+        }
+        if kind == Application.Kind.CHAT:
+            definition.update({
+                'chat_profile': attrs.get('chat_profile', current.get('chat_profile', {})),
+                'agent_bindings': attrs.get('agent_bindings', current.get('agent_bindings', [])),
+                'skill_bindings': attrs.get('skill_bindings', current.get('skill_bindings', [])),
+                'guided_prompts': attrs.get('guided_prompts', current.get('guided_prompts', [])),
+            })
+        return definition
+
+    @transaction.atomic
+    def create(self, validated_data):
+        definition = validated_data.pop('_definition')
+        self._pop_definition_fields(validated_data)
+        application = super().create(validated_data)
+        if application.kind == Application.Kind.CHAT:
+            ChatApplication.objects.create(application=application)
+        self._save_draft(application, definition)
+        return application
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        definition = validated_data.pop('_definition')
+        self._pop_definition_fields(validated_data)
+        old_kind = instance.kind
+        application = super().update(instance, validated_data)
+        if application.kind == Application.Kind.CHAT:
+            ChatApplication.objects.get_or_create(application=application)
+        elif old_kind == Application.Kind.CHAT:
+            ChatApplication.objects.filter(application=application).delete()
+        self._save_draft(application, definition)
+        return application
+
+    @staticmethod
+    def _pop_definition_fields(values):
+        for key in (
+            'renderer_key', 'executor_key', 'input_schema', 'output_schema',
+            'default_config', 'chat_profile', 'agent_bindings',
+            'skill_bindings', 'guided_prompts',
+        ):
+            values.pop(key, None)
+
+    def _save_draft(self, application, definition):
+        if application.organization_id is None:
+            return
+        actor = self.context['request'].user
+        draft, created = ApplicationDraft.objects.get_or_create(
+            application=application,
+            defaults={
+                'organization': application.organization,
+                'content': definition,
+                'updated_by': actor,
+            },
+        )
+        if not created:
+            draft.content = definition
+            draft.version += 1
+            draft.updated_by = actor
+            draft.save(update_fields=['content', 'version', 'updated_by', 'updated_at'])
+
+    def to_representation(self, instance):
+        return ApplicationDetailSerializer(instance, context=self.context).data
 
 
 class ApplicationListSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    category_slug = serializers.CharField(source="category.slug", read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_slug = serializers.CharField(source='category.slug', read_only=True)
+    renderer_key = serializers.SerializerMethodField()
+
+    def get_renderer_key(self, obj):
+        return application_definition(obj).get('renderer_key', '')
 
     class Meta:
         model = Application
         fields = [
-            "id", "slug", "name", "description", "icon", "color", "tags",
-            "developer", "category_name", "category_slug", "usage_count", "kind",
-            "renderer_key",
+            'id', 'slug', 'name', 'description', 'icon', 'color', 'tags',
+            'developer', 'category_name', 'category_slug', 'usage_count', 'kind',
+            'renderer_key',
         ]
 
 
 class ApplicationDetailSerializer(ApplicationRuntimeSerializer):
     category = ApplicationCategorySerializer(read_only=True)
-    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+    created_by_username = serializers.CharField(
+        source='created_by.username', read_only=True)
     can_edit = serializers.SerializerMethodField()
 
     def get_can_edit(self, obj):
-        request = self.context.get("request")
-        return bool(
-            request
-            and request.user.is_authenticated
-            and (request.user.is_superuser or obj.created_by_id == request.user.id)
-        )
+        request = self.context.get('request')
+        return bool(request and request.user.is_authenticated and (
+            request.user.is_superuser or obj.created_by_id == request.user.id))
 
     class Meta(ApplicationRuntimeSerializer.Meta):
         fields = ApplicationRuntimeSerializer.Meta.fields + [
-            "tags", "developer", "screenshots", "category", "usage_count",
-            "is_public", "created_by_username", "can_edit",
+            'tags', 'developer', 'screenshots', 'category', 'usage_count',
+            'is_public', 'created_by_username', 'can_edit',
         ]
 
 
+class GenerateImageSerializer(serializers.Serializer):
+    prompt = serializers.CharField(required=True, max_length=2000)
+    size = serializers.CharField(required=False, allow_blank=True)
+
+
 class ComposeGuidedPromptSerializer(serializers.Serializer):
-    prompt_id = serializers.UUIDField()
+    prompt_id = serializers.CharField()
     answers = serializers.DictField(required=False, default=dict)

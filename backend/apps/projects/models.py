@@ -17,6 +17,9 @@ class Project(models.Model):
     application = models.ForeignKey(
         'applications.Application', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='projects')
+    workflow = models.ForeignKey(
+        'workflows.Workflow', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='projects')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     structure = models.JSONField(default=dict)
@@ -29,6 +32,10 @@ class Project(models.Model):
     class Meta:
         ordering = ['-updated_at']
         db_table = 'projects'
+        constraints = [models.CheckConstraint(
+            check=(models.Q(application__isnull=True) |
+                   models.Q(workflow__isnull=True)),
+            name='project_has_single_origin')]
 
     def __str__(self):
         return self.title

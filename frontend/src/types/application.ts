@@ -62,7 +62,7 @@ export interface ChatApplicationProfile {
   starter_layout: 'cards' | 'list' | 'compact';
 }
 
-export interface ApplicationRuntime {
+export interface BaseApplicationRuntime {
   id: number;
   application_id: number;
   organization_id?: string;
@@ -72,15 +72,55 @@ export interface ApplicationRuntime {
   application_description: string;
   application_icon: string;
   application_color?: string;
-  kind: ApplicationKind;
   renderer_key: string;
   executor_key?: string;
   default_config: Record<string, unknown>;
-  chat_profile?: ChatApplicationProfile;
+}
+
+export interface ChatApplicationRuntime extends BaseApplicationRuntime {
+  kind: 'chat';
+  renderer_key: 'chat';
+  chat_profile: ChatApplicationProfile;
   agent_bindings: AgentBinding[];
   skill_bindings: SkillBinding[];
   guided_prompts: GuidedPrompt[];
 }
+
+export interface StandardApplicationRuntime extends BaseApplicationRuntime {
+  kind: 'task' | 'custom';
+}
+
+export type ApplicationRuntime = ChatApplicationRuntime | StandardApplicationRuntime;
+
+export interface BaseApplicationDefinition {
+  executor_kind: 'agent' | 'media' | 'workflow' | 'evaluation';
+  executor_key: string;
+  executor_protocol_version?: number;
+  renderer_key?: string | null;
+  renderer_schema_version?: number;
+  retry_policy?: { max_attempts: number; retry_safe: boolean };
+  input_schema?: Record<string, unknown>;
+  output_schema?: Record<string, unknown>;
+  default_config?: Record<string, unknown>;
+}
+
+export interface ChatApplicationDefinition extends BaseApplicationDefinition {
+  kind: 'chat';
+  executor_kind: 'agent';
+  renderer_key: 'chat';
+  chat_profile: ChatApplicationProfile;
+  agent_bindings: AgentBinding[];
+  skill_bindings: SkillBinding[];
+  guided_prompts: GuidedPrompt[];
+}
+
+export interface StandardApplicationDefinition extends BaseApplicationDefinition {
+  kind: 'task' | 'custom';
+}
+
+export type ApplicationDefinition =
+  | ChatApplicationDefinition
+  | StandardApplicationDefinition;
 
 export interface WorkflowStep {
   id: string;

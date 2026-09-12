@@ -302,18 +302,22 @@ def start_agent_run(
         return replay, True
     with transaction.atomic():
         agent = Agent.objects.select_for_update().filter(
-            Q(organization_id=organization_id) | Q(organization__isnull=True, is_public=True),
+            Q(organization_id=organization_id) | Q(is_public=True),
             pk=agent_id,
             is_active=True,
         ).first()
         if agent is None:
             raise DeploymentUnavailable("Agent is not available")
         deployment = None
-        if agent.organization_id is not None:
-            deployment = AgentDeployment.objects.for_organization(organization_id).select_related(
-                "revision"
-            ).filter(agent=agent, environment=environment).first()
-        if agent.organization_id is not None and deployment is None:
+        if agent.organization_id == organization_id:
+            deployment = AgentDeployment.objects.for_organization(
+                organization_id).select_related("revision").filter(
+                    agent=agent, environment=environment).first()
+        elif agent.is_public:
+            deployment = AgentDeployment.objects.select_related("revision").filter(
+                agent=agent, environment=environment).first()
+        if (agent.organization_id == organization_id
+                and deployment is None):
             raise DeploymentUnavailable(f"Agent has no {environment} deployment")
         registered = getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get("agent", {})
         executor_key = "agent-completion"
@@ -323,15 +327,9 @@ def start_agent_run(
         run_organization = Organization.objects.get(pk=organization_id)
         enforce_quota(run_organization)
         agent_definition = (
-            deployment.revision.content if deployment is not None else {
-                "system_prompt": agent.system_prompt,
-                "model_config": agent.model_config,
-                "tool_config": agent.tool_config,
-                "skill_config": agent.skill_config,
-                "knowledge_config": agent.knowledge_config,
-                "guardrail_config": agent.guardrail_config,
-                "workflow_config": agent.workflow_config,
-            }
+            deployment.revision.content
+            if deployment is not None
+            else dict(agent.draft.content if hasattr(agent, "draft") else {})
         )
         record = IdempotencyRecord.objects.create(
             organization_id=organization_id,

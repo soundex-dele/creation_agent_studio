@@ -356,7 +356,7 @@ AUTH_USER_MODEL = 'users.User'
 DEEPSEEK_API_KEY = config('DEEPSEEK_API_KEY', default='')
 DEEPSEEK_BASE_URL = config('DEEPSEEK_BASE_URL', default='https://api.deepseek.com/v1')
 
-# Agent adapter selection. Individual Agent.model_config values may override
+# Agent adapter selection. Individual deployed Agent definitions may override
 # this with {"adapter": "codex", "model": "..."}.
 AGENT_ENGINE_ADAPTER = config('AGENT_ENGINE_ADAPTER', default='codex')
 

@@ -2,7 +2,7 @@
 Admin configuration for agents app.
 """
 from django.contrib import admin
-from apps.agents.models import AgentCategory, Agent, AgentSkillBinding
+from apps.agents.models import AgentCategory, Agent
 
 
 @admin.register(AgentCategory)
@@ -22,6 +22,3 @@ class AgentAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description', 'slug']
     ordering = ['category__order', 'name']
     readonly_fields = ['created_at', 'updated_at']
-
-
-admin.site.register(AgentSkillBinding)

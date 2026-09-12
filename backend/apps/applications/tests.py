@@ -1,21 +1,35 @@
+from django.core.exceptions import FieldDoesNotExist
 from django.test import TestCase
-from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
 from apps.enterprise.models import Membership, Organization
-from apps.conversations.models import Conversation
-from apps.projects.models import Project
 from apps.users.models import User
-from .models import (
-    Application, ApplicationAgentBinding, ApplicationCategory,
-    ApplicationSkillBinding, ChatApplicationProfile, GuidedOption,
-    GuidedPrompt, GuidedQuestion, Skill,
+from modules.catalog.models import (
+    AgentDraft, ApplicationDraft, ChatApplicationRevision,
 )
-from .services import compose_guided_prompt
+from modules.catalog.services import publish_application
+
+from .models import Application, ApplicationCategory, ChatApplication, Skill
 
 
-class ChatApplicationServiceTest(TestCase):
+class LegacyDefinitionMigrationTest(TestCase):
+    def test_seeded_chat_and_agent_definitions_survive_schema_migration(self):
+        application = Application.objects.get(slug='creative-chat')
+        definition = application.draft.content
+        self.assertIsNotNone(application.organization_id)
+        self.assertEqual(definition['kind'], 'chat')
+        self.assertEqual(definition['renderer_key'], 'chat')
+        self.assertEqual(len(definition['agent_bindings']), 1)
+        self.assertTrue(definition['agent_bindings'][0]['is_default'])
+        self.assertTrue(definition['guided_prompts'])
+
+        agent = Agent.objects.get(slug='general')
+        self.assertIsNotNone(agent.organization_id)
+        self.assertIn('视频创作助手', agent.draft.content['system_prompt'])
+
+
+class ChatApplicationBoundaryTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('app-owner', password='secret')
         self.organization = Organization.objects.create(
@@ -23,216 +37,180 @@ class ChatApplicationServiceTest(TestCase):
         Membership.objects.create(
             organization=self.organization, user=self.user,
             role=Membership.Role.OWNER)
-        app_category = ApplicationCategory.objects.create(
-            name='Test chat', slug='test-chat')
+        self.app_category = ApplicationCategory.objects.create(
+            name='Test apps', slug='test-apps')
         agent_category = AgentCategory.objects.create(
-            name='Test agent', slug='test-agent')
-        agent = Agent.objects.create(
+            name='Test agents', slug='test-agents')
+        self.agent = Agent.objects.create(
             category=agent_category, name='Writer', slug='writer-test',
-            description='Writes', system_prompt='Write', created_by=self.user,
+            description='Writes', created_by=self.user,
             organization=self.organization)
-        self.agent = agent
-        self.application = Application.objects.create(
-            category=app_category, name='Chat', slug='chat-test',
-            description='Chat app', created_by=self.user,
-            organization=self.organization, kind='chat', renderer_key='chat')
-        ChatApplicationProfile.objects.create(application=self.application)
-        ApplicationAgentBinding.objects.create(
-            application=self.application, agent=agent,
-            is_default=True)
-        self.prompt = GuidedPrompt.objects.create(
-            application=self.application, key='copy', title='Copy',
-            prompt_template='主题：{topic}\n语气：{tone}')
-        GuidedQuestion.objects.create(
-            guided_prompt=self.prompt, key='topic', label='主题',
-            type='text', required=True, order=0)
-        tone = GuidedQuestion.objects.create(
-            guided_prompt=self.prompt, key='tone', label='语气',
-            type='single_choice', order=1)
-        GuidedOption.objects.create(
-            question=tone, value='friendly', label='亲切')
+        AgentDraft.objects.create(
+            organization=self.organization, agent=self.agent,
+            updated_by=self.user, content={
+                'system_prompt': 'Write', 'model_config': {},
+                'skill_bindings': [],
+            })
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.headers = {'HTTP_X_ORGANIZATION_ID': str(self.organization.id)}
 
-    def test_compose_guided_prompt_uses_option_label(self):
-        result = compose_guided_prompt(
-            self.prompt, {'topic': '咖啡', 'tone': 'friendly'})
-        self.assertEqual(result['prompt'], '主题：咖啡\n语气：亲切')
-
-    def test_compose_guided_prompt_requires_question(self):
-        with self.assertRaises(ValidationError):
-            compose_guided_prompt(self.prompt, {'tone': 'friendly'})
-
-    def test_chat_application_creates_bound_conversation(self):
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.post('/api/conversations/', {
-            'application_id': self.application.id,
-            'agent_id': self.agent.id,
-        }, format='json', HTTP_X_ORGANIZATION_ID=str(self.organization.id))
-        self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data['application_id'], self.application.id)
-        self.assertEqual(response.data['agent']['id'], self.agent.id)
-
-    def test_application_project_history_identifies_its_conversation(self):
-        project = Project.objects.create(
-            user=self.user,
-            organization=self.organization,
-            application=self.application,
-            title='Chat history',
-        )
-        conversation = Conversation.objects.create(
-            user=self.user,
-            organization=self.organization,
-            application=self.application,
-            project=project,
-            agent=self.agent,
-            title='Distinct conversation',
-        )
-        client = APIClient()
-        client.force_authenticate(self.user)
-
-        response = client.get(
-            '/api/projects/',
-            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
-        )
-
-        self.assertEqual(response.status_code, 200, response.data)
-        projects = response.data.get('results', response.data)
-        item = next(value for value in projects if value['id'] == project.id)
-        self.assertEqual(item['application_kind'], 'chat')
-        self.assertEqual(item['conversation_id'], conversation.id)
-
-    def test_discovery_endpoint_rejects_application_create(self):
-        outsider = User.objects.create_user('outsider', password='secret')
-        other_org = Organization.objects.create(
-            name='Other Studio', slug='other-studio-test', owner=outsider)
-        other_category = AgentCategory.objects.create(
-            name='Other agent', slug='other-agent-test')
-        private_agent = Agent.objects.create(
-            category=other_category, name='Private', slug='private-agent-test',
-            description='Private', system_prompt='Private', is_public=False,
-            created_by=outsider, organization=other_org)
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.post('/api/apps/', {
-            'category': self.application.category_id,
-            'name': 'Rejected app',
-            'slug': 'rejected-app',
-            'description': 'Should fail',
-            'kind': 'chat',
-            'renderer_key': 'chat',
-            'agent_bindings': [{
-                'agent_id': private_agent.id,
-                'is_default': True,
-            }],
-        }, format='json', HTTP_X_ORGANIZATION_ID=str(self.organization.id))
-
-        self.assertEqual(response.status_code, 405, response.data)
-
-    def test_discovery_endpoint_rejects_application_update(self):
-        skill = Skill.objects.create(
-            slug='copy-skill', name='Copy skill', owner=self.user,
-            organization=self.organization, visibility=Skill.Visibility.PUBLIC)
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.patch(
-            f'/api/apps/{self.application.slug}/',
-            {
-                'default_config': {'guided_entry_prompt_key': 'brief'},
+    def _create_chat(self, *, slug='chat-test'):
+        response = self.client.post(
+            f'/api/organizations/{self.organization.id}/applications', {
+            'category_id': self.app_category.id,
+            'name': 'Chat',
+            'slug': slug,
+            'description': 'Chat app',
+            'content': {
+                'kind': 'chat',
+                'executor_kind': 'agent',
+                'renderer_key': 'chat',
+                'executor_key': 'agent-chat',
+                'default_config': {'guided_entry_prompt_key': 'copy'},
+                'chat_profile': {
+                    'welcome_message': 'Welcome',
+                    'allow_agent_selection': False,
+                    'allow_skill_selection': True,
+                    'allow_extra_skills': False,
+                    'starter_layout': 'cards',
+                },
                 'agent_bindings': [{
-                    'agent_id': self.agent.id,
-                    'label': self.agent.name,
-                    'is_default': True,
-                    'order': 0,
-                }],
-                'skill_bindings': [{
-                    'skill_id': str(skill.id),
-                    'mode': 'default',
-                    'order': 0,
+                    'agent_id': self.agent.id, 'is_default': True, 'order': 0,
                 }],
                 'guided_prompts': [{
-                    'key': 'brief',
-                    'title': 'Create brief',
-                    'prompt_template': 'Topic: {topic}',
-                    'action': 'preview',
-                    'is_featured': True,
-                    'order': 0,
-                    'questions': [{
-                        'key': 'topic',
-                        'label': 'Topic',
-                        'type': 'text',
-                        'required': True,
-                        'order': 0,
-                        'options': [],
-                    }],
+                    'id': 'copy', 'key': 'copy', 'title': 'Copy',
+                    'prompt_template': '主题：{topic}\n语气：{tone}',
+                    'action': 'preview', 'is_featured': True, 'order': 0,
+                    'questions': [
+                        {'id': 'topic', 'key': 'topic', 'label': '主题',
+                         'type': 'text', 'required': True, 'options': []},
+                        {'id': 'tone', 'key': 'tone', 'label': '语气',
+                         'type': 'single_choice', 'required': False,
+                         'options': [{'value': 'friendly', 'label': '亲切'}]},
+                    ],
                 }],
             },
-            format='json',
-            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
-        )
-
-        self.assertEqual(response.status_code, 405, response.data)
-
-    def test_application_detail_reports_edit_permission(self):
-        owner_client = APIClient()
-        owner_client.force_authenticate(self.user)
-        owner_response = owner_client.get(
-            f'/api/apps/{self.application.slug}/')
-        self.assertTrue(owner_response.data['can_edit'])
-
-        outsider = User.objects.create_user('app-viewer', password='secret')
-        outsider_client = APIClient()
-        outsider_client.force_authenticate(outsider)
-        outsider_response = outsider_client.get(
-            f'/api/apps/{self.application.slug}/')
-        self.assertFalse(outsider_response.data['can_edit'])
-
-    def test_discovery_endpoint_does_not_validate_or_write_legacy_payloads(self):
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.patch(
-            f'/api/apps/{self.application.slug}/',
-            {'default_config': {'guided_entry_prompt_key': 'missing'}},
-            format='json',
-            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
-        )
-
-        self.assertEqual(response.status_code, 405, response.data)
-
-
-class SeededWechatArticleApplicationTest(TestCase):
-    def test_application_preloads_write_wechat_article_skill(self):
-        application = Application.objects.get(slug='wechat-article-writer')
-
-        self.assertEqual(application.kind, Application.Kind.CHAT)
-        self.assertEqual(application.renderer_key, 'chat')
-        self.assertEqual(
-            application.default_config['guided_entry_prompt_key'],
-            'article-brief',
-        )
-        self.assertEqual(
-            application.agent_bindings.get(is_default=True).agent.slug,
-            'wechat-article-writer',
-        )
-        binding = application.skill_bindings.select_related('skill').get()
-        self.assertEqual(binding.skill.slug, 'write-wechat-article')
-        self.assertEqual(binding.mode, ApplicationSkillBinding.Mode.REQUIRED)
-        prompt = application.guided_prompts.get(key='article-brief')
-        self.assertEqual(prompt.questions.count(), 7)
-        self.assertIn('write-wechat-article Skill', prompt.prompt_template)
-
-    def test_new_conversation_inherits_required_skill(self):
-        user = User.objects.create_user('wechat-writer-user', password='secret')
-        application = Application.objects.get(slug='wechat-article-writer')
-        client = APIClient()
-        client.force_authenticate(user)
-
-        response = client.post('/api/conversations/', {
-            'application_id': application.id,
-        }, format='json')
-
+        }, format='json', **self.headers)
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data['application_id'], application.id)
-        conversation = user.conversations.get(id=response.data['id'])
-        binding = conversation.skill_bindings.select_related('skill').get()
-        self.assertEqual(binding.skill.slug, 'write-wechat-article')
-        self.assertEqual(binding.source, 'app_required')
+        application = Application.objects.get(slug=slug)
+        runtime = self.client.get(f'/api/apps/{slug}/', **self.headers)
+        self.assertEqual(runtime.status_code, 200, runtime.data)
+        return runtime, application
+
+    def test_chat_fields_live_only_in_the_typed_draft(self):
+        response, application = self._create_chat()
+        self.assertTrue(ChatApplication.objects.filter(application=application).exists())
+        for field in ('renderer_key', 'executor_key', 'default_config'):
+            with self.assertRaises(FieldDoesNotExist):
+                Application._meta.get_field(field)
+        self.assertEqual(application.draft.content['kind'], 'chat')
+        self.assertEqual(response.data['agent_bindings'][0]['agent_name'], 'Writer')
+        self.assertEqual(response.data['chat_profile']['welcome_message'], 'Welcome')
+
+    def test_non_chat_runtime_has_no_chat_members(self):
+        response = self.client.post(
+            f'/api/organizations/{self.organization.id}/applications', {
+            'category_id': self.app_category.id,
+            'name': 'Task', 'slug': 'task-test', 'description': 'Task app',
+            'content': {
+                'kind': 'task', 'executor_kind': 'media',
+                'renderer_key': 'generic-task', 'executor_key': 'task-executor',
+            },
+        }, format='json', **self.headers)
+        self.assertEqual(response.status_code, 201, response.data)
+        runtime = self.client.get('/api/apps/task-test/', **self.headers)
+        self.assertNotIn('agent_bindings', runtime.data)
+        self.assertNotIn('skill_bindings', runtime.data)
+        self.assertNotIn('guided_prompts', runtime.data)
+        self.assertNotIn('chat_profile', runtime.data)
+
+    def test_publish_creates_chat_revision_subtype(self):
+        _response, application = self._create_chat()
+        revision = publish_application(
+            application=application, actor=self.user,
+            expected_draft_version=application.draft.version)
+        self.assertTrue(
+            ChatApplicationRevision.objects.filter(revision=revision).exists())
+
+    def test_compose_and_conversation_use_chat_definition(self):
+        _response, application = self._create_chat()
+        composed = self.client.post(
+            f'/api/apps/{application.slug}/compose-prompt/',
+            {'prompt_id': 'copy', 'answers': {
+                'topic': '咖啡', 'tone': 'friendly'}},
+            format='json', **self.headers)
+        self.assertEqual(composed.status_code, 200, composed.data)
+        self.assertEqual(composed.data['prompt'], '主题：咖啡\n语气：亲切')
+
+        created = self.client.post('/api/conversations/', {
+            'application_id': application.id,
+        }, format='json', **self.headers)
+        self.assertEqual(created.status_code, 201, created.data)
+        conversation = self.user.conversations.get(id=created.data['id'])
+        self.assertEqual(conversation.chat_application_id, application.id)
+
+    def test_user_selected_application_skill_is_bound_only_once(self):
+        skill = Skill.objects.create(
+            organization=self.organization,
+            owner=self.user,
+            slug='shared-skill',
+            name='Shared Skill',
+            visibility=Skill.Visibility.ORGANIZATION,
+        )
+        _response, application = self._create_chat()
+        application.draft.content['skill_bindings'] = [{
+            'skill_id': str(skill.id),
+            'mode': 'default',
+            'config': {},
+            'order': 0,
+        }]
+        application.draft.save(update_fields=['content'])
+
+        created = self.client.post('/api/conversations/', {
+            'application_id': application.id,
+            'skill_ids': [str(skill.id)],
+        }, format='json', **self.headers)
+
+        self.assertEqual(created.status_code, 201, created.data)
+        conversation = self.user.conversations.get(id=created.data['id'])
+        self.assertEqual(conversation.skill_bindings.count(), 1)
+
+    def test_chat_update_replaces_the_single_draft_source(self):
+        _response, application = self._create_chat()
+        version = application.draft.version
+        content = application.draft.content
+        content['chat_profile'] = {
+            **content['chat_profile'], 'welcome_message': 'Updated'}
+        response = self.client.put(
+            f'/api/organizations/{self.organization.id}/applications/'
+            f'{application.id}/draft',
+            {'expected_version': version, 'content': content},
+            format='json', **self.headers)
+        self.assertEqual(response.status_code, 200, response.data)
+        application.draft.refresh_from_db()
+        self.assertEqual(application.draft.version, version + 1)
+        self.assertEqual(
+            application.draft.content['chat_profile']['welcome_message'],
+            'Updated')
+
+    def test_rejects_private_agent_from_another_tenant(self):
+        outsider = User.objects.create_user('outsider', password='secret')
+        other_org = outsider.organization_memberships.get().organization
+        other_category = AgentCategory.objects.create(
+            name='Other agents', slug='other-agents')
+        private_agent = Agent.objects.create(
+            category=other_category, name='Private', slug='private-agent',
+            description='Private', is_public=False, created_by=outsider,
+            organization=other_org)
+        _response, application = self._create_chat(slug='rejected')
+        application.draft.content['agent_bindings'] = [{
+            'agent_id': private_agent.id, 'is_default': True,
+        }]
+        application.draft.save(update_fields=['content'])
+        response = self.client.post(
+            f'/api/organizations/{self.organization.id}/applications/'
+            f'{application.id}/revisions',
+            {'expected_draft_version': application.draft.version},
+            format='json', **self.headers)
+        self.assertEqual(response.status_code, 422, response.data)

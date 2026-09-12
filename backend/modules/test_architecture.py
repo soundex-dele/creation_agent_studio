@@ -14,6 +14,10 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.agents.models",
         "apps.applications.models",
     },
+    "modules/catalog/services.py": {
+        "apps.agents.models",
+        "apps.applications.models",
+    },
     "modules/execution/api/streaming.py": {"apps.enterprise.models"},
     "modules/execution/application/projections.py": {"apps.conversations.models"},
     "modules/execution/application/start_runs.py": {
