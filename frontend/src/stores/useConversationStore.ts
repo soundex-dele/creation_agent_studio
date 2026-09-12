@@ -5,6 +5,7 @@ import type { AgentQuestion, AgentToolCall, RunEventEnvelope } from '@/entities/
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
+import { tenantApiRoot } from '@/services/tenantContext';
 
 interface Message {
   id: string;
@@ -389,7 +390,7 @@ export const useConversationStore = create<ConversationState>()(
           set({ pendingQuestion: null, agentActivity: '正在提交回答…', error: null });
           try {
             await api.post(
-              `/organizations/${activeRun.organization_id}/runs/${activeRun.id}/commands`,
+              `${tenantApiRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`,
               {
                 type,
                 idempotency_key: crypto.randomUUID(),
@@ -408,7 +409,7 @@ export const useConversationStore = create<ConversationState>()(
           if (!run) return;
           set({ agentActivity: '正在取消…', error: null });
           await api.post(
-            `/organizations/${run.organization_id}/runs/${run.id}/commands`,
+            `${tenantApiRoot(run.organization_id)}/runs/${run.id}/commands`,
             { type: 'cancel', idempotency_key: crypto.randomUUID(), payload: {} },
           );
         },

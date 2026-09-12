@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from .models import Membership, Organization
+from .tenancy import provision_single_tenant_user, single_tenant_mode_enabled
 
 
 ROLE_LEVEL = {
@@ -18,6 +19,14 @@ def resolve_organization(request, *, required=True):
     """Resolve a tenant only through an active membership."""
     if not request.user or not request.user.is_authenticated:
         return None
+    if single_tenant_mode_enabled():
+        membership = provision_single_tenant_user(request.user)
+        if membership:
+            request.organization = membership.organization
+            request.organization_membership = membership
+            return membership.organization
+        return None
+
     requested = request.headers.get('X-Organization-ID') or request.query_params.get(
         'organization_id')
     memberships = Membership.objects.select_related('organization').filter(

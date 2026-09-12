@@ -5,6 +5,16 @@ class _SuspendExecution(Exception):
     pass
 
 
+def _initialize_django():
+    """Initialize Django inside a fresh multiprocessing ``spawn`` child."""
+
+    import django
+    from django.apps import apps
+
+    if not apps.ready:
+        django.setup()
+
+
 def _load_entrypoint(dotted_path):
     try:
         module_name, attribute_name = dotted_path.split(":", 1)
@@ -59,6 +69,7 @@ def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint):
     """Spawn-safe process entry point; adapters receive data and an IPC sink."""
 
     try:
+        _initialize_django()
         adapter = _load_entrypoint(adapter_entrypoint)
         output = adapter(run_payload, ChildEventSink(message_queue, cancel_event))
         outcome = "cancelled" if cancel_event.is_set() else "succeeded"

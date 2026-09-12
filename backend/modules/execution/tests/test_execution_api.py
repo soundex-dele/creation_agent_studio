@@ -619,6 +619,7 @@ def test_stream_uses_last_event_id_and_sse_headers(
 ):
     response = authenticated_client.get(
         _run_url(api_organization, api_run, "/stream"),
+        HTTP_ACCEPT="text/event-stream",
         HTTP_LAST_EVENT_ID="1",
     )
 

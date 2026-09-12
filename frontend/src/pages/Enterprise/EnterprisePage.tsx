@@ -71,7 +71,10 @@ function DynamicField({ field }: { field: Field }) {
 }
 
 export default function EnterprisePage() {
-  const { organizations, currentOrganizationId, loadOrganizations, selectOrganization } = useOrganizationStore();
+  const {
+    organizations, currentOrganizationId, singleTenantMode,
+    loadOrganizations, selectOrganization,
+  } = useOrganizationStore();
   const [active, setActive] = useState('traces');
   const [rows, setRows] = useState<Row[]>([]);
   const [usage, setUsage] = useState<Row>({});
@@ -157,8 +160,8 @@ export default function EnterprisePage() {
 
   const currentOrg = organizations.find(o => o.id === currentOrganizationId);
   return <div className="enterprise-page animate-fade-in">
-    <div className="enterprise-hero"><div><h1 className="enterprise-title">企业控制台</h1><div className="enterprise-subtitle">多租户治理、运行观测、知识评测与企业集成</div></div><Select style={{ width: 280 }} value={currentOrganizationId} onChange={selectOrganization} options={organizations.map(o => ({ value: o.id, label: `${o.name} · ${o.role}` }))} /></div>
-    {!currentOrganizationId && <Alert type="warning" showIcon message="暂无可用组织" description="注册用户会自动创建个人组织。" />}
+    <div className="enterprise-hero"><div><h1 className="enterprise-title">企业控制台</h1><div className="enterprise-subtitle">{singleTenantMode ? '企业治理、运行观测、知识评测与企业集成' : '多租户治理、运行观测、知识评测与企业集成'}</div></div>{singleTenantMode ? <Tag color="blue">{currentOrg?.name || '企业私有部署'}</Tag> : <Select style={{ width: 280 }} value={currentOrganizationId} onChange={selectOrganization} options={organizations.map(o => ({ value: o.id, label: `${o.name} · ${o.role}` }))} />}</div>
+    {!currentOrganizationId && <Alert type="warning" showIcon message="暂无可用组织" description={singleTenantMode ? '默认企业尚未完成初始化。' : '当前账号尚未加入任何组织。'} />}
     <div className="enterprise-grid"><Card><Statistic title="本月 Tokens" value={Number(usage.tokens || 0)} /></Card><Card><Statistic title="Token 配额" value={Number(usage.monthly_token_limit || 0)} /></Card><Card><Statistic title="本月成本" prefix="¥" value={Number(usage.cost || 0)} precision={4} /></Card><Card><Statistic title="成本预算" prefix="¥" value={Number(usage.monthly_cost_limit || 0)} /></Card></div>
     <div className="enterprise-table-card">
       <Tabs activeKey={active} onChange={setActive} items={Object.entries(sections).map(([key, value]) => ({ key, label: value.title }))} />

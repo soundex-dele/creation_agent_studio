@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import type { Workflow } from '@/types';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { tenantApiRoot } from '@/services/tenantContext';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -28,7 +29,7 @@ const WorkflowsPage = () => {
       const [workflowResponse, runResponse] = await Promise.all([
         api.get<Workflow[] | { results?: Workflow[] }>('/workflows/'),
         organizationId
-          ? api.get<RunResource[]>(`/organizations/${organizationId}/runs`, {
+          ? api.get<RunResource[]>(`${tenantApiRoot(organizationId)}/runs`, {
               source_type: 'workflow',
             })
           : Promise.resolve([]),

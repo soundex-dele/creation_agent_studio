@@ -17,6 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import ExternalIdentity, IdentityProvider, Membership
 from .services import resolve_secret
+from .tenancy import get_single_tenant_organization, single_tenant_mode_enabled
 
 
 def _json(url, *, data=None, headers=None):
@@ -30,13 +31,23 @@ def _discovery(provider):
     return _json(url)
 
 
+def _identity_providers():
+    providers = IdentityProvider.objects.select_related('organization').filter(
+        protocol=IdentityProvider.Protocol.OIDC,
+        is_active=True,
+        organization__is_active=True,
+    )
+    if single_tenant_mode_enabled():
+        organization = get_single_tenant_organization()
+        return providers.filter(organization=organization) if organization else providers.none()
+    return providers
+
+
 class OidcLoginView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, provider_id):
-        provider = IdentityProvider.objects.select_related('organization').filter(
-            id=provider_id, protocol=IdentityProvider.Protocol.OIDC, is_active=True,
-            organization__is_active=True).first()
+        provider = _identity_providers().filter(id=provider_id).first()
         if provider is None:
             return Response({'detail': 'OIDC provider not found.'}, status=404)
         try:
@@ -71,8 +82,7 @@ class OidcCallbackView(APIView):
         cache.delete(f'oidc-state:{state}')
         if not flow or str(flow['provider_id']) != str(provider_id):
             return Response({'detail': 'Invalid or expired OIDC state.'}, status=400)
-        provider = IdentityProvider.objects.select_related('organization').filter(
-            id=provider_id, protocol=IdentityProvider.Protocol.OIDC, is_active=True).first()
+        provider = _identity_providers().filter(id=provider_id).first()
         if not provider or not request.query_params.get('code'):
             return Response({'detail': 'OIDC authorization failed.'}, status=400)
         try:

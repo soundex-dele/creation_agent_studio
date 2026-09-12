@@ -56,6 +56,10 @@ urlpatterns += [
     path('api/enterprise/', include('apps.enterprise.urls')),
     path('api/workflows/', include('apps.workflows.urls')),
 
+    # Private deployments use these aliases without exposing an organization
+    # selector. They return 404 unless SINGLE_TENANT_MODE is enabled.
+    path('api/', include('modules.tenancy.single_tenant_urls')),
+
     # Versioned definitions and durable Runs share the canonical organization.
     path(
         'api/organizations/<uuid:organization_id>/',

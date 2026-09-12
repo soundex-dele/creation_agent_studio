@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +23,11 @@ from .serializers import (
     RunTraceSerializer, SecretReferenceSerializer, UsageRecordSerializer,
 )
 from .services import dispatch_automation, index_document, run_evaluation, search_knowledge
+from .tenancy import (
+    get_single_tenant_organization,
+    provision_single_tenant_user,
+    single_tenant_mode_enabled,
+)
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -33,10 +39,13 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             user=self.request.user, is_active=True).first()
         if not membership or membership.role not in (
                 Membership.Role.OWNER, Membership.Role.ADMIN):
-            from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Administrator role required.')
 
     def get_queryset(self):
+        if single_tenant_mode_enabled():
+            membership = provision_single_tenant_user(self.request.user)
+            return Organization.objects.filter(
+                pk=membership.organization_id) if membership else Organization.objects.none()
         return Organization.objects.filter(
             memberships__user=self.request.user,
             memberships__is_active=True,
@@ -44,6 +53,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        if single_tenant_mode_enabled():
+            raise MethodNotAllowed(
+                'POST', detail='Organization creation is disabled in single-tenant mode.')
         organization = serializer.save(owner=self.request.user)
         Membership.objects.create(organization=organization, user=self.request.user,
                                   role=Membership.Role.OWNER)
@@ -51,8 +63,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         GovernancePolicy.objects.create(organization=organization)
 
     def perform_destroy(self, instance):
+        if single_tenant_mode_enabled():
+            raise MethodNotAllowed(
+                'DELETE', detail='The deployment organization cannot be deleted.')
         if instance.owner_id != self.request.user.id:
-            from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Only the owner may delete an organization.')
         instance.is_active = False
         instance.save(update_fields=['is_active', 'updated_at'])
@@ -101,6 +115,29 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class DeploymentContextView(APIView):
+    """Return the server-controlled tenancy mode and visible workspaces."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        single_tenant = single_tenant_mode_enabled()
+        if single_tenant:
+            membership = provision_single_tenant_user(request.user)
+            organizations = [membership.organization] if membership else []
+        else:
+            organizations = list(
+                Organization.objects.visible_to(request.user)
+                .filter(is_active=True)
+                .order_by('created_at')
+            )
+        return Response({
+            'single_tenant_mode': single_tenant,
+            'organizations': OrganizationSerializer(
+                organizations, many=True, context={'request': request}).data,
+        })
 
 
 class TenantModelViewSet(viewsets.ModelViewSet):
@@ -154,6 +191,10 @@ class PublicIdentityDiscoveryView(APIView):
         providers = IdentityProvider.objects.filter(
             protocol=IdentityProvider.Protocol.OIDC, is_active=True,
             organization__is_active=True)
+        if single_tenant_mode_enabled():
+            organization = get_single_tenant_organization()
+            providers = providers.filter(
+                organization=organization) if organization else providers.none()
         values = [{
             'id': provider.id, 'name': provider.name,
             'organization': provider.organization.name,

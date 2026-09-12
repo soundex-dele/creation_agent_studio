@@ -1,5 +1,9 @@
+from importlib import import_module
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.apps import apps
+from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent as ProductAgent, AgentCategory
@@ -36,6 +40,25 @@ def unified_context(db):
 def test_catalog_exports_the_product_entities():
     assert Agent is ProductAgent
     assert Application is ProductApplication
+
+
+@pytest.mark.django_db
+@override_settings(SINGLE_TENANT_MODE=True)
+def test_seeded_general_agent_has_a_production_deployment():
+    migration = import_module(
+        "modules.catalog.migrations.0004_deploy_seeded_general_agent"
+    )
+    migration.deploy_seeded_general_agent(apps, None)
+
+    agent = ProductAgent.objects.get(slug="general")
+    draft = AgentDraft.objects.get(agent=agent)
+    deployment = AgentDeployment.objects.select_related("revision").get(
+        agent=agent,
+        environment="production",
+    )
+
+    assert deployment.organization_id == agent.organization_id
+    assert deployment.revision.content == draft.content
 
 
 @pytest.mark.django_db

@@ -2,6 +2,7 @@ import type { RunStreamHandle, RunStreamOptions } from './runStream';
 import { streamRunEvents } from './runStream';
 import { api } from './api';
 import type { ApplicationDefinition } from '@/types/application';
+import { tenantApiRoot } from './tenantContext';
 
 
 export type DeploymentEnvironment = 'development' | 'staging' | 'production';
@@ -72,7 +73,7 @@ export function createApplicationRuntimeClient({
   applicationId,
   environment = 'production',
 }: RuntimeClientOptions) {
-  const root = `/organizations/${organizationId}`;
+  const root = tenantApiRoot(organizationId);
   return {
     organizationId,
     applicationId,
@@ -129,7 +130,7 @@ export async function loadApplicationRuntime(
   environment: DeploymentEnvironment = 'production',
 ): Promise<ApplicationRuntimeDescriptor> {
   return api.get<ApplicationRuntimeDescriptor>(
-    `/organizations/${organizationId}/applications/${applicationId}/runtime`,
+    `${tenantApiRoot(organizationId)}/applications/${applicationId}/runtime`,
     { environment },
   );
 }

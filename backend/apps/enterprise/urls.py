@@ -5,7 +5,8 @@ from .views import (
     EvaluationSuiteViewSet, GovernancePolicyViewSet, IdentityProviderViewSet, KnowledgeBaseViewSet, OrganizationViewSet,
     ProviderConfigViewSet, QuotaViewSet, RunTraceViewSet,
     SecretReferenceViewSet, UsageViewSet,
-    PublicIdentityDiscoveryView, ScimUserDetailView, ScimUsersView,
+    DeploymentContextView, PublicIdentityDiscoveryView, ScimUserDetailView,
+    ScimUsersView,
 )
 from .sso import OidcCallbackView, OidcLoginView, SsoExchangeView
 
@@ -26,6 +27,8 @@ router.register('quota', QuotaViewSet, basename='quota')
 
 urlpatterns = router.urls
 urlpatterns += [__import__('django.urls', fromlist=['path']).path(
+    'deployment-context/', DeploymentContextView.as_view(), name='deployment-context'),
+    __import__('django.urls', fromlist=['path']).path(
     'scim/v2/Users', ScimUsersView.as_view(), name='scim-users'),
     __import__('django.urls', fromlist=['path']).path(
         'scim/v2/Users/<int:user_id>', ScimUserDetailView.as_view(),

@@ -6,6 +6,7 @@ import { useRunStream } from '@/hooks/useRunStream';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { tenantApiRoot } from '@/services/tenantContext';
 
 const terminal = ['succeeded', 'failed', 'cancelled'];
 
@@ -22,14 +23,14 @@ const WorkflowRunnerPage = () => {
 
   useEffect(() => {
     if (!organizationId || !runId) return;
-    api.get<RunResource>(`/organizations/${organizationId}/runs/${runId}`)
+    api.get<RunResource>(`${tenantApiRoot(organizationId)}/runs/${runId}`)
       .then(setRun)
       .catch((reason: any) => setError(reason?.response?.data?.detail || 'Run 加载失败'));
   }, [organizationId, runId]);
 
   const cancel = async () => {
     if (!organizationId || !runId) return;
-    await api.post(`/organizations/${organizationId}/runs/${runId}/commands`, {
+    await api.post(`${tenantApiRoot(organizationId)}/runs/${runId}/commands`, {
       type: 'cancel',
       idempotency_key: crypto.randomUUID(),
       payload: { reason: 'user_requested' },

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { message } from 'antd';
 import { API_BASE_URL } from './apiBaseUrl';
 import { clearAuthSession, getAccessToken, refreshAccessToken } from './authSession';
+import { isSingleTenantMode } from './tenantContext';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -25,7 +26,9 @@ axiosInstance.interceptors.request.use(
     } catch {
       organizationId = null;
     }
-    if (organizationId) {
+    if (isSingleTenantMode()) {
+      delete config.headers['X-Organization-ID'];
+    } else if (organizationId) {
       config.headers['X-Organization-ID'] = organizationId;
     }
     return config;

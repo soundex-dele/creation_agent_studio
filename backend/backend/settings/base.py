@@ -16,6 +16,20 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
+# Deployment tenancy. A private single-enterprise installation is the default;
+# multi-tenant operators must opt in explicitly with SINGLE_TENANT_MODE=False.
+# The organization boundary remains canonical internally without requiring
+# clients to select or send an organization identifier on every request.
+SINGLE_TENANT_MODE = config('SINGLE_TENANT_MODE', default=True, cast=bool)
+SINGLE_TENANT_ORGANIZATION_ID = config(
+    'SINGLE_TENANT_ORGANIZATION_ID', default='').strip()
+SINGLE_TENANT_ORGANIZATION_SLUG = config(
+    'SINGLE_TENANT_ORGANIZATION_SLUG', default='enterprise').strip()
+SINGLE_TENANT_ORGANIZATION_NAME = config(
+    'SINGLE_TENANT_ORGANIZATION_NAME', default='Enterprise Workspace').strip()
+SINGLE_TENANT_DEFAULT_ROLE = config(
+    'SINGLE_TENANT_DEFAULT_ROLE', default='viewer').strip().lower()
+
 DATABASE_ENGINE = config('DATABASE_ENGINE', default='postgresql').strip().lower()
 REDIS_ENABLED = config(
     'REDIS_ENABLED',
@@ -25,6 +39,9 @@ REDIS_ENABLED = config(
 
 # Application definition
 INSTALLED_APPS = [
+    # Register Daphne's ASGI runserver before Django's staticfiles command so
+    # local SSE responses are consumed as asynchronous iterators.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

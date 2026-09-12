@@ -44,6 +44,14 @@ SAML metadata can be governed in the same control plane, but signed assertion
 validation is intentionally not exposed until a production SAML adapter and
 certificate trust policy are configured.
 
+Private installations default to `SINGLE_TENANT_MODE=True`; multi-tenant
+operators must explicitly set it to `False`. The first user provisions the configured enterprise
+workspace and becomes its owner; later users join with
+`SINGLE_TENANT_DEFAULT_ROLE`. The browser no longer selects or submits a tenant,
+and organization-free `/api/runs` and `/api/applications/...` aliases are
+enabled. The canonical Organization foreign keys and PostgreSQL RLS scope stay
+in place for policy, audit and defense in depth.
+
 ## Agent release lifecycle
 
 1. Create a draft containing prompt, model, tools, skills, knowledge,

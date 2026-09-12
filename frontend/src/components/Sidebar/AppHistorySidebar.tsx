@@ -7,6 +7,7 @@ import { useProjectStore } from '@/stores/useProjectStore';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { tenantApiRoot } from '@/services/tenantContext';
 
 interface AppHistoryItem {
   key: string;
@@ -65,7 +66,7 @@ const AppHistorySidebar: React.FC = () => {
     loadCategories();
     loadProjects();
     if (organizationId) {
-      api.get<RunResource[]>(`/organizations/${organizationId}/runs`, {
+      api.get<RunResource[]>(`${tenantApiRoot(organizationId)}/runs`, {
         source_type: 'workflow',
       }).then(setWorkflowRuns).catch(() => setWorkflowRuns([]));
     } else {

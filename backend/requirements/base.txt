@@ -3,6 +3,12 @@ djangorestframework==3.14.0
 django-cors-headers==4.3.1
 dj-rest-auth==5.0.2
 django-allauth==0.61.1
+# Keep a universal macOS wheel available; newer source-only resolution requires
+# a working Rust registry and makes fresh venv setup unnecessarily brittle.
+cryptography==46.0.3
+# Autobahn accepts cbor2>=5.2; this release still ships a Python 3.11 macOS
+# wheel and avoids requiring a Rust toolchain during environment bootstrap.
+cbor2==5.7.1
 psycopg[binary]==3.2.10
 redis==5.0.1
 python-decouple==3.8

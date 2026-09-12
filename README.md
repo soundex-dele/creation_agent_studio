@@ -17,22 +17,30 @@ Workflow 使用唯一的 `workflow-dag` 执行器，支持显式依赖、条件�
 
 ## 本地启动
 
-要求 Python 3.11+、Node.js 20+。生产形态另需 Docker、PostgreSQL 和 Redis。
+要求 Python 3.11+、Node.js 20.19+（推荐 Node.js 22）。生产形态另需 Docker、PostgreSQL 和 Redis。
 
 后端：
 
-```powershell
+```bash
 cd backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip wheel
 python -m pip install -r requirements/development.txt
-Copy-Item .env.example .env
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8080
 ```
 
+Windows 使用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。开发环境不复制
+`.env.example` 时默认使用 SQLite；该示例文件默认配置 PostgreSQL，供部署时按实际环境修改后使用。
+项目已通过 Daphne 将 `runserver` 注册为 ASGI 服务，以支持 Run 的异步 SSE
+事件流；不要改用同步 WSGI 服务器承载 `/api/runs/.../stream`。
+
 开发环境默认使用 SQLite。另开终端启动需要的执行 Worker：
 
-```powershell
+```bash
 cd backend
+source .venv/bin/activate
 python manage.py run_execution_coordinator --worker-pool agent
 python manage.py run_execution_coordinator --worker-pool media
 python manage.py run_execution_coordinator --worker-pool workflow
@@ -40,9 +48,9 @@ python manage.py run_execution_coordinator --worker-pool workflow
 
 前端：
 
-```powershell
+```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -63,6 +71,21 @@ REST API 带 `/api` 前缀：
 - `POST /api/auth/logout/`
 
 直接向 `http://localhost:3030/auth/register/` 发送 POST 会命中前端开发服务器，不是后端 API；正确地址是 `http://localhost:3030/api/auth/register/`。
+
+## 单企业私有部署
+
+系统默认启用单企业模式；企业服务器可在 `backend/.env` 中覆盖企业信息：
+
+```dotenv
+SINGLE_TENANT_MODE=True
+SINGLE_TENANT_ORGANIZATION_SLUG=enterprise
+SINGLE_TENANT_ORGANIZATION_NAME=Enterprise Workspace
+SINGLE_TENANT_DEFAULT_ROLE=viewer
+```
+
+首个用户会初始化并拥有默认企业，后续用户自动以默认角色加入。前端隐藏企业选择器，服务端忽略客户端提交的组织头，并提供 `/api/runs`、`/api/applications/...` 等无组织 ID 别名。数据库仍保留 `organization_id`，用于权限、审计、配额与行级安全。多租户部署必须显式设置 `SINGLE_TENANT_MODE=False`。
+
+已有数据的部署应将 `SINGLE_TENANT_ORGANIZATION_ID` 设置为需要保留的现有组织 UUID；不要只修改 slug，否则系统会创建新的默认企业，原组织数据不会自动迁移。
 
 ## Durable Run API
 

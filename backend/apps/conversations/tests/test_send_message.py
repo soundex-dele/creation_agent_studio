@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -33,4 +35,26 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(run.executor_kind, Run.ExecutorKind.AGENT)
         self.assertTrue(Message.objects.filter(
             conversation=self.conversation, role="user", content="hello"
+        ).exists())
+
+    @patch("apps.conversations.views.start_agent_run")
+    def test_failed_run_creation_does_not_persist_user_message(self, start_run):
+        from modules.execution.application.errors import DeploymentUnavailable
+
+        start_run.side_effect = DeploymentUnavailable(
+            "Agent has no production deployment"
+        )
+
+        response = self.client.post(
+            f"/api/conversations/{self.conversation.id}/send_message/",
+            {"content": "must roll back"},
+            format="json",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Message.objects.filter(
+            conversation=self.conversation,
+            role="user",
+            content="must roll back",
         ).exists())

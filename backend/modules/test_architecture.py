@@ -31,7 +31,12 @@ ALLOWED_DOMAIN_IMPORTS = {
     },
     "modules/execution/runtime/builtin.py": {"apps.enterprise.models"},
     "modules/tenancy/models.py": {"apps.enterprise.models"},
-    "modules/tenancy/permissions.py": {"apps.enterprise.models"},
+    "modules/tenancy/middleware.py": {"apps.enterprise.tenancy"},
+    "modules/tenancy/permissions.py": {
+        "apps.enterprise.models",
+        "apps.enterprise.tenancy",
+    },
+    "modules/tenancy/single_tenant_urls.py": {"apps.enterprise.tenancy"},
 }
 
 

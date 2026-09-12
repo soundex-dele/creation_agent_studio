@@ -1,5 +1,6 @@
 import type { RunEventEnvelope, RunEventSnapshotEnvelope } from '@/entities/run';
 import { API_BASE_URL } from './apiBaseUrl';
+import { tenantApiRoot } from './tenantContext';
 
 export interface RunEventsPage {
   results: RunEventEnvelope[];
@@ -216,7 +217,7 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const controller = new AbortController();
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = options.baseUrl ?? API_BASE_URL;
-  const root = `${baseUrl}/organizations/${options.organizationId}/runs/${options.runId}`;
+  const root = `${baseUrl}${tenantApiRoot(options.organizationId)}/runs/${options.runId}`;
   const authToken = options.authToken === undefined ? storedToken() : options.authToken;
   const headers = {
     Accept: 'text/event-stream',

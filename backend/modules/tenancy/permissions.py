@@ -1,6 +1,10 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.enterprise.models import Membership, Organization
+from apps.enterprise.tenancy import (
+    provision_single_tenant_user,
+    single_tenant_mode_enabled,
+)
 
 
 ROLE_LEVEL = {
@@ -18,6 +22,13 @@ def resolve_path_organization(request, organization_id):
 
     if not request.user or not request.user.is_authenticated:
         return None
+    if single_tenant_mode_enabled():
+        membership = provision_single_tenant_user(request.user)
+        if membership is None or str(membership.organization_id) != str(organization_id):
+            return None
+        request.organization = membership.organization
+        request.organization_membership = membership
+        return membership.organization
     organization = (
         Organization.objects.visible_to(request.user)
         .filter(pk=organization_id, is_active=True)

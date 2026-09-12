@@ -257,6 +257,7 @@ class ConversationViewSet(viewsets.ViewSet):
         except FileNotFoundError:
             return Response({"detail": "文件不存在或已被删除。"}, status=404)
 
+    @transaction.atomic
     def _create_run(self, request, conversation, message, requested_agent_id=None):
         organization = conversation.organization
         agent = resolve_agent(requested_agent_id or conversation.agent_id, organization)

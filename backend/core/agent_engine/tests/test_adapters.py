@@ -100,7 +100,7 @@ class CodexIntegrationTest(TestCase):
     def test_resolves_source_build_or_installed_codex(self):
         path = resolve_codex_binary()
         self.assertTrue(path.is_file())
-        self.assertEqual(path.name.lower(), "codex.exe")
+        self.assertTrue(path.name.lower().startswith("codex"))
 
     @skipUnless(sys.platform == "win32", "Windows standalone install layout")
     @override_settings(CODEX_BINARY="", CODEX_REPOSITORY_PATH="D:/missing-codex")

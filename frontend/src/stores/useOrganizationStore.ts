@@ -12,6 +12,7 @@ export interface Organization {
 interface OrganizationState {
   organizations: Organization[];
   currentOrganizationId: string | null;
+  singleTenantMode: boolean;
   loadedForUserId: string | null;
   isLoading: boolean;
   loadError: string | null;
@@ -25,6 +26,7 @@ export const useOrganizationStore = create<OrganizationState>()(
     (set, get) => ({
       organizations: [],
       currentOrganizationId: null,
+      singleTenantMode: false,
       loadedForUserId: null,
       isLoading: false,
       loadError: null,
@@ -32,16 +34,22 @@ export const useOrganizationStore = create<OrganizationState>()(
         if (get().isLoading) return;
         set({ isLoading: true, loadError: null });
         try {
-          const response = await api.get<Organization[] | { results: Organization[] }>(
-            '/enterprise/organizations/'
+          const response = await api.get<{
+            single_tenant_mode: boolean;
+            organizations: Organization[];
+          }>(
+            '/enterprise/deployment-context/'
           );
-          const organizations = Array.isArray(response) ? response : response.results;
+          const organizations = response.organizations;
           const selected = get().currentOrganizationId;
           set({
             organizations,
-            currentOrganizationId: organizations.some((item) => item.id === selected)
+            currentOrganizationId: response.single_tenant_mode
+              ? organizations[0]?.id ?? null
+              : organizations.some((item) => item.id === selected)
               ? selected
               : organizations[0]?.id ?? null,
+            singleTenantMode: response.single_tenant_mode,
             loadedForUserId: userId ?? null,
             isLoading: false,
           });
@@ -53,10 +61,13 @@ export const useOrganizationStore = create<OrganizationState>()(
           throw error;
         }
       },
-      selectOrganization: (id) => set({ currentOrganizationId: id }),
+      selectOrganization: (id) => {
+        if (!get().singleTenantMode) set({ currentOrganizationId: id });
+      },
       reset: () => set({
         organizations: [],
         currentOrganizationId: null,
+        singleTenantMode: false,
         loadedForUserId: null,
         isLoading: false,
         loadError: null,
@@ -67,6 +78,7 @@ export const useOrganizationStore = create<OrganizationState>()(
       partialize: (state) => ({
         organizations: state.organizations,
         currentOrganizationId: state.currentOrganizationId,
+        singleTenantMode: state.singleTenantMode,
       }),
     }
   )

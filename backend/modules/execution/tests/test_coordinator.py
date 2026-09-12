@@ -1,3 +1,4 @@
+import multiprocessing
 import queue
 import threading
 from types import SimpleNamespace
@@ -19,6 +20,39 @@ def _suspending_adapter(_payload, sink):
         checkpoint={"cursor": 3},
         expires_in_seconds=120,
     )
+
+
+def _django_model_adapter(_payload, _sink):
+    from apps.enterprise.models import Organization
+
+    return {"model": Organization._meta.label}
+
+
+def test_spawned_child_initializes_django_before_loading_adapter():
+    context = multiprocessing.get_context("spawn")
+    messages = context.Queue()
+    cancel_event = context.Event()
+    process = context.Process(
+        target=execute_child,
+        args=(
+            {"input": {}},
+            messages,
+            cancel_event,
+            "modules.execution.tests.test_coordinator:_django_model_adapter",
+        ),
+    )
+
+    process.start()
+    process.join(timeout=15)
+    if process.is_alive():
+        process.terminate()
+        process.join(timeout=5)
+
+    assert process.exitcode == 0
+    terminal = messages.get(timeout=2)
+    assert terminal["outcome"] == "succeeded"
+    assert terminal["output"] == {"model": "enterprise.Organization"}
+    messages.close()
 
 
 def test_child_reports_invalid_adapter_without_database_access():

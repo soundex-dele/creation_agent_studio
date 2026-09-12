@@ -38,6 +38,7 @@ from modules.tenancy.permissions import HasPathOrganizationRole
 
 from .base import ProblemDetailsAPIView
 from .pagination import RunArtifactCursorPagination, RunAttemptCursorPagination
+from .renderers import EventStreamRenderer
 from .serializers import (
     RunCommandSerializer,
     RunArtifactSerializer,
@@ -381,6 +382,7 @@ class OrganizationRunEventSnapshotView(ProblemDetailsAPIView):
 
 class OrganizationRunStreamView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    renderer_classes = (EventStreamRenderer,)
 
     def get(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
