@@ -1,4 +1,4 @@
-"""Backend-neutral facade used by legacy synchronous call sites."""
+"""Backend-neutral facade used by the durable Agent Run adapter."""
 from __future__ import annotations
 
 import logging
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentEngine:
-    """Compatibility facade that dispatches to a registered agent adapter."""
+    """Dispatch a completion to the configured provider adapter."""
 
     def __init__(
         self,
@@ -37,11 +37,12 @@ class AgentEngine:
             config,
         )
 
-    def complete(self, messages: list[dict]) -> LLMResponse:
+    def complete(self, messages: list[dict], **options) -> LLMResponse:
         logger.info("AgentEngine.complete called, messages=%d", len(messages))
         response = self._adapter.complete(
             messages,
             working_directory=self._working_directory,
+            **options,
         )
         logger.info(
             "AgentEngine.complete finished adapter=%s success=%s tokens=%s error=%r",

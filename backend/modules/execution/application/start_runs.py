@@ -419,7 +419,7 @@ def start_workflow_run(
             organization=organization,
             owner=actor,
             executor_kind=Run.ExecutorKind.WORKFLOW,
-            executor_key="workflow-sequential",
+            executor_key="workflow-dag",
             source_type="workflow",
             source_id=workflow_id,
             definition_snapshot={

@@ -1,35 +1,28 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
 import { ProtectedRoute, PublicRoute } from './guards';
 
-// Pages
-import HomePage from '@/pages/Home/HomePage';
-import LoginPage from '@/pages/Auth/LoginPage';
-import RegisterPage from '@/pages/Auth/RegisterPage';
-import SsoCallbackPage from '@/pages/Auth/SsoCallbackPage';
-import AgentsPage from '@/pages/Agents/AgentsPage';
-import AgentDetailPage from '@/pages/Agents/AgentDetailPage';
-import TemplatesPage from '@/pages/Templates/TemplatesPage';
-import TemplateDetailPage from '@/pages/Templates/TemplateDetailPage';
-import AppsPage from '@/pages/Apps/AppsPage';
-import AppDetailPage from '@/pages/Apps/AppDetailPage';
-import DurableApplicationRuntimePage from '@/pages/Apps/DurableApplicationRuntimePage';
-import WorkspacePage from '@/pages/Workspace/WorkspacePage';
-import WorkflowsPage from '@/pages/Workflows/WorkflowsPage';
-import WorkflowEditorPage from '@/pages/Workflows/WorkflowEditorPage';
-import WorkflowRunnerPage from '@/pages/Workflows/WorkflowRunnerPage';
-import SkillsPage from '@/pages/Skills/SkillsPage';
+const HomePage = lazy(() => import('@/pages/Home/HomePage'));
+const LoginPage = lazy(() => import('@/pages/Auth/LoginPage'));
+const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage'));
+const SsoCallbackPage = lazy(() => import('@/pages/Auth/SsoCallbackPage'));
+const AgentsPage = lazy(() => import('@/pages/Agents/AgentsPage'));
+const AgentDetailPage = lazy(() => import('@/pages/Agents/AgentDetailPage'));
+const TemplatesPage = lazy(() => import('@/pages/Templates/TemplatesPage'));
+const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPage'));
+const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
+const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
+const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
+const WorkspacePage = lazy(() => import('@/pages/Workspace/WorkspacePage'));
+const WorkflowsPage = lazy(() => import('@/pages/Workflows/WorkflowsPage'));
+const WorkflowEditorPage = lazy(() => import('@/pages/Workflows/WorkflowEditorPage'));
+const WorkflowRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowRunnerPage'));
+const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 
-const enterpriseElement = (
-  <ProtectedRoute>
-    <MainLayout>
-      <Suspense fallback={<div style={{ padding: 32 }}>正在加载企业控制台…</div>}>
-        <EnterprisePage />
-      </Suspense>
-    </MainLayout>
-  </ProtectedRoute>
+const page = (element: ReactNode) => (
+  <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
 );
 
 const router = createBrowserRouter([
@@ -38,7 +31,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <HomePage />
+          {page(<HomePage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -49,7 +42,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <AgentsPage />
+          {page(<AgentsPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -59,7 +52,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <AgentDetailPage />
+          {page(<AgentDetailPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -69,7 +62,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <TemplatesPage />
+          {page(<TemplatesPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -79,7 +72,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <TemplateDetailPage />
+          {page(<TemplateDetailPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -89,7 +82,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <AppsPage />
+          {page(<AppsPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -99,7 +92,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <AppDetailPage />
+          {page(<AppDetailPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -109,7 +102,7 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout hideSidebar>
-          <DurableApplicationRuntimePage />
+          {page(<DurableApplicationRuntimePage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -119,29 +112,29 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout hideSidebar>
-          <SkillsPage />
+          {page(<SkillsPage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
   },
   {
     path: '/workflows',
-    element: <ProtectedRoute><MainLayout hideSidebar><WorkflowsPage /></MainLayout></ProtectedRoute>,
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowsPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/workflows/:id/edit',
-    element: <ProtectedRoute><MainLayout hideSidebar><WorkflowEditorPage /></MainLayout></ProtectedRoute>,
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/runs/:runId',
-    element: <ProtectedRoute><MainLayout hideSidebar hideHeader><WorkflowRunnerPage /></MainLayout></ProtectedRoute>,
+    element: <ProtectedRoute><MainLayout hideSidebar hideHeader>{page(<WorkflowRunnerPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/workspace',
     element: (
       <ProtectedRoute>
         <MainLayout>
-          <WorkspacePage />
+          {page(<WorkspacePage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
@@ -151,26 +144,26 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MainLayout hideSidebar>
-          <WorkspacePage />
+          {page(<WorkspacePage />)}
         </MainLayout>
       </ProtectedRoute>
     ),
   },
   {
     path: '/enterprise',
-    element: enterpriseElement,
+    element: <ProtectedRoute><MainLayout>{page(<EnterprisePage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/auth/sso/callback',
-    element: <AuthLayout><SsoCallbackPage /></AuthLayout>,
+    element: <AuthLayout>{page(<SsoCallbackPage />)}</AuthLayout>,
   },
   {
     path: '/auth/login',
-    element: <AuthLayout><PublicRoute><LoginPage /></PublicRoute></AuthLayout>,
+    element: <AuthLayout><PublicRoute>{page(<LoginPage />)}</PublicRoute></AuthLayout>,
   },
   {
     path: '/auth/register',
-    element: <AuthLayout><PublicRoute><RegisterPage /></PublicRoute></AuthLayout>,
+    element: <AuthLayout><PublicRoute>{page(<RegisterPage />)}</PublicRoute></AuthLayout>,
   },
   {
     path: '*',

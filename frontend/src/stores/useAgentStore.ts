@@ -82,7 +82,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   executeAgent: async (agentId: number, inputData: any) => {
     try {
-      const response = await api.post(`/agents/${agentId}/execute/`, {
+      const response = await api.post<RunResource>(`/agents/${agentId}/execute/`, {
         input_data: inputData,
       });
       return response;

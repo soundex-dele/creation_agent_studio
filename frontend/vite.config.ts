@@ -10,6 +10,37 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 550,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const marker = '/node_modules/';
+          const normalized = id.replace(/\\/g, '/');
+          const index = normalized.lastIndexOf(marker);
+          if (index < 0) return undefined;
+          const parts = normalized.slice(index + marker.length).split('/');
+          const packageName = parts[0].startsWith('@')
+            ? `${parts[0]}-${parts[1]}`
+            : parts[0];
+          if (packageName === 'antd') return 'vendor-antd';
+          if (
+            packageName.startsWith('rc-')
+            || packageName.startsWith('@rc-component-')
+            || packageName.startsWith('@ant-design-')
+          ) return 'vendor-antd-runtime';
+          if (
+            packageName === 'react'
+            || packageName === 'react-dom'
+            || packageName === 'react-router'
+            || packageName === 'react-router-dom'
+            || packageName === 'scheduler'
+          ) return 'vendor-react';
+          return 'vendor-common';
+        },
+      },
+    },
+  },
   server: {
     port: 3030,
     proxy: {

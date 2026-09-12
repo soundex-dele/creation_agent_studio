@@ -1,6 +1,6 @@
 import type { RunStreamHandle, RunStreamOptions } from './runStream';
 import { streamRunEvents } from './runStream';
-import axiosInstance from './axios';
+import { api } from './api';
 
 
 export type DeploymentEnvironment = 'development' | 'staging' | 'production';
@@ -80,7 +80,7 @@ export function createApplicationRuntimeClient({
     startRun: async (
       input: Record<string, unknown>,
       idempotencyKey: string,
-    ): Promise<RunResource> => axiosInstance.post(
+    ): Promise<RunResource> => api.post<RunResource>(
       `${root}/applications/${applicationId}/runs`,
       { environment, input },
       { headers: { 'Idempotency-Key': idempotencyKey } },
@@ -104,21 +104,21 @@ export function createApplicationRuntimeClient({
         expected_run_version?: number | null;
         payload?: Record<string, unknown>;
       },
-    ): Promise<Record<string, unknown>> => axiosInstance.post(
+    ): Promise<Record<string, unknown>> => api.post<Record<string, unknown>>(
       `${root}/runs/${runId}/commands`,
       command,
     ) as Promise<Record<string, unknown>>,
 
     listArtifacts: async (runId: string): Promise<CursorPage<RunArtifact>> =>
-      axiosInstance.get(`${root}/runs/${runId}/artifacts`) as Promise<CursorPage<RunArtifact>>,
+      api.get<CursorPage<RunArtifact>>(`${root}/runs/${runId}/artifacts`),
 
     getArtifactAccess: async (
       runId: string,
       artifactId: string,
     ): Promise<{ artifact_id: string; url: string; expires_at: string }> =>
-      axiosInstance.get(
+      api.get<{ artifact_id: string; url: string; expires_at: string }>(
         `${root}/runs/${runId}/artifacts/${artifactId}/access`,
-      ) as Promise<{ artifact_id: string; url: string; expires_at: string }>,
+      ),
   };
 }
 
@@ -127,10 +127,10 @@ export async function loadApplicationRuntime(
   applicationId: string,
   environment: DeploymentEnvironment = 'production',
 ): Promise<ApplicationRuntimeDescriptor> {
-  return axiosInstance.get(
+  return api.get<ApplicationRuntimeDescriptor>(
     `/organizations/${organizationId}/applications/${applicationId}/runtime`,
-    { params: { environment } },
-  ) as Promise<ApplicationRuntimeDescriptor>;
+    { environment },
+  );
 }
 
 export type ApplicationRuntimeClient = ReturnType<typeof createApplicationRuntimeClient>;

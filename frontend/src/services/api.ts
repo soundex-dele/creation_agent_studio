@@ -1,33 +1,36 @@
-import axiosInstance from './axios'
+import type { AxiosRequestConfig } from 'axios';
+
+import axiosInstance from './axios';
+
+export type ApiRequestConfig = Omit<AxiosRequestConfig, 'url' | 'method' | 'data' | 'params'>;
 
 export const api = {
-  // Generic HTTP methods (response.data is unwrapped by interceptor)
-  get: <T = any>(url: string, params?: any): Promise<T> =>
-    axiosInstance.get(url, { params }) as Promise<T>,
+  // The response interceptor unwraps response.data. This is the sole REST
+  // entry point used by application code; axios.ts is the private transport.
+  get: <T = unknown>(
+    url: string,
+    params?: Record<string, unknown>,
+    config?: ApiRequestConfig,
+  ): Promise<T> => axiosInstance.get(url, { ...config, params }) as Promise<T>,
 
-  post: <T = any>(url: string, data?: any): Promise<T> =>
-    axiosInstance.post(url, data) as Promise<T>,
+  post: <T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: ApiRequestConfig,
+  ): Promise<T> => axiosInstance.post(url, data, config) as Promise<T>,
 
-  put: <T = any>(url: string, data?: any): Promise<T> =>
-    axiosInstance.put(url, data) as Promise<T>,
+  put: <T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: ApiRequestConfig,
+  ): Promise<T> => axiosInstance.put(url, data, config) as Promise<T>,
 
-  delete: <T = any>(url: string): Promise<T> =>
-    axiosInstance.delete(url) as Promise<T>,
+  delete: <T = unknown>(url: string, config?: ApiRequestConfig): Promise<T> =>
+    axiosInstance.delete(url, config) as Promise<T>,
 
-  patch: <T = any>(url: string, data?: any): Promise<T> =>
-    axiosInstance.patch(url, data) as Promise<T>,
-
-  // Auth APIs
-  login: (data: { username: string; password: string }) =>
-    axiosInstance.post('/auth/login/', data),
-
-  register: (data: { username: string; email: string; password: string; password_confirm: string }) =>
-    axiosInstance.post('/auth/register/', data),
-
-  logout: () =>
-    axiosInstance.post('/auth/logout/'),
-
-  // User APIs
-  getUser: () =>
-    axiosInstance.get('/auth/me/'),
-}
+  patch: <T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: ApiRequestConfig,
+  ): Promise<T> => axiosInstance.patch(url, data, config) as Promise<T>,
+};

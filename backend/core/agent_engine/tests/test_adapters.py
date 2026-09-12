@@ -86,7 +86,11 @@ class CodexIntegrationTest(TestCase):
 
         self.assertEqual(sdk.ApprovalMode.deny_all, "deny_all")
         self.assertEqual(client, app_server.return_value)
-        app_server.assert_called_once_with(codex_bin=binary, cwd="D:/project")
+        app_server.assert_called_once_with(
+            codex_bin=binary,
+            cwd="D:/project",
+            approval_decision="",
+        )
         load_sdk.assert_not_called()
 
     @override_settings(

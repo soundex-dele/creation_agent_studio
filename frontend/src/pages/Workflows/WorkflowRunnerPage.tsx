@@ -41,7 +41,7 @@ const WorkflowRunnerPage = () => {
 
   const definition = run.definition_snapshot as {
     workflow_name?: string;
-    workflow_steps?: Array<{ id: string; name: string }>;
+    workflow_steps?: Array<{ id: string; key: string; name: string; depends_on?: string[] }>;
   };
   const progress = projection.state.progress;
   const current = Number(progress?.current ?? 0);
@@ -79,7 +79,16 @@ const WorkflowRunnerPage = () => {
             <List.Item>
               <List.Item.Meta
                 title={`${index + 1}. ${step.name}`}
-                description={index < current ? '已完成' : index === current ? '执行中' : '等待中'}
+                description={(() => {
+                  const eventType = projection.state.tools[`workflow:${step.key}`]?.event_type;
+                  const stateLabel = eventType === 'workflow.step.completed' ? '已完成'
+                    : eventType === 'workflow.step.started' ? '执行中'
+                      : eventType === 'workflow.step.failed' ? '重试或失败'
+                        : eventType === 'workflow.step.skipped' ? '条件未满足，已跳过' : '等待依赖';
+                  const dependencies = step.depends_on?.length
+                    ? ` · 依赖 ${step.depends_on.join(', ')}` : ' · 无依赖，可并行';
+                  return `${stateLabel}${dependencies}`;
+                })()}
               />
             </List.Item>
           )}

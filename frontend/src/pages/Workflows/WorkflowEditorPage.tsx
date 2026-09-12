@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Input, Select, Spin, message } from 'antd';
+import { Button, Card, Empty, Input, InputNumber, Select, Spin, message } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -44,11 +44,16 @@ const WorkflowEditorPage = () => {
   const addStep = () => {
     const app = apps.find((item) => item.applicationId === selectedApplication);
     if (!app || !selectedApplication) return;
+    const key = `step-${Date.now()}`;
     setSteps((current) => [...current, {
       id: `draft-${Date.now()}`,
+      key,
       name: app.name,
       order: current.length,
       config: {},
+      depends_on: current.length ? [current[current.length - 1].key] : [],
+      condition: {},
+      max_attempts: 1,
       application_id: selectedApplication,
       application: {
         id: selectedApplication, application_id: selectedApplication, application_slug: app.id,
@@ -80,9 +85,13 @@ const WorkflowEditorPage = () => {
         is_public: workflow.is_public,
         steps: steps.map((step, order) => ({
           application_id: step.application_id || step.application.id,
+          key: step.key,
           name: step.name || step.application.application_name,
           order,
           config: step.config || {},
+          depends_on: step.depends_on || [],
+          condition: step.condition || {},
+          max_attempts: step.max_attempts || 1,
         })),
       });
       message.success('工作流已保存');
@@ -120,6 +129,22 @@ const WorkflowEditorPage = () => {
               <div className="workflow-step-copy">
                 <strong>{step.name || step.application.application_name}</strong>
                 <span>{step.application.application_description}</span>
+                <Select
+                  mode="multiple"
+                  value={step.depends_on || []}
+                  placeholder="无依赖（可并行）"
+                  options={steps.filter((candidate) => candidate.key !== step.key).map((candidate) => ({
+                    value: candidate.key,
+                    label: candidate.name || candidate.application.application_name,
+                  }))}
+                  onChange={(depends_on) => setSteps((current) => current.map((item) =>
+                    item.key === step.key ? { ...item, depends_on } : item))}
+                />
+                <span>
+                  节点重试：<InputNumber min={1} max={10} value={step.max_attempts || 1}
+                    onChange={(value) => setSteps((current) => current.map((item) =>
+                      item.key === step.key ? { ...item, max_attempts: value || 1 } : item))} />
+                </span>
               </div>
               <Button icon={<ArrowUpOutlined />} disabled={index === 0}
                 onClick={() => move(index, -1)} />
@@ -127,7 +152,13 @@ const WorkflowEditorPage = () => {
                 onClick={() => move(index, 1)} />
               <Button danger icon={<DeleteOutlined />}
                 onClick={() => setSteps((current) => current.filter((_, i) => i !== index)
-                  .map((item, order) => ({ ...item, order })))} />
+                  .map((item, order) => ({
+                    ...item,
+                    order,
+                    depends_on: (item.depends_on || []).filter((key) => key !== step.key),
+                    condition: item.condition?.source === 'dependency'
+                      && item.condition?.step === step.key ? {} : item.condition,
+                  })))} />
             </Card>
           ))}
       </div>

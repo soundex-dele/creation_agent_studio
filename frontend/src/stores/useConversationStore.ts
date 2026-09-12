@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import type { AgentQuestion, AgentToolCall, RunEventEnvelope } from '@/entities/run';
-import axiosInstance from '@/services/axios';
+import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
 
@@ -197,7 +197,7 @@ export const useConversationStore = create<ConversationState>()(
         fetchConversations: async () => {
           set({ isLoading: true, error: null });
           try {
-            const response = await axiosInstance.get('/conversations/');
+            const response = await api.get<Conversation[] | { results?: Conversation[] }>('/conversations/');
             set({ conversations: normalizeConversations(response), isLoading: false });
           } catch (error: any) {
             set({ error: error.response?.data?.detail || '获取对话列表失败', isLoading: false });
@@ -209,7 +209,7 @@ export const useConversationStore = create<ConversationState>()(
           const requestId = ++latestConversationDetailRequest;
           set({ isLoading: true, error: null });
           try {
-            const response = await axiosInstance.get(`/conversations/${id}/`) as any;
+            const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
             if (requestId === latestConversationDetailRequest) {
               set({
                 currentConversation: { ...response, id: String(response.id) },
@@ -226,9 +226,10 @@ export const useConversationStore = create<ConversationState>()(
 
         fetchProjectConversations: async (projectId) => {
           try {
-            const response = await axiosInstance.get('/conversations/', {
-              params: { project_id: projectId },
-            });
+            const response = await api.get<Conversation[] | { results?: Conversation[] }>(
+              '/conversations/',
+              { project_id: projectId },
+            );
             return normalizeConversations(response);
           } catch {
             return [];
@@ -246,7 +247,7 @@ export const useConversationStore = create<ConversationState>()(
             if (context.applicationId) payload.application_id = context.applicationId;
             if (context.skillIds?.length) payload.skill_ids = context.skillIds;
             if (context.workingDirectory) payload.working_directory = context.workingDirectory;
-            const response = await axiosInstance.post('/conversations/', payload) as any;
+            const response = await api.post<Conversation>('/conversations/', payload);
             if (!projectId) set({ conversations: [response, ...get().conversations] });
             set({ isLoading: false });
             return response;
@@ -256,11 +257,11 @@ export const useConversationStore = create<ConversationState>()(
           }
         },
 
-        sendMessage: async (conversationId, content) => axiosInstance.post(
+        sendMessage: async (conversationId, content) => api.post<RunResource>(
           `/conversations/${conversationId}/send_message/`,
           { content },
           { headers: { 'Idempotency-Key': crypto.randomUUID() } },
-        ) as Promise<RunResource>,
+        ),
 
         sendMessageStream: (conversationId, content, options = {}) => {
           const controller = new AbortController();
@@ -387,7 +388,7 @@ export const useConversationStore = create<ConversationState>()(
             : 'answer';
           set({ pendingQuestion: null, agentActivity: '正在提交回答…', error: null });
           try {
-            await axiosInstance.post(
+            await api.post(
               `/organizations/${activeRun.organization_id}/runs/${activeRun.id}/commands`,
               {
                 type,
@@ -406,7 +407,7 @@ export const useConversationStore = create<ConversationState>()(
           const run = get().activeRun;
           if (!run) return;
           set({ agentActivity: '正在取消…', error: null });
-          await axiosInstance.post(
+          await api.post(
             `/organizations/${run.organization_id}/runs/${run.id}/commands`,
             { type: 'cancel', idempotency_key: crypto.randomUUID(), payload: {} },
           );
@@ -415,7 +416,7 @@ export const useConversationStore = create<ConversationState>()(
         clearConversation: async (conversationId) => {
           set({ isLoading: true, error: null });
           try {
-            await axiosInstance.delete(`/conversations/${conversationId}/clear/`);
+            await api.delete(`/conversations/${conversationId}/clear/`);
             const currentConversation = get().currentConversation;
             set({
               currentConversation: currentConversation?.id === conversationId
@@ -432,7 +433,7 @@ export const useConversationStore = create<ConversationState>()(
         deleteConversation: async (conversationId) => {
           set({ isLoading: true, error: null });
           try {
-            await axiosInstance.delete(`/conversations/${conversationId}/delete_conversation/`);
+            await api.delete(`/conversations/${conversationId}/delete_conversation/`);
             const { conversations, currentConversation } = get();
             set({
               conversations: conversations.filter((item) => item.id !== conversationId),

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import axiosInstance from '@/services/axios';
+import { api } from '@/services/api';
 import * as runStream from '@/services/runStream';
 import type { RunEventEnvelope } from '@/entities/run';
 import { useConversationStore } from '../useConversationStore';
@@ -21,7 +21,7 @@ describe('useConversationStore durable Run integration', () => {
   it('keeps the latest conversation when detail requests finish out of order', async () => {
     let resolveFirst: ((value: any) => void) | undefined;
     let resolveSecond: ((value: any) => void) | undefined;
-    vi.spyOn(axiosInstance, 'get').mockImplementation((url) => {
+    vi.spyOn(api, 'get').mockImplementation((url) => {
       if (url === '/conversations/15/') {
         return new Promise((resolve) => { resolveFirst = resolve; });
       }
@@ -40,7 +40,7 @@ describe('useConversationStore durable Run integration', () => {
 
   it('renders the canonical RunEvent stream', async () => {
     let emit: ((event: RunEventEnvelope) => void) | undefined;
-    vi.spyOn(axiosInstance, 'post').mockResolvedValue({
+    vi.spyOn(api, 'post').mockResolvedValue({
       id: 'run-1',
       organization_id: 'org-1',
       status: 'queued',

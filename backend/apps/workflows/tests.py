@@ -63,8 +63,15 @@ class WorkflowApiTest(TestCase):
         response = self.client.post("/api/workflows/", {
             "name": "Content flow",
             "steps": [
-                {"application_id": self.applications[0].id, "name": "First", "order": 0},
-                {"application_id": self.applications[1].id, "name": "Second", "order": 1},
+                {
+                    "key": "first", "application_id": self.applications[0].id,
+                    "name": "First", "order": 0, "depends_on": [],
+                },
+                {
+                    "key": "second", "application_id": self.applications[1].id,
+                    "name": "Second", "order": 1, "depends_on": ["first"],
+                    "max_attempts": 2,
+                },
             ],
         }, format="json", **self.headers)
         self.assertEqual(response.status_code, 201, response.data)
@@ -80,8 +87,14 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(response.status_code, 202, response.data)
         run = Run.objects.get(pk=response.data["id"])
         self.assertEqual(run.executor_kind, Run.ExecutorKind.WORKFLOW)
-        self.assertEqual(run.executor_key, "workflow-sequential")
+        self.assertEqual(run.executor_key, "workflow-dag")
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+        self.assertEqual(
+            run.definition_snapshot["workflow_steps"][1]["depends_on"], ["first"]
+        )
+        self.assertEqual(
+            run.definition_snapshot["workflow_steps"][1]["max_attempts"], 2
+        )
 
         replay = self.client.post(
             f"/api/workflows/{workflow.id}/start/",
@@ -97,3 +110,20 @@ class WorkflowApiTest(TestCase):
         workflow.steps.all().delete()
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+
+    def test_rejects_cyclic_workflow(self):
+        response = self.client.post("/api/workflows/", {
+            "name": "Cycle",
+            "steps": [
+                {
+                    "key": "first", "application_id": self.applications[0].id,
+                    "name": "First", "order": 0, "depends_on": ["second"],
+                },
+                {
+                    "key": "second", "application_id": self.applications[1].id,
+                    "name": "Second", "order": 1, "depends_on": ["first"],
+                },
+            ],
+        }, format="json", **self.headers)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("工作流依赖不能形成环", str(response.data))

@@ -121,6 +121,21 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
       };
       break;
     }
+    case 'workflow.step.started':
+    case 'workflow.step.completed':
+    case 'workflow.step.failed':
+    case 'workflow.step.skipped': {
+      const key = String(event.payload.workflow_step_key ?? event.payload.workflow_step_id ?? event.sequence);
+      next.tools = {
+        ...next.tools,
+        [`workflow:${key}`]: {
+          ...next.tools[`workflow:${key}`],
+          ...event.payload,
+          event_type: event.type,
+        },
+      };
+      break;
+    }
   }
   return next;
 }

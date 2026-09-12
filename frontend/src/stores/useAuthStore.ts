@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import axiosInstance from '@/services/axios';
+import { api } from '@/services/api';
+import { registerAuthSession } from '@/services/authSession';
 
 interface User {
   id: string;
@@ -34,6 +35,21 @@ interface RegisterData {
   role?: string;
 }
 
+interface AuthTokens {
+  access: string;
+  refresh: string;
+}
+
+interface AuthResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+interface RefreshResponse {
+  access: string;
+  refresh?: string;
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -43,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: async (username: string, password: string) => {
-        const response = await axiosInstance.post('/auth/login/', { username, password }) as any;
+        const response = await api.post<AuthResponse>('/auth/login/', { username, password });
         const { user, tokens } = response;
 
         set({
@@ -55,7 +71,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       register: async (data: RegisterData) => {
-        const response = await axiosInstance.post('/auth/register/', data) as any;
+        const response = await api.post<AuthResponse>('/auth/register/', data);
         const { user, tokens } = response;
 
         set({
@@ -67,7 +83,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       completeSso: async (exchange: string) => {
-        const response = await axiosInstance.post('/enterprise/sso/exchange', { exchange }) as any;
+        const response = await api.post<AuthResponse>('/enterprise/sso/exchange', { exchange });
         const { user, tokens } = response;
         set({ user, token: tokens.access, refreshToken: tokens.refresh, isAuthenticated: true });
       },
@@ -91,7 +107,7 @@ export const useAuthStore = create<AuthState>()(
         get().clearAuth();
         if (refreshToken) {
           try {
-            await axiosInstance.post('/auth/logout/', { refresh: refreshToken });
+            await api.post('/auth/logout/', { refresh: refreshToken });
           } catch (error) {
             console.error('Logout error:', error);
           }
@@ -103,9 +119,9 @@ export const useAuthStore = create<AuthState>()(
           const { refreshToken } = get();
           if (!refreshToken) throw new Error('No refresh token');
 
-          const response = await axiosInstance.post('/auth/token/refresh/', {
+          const response = await api.post<RefreshResponse>('/auth/token/refresh/', {
             refresh: refreshToken,
-          }) as any;
+          });
 
           set({
             token: response.access,
@@ -137,3 +153,9 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+registerAuthSession({
+  accessToken: () => useAuthStore.getState().token,
+  refresh: () => useAuthStore.getState().refreshAccessToken(),
+  clear: () => useAuthStore.getState().clearAuth(),
+});

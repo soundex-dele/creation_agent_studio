@@ -29,7 +29,7 @@ class Workflow(models.Model):
 
 
 class WorkflowStep(models.Model):
-    """工作流中的有序应用引用；第一版不做自动依赖调度。"""
+    """A stable node in the workflow DAG."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workflow = models.ForeignKey(
@@ -38,11 +38,22 @@ class WorkflowStep(models.Model):
         'applications.Application', on_delete=models.PROTECT,
         related_name='workflow_steps')
     name = models.CharField(max_length=200, blank=True)
+    key = models.SlugField(max_length=100)
     config = models.JSONField(default=dict, blank=True)
+    depends_on = models.JSONField(default=list, blank=True)
+    condition = models.JSONField(default=dict, blank=True)
+    max_attempts = models.PositiveSmallIntegerField(default=1)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = 'workflow_steps'
         ordering = ['order', 'id']
-        constraints = [models.UniqueConstraint(
-            fields=['workflow', 'order'], name='unique_workflow_step_order')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['workflow', 'order'], name='unique_workflow_step_order'),
+            models.UniqueConstraint(
+                fields=['workflow', 'key'], name='unique_workflow_step_key'),
+            models.CheckConstraint(
+                check=models.Q(max_attempts__gte=1),
+                name='workflow_step_attempts_at_least_one'),
+        ]

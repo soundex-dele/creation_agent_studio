@@ -48,7 +48,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadProject: async (id: number) => {
     try {
       set({ isLoading: true });
-      const response = await api.get(`/projects/${id}/`);
+      const response = await api.get<Project>(`/projects/${id}/`);
       set({ currentProject: response });
     } catch (error) {
       console.error('Failed to load project:', error);
@@ -59,7 +59,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   createProject: async (data) => {
     try {
-      const response = await api.post('/projects/', data);
+      const response = await api.post<Project>('/projects/', data);
       const { projects } = get();
       set({ projects: [response, ...projects] });
       return response;

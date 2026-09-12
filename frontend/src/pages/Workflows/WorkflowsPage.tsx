@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Empty, Input, Modal, Spin, message } from 'antd';
 import {
   EditOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined,
@@ -22,7 +22,7 @@ const WorkflowsPage = () => {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [workflowResponse, runResponse] = await Promise.all([
@@ -38,9 +38,9 @@ const WorkflowsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
 
-  useEffect(() => { void load(); }, [organizationId]);
+  useEffect(() => { void load(); }, [load]);
 
   const create = async () => {
     if (!name.trim()) return;

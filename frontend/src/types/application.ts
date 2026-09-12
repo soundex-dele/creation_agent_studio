@@ -84,9 +84,13 @@ export interface ApplicationRuntime {
 
 export interface WorkflowStep {
   id: string;
+  key: string;
   name?: string;
   order: number;
   config: Record<string, unknown>;
+  depends_on: string[];
+  condition: Record<string, unknown>;
+  max_attempts: number;
   application_id?: number;
   application: ApplicationRuntime;
 }

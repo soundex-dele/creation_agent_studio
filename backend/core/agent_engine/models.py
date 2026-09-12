@@ -35,6 +35,7 @@ class LLMResponse(BaseModel):
     model: str
     success: bool = True
     error: str | None = None
+    input_request: dict | None = None
 
 
 class Conversation(BaseModel):

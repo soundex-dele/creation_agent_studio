@@ -135,7 +135,7 @@ export default function EnterprisePage() {
   };
   const remove = async (row: Row) => { await api.delete(`${section.endpoint}${row.id}/`); message.success('已删除'); await reload(); };
   const invoke = async (row: Row) => { const result = await api.post(`${section.endpoint}${row.id}/invoke/`, { ping: new Date().toISOString() }); Modal.info({ title: '连接器响应', width: 720, content: <pre>{JSON.stringify(result, null, 2)}</pre> }); };
-  const trigger = async (row: Row) => { const result = await api.post(`${section.endpoint}${row.id}/trigger/`, {}); message.success(`已触发，Trace: ${result.id}`); };
+  const trigger = async (row: Row) => { const result = await api.post<{ id: string }>(`${section.endpoint}${row.id}/trigger/`, {}); message.success(`已触发，Trace: ${result.id}`); };
 
   const manageKnowledge = async (row: Row) => {
     const documents = await api.get<Row[]>(`${section.endpoint}${row.id}/documents/`);

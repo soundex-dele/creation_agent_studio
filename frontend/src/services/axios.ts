@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { message } from 'antd';
-import { useAuthStore } from '@/stores/useAuthStore';
 import { API_BASE_URL } from './apiBaseUrl';
+import { clearAuthSession, getAccessToken, refreshAccessToken } from './authSession';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -14,7 +14,7 @@ const axiosInstance = axios.create({
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -59,7 +59,7 @@ let redirectingToLogin = false;
 const redirectToLogin = () => {
   if (redirectingToLogin) return;
   redirectingToLogin = true;
-  useAuthStore.getState().clearAuth();
+  clearAuthSession();
   window.location.href = '/auth/login';
 };
 
@@ -107,8 +107,8 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await useAuthStore.getState().refreshAccessToken();
-        const newToken = useAuthStore.getState().token;
+        await refreshAccessToken();
+        const newToken = getAccessToken();
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return axiosInstance(originalRequest);

@@ -1,6 +1,6 @@
 # Creation Agent Studio 当前架构分析
 
-> 分析日期：2026-09-11
+> 分析日期：2026-09-12
 >
 > 分析方式：只检查当前源码、配置、迁移和可执行测试，没有引用仓库中原有说明文档。
 > 迁移策略：项目尚未上线，本轮按破坏性合并处理，不提供旧执行协议兼容层。
@@ -121,8 +121,10 @@ queued → running → succeeded
 
 - `WorkflowRun` 和 `WorkflowStepRun` 已删除。
 - 手工 `select-step/complete-step` 状态机已删除。
-- Workflow 启动时冻结每一步的 Application Deployment Revision，创建一个 `workflow/workflow-sequential` Run。
-- 步骤状态通过 RunEvent 的 `workflow_step_id` 展示；历史和详情读取通用 Run API。
+- Workflow 启动时冻结每一步的 Application Deployment Revision、依赖、条件和重试策略，创建一个 `workflow/workflow-dag` Run。
+- DAG 使用稳定 step key 描述依赖，循环依赖在写入阶段拒绝；同一拓扑层按配置的并行度执行。
+- 节点支持独立 `max_attempts`、基于输入或依赖输出的条件分支，并产生 `workflow.step.*` RunEvent。
+- 步骤状态通过统一 RunEvent 投影展示；历史和详情读取通用 Run API。
 - Workflow 启动使用请求幂等键，防止重复创建。
 
 ### Media
@@ -140,6 +142,8 @@ Page / Store
     → entities/run sequencer + reducer
     → RunEvent projection
 ```
+
+所有 REST 请求只从 `services/api.ts` 进入，`axios.ts` 是不对业务代码暴露的传输实现。路由页面全部使用动态 import，第三方依赖按 React、Ant Design 组件、Markdown 和公共库拆包。
 
 已经删除：
 
@@ -159,6 +163,7 @@ Application 只保留 `/applications/:applicationId/run` durable 页面；Workfl
 - 生产 Compose 使用独立应用数据库账号，显式设置 `NOSUPERUSER` 和 `NOBYPASSRLS`；管理员账号只用于初始化数据库。
 - Revision 只能选择服务端注册的 executor key，不能通过 JSON 注入 Python import path。
 - Artifact 使用短期签名访问，且本地 object key 必须位于配置根目录。
+- 共享模块对产品 App 的依赖由 AST 架构测试形成可执行白名单；新增跨边界 import 必须显式评审。
 
 ## 6. 部署与可观测性
 
@@ -185,26 +190,24 @@ Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触�
 - 删除 AgentExecution、Agent Thread/Turn/Item/ServerRequest、WorkflowRun/WorkflowStepRun 表。
 - 删除无 Organization 的历史 Conversation，再把 Organization 改为必填。
 - 删除旧 API、旧前端路由、旧事件协议和旧运行组件。
+- 删除旧 V2 设计稿；README 和本文只描述当前唯一实现。
 - PostgreSQL 初始化变量发生变化：需要提供 `DB_ADMIN_PASSWORD`；`DB_USER/DB_PASSWORD/DB_NAME` 用于创建非特权应用账号和数据库。
 
 现有开发数据库建议从空库重新执行迁移；已有 Compose volume 需要重建，初始化脚本才会生效。
 
-## 8. 当前仍存在的缺点
+## 8. 当前约束
 
-以下问题不再是“多套实现”，但仍值得后续优化：
+本轮已直接替换 REST 双入口、顺序 Workflow、不可达的交互 checkpoint 和单一大前端包，没有保留旧实现。当前仍需明确的运行约束是：
 
-1. Django 模块间仍存在较多跨 App import，领域边界主要靠约定，没有独立包级依赖检查。
-2. 前端 REST 调用同时存在 `axiosInstance` 和轻量 `api` 包装；它们共享同一个底层实例，但类型仍有较多 `any`，适合改为 OpenAPI 生成客户端。
-3. Workflow 当前是顺序执行器，不是通用 DAG；缺少分支、节点级重试和并行调度。
-4. Agent adapter 的当前 durable 实现以一次性 completion 为核心，RunCommand 的交互输入能力已建模，但 Codex/GraphFlow adapter 尚未产出可 checkpoint 的交互事件。
-5. SQLite 适合单机开发；多 Worker Pool、RLS 和 `skip_locked` 的完整能力依赖 PostgreSQL。
-6. 前端主 bundle 约 1.35 MB，Vite 仍提示 chunk 超过 500 KB；需要继续按页面拆包。
+1. Django 是模块化单体，Catalog、Execution、Tenancy 与产品 App 仍有少量必要集成边；这些边已由架构测试精确锁定，但还不是可独立部署的服务边界。
+2. SQLite 只用于单进程本地开发和测试；多 Worker、RLS、`skip_locked` 与生产一致性验证必须使用 PostgreSQL。生产配置默认且仅支持 PostgreSQL 部署形态。
+3. GraphFlow 只有在其 SDK 返回 `input_request`/`pending_question` 时才能进入 durable suspend；SDK 本身不暴露交互请求时，平台无法从最终 completion 反向推断问题。
 
 ## 9. 验证结果
 
 - Django system check：通过。
 - `makemigrations --check --dry-run`：无遗漏模型变化。
-- 后端全量测试：124 passed，3 skipped。
+- 后端全量测试：130 passed，3 skipped。
 - 前端全量测试：17 passed。
 - TypeScript 与 Vite 生产构建：通过。
-- 构建只剩主 chunk 体积告警，没有类型或编译错误。
+- 前端已按页面和第三方组件拆包。

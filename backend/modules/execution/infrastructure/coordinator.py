@@ -1,7 +1,11 @@
 import multiprocessing
 import queue
 import time
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import timedelta
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.cache import cache
@@ -19,6 +23,8 @@ from modules.execution.application.runs import (
     append_event_and_transition,
     fail_attempt,
     finish_attempt,
+    record_artifact,
+    suspend_attempt_for_input,
 )
 from modules.execution.infrastructure.claim import claim_next_run, renew_lease
 from modules.execution.models import Run, RunCommand
@@ -33,6 +39,10 @@ ADAPTER_EVENT_TYPES = {
     "tool.completed",
     "tool.failed",
     "progress.updated",
+    "workflow.step.started",
+    "workflow.step.completed",
+    "workflow.step.failed",
+    "workflow.step.skipped",
 }
 
 
@@ -241,6 +251,62 @@ class ExecutionCoordinator:
         )
 
     def _handle_message(self, active, message):
+        if message.get("kind") == "suspend":
+            checkpoint_data = message.get("checkpoint") or {}
+            encoded = json.dumps(
+                checkpoint_data,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            max_size = int(getattr(settings, "EXECUTION_CHECKPOINT_MAX_BYTES", 1048576))
+            if len(encoded) > max_size:
+                self._finish(active, {
+                    "outcome": "failed",
+                    "error_code": "checkpoint_too_large",
+                    "error_message": f"Checkpoint exceeds {max_size} bytes",
+                })
+                return True
+            input_kind = message.get("input_kind")
+            if input_kind not in Run.InputKind.values:
+                self._finish(active, {
+                    "outcome": "failed",
+                    "error_code": "invalid_input_kind",
+                    "error_message": f"Unsupported input kind: {input_kind}",
+                })
+                return True
+            expires_in = min(max(int(message.get("expires_in_seconds") or 86400), 60), 604800)
+            input_request_id = uuid4()
+            # Both helper functions use inner savepoints. The outer transaction
+            # makes artifact creation and the waiting_input transition atomic.
+            with transaction.atomic():
+                artifact, _event, _created = record_artifact(
+                    run_id=active.claimed.run.id,
+                    organization_id=active.claimed.run.organization_id,
+                    attempt_id=active.claimed.attempt.id,
+                    lease_fence=self._fence(active),
+                    kind="checkpoint",
+                    object_key=(
+                        f"runs/{active.claimed.run.id}/attempts/"
+                        f"{active.claimed.attempt.id}/checkpoint.json"
+                    ),
+                    content_hash=hashlib.sha256(encoded).hexdigest(),
+                    mime_type="application/json",
+                    size=len(encoded),
+                    metadata={"checkpoint": checkpoint_data},
+                )
+                suspend_attempt_for_input(
+                    run_id=active.claimed.run.id,
+                    organization_id=active.claimed.run.organization_id,
+                    attempt_id=active.claimed.attempt.id,
+                    lease_fence=self._fence(active),
+                    checkpoint_artifact_id=artifact.id,
+                    input_request_id=input_request_id,
+                    input_kind=input_kind,
+                    expires_at=timezone.now() + timedelta(seconds=expires_in),
+                    request_payload=message.get("request_payload") or {},
+                )
+            return True
         if message.get("kind") == "event":
             if message.get("type") not in ADAPTER_EVENT_TYPES:
                 self._finish(

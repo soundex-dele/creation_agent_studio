@@ -95,7 +95,11 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 )
             snapshots.append({
                 "id": str(step.id),
+                "key": step.key,
                 "name": step.name or step.application.name,
+                "depends_on": step.depends_on,
+                "condition": step.condition,
+                "max_attempts": step.max_attempts,
                 "application_id": step.application_id,
                 "application_revision_id": str(deployment.revision_id),
                 "executor_kind": kind,

@@ -160,13 +160,17 @@ EXECUTION_CHILD_ADAPTERS = config(
         '"modules.execution.runtime.builtin:execute_agent_completion"},'
         '"media":{"batch-transcribe":'
         '"modules.execution.runtime.builtin:execute_batch_transcribe"},'
-        '"workflow":{"workflow-sequential":'
+        '"workflow":{"workflow-dag":'
         '"modules.execution.runtime.builtin:execute_workflow"}}'
     ),
     cast=json.loads,
 )
 EXECUTION_EVENT_QUEUE_SIZE = config(
     'EXECUTION_EVENT_QUEUE_SIZE', default=1000, cast=int)
+EXECUTION_CHECKPOINT_MAX_BYTES = config(
+    'EXECUTION_CHECKPOINT_MAX_BYTES', default=1048576, cast=int)
+EXECUTION_WORKFLOW_MAX_PARALLELISM = config(
+    'EXECUTION_WORKFLOW_MAX_PARALLELISM', default=4, cast=int)
 REQUIRED_EXECUTION_WORKER_POOLS = tuple(
     value.strip()
     for value in config('REQUIRED_EXECUTION_WORKER_POOLS', default='').split(',')

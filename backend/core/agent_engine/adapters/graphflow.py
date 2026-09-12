@@ -73,14 +73,32 @@ class GraphFlowAdapter(AgentAdapter):
             model=self.model,
         ) as engine:
             result = engine.query(query)
+        input_request = getattr(result, "input_request", None)
+        if input_request is None:
+            input_request = getattr(result, "pending_question", None)
+        if hasattr(input_request, "model_dump"):
+            input_request = input_request.model_dump()
+        if input_request is not None and not isinstance(input_request, dict):
+            input_request = {"question": str(input_request)}
+        if input_request:
+            input_request = {
+                "input_kind": input_request.get("input_kind", "answer"),
+                "kind": input_request.get("kind", "question"),
+                "header": input_request.get("header", "Agent 提问"),
+                "question": input_request.get(
+                    "question", "请提供继续执行所需的信息"
+                ),
+                "options": input_request.get("options", []),
+            }
         return LLMResponse(
-            content=result.final_answer,
+            content=getattr(result, "final_answer", ""),
             usage=TokenUsage(
                 prompt_tokens=result.token_usage.prompt_tokens,
                 completion_tokens=result.token_usage.completion_tokens,
                 total_tokens=result.token_usage.total_tokens,
             ),
             model=self.model,
-            success=result.success,
-            error=result.error_message or None,
+            success=bool(getattr(result, "success", False)) or bool(input_request),
+            error=getattr(result, "error_message", "") or None,
+            input_request=input_request,
         )

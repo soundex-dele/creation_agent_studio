@@ -53,7 +53,7 @@ def _protocol_value(value):
 class _AppServerTransport:
     """Minimal JSONL client for a dedicated Codex app-server process."""
 
-    def __init__(self, *, codex_bin: Path) -> None:
+    def __init__(self, *, codex_bin: Path, approval_decision: str = "") -> None:
         creation_flags = 0
         if sys.platform == "win32":
             creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -73,6 +73,8 @@ class _AppServerTransport:
         self._pending: dict[int, queue.Queue] = {}
         self._notifications: queue.Queue = queue.Queue()
         self._stderr_lines: list[str] = []
+        self._approval_decision = approval_decision
+        self.input_request: dict | None = None
         self._reader = threading.Thread(target=self._read_stdout, daemon=True)
         self._stderr_reader = threading.Thread(target=self._read_stderr, daemon=True)
         self._reader.start()
@@ -180,13 +182,36 @@ class _AppServerTransport:
         self._send(message)
 
     def _handle_server_request(self, message: dict) -> None:
-        """Decline unexpected approvals instead of leaving the turn blocked."""
+        """Resolve or project an approval into the durable Run input protocol."""
         method = message.get("method", "")
         if method in {
             "item/commandExecution/requestApproval",
             "item/fileChange/requestApproval",
         }:
-            self._send({"id": message["id"], "result": {"decision": "decline"}})
+            approval_decision = self._approval_decision
+            self._approval_decision = ""
+            if approval_decision == "grant":
+                decision = "accept"
+            else:
+                decision = "decline"
+                if approval_decision != "deny":
+                    params = message.get("params") or {}
+                    self.input_request = {
+                        "input_kind": "permission",
+                        "kind": "permission",
+                        "header": "Codex 权限确认",
+                        "question": str(
+                            params.get("reason")
+                            or params.get("command")
+                            or "Codex 请求执行受保护的操作"
+                        ),
+                        "options": [
+                            {"label": "允许", "value": "grant"},
+                            {"label": "拒绝", "value": "deny"},
+                        ],
+                        "permission": {"method": method, "request": params},
+                    }
+            self._send({"id": message["id"], "result": {"decision": decision}})
             return
         self._send(
             {
@@ -333,9 +358,18 @@ class _AppServerThread:
 
 
 class _AppServerCodex:
-    def __init__(self, *, codex_bin: Path, cwd: str = "") -> None:
-        self._transport = _AppServerTransport(codex_bin=codex_bin)
+    def __init__(
+        self, *, codex_bin: Path, cwd: str = "", approval_decision: str = ""
+    ) -> None:
+        self._transport = _AppServerTransport(
+            codex_bin=codex_bin,
+            approval_decision=approval_decision,
+        )
         self._cwd = cwd
+
+    @property
+    def input_request(self):
+        return self._transport.input_request
 
     def thread_start(
         self,
@@ -491,12 +525,13 @@ class CodexAdapter(AgentAdapter):
     def __init__(self, *, model=None, **_options) -> None:
         self.model = model or settings.CODEX_MODEL
 
-    def _client(self, *, cwd: str = ""):
+    def _client(self, *, cwd: str = "", approval_decision: str = ""):
         transport = str(getattr(settings, "CODEX_TRANSPORT", "app-server")).strip().lower()
         if transport == "app-server":
             return _AppServerSdk, _AppServerCodex(
                 codex_bin=resolve_codex_binary(),
                 cwd=cwd or settings.CODEX_WORKING_DIRECTORY,
+                approval_decision=approval_decision,
             )
         if transport != "python-sdk":
             raise ValueError("CODEX_TRANSPORT must be app-server or python-sdk")
@@ -512,7 +547,11 @@ class CodexAdapter(AgentAdapter):
     def complete(self, messages: list[dict], **options) -> LLMResponse:
         system_prompt, query = format_messages_for_query(messages)
         cwd = options.get("working_directory", "") or settings.CODEX_WORKING_DIRECTORY
-        sdk, client = self._client(cwd=cwd)
+        sdk, client = self._client(
+            cwd=cwd,
+            approval_decision=str(options.get("approval_decision") or ""),
+        )
+        input_request = None
         try:
             thread = client.thread_start(
                 approval_mode=_approval_mode(sdk),
@@ -522,6 +561,7 @@ class CodexAdapter(AgentAdapter):
                 sandbox=_sandbox(sdk),
             )
             result = thread.run(query, model=self.model or None)
+            input_request = getattr(client, "input_request", None)
         finally:
             client.close()
         usage = _usage_payload(result.usage)
@@ -532,4 +572,5 @@ class CodexAdapter(AgentAdapter):
             model=self.model or "codex-default",
             success=success,
             error=(getattr(result.error, "message", None) if result.error else None),
+            input_request=input_request,
         )

@@ -1,12 +1,24 @@
 import queue
 import threading
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
 
 from modules.execution.infrastructure.coordinator import ExecutionCoordinator
+from modules.execution.application.runs import create_run
+from modules.execution.infrastructure.claim import claim_next_run
 from modules.execution.models import Run
 from modules.execution.runtime.child import execute_child
+
+
+def _suspending_adapter(_payload, sink):
+    sink.request_input(
+        input_kind="answer",
+        request_payload={"question": "Continue?"},
+        checkpoint={"cursor": 3},
+        expires_in_seconds=120,
+    )
 
 
 def test_child_reports_invalid_adapter_without_database_access():
@@ -23,6 +35,72 @@ def test_child_reports_invalid_adapter_without_database_access():
     assert terminal["outcome"] == "failed"
     assert terminal["error_code"] == "execution_adapter_failed"
     assert "Cannot load execution adapter" in terminal["error_message"]
+
+
+def test_child_reports_one_canonical_suspend_message():
+    messages = queue.Queue()
+    execute_child(
+        {"input": {}},
+        messages,
+        threading.Event(),
+        "modules.execution.tests.test_coordinator:_suspending_adapter",
+    )
+
+    suspended = messages.get_nowait()
+    assert suspended == {
+        "kind": "suspend",
+        "input_kind": "answer",
+        "request_payload": {"question": "Continue?"},
+        "checkpoint": {"cursor": 3},
+        "expires_in_seconds": 120,
+    }
+    with pytest.raises(queue.Empty):
+        messages.get_nowait()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_coordinator_persists_suspend_as_checkpoint_and_waiting_input():
+    actor = get_user_model().objects.create_user(username="suspend-owner")
+    organization = actor.owned_organizations.get()
+    run = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="agent",
+        source_id="1",
+        definition_snapshot={},
+        input_data={"message": "hello"},
+    )
+    claimed = claim_next_run(
+        worker_id="test-coordinator",
+        worker_pool=Run.ExecutorKind.AGENT,
+        lease_seconds=30,
+        executor_keys=("agent-completion",),
+    )
+    coordinator = ExecutionCoordinator(
+        worker_id="test-coordinator",
+        worker_pool=Run.ExecutorKind.AGENT,
+        adapter_entries={"agent-completion": "unused:adapter"},
+    )
+
+    terminal = coordinator._handle_message(SimpleNamespace(claimed=claimed), {
+        "kind": "suspend",
+        "input_kind": "answer",
+        "request_payload": {"question": "Continue?"},
+        "checkpoint": {"messages": [{"role": "user", "content": "hello"}]},
+        "expires_in_seconds": 120,
+    })
+
+    assert terminal is True
+    run.refresh_from_db()
+    assert run.status == Run.Status.WAITING_INPUT
+    assert run.pending_input_kind == Run.InputKind.ANSWER
+    checkpoint = run.artifacts.get(kind="checkpoint")
+    assert checkpoint.metadata["checkpoint"]["messages"][0]["content"] == "hello"
+    assert list(run.events.values_list("type", flat=True)) == [
+        "run.queued", "run.started", "artifact.created", "input.required",
+    ]
 
 
 @pytest.mark.django_db(transaction=True)
