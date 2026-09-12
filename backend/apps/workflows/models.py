@@ -98,6 +98,9 @@ class WorkflowStepRun(models.Model):
     application = models.ForeignKey(
         'applications.Application', on_delete=models.PROTECT,
         related_name='workflow_step_runs')
+    application_revision = models.ForeignKey(
+        'catalog.ApplicationRevision', on_delete=models.PROTECT,
+        related_name='workflow_step_runs')
     name = models.CharField(max_length=200, blank=True)
     config = models.JSONField(default=dict, blank=True)
     order = models.PositiveIntegerField(default=0)

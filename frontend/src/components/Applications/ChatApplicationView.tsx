@@ -7,12 +7,12 @@ import WorkspaceFilesPanel from '@/components/Workspace/WorkspaceFilesPanel';
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles';
 import { api } from '@/services/api';
 import { useConversationStore } from '@/stores/useConversationStore';
-import type { ApplicationRuntime, GuidedPrompt, GuidedQuestion } from '@/types';
+import type { ChatApplicationRuntime, GuidedPrompt, GuidedQuestion } from '@/types';
 import type { WorkflowProcess } from '@/types/workflow';
 import './ChatApplicationView.css';
 
 interface Props {
-  application: ApplicationRuntime;
+  application: ChatApplicationRuntime;
   projectId?: number;
   workflowStepRunId?: string;
 }

@@ -28,24 +28,24 @@ const toAppItem = (application: ApplicationRuntimeData): AppItem => ({
 const ApplicationRuntime: React.FC<Props> = ({ application: runtime, projectId, workflowStepRunId }) => {
   const application = toAppItem(runtime);
   let content: React.ReactNode;
-  switch (runtime.renderer_key) {
+  switch (runtime.kind) {
     case 'chat':
       content = <ChatApplicationView application={runtime} projectId={projectId}
         workflowStepRunId={workflowStepRunId} />;
       break;
-    case 'image-genie':
-      content = <ImageGenieRunner application={application} embedded projectId={projectId} />;
-      break;
-    case 'batch-transcribe':
-      content = <BatchTranscribeRunner application={application} embedded />;
-      break;
     default:
-      content = (
-        <div style={{ display: 'grid', height: '100%', placeItems: 'center' }}>
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={`${runtime.application_name} 尚未注册界面：${runtime.renderer_key}`} />
-        </div>
-      );
+      if (runtime.renderer_key === 'image-genie') {
+        content = <ImageGenieRunner application={application} embedded projectId={projectId} />;
+      } else if (runtime.renderer_key === 'batch-transcribe') {
+        content = <BatchTranscribeRunner application={application} embedded />;
+      } else {
+        content = (
+          <div style={{ display: 'grid', height: '100%', placeItems: 'center' }}>
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={`${runtime.application_name} 尚未注册界面：${runtime.renderer_key}`} />
+          </div>
+        );
+      }
   }
   if (runtime.organization_id) {
     return (

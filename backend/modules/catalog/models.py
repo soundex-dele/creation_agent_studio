@@ -134,6 +134,20 @@ class ApplicationRevision(ImmutableRevision):
         ]
 
 
+class ChatApplicationRevision(models.Model):
+    """Typed marker guaranteeing that a revision contains a chat definition."""
+
+    revision = models.OneToOneField(
+        ApplicationRevision,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="chat_revision",
+    )
+
+    class Meta:
+        db_table = "chat_application_revisions"
+
+
 class DeploymentEnvironment(models.TextChoices):
     DEVELOPMENT = "development", "Development"
     STAGING = "staging", "Staging"

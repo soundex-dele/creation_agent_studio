@@ -3,9 +3,7 @@ Admin configuration for applications app.
 """
 from django.contrib import admin
 from apps.applications.models import (
-    Application, ApplicationAgentBinding, ApplicationCategory,
-    ApplicationSkillBinding, ChatApplicationProfile,
-    GuidedOption, GuidedPrompt, GuidedQuestion, Skill,
+    Application, ApplicationCategory, ChatApplication, Skill,
 )
 
 
@@ -28,10 +26,5 @@ class ApplicationAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
 
 
-admin.site.register(ChatApplicationProfile)
-admin.site.register(ApplicationAgentBinding)
-admin.site.register(ApplicationSkillBinding)
+admin.site.register(ChatApplication)
 admin.site.register(Skill)
-admin.site.register(GuidedPrompt)
-admin.site.register(GuidedQuestion)
-admin.site.register(GuidedOption)

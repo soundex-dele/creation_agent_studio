@@ -6,6 +6,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
+from modules.catalog.models import AgentDraft
 from apps.conversations.models import Conversation, Message
 from core.agent_engine.models import LLMResponse, TokenUsage
 
@@ -61,7 +62,11 @@ class SendMessageTest(TestCase):
         category = AgentCategory.objects.create(name='C', slug='cat-c')
         agent = Agent.objects.create(
             name='A', slug='agent-a', description='d',
-            system_prompt='你是专属助手', category=category, created_by=self.user)
+            category=category, created_by=self.user,
+            organization=self.user.organization_memberships.get().organization)
+        AgentDraft.objects.create(
+            organization=agent.organization, agent=agent, updated_by=self.user,
+            content={'system_prompt': '你是专属助手', 'model_config': {}})
         conv = Conversation.objects.create(user=self.user, title='T', agent=agent)
 
         url = f'/api/conversations/{conv.id}/send_message/'

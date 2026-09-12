@@ -3,7 +3,7 @@ import { Button, Card, Empty, Input, Select, Spin, message } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
-import type { AppItem, Workflow, WorkflowStep } from '@/types';
+import type { AppItem, ApplicationRuntime, Workflow, WorkflowStep } from '@/types';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -44,20 +44,33 @@ const WorkflowEditorPage = () => {
   const addStep = () => {
     const app = apps.find((item) => item.applicationId === selectedApplication);
     if (!app || !selectedApplication) return;
+    const base = {
+      id: selectedApplication, application_id: selectedApplication, application_slug: app.id,
+      application_name: app.name, application_description: app.description,
+      application_icon: app.icon, application_color: app.color,
+      renderer_key: app.rendererKey || 'generic-task', default_config: {},
+    };
+    const runtime: ApplicationRuntime = app.kind === 'chat'
+      ? {
+          ...base,
+          kind: 'chat',
+          renderer_key: 'chat',
+          chat_profile: {
+            allow_agent_selection: false,
+            allow_skill_selection: true,
+            allow_extra_skills: false,
+            starter_layout: 'cards',
+          },
+          agent_bindings: [], skill_bindings: [], guided_prompts: [],
+        }
+      : { ...base, kind: app.kind === 'custom' ? 'custom' : 'task' };
     setSteps((current) => [...current, {
       id: `draft-${Date.now()}`,
       name: app.name,
       order: current.length,
       config: {},
       application_id: selectedApplication,
-      application: {
-        id: selectedApplication, application_id: selectedApplication, application_slug: app.id,
-        application_name: app.name, application_description: app.description,
-        application_icon: app.icon, application_color: app.color,
-        kind: app.kind || 'task',
-        renderer_key: app.rendererKey || 'generic-task', default_config: {},
-        agent_bindings: [], skill_bindings: [], guided_prompts: [],
-      },
+      application: runtime,
     }]);
     setSelectedApplication(undefined);
   };

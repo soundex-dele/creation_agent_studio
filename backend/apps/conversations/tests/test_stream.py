@@ -9,6 +9,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
+from modules.catalog.models import AgentDraft
 from apps.conversations.models import (
     AgentItem,
     AgentServerRequest,
@@ -198,9 +199,12 @@ class StreamEndpointTest(TestCase):
             name='Writer',
             slug='writer',
             description='Writes',
-            system_prompt='You are the writer agent.',
             created_by=self.user,
+            organization=self.user.organization_memberships.get().organization,
         )
+        AgentDraft.objects.create(
+            organization=agent.organization, agent=agent, updated_by=self.user,
+            content={'system_prompt': 'You are the writer agent.', 'model_config': {}})
         get_or_create.return_value = self.fake_session(self.completed_events())
 
         response = self.client.post(
@@ -556,8 +560,12 @@ class StreamEndpointTest(TestCase):
         category = AgentCategory.objects.create(name='C', slug='cat-stream')
         agent = Agent.objects.create(
             name='A', slug='agent-stream', description='d',
-            system_prompt='你是专属直播助手', category=category, created_by=self.user,
+            category=category, created_by=self.user,
+            organization=self.user.organization_memberships.get().organization,
         )
+        AgentDraft.objects.create(
+            organization=agent.organization, agent=agent, updated_by=self.user,
+            content={'system_prompt': '你是专属直播助手', 'model_config': {}})
         conversation = Conversation.objects.create(user=self.user, title='T', agent=agent)
         get_or_create.return_value = self.fake_session(self.completed_events('回复'))
         response = self.client.post(

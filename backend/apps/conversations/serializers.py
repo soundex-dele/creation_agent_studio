@@ -37,12 +37,13 @@ class ConversationListSerializer(serializers.ModelSerializer):
     agent = AgentNestedSerializer(read_only=True)
     project = serializers.IntegerField(source='project_id', read_only=True)
     application_id = serializers.IntegerField(read_only=True)
+    chat_application_id = serializers.IntegerField(read_only=True)
     workflow_step_run_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = Conversation
         fields = ['id', 'title', 'agent', 'project', 'process_id',
-                  'application_id', 'workflow_step_run_id',
+                  'application_id', 'chat_application_id', 'workflow_step_run_id',
                   'working_directory',
                   'created_at', 'updated_at',
                   'last_message', 'message_count']
@@ -63,13 +64,14 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
     agent = AgentNestedSerializer(read_only=True)
     project = serializers.IntegerField(source='project_id', read_only=True)
     application_id = serializers.IntegerField(read_only=True)
+    chat_application_id = serializers.IntegerField(read_only=True)
     workflow_step_run_id = serializers.UUIDField(read_only=True)
     skills = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = ['id', 'title', 'agent', 'project', 'process_id',
-                  'application_id', 'workflow_step_run_id',
+                  'application_id', 'chat_application_id', 'workflow_step_run_id',
                   'working_directory',
                   'skills', 'created_at', 'updated_at',
                   'messages']

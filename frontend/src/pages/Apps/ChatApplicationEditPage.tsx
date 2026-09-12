@@ -7,12 +7,10 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
-import type { ApplicationRuntime } from '@/types';
+import type { ChatApplicationRuntime } from '@/types';
 import './ChatApplicationEditPage.css';
 
-interface EditableApplication extends ApplicationRuntime {
-  can_edit: boolean;
-}
+type EditableApplication = ChatApplicationRuntime & { can_edit: boolean };
 
 interface AgentOption {
   id: number;

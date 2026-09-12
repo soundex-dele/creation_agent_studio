@@ -52,8 +52,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Agent.objects.select_related('category', 'created_by').prefetch_related(
-            'skill_bindings__skill')
+        queryset = Agent.objects.select_related('category', 'created_by', 'draft')
         if not self.request.user.is_authenticated:
             return queryset.filter(is_public=True)
         from apps.enterprise.models import Membership
@@ -92,6 +91,16 @@ class AgentViewSet(viewsets.ModelViewSet):
         from apps.enterprise.models import Membership
         self.require_agent_role(self.request, instance, (
             Membership.Role.OWNER, Membership.Role.ADMIN))
+        from modules.catalog.models import ApplicationDraft, ApplicationRevision
+        definitions = list(ApplicationDraft.objects.filter(
+            organization=instance.organization).values_list('content', flat=True))
+        definitions += list(ApplicationRevision.objects.filter(
+            organization=instance.organization).values_list('content', flat=True))
+        if any(str(instance.id) in {
+            str(binding.get('agent_id'))
+            for binding in definition.get('agent_bindings', [])
+        } for definition in definitions):
+            raise ProtectedError('Agent is referenced by an application definition.', [instance])
         instance.delete()
 
     def destroy(self, request, *args, **kwargs):

@@ -12,9 +12,9 @@ from django.contrib.auth import get_user_model
 
 from apps.agents.models import AgentCategory, Agent
 from apps.applications.models import (
-    Application, ApplicationAgentBinding, ApplicationCategory,
-    ChatApplicationProfile, GuidedOption, GuidedPrompt, GuidedQuestion,
+    Application, ApplicationCategory, ChatApplication,
 )
+from modules.catalog.models import AgentDraft, ApplicationDraft
 from apps.templates.models import Template, TemplateAnalysisSection, TemplateCategory
 from apps.conversations.models import Conversation, Message
 
@@ -193,15 +193,29 @@ class Command(BaseCommand):
         agents = []
         for d in data:
             cat_slug = d.pop('category_slug')
+            system_prompt = d.pop('system_prompt')
+            organization = creator.organization_memberships.get().organization
             agent, _ = Agent.objects.get_or_create(
                 slug=d['slug'],
                 defaults={
                     **d,
                     'category': cat_map[cat_slug],
                     'created_by': creator,
+                    'organization': organization,
                     'is_public': True,
                 }
             )
+            AgentDraft.objects.update_or_create(
+                agent=agent,
+                defaults={
+                    'organization': organization, 'updated_by': creator,
+                    'content': {
+                        'system_prompt': system_prompt,
+                        'model_config': {}, 'tool_config': [],
+                        'knowledge_config': [], 'guardrail_config': {},
+                        'workflow_config': {}, 'skill_bindings': [],
+                    },
+                })
             agents.append(agent)
         return agents
 
@@ -344,20 +358,41 @@ class Command(BaseCommand):
         apps = []
         for d in data:
             cat_slug = d.pop('category_slug')
+            kind = d.pop('kind', Application.Kind.TASK)
+            renderer_key = d.pop(
+                'renderer_key',
+                'image-genie' if d['slug'] == 'image-genie' else 'generic-task')
+            executor_key = d.pop('executor_key', 'catalog-task')
+            default_config = d.pop('default_config', {})
+            organization = creator.organization_memberships.get().organization
             app, _ = Application.objects.get_or_create(
                 slug=d['slug'],
                 defaults={
                     **d,
                     'category': cat_map[cat_slug],
                     'created_by': creator,
+                    'organization': organization,
                     'is_public': True,
-                    'kind': d.get('kind', Application.Kind.TASK),
-                    'renderer_key': d.get(
-                        'renderer_key',
-                        'image-genie' if d['slug'] == 'image-genie'
-                        else 'generic-task'),
+                    'kind': kind,
                 }
             )
+            if kind == Application.Kind.CHAT:
+                ChatApplication.objects.get_or_create(application=app)
+            ApplicationDraft.objects.update_or_create(
+                application=app,
+                defaults={
+                    'organization': organization, 'updated_by': creator,
+                    'content': {
+                        'kind': kind, 'executor_kind': (
+                            'agent' if kind == Application.Kind.CHAT else 'media'),
+                        'executor_key': executor_key,
+                        'renderer_key': renderer_key,
+                        'default_config': default_config,
+                        **({'chat_profile': {}, 'agent_bindings': [],
+                            'skill_bindings': [], 'guided_prompts': []}
+                           if kind == Application.Kind.CHAT else {}),
+                    },
+                })
             if app.slug == 'xiaohongshu-copy':
                 self._configure_xiaohongshu_copy_app(
                     app, agent_map['copywriting-polisher'], creator)
@@ -369,91 +404,79 @@ class Command(BaseCommand):
         if app.created_by.username == 'system' and creator.username != 'system':
             app.created_by = creator
             app.save(update_fields=['created_by'])
-        entry_config = {'guided_entry_prompt_key': 'generate-copy'}
-        if app.default_config != entry_config:
-            app.default_config = entry_config
-            app.save(update_fields=['default_config'])
-        ChatApplicationProfile.objects.update_or_create(
-            application=app,
-            defaults={
+        draft = app.draft
+        definition = {
+            **draft.content,
+            'kind': 'chat', 'executor_kind': 'agent',
+            'executor_key': 'agent-chat', 'renderer_key': 'chat',
+            'default_config': {'guided_entry_prompt_key': 'generate-copy'},
+            'chat_profile': {
                 'welcome_message': '告诉我笔记主题，我会生成标题、正文和话题标签。',
                 'input_placeholder': '描述你想创作的小红书笔记…',
                 'empty_state_title': '生成一篇小红书种草文案',
                 'allow_agent_selection': False,
                 'allow_skill_selection': False,
                 'allow_extra_skills': False,
-                'conversation_policy': (
-                    ChatApplicationProfile.ConversationPolicy.NEW_EACH_OPEN),
-                'starter_layout': ChatApplicationProfile.StarterLayout.CARDS,
+                'conversation_policy': 'new_each_open',
+                'starter_layout': 'cards',
             },
-        )
-        ApplicationAgentBinding.objects.filter(
-            application=app).update(is_default=False)
-        ApplicationAgentBinding.objects.update_or_create(
-            application=app,
-            agent=agent,
-            defaults={
+            'agent_bindings': [{
+                'agent_id': agent.id,
                 'label': '小红书文案助手',
                 'is_default': True,
                 'order': 0,
-            },
-        )
-
-        prompt, _ = GuidedPrompt.objects.update_or_create(
-            application=app,
-            key='generate-copy',
-            defaults={
+            }],
+            'skill_bindings': [],
+            'guided_prompts': [{
+                'key': 'generate-copy',
                 'title': '生成小红书文案',
                 'description': '生成吸睛标题、种草正文和相关话题标签。',
                 'icon': '✍️',
                 'prompt_template': (
                     '请为一条小红书笔记撰写种草文案，包含吸睛标题、正文与话题标签。\n'
                     '主题：{topic}\n语气：{tone}\n字数：约 {length}\n补充要求：{extra}'),
-                'action': GuidedPrompt.Action.PREVIEW,
+                'action': 'preview',
                 'is_featured': True,
                 'order': 0,
-            },
-        )
-        questions = [
+                'questions': [
             {
                 'key': 'topic', 'label': '内容主题',
-                'type': GuidedQuestion.Type.TEXT, 'required': True,
+                'type': 'text', 'required': True,
                 'placeholder': '例如：周末探店·胡同咖啡馆',
+                'options': [],
             },
             {
                 'key': 'tone', 'label': '文案语气',
-                'type': GuidedQuestion.Type.SINGLE_CHOICE, 'required': False,
+                'type': 'single_choice', 'required': False,
                 'options': [
-                    ('friendly', '亲切种草'), ('professional', '专业客观'),
-                    ('playful', '活泼俏皮'), ('literary', '文艺走心'),
+                    {'value': 'friendly', 'label': '亲切种草'},
+                    {'value': 'professional', 'label': '专业客观'},
+                    {'value': 'playful', 'label': '活泼俏皮'},
+                    {'value': 'literary', 'label': '文艺走心'},
                 ],
             },
             {
                 'key': 'length', 'label': '正文长度',
-                'type': GuidedQuestion.Type.SINGLE_CHOICE, 'required': False,
+                'type': 'single_choice', 'required': False,
                 'options': [
-                    ('100', '100字'), ('200', '200字'), ('300', '300字'),
+                    {'value': '100', 'label': '100字'},
+                    {'value': '200', 'label': '200字'},
+                    {'value': '300', 'label': '300字'},
                 ],
             },
             {
                 'key': 'extra', 'label': '补充说明',
-                'type': GuidedQuestion.Type.TEXT, 'required': False,
+                'type': 'text', 'required': False,
                 'placeholder': '例如：突出性价比和氛围感',
+                'options': [],
             },
-        ]
-        for order, definition in enumerate(questions):
-            options = definition.pop('options', [])
-            question, _ = GuidedQuestion.objects.update_or_create(
-                guided_prompt=prompt,
-                key=definition['key'],
-                defaults={**definition, 'order': order},
-            )
-            for option_order, (value, label) in enumerate(options):
-                GuidedOption.objects.update_or_create(
-                    question=question,
-                    value=value,
-                    defaults={'label': label, 'order': option_order},
-                )
+                ],
+            }],
+        }
+        draft.content = definition
+        draft.version += 1
+        draft.updated_by = creator
+        draft.save(update_fields=['content', 'version', 'updated_by', 'updated_at'])
 
     # ──────────────────────────────────────────────
     def _seed_template_categories(self):

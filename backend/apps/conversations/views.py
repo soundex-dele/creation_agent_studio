@@ -16,10 +16,10 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from apps.agents.models import Agent, AgentSkillBinding
-from apps.applications.models import (
-    Application, ApplicationSkillBinding, Skill,
-)
+from apps.agents.models import Agent
+from apps.agents.runtime import get_agent_definition
+from apps.applications.models import Application, Skill
+from apps.applications.serializers import application_definition
 from apps.projects.models import Project
 from apps.projects.services.asset_collector import collect_assets_from_message
 from apps.projects.services.workspace_files import (
@@ -78,7 +78,9 @@ def resolve_agent(agent_id):
 def resolve_system_prompt(conversation) -> str:
     """返回对话所绑定 agent 的 system_prompt；未绑定（旧数据）时回退到全局默认。"""
     if conversation.agent:
-        prompt = conversation.agent.system_prompt
+        prompt = get_agent_definition(conversation.agent).get('system_prompt', '')
+        if not prompt:
+            prompt = PromptManager.SYSTEM_PROMPT
         logger.info(
             "resolve_system_prompt: conversation=%s agent=%s slug=%s prompt_prefix=%r",
             conversation.id, conversation.agent.name, conversation.agent.slug, prompt[:40],
@@ -90,8 +92,8 @@ def resolve_system_prompt(conversation) -> str:
 
 
 def resolve_adapter_config(agent) -> tuple[str, dict]:
-    """Read the adapter selection from an Agent's existing model_config JSON."""
-    model_config = (agent.model_config or {}) if agent else {}
+    """Read adapter selection from the agent's deployed definition."""
+    model_config = get_agent_definition(agent).get('model_config', {}) if agent else {}
     return (
         (model_config.get('adapter') or settings.AGENT_ENGINE_ADAPTER).strip().lower(),
         {'model': model_config.get('model', '')},
@@ -154,7 +156,7 @@ class ConversationViewSet(viewsets.ViewSet):
         if workflow_step_run_id:
             queryset = queryset.filter(workflow_step_run_id=workflow_step_run_id)
         elif application_id:
-            queryset = queryset.filter(application_id=application_id)
+            queryset = queryset.filter(chat_application_id=application_id)
             if project_id:
                 queryset = queryset.filter(project_id=project_id)
         elif project_id:
@@ -185,6 +187,8 @@ class ConversationViewSet(viewsets.ViewSet):
         from apps.enterprise.permissions import resolve_organization
         organization = resolve_organization(request)
         application = None
+        chat_application = None
+        chat_definition = None
         workflow_step_run = None
         application_id = data.get('application_id')
         workflow_step_run_id = data.get('workflow_step_run_id')
@@ -193,35 +197,40 @@ class ConversationViewSet(viewsets.ViewSet):
             workflow_step_run = get_object_or_404(
                 WorkflowStepRun.objects.select_related(
                     'workflow_run__project', 'workflow_run__started_by',
-                    'application'),
+                    'application', 'application_revision'),
                 id=workflow_step_run_id,
                 workflow_run__started_by=request.user,
             )
             application = workflow_step_run.application
+            chat_definition = workflow_step_run.application_revision.content
             if application_id and application.id != application_id:
                 return Response(
                     {'application_id': '与工作流步骤中的应用不一致。'},
                     status=status.HTTP_400_BAD_REQUEST)
         elif application_id:
             application = get_object_or_404(
-                Application.objects.select_related('chat_profile').filter(
+                Application.objects.select_related('chat_application', 'draft').filter(
                     Q(is_public=True) | Q(organization=organization) |
                     Q(created_by=request.user)),
                 id=application_id)
+            chat_application = application.chat_application
+            chat_definition = application_definition(application)
 
         requested_agent_id = data.get('agent_id')
         if application:
             if application.kind != Application.Kind.CHAT:
                 return Response({'detail': '只有聊天应用可以创建对话。'}, status=400)
-            agent_bindings = application.agent_bindings.select_related('agent')
+            agent_bindings = chat_definition.get('agent_bindings', [])
             if requested_agent_id:
-                binding = agent_bindings.filter(agent_id=requested_agent_id).first()
+                binding = next((item for item in agent_bindings
+                                if item.get('agent_id') == requested_agent_id), None)
             else:
-                binding = agent_bindings.filter(is_default=True).first()
+                binding = next((item for item in agent_bindings
+                                if item.get('is_default')), None)
             if binding is None:
                 return Response({'agent_id': '该智能体不属于当前聊天应用。'},
                                 status=status.HTTP_400_BAD_REQUEST)
-            agent = binding.agent
+            agent = get_object_or_404(Agent, id=binding['agent_id'])
         else:
             agent = resolve_agent(requested_agent_id)
 
@@ -246,7 +255,7 @@ class ConversationViewSet(viewsets.ViewSet):
         if application and project and not workflow_step_run:
             if (
                 project.application_id is None
-                and not (project.structure or {}).get('workflow_id')
+                and not project.workflow_id
                 and not project.working_directory
             ):
                 # Backward compatibility for application workspaces created
@@ -262,27 +271,29 @@ class ConversationViewSet(viewsets.ViewSet):
 
         skill_sources = {}
         if agent:
-            for binding in AgentSkillBinding.objects.filter(
-                    agent=agent,
-                    mode__in=[AgentSkillBinding.Mode.REQUIRED,
-                              AgentSkillBinding.Mode.DEFAULT]):
+            for binding in get_agent_definition(agent).get('skill_bindings', []):
+                if binding.get('mode') not in ('required', 'default'):
+                    continue
                 source = (ConversationSkillBinding.Source.AGENT_REQUIRED
-                          if binding.mode == AgentSkillBinding.Mode.REQUIRED
+                          if binding.get('mode') == 'required'
                           else ConversationSkillBinding.Source.AGENT_DEFAULT)
-                skill_sources[binding.skill_id] = (source, binding.config)
+                skill_sources[str(binding['skill_id'])] = (
+                    source, binding.get('config', {}))
         if application:
-            for binding in ApplicationSkillBinding.objects.filter(
-                    application=application,
-                    mode__in=[ApplicationSkillBinding.Mode.REQUIRED,
-                              ApplicationSkillBinding.Mode.DEFAULT]):
+            for binding in chat_definition.get('skill_bindings', []):
+                if binding.get('mode') not in ('required', 'default'):
+                    continue
                 source = (ConversationSkillBinding.Source.APP_REQUIRED
-                          if binding.mode == ApplicationSkillBinding.Mode.REQUIRED
+                          if binding.get('mode') == 'required'
                           else ConversationSkillBinding.Source.APP_DEFAULT)
-                skill_sources[binding.skill_id] = (source, binding.config)
-        requested_skills = set(data.get('skill_ids', []))
+                skill_sources[str(binding['skill_id'])] = (
+                    source, binding.get('config', {}))
+        requested_skills = {str(item) for item in data.get('skill_ids', [])}
         if requested_skills:
-            if application and not application.chat_profile.allow_extra_skills:
-                allowed = set(application.skill_bindings.values_list('skill_id', flat=True))
+            profile = (chat_definition or {}).get('chat_profile', {})
+            if application and not profile.get('allow_extra_skills', False):
+                allowed = {str(item['skill_id']) for item in
+                           chat_definition.get('skill_bindings', [])}
                 if not requested_skills.issubset(allowed):
                     return Response({'skill_ids': '包含应用未授权的 Skill。'},
                                     status=status.HTTP_400_BAD_REQUEST)
@@ -296,7 +307,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 return Response({'skill_ids': '包含无权使用的 Skill。'},
                                 status=status.HTTP_400_BAD_REQUEST)
             for skill in skills:
-                skill_sources[skill.id] = (
+                skill_sources[str(skill.id)] = (
                     ConversationSkillBinding.Source.USER, {})
         with transaction.atomic():
             conversation = Conversation.objects.create(
@@ -304,7 +315,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 organization=organization,
                 title=data.get('title', ''),
                 agent=agent,
-                application=application,
+                chat_application=(chat_application if not workflow_step_run else None),
                 workflow_step_run=workflow_step_run,
                 project=project,
                 process_id=process_id,
@@ -688,7 +699,8 @@ class ConversationViewSet(viewsets.ViewSet):
                 session = session_registry.get_or_create(
                     str(conversation.id),
                     system_prompt=(
-                        effective_agent.system_prompt
+                        get_agent_definition(effective_agent).get('system_prompt', '')
+                        or PromptManager.SYSTEM_PROMPT
                         if effective_agent else PromptManager.SYSTEM_PROMPT
                     ),
                     enable_permissions=permission_mode != 'allow_all',
@@ -740,7 +752,8 @@ class ConversationViewSet(viewsets.ViewSet):
                 session.submit(
                     run_content,
                     system_prompt=(
-                        effective_agent.system_prompt
+                        get_agent_definition(effective_agent).get('system_prompt', '')
+                        or PromptManager.SYSTEM_PROMPT
                         if effective_agent else PromptManager.SYSTEM_PROMPT
                     ),
                     preload_skills=selected_skills,

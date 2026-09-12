@@ -11,7 +11,7 @@ from apps.enterprise.permissions import resolve_organization
 from core.llm.factory import build_image_provider
 from .filters import ApplicationFilter
 from .models import (
-    Application, ApplicationCategory, GuidedPrompt, Skill,
+    Application, ApplicationCategory, Skill,
 )
 from .serializers import (
     ApplicationCategorySerializer, ApplicationDetailSerializer,
@@ -19,13 +19,11 @@ from .serializers import (
     ComposeGuidedPromptSerializer, GenerateImageSerializer, SkillSerializer,
 )
 from .services import compose_guided_prompt
+from .serializers import application_definition
 
 
 def _runtime_prefetch(queryset):
-    return queryset.select_related('category', 'chat_profile').prefetch_related(
-        'agent_bindings__agent',
-        'skill_bindings__skill',
-        'guided_prompts__questions__options')
+    return queryset.select_related('category').select_related('draft')
 
 
 class ApplicationCategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -72,17 +70,18 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     @action(detail=True, methods=['post'], url_path='compose-prompt')
-    def compose_prompt(self, request, pk=None):
+    def compose_prompt(self, request, *args, **kwargs):
         application = self.get_object()
         serializer = ComposeGuidedPromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            prompt = application.guided_prompts.get(
-                id=serializer.validated_data['prompt_id'])
-        except GuidedPrompt.DoesNotExist:
+        prompts = application_definition(application).get('guided_prompts', [])
+        prompt_id = str(serializer.validated_data['prompt_id'])
+        prompt = next((item for item in prompts if str(item.get('id') or item.get('key')) == prompt_id), None)
+        if prompt is None:
             return Response({'detail': '引导问题不存在。'}, status=404)
         return Response(compose_guided_prompt(
-            prompt, serializer.validated_data['answers']))
+            prompt, serializer.validated_data['answers'],
+            application_id=application.id))
 
 
 class SkillViewSet(viewsets.ModelViewSet):

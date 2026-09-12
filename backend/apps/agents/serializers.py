@@ -2,9 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
 
-from .models import (
-    Agent, AgentCategory, AgentExecution, AgentSkillBinding,
-)
+from .models import Agent, AgentCategory, AgentExecution
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 
 
@@ -68,6 +66,12 @@ class AgentDetailSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(
         source='created_by.username', read_only=True)
     skill_bindings = serializers.SerializerMethodField()
+    system_prompt = serializers.SerializerMethodField()
+    model_config = serializers.SerializerMethodField()
+    tool_config = serializers.SerializerMethodField()
+    knowledge_config = serializers.SerializerMethodField()
+    guardrail_config = serializers.SerializerMethodField()
+    workflow_config = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
 
@@ -75,20 +79,46 @@ class AgentDetailSerializer(serializers.ModelSerializer):
         model = Agent
         fields = [
             'id', 'name', 'slug', 'description', 'icon', 'category',
-            'system_prompt', 'model_config', 'tool_config', 'skill_config',
+            'system_prompt', 'model_config', 'tool_config',
             'knowledge_config', 'guardrail_config', 'workflow_config',
             'skill_bindings', 'is_public', 'created_by_username',
             'can_edit', 'can_delete', 'created_at', 'updated_at',
         ]
 
     def get_skill_bindings(self, obj):
+        content = self._content(obj)
+        ids = [item.get('skill_id') for item in content.get('skill_bindings', [])]
+        from apps.applications.models import Skill
+        skills = {str(skill.id): skill for skill in Skill.objects.filter(id__in=ids)}
         return [{
-            'skill_id': str(binding.skill_id),
-            'slug': binding.skill.slug,
-            'name': binding.skill.name,
-            'mode': binding.mode,
-            'config': binding.config,
-        } for binding in obj.skill_bindings.select_related('skill').all()]
+            **binding,
+            'slug': skills[str(binding['skill_id'])].slug,
+            'name': skills[str(binding['skill_id'])].name,
+        } for binding in content.get('skill_bindings', [])
+          if str(binding.get('skill_id')) in skills]
+
+    @staticmethod
+    def _content(obj):
+        draft = getattr(obj, 'draft', None)
+        return draft.content if draft else {}
+
+    def get_system_prompt(self, obj):
+        return self._content(obj).get('system_prompt', '')
+
+    def get_model_config(self, obj):
+        return self._content(obj).get('model_config', {})
+
+    def get_tool_config(self, obj):
+        return self._content(obj).get('tool_config', [])
+
+    def get_knowledge_config(self, obj):
+        return self._content(obj).get('knowledge_config', [])
+
+    def get_guardrail_config(self, obj):
+        return self._content(obj).get('guardrail_config', {})
+
+    def get_workflow_config(self, obj):
+        return self._content(obj).get('workflow_config', {})
 
     def get_can_edit(self, obj):
         return _agent_permissions(obj, self.context.get('request'))[0]
@@ -98,6 +128,12 @@ class AgentDetailSerializer(serializers.ModelSerializer):
 
 
 class AgentWriteSerializer(serializers.ModelSerializer):
+    system_prompt = serializers.CharField()
+    model_config = serializers.JSONField(required=False, default=dict)
+    tool_config = serializers.JSONField(required=False, default=list)
+    knowledge_config = serializers.JSONField(required=False, default=list)
+    guardrail_config = serializers.JSONField(required=False, default=dict)
+    workflow_config = serializers.JSONField(required=False, default=dict)
     skill_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, write_only=True)
 
@@ -105,7 +141,7 @@ class AgentWriteSerializer(serializers.ModelSerializer):
         model = Agent
         fields = [
             'id', 'category', 'name', 'slug', 'description', 'icon', 'system_prompt',
-            'model_config', 'tool_config', 'skill_config', 'knowledge_config',
+            'model_config', 'tool_config', 'knowledge_config',
             'guardrail_config', 'workflow_config', 'skill_ids', 'is_public',
         ]
         read_only_fields = ['id']
@@ -140,33 +176,38 @@ class AgentWriteSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         skill_ids = validated_data.pop('skill_ids', [])
+        content = self._pop_definition(validated_data, skill_ids)
         agent = super().create(validated_data)
-        self._replace_skills(agent, skill_ids)
-        self._sync_draft(agent)
+        self._sync_draft(agent, content)
         return agent
 
     @transaction.atomic
     def update(self, instance, validated_data):
         skill_ids = validated_data.pop('skill_ids', None)
+        current = instance.draft.content if hasattr(instance, 'draft') else {}
+        content = self._pop_definition(validated_data, skill_ids, current=current)
         agent = super().update(instance, validated_data)
-        if skill_ids is not None:
-            self._replace_skills(agent, skill_ids)
-        self._sync_draft(agent)
+        self._sync_draft(agent, content)
         return agent
 
-    def _sync_draft(self, agent):
-        """Keep the one editable runtime draft beside the canonical Agent."""
+    @staticmethod
+    def _pop_definition(values, skill_ids, current=None):
+        current = current or {}
+        content = dict(current)
+        for key in ('system_prompt', 'model_config', 'tool_config',
+                    'knowledge_config', 'guardrail_config', 'workflow_config'):
+            if key in values:
+                content[key] = values.pop(key)
+        if skill_ids is not None:
+            content['skill_bindings'] = [
+                {'skill_id': str(skill_id), 'mode': 'default', 'config': {}, 'order': order}
+                for order, skill_id in enumerate(skill_ids)
+            ]
+        return content
+
+    def _sync_draft(self, agent, content):
         if agent.organization_id is None:
             return
-        content = {
-            'system_prompt': agent.system_prompt,
-            'model_config': agent.model_config,
-            'tool_config': agent.tool_config,
-            'skill_config': agent.skill_config,
-            'knowledge_config': agent.knowledge_config,
-            'guardrail_config': agent.guardrail_config,
-            'workflow_config': agent.workflow_config,
-        }
         draft = AgentDraft.objects.filter(agent=agent).first()
         actor = self.context['request'].user
         if draft is None:
@@ -182,16 +223,8 @@ class AgentWriteSerializer(serializers.ModelSerializer):
         draft.updated_by = actor
         draft.save(update_fields=['content', 'version', 'updated_by', 'updated_at'])
 
-    @staticmethod
-    def _replace_skills(agent, skill_ids):
-        agent.skill_bindings.all().delete()
-        AgentSkillBinding.objects.bulk_create([
-            AgentSkillBinding(
-                agent=agent, skill_id=skill_id,
-                mode=AgentSkillBinding.Mode.DEFAULT, order=order)
-            for order, skill_id in enumerate(skill_ids)
-        ])
-
+    def to_representation(self, instance):
+        return AgentDetailSerializer(instance, context=self.context).data
 
 class AgentDeploymentSerializer(serializers.ModelSerializer):
     class Meta:

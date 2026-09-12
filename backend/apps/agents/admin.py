@@ -2,7 +2,7 @@
 Admin configuration for agents app.
 """
 from django.contrib import admin
-from apps.agents.models import AgentCategory, Agent, AgentExecution, AgentSkillBinding
+from apps.agents.models import AgentCategory, Agent, AgentExecution
 
 
 @admin.register(AgentCategory)
@@ -32,6 +32,3 @@ class AgentExecutionAdmin(admin.ModelAdmin):
     search_fields = ['agent__name', 'user__username']
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'updated_at']
-
-
-admin.site.register(AgentSkillBinding)

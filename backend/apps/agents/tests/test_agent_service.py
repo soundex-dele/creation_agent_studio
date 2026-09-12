@@ -10,6 +10,7 @@ from core.llm.factory import build_agent_engine
 from apps.agents.models import Agent, AgentCategory
 from apps.agents.services.agent_service import AgentService
 from apps.users.models import User
+from modules.catalog.models import AgentDraft
 
 
 class BuildAgentEngineTest(TestCase):
@@ -28,9 +29,14 @@ class AgentServiceExecuteTest(TestCase):
             name="a",
             slug="a",
             description="d",
-            system_prompt="sys",
             created_by=self.user,
+            organization=self.user.organization_memberships.get().organization,
         )
+        AgentDraft.objects.create(
+            organization=self.agent.organization, agent=self.agent,
+            updated_by=self.user,
+            content={'system_prompt': 'sys', 'model_config': {},
+                     'skill_bindings': []})
 
     def _engine_returning(self, response):
         engine = MagicMock()

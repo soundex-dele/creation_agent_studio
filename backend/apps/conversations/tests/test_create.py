@@ -26,7 +26,6 @@ class CreateConversationTest(TestCase):
             name='脚本助手',
             slug='script-writer',
             description='写脚本',
-            system_prompt='你是脚本助手',
             category=self.category,
             created_by=self.user,
         )

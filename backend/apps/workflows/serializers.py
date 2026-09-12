@@ -92,6 +92,7 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
 
 class WorkflowStepRunSerializer(serializers.ModelSerializer):
     step = serializers.SerializerMethodField()
+    application_revision_id = serializers.UUIDField(read_only=True)
 
     def get_step(self, obj):
         return {
@@ -100,14 +101,15 @@ class WorkflowStepRunSerializer(serializers.ModelSerializer):
             'order': obj.order,
             'config': obj.config,
             'application_id': obj.application_id,
-            'application': ApplicationRuntimeSerializer(obj.application).data,
+            'application': ApplicationRuntimeSerializer(
+                obj.application, context={'revision': obj.application_revision}).data,
         }
 
     class Meta:
         model = WorkflowStepRun
         fields = [
             'id', 'status', 'state', 'working_directory', 'last_opened_at',
-            'completed_at', 'step',
+            'completed_at', 'application_revision_id', 'step',
         ]
 
 

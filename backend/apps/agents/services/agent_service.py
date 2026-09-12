@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from core.llm.factory import build_agent_engine
 from ..models import Agent, AgentExecution
+from ..runtime import get_agent_definition
 
 
 class AgentService:
@@ -35,7 +36,8 @@ class AgentService:
             span = TraceSpan.objects.create(
                 trace=trace, name='llm.completion', kind='llm', input=input_data)
         try:
-            model_config = agent.model_config or {}
+            definition = get_agent_definition(agent)
+            model_config = definition.get('model_config') or {}
             configured_model = model_config.get('model', '')
             engine = build_agent_engine(
                 agent.organization,
@@ -43,7 +45,7 @@ class AgentService:
                 adapter_name=model_config.get('adapter', ''),
             )
             messages = [
-                {"role": "system", "content": agent.system_prompt},
+                {"role": "system", "content": definition.get('system_prompt', '')},
                 {"role": "user", "content": str(input_data)},
             ]
             response = engine.complete(messages)

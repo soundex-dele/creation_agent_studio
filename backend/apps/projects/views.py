@@ -19,7 +19,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Project.objects.filter(
             Q(organization=organization) | Q(organization__isnull=True),
             user=self.request.user,
-        ).select_related('application').prefetch_related('conversations')
+        ).select_related('application', 'workflow').prefetch_related('conversations')
 
     def get_serializer_class(self):
         if self.action == 'list':

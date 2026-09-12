@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from apps.enterprise.permissions import resolve_organization
 from apps.projects.models import Project
 from apps.projects.services.workspace_paths import workflow_working_directories
+from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
 from .models import Workflow, WorkflowRun, WorkflowStepRun
 from .serializers import (
     SelectStepSerializer,
@@ -28,10 +29,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             organization=organization,
         ).filter(Q(owner=self.request.user) | Q(is_public=True)).annotate(
             step_count=Count('steps')).prefetch_related(
-            'steps__application__chat_profile',
-            'steps__application__agent_bindings__agent',
-            'steps__application__skill_bindings__skill',
-            'steps__application__guided_prompts__questions__options',
+            'steps__application__draft',
         )
 
     def get_serializer_class(self):
@@ -57,13 +55,27 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         steps = list(workflow.steps.select_related('application').order_by('order'))
         if not steps:
             return Response({'detail': '工作流至少需要一个应用。'}, status=400)
+        deployments = {
+            item.application_id: item
+            for item in ApplicationDeployment.objects.filter(
+                application_id__in=[step.application_id for step in steps],
+                environment=DeploymentEnvironment.PRODUCTION,
+            ).select_related('revision')
+        }
+        missing = [step.application.name for step in steps
+                   if step.application_id not in deployments]
+        if missing:
+            return Response({
+                'detail': '以下应用尚未部署 production revision：' + '、'.join(missing)
+            }, status=status.HTTP_409_CONFLICT)
         with transaction.atomic():
             project = Project.objects.create(
                 user=request.user,
                 organization=workflow.organization,
+                workflow=workflow,
                 title=f'{workflow.name} 工作区',
                 description=workflow.description,
-                structure={'workflow_id': str(workflow.id)},
+                structure={},
                 status='active',
             )
             run = WorkflowRun.objects.create(
@@ -79,6 +91,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     workflow_step=step,
                     source_step_id=step.id,
                     application=step.application,
+                    application_revision=deployments[step.application_id].revision,
                     name=step.name,
                     config=step.config,
                     order=step.order,
@@ -99,10 +112,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         return WorkflowRun.objects.select_related(
             'workflow', 'project', 'selected_step',
             'selected_step_run').prefetch_related(
-            'step_runs__application__chat_profile',
-            'step_runs__application__agent_bindings__agent',
-            'step_runs__application__skill_bindings__skill',
-            'step_runs__application__guided_prompts__questions__options',
+            'step_runs__application__draft',
+            'step_runs__application_revision',
         )
 
 
