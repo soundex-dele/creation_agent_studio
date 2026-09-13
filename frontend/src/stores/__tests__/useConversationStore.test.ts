@@ -79,11 +79,33 @@ describe('useConversationStore durable Run integration', () => {
     emit?.(event(2, 'output.delta', { text: 'Hello ' }));
     emit?.(event(3, 'output.delta', { text: 'world' }));
     emit?.(event(4, 'tool.started', { tool_call_id: 'tool-1', name: 'read' }));
+    emit?.(event(5, 'input.required', {
+      input_request_id: 'question-1',
+      input_kind: 'permission',
+      question: 'Allow access?',
+      options: [{ label: 'Deny', value: 'deny' }],
+    }));
 
     const assistant = useConversationStore.getState().currentConversation?.messages[1];
     expect(assistant?.content).toBe('Hello world');
     expect(assistant?.metadata?.agent?.tool_calls[0]).toMatchObject({
       id: 'tool-1', name: 'read', status: 'running',
     });
+    expect(useConversationStore.getState().pendingQuestion).toMatchObject({
+      kind: 'permission', question: 'Allow access?',
+    });
+    expect(useConversationStore.getState().activeRun?.pending_input_request_id)
+      .toBe('question-1');
+
+    await useConversationStore.getState().answerQuestion(
+      'conversation-1', { selections: ['deny'] },
+    );
+    expect(api.post).toHaveBeenLastCalledWith(
+      '/organizations/org-1/runs/run-1/commands',
+      expect.objectContaining({
+        type: 'deny_permission',
+        input_request_id: 'question-1',
+      }),
+    );
   });
 });

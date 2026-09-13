@@ -5,6 +5,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
@@ -27,6 +28,7 @@ from modules.execution.application.runs import (
     suspend_attempt_for_input,
 )
 from modules.execution.infrastructure.claim import claim_next_run, renew_lease
+from modules.execution.infrastructure.artifacts import persist_local_artifact
 from modules.execution.models import Run, RunCommand
 from modules.execution.runtime.child import execute_child
 from modules.tenancy.database import tenant_database_context
@@ -88,6 +90,9 @@ class ExecutionCoordinator:
         self._active = {}
         self._stopping = False
         self._next_maintenance_at = 0.0
+        self._organization_ids = []
+        self._next_organization_refresh_at = 0.0
+        self._organization_cursor = 0
 
     @property
     def active_count(self):
@@ -171,6 +176,19 @@ class ExecutionCoordinator:
         outcome = message.get("outcome")
         if outcome == "succeeded":
             output = message.get("output") or {}
+            try:
+                from apps.enterprise.services import apply_output_guardrails
+                output = apply_output_guardrails(claimed.run.organization, output)
+            except Exception as exc:
+                fail_attempt(
+                    run_id=claimed.run.id,
+                    organization_id=claimed.run.organization_id,
+                    attempt_id=claimed.attempt.id,
+                    lease_fence=fence,
+                    error_code="output_governance_blocked",
+                    error_message=str(exc),
+                )
+                return
             schema = (
                 claimed.run.definition_snapshot.get("content", {})
                 .get("output_schema", {})
@@ -277,36 +295,89 @@ class ExecutionCoordinator:
                 return True
             expires_in = min(max(int(message.get("expires_in_seconds") or 86400), 60), 604800)
             input_request_id = uuid4()
-            # Both helper functions use inner savepoints. The outer transaction
-            # makes artifact creation and the waiting_input transition atomic.
-            with transaction.atomic():
-                artifact, _event, _created = record_artifact(
-                    run_id=active.claimed.run.id,
-                    organization_id=active.claimed.run.organization_id,
-                    attempt_id=active.claimed.attempt.id,
-                    lease_fence=self._fence(active),
-                    kind="checkpoint",
-                    object_key=(
-                        f"runs/{active.claimed.run.id}/attempts/"
-                        f"{active.claimed.attempt.id}/checkpoint.json"
-                    ),
-                    content_hash=hashlib.sha256(encoded).hexdigest(),
-                    mime_type="application/json",
-                    size=len(encoded),
-                    metadata={"checkpoint": checkpoint_data},
-                )
-                suspend_attempt_for_input(
-                    run_id=active.claimed.run.id,
-                    organization_id=active.claimed.run.organization_id,
-                    attempt_id=active.claimed.attempt.id,
-                    lease_fence=self._fence(active),
-                    checkpoint_artifact_id=artifact.id,
-                    input_request_id=input_request_id,
-                    input_kind=input_kind,
-                    expires_at=timezone.now() + timedelta(seconds=expires_in),
-                    request_payload=message.get("request_payload") or {},
-                )
+            checkpoint_key = (
+                f"runs/{active.claimed.run.id}/attempts/"
+                f"{active.claimed.attempt.id}/checkpoint.json"
+            )
+            checkpoint_path = persist_local_artifact(checkpoint_key, encoded)
+            try:
+                # Both helper functions use inner savepoints. The outer transaction
+                # makes artifact creation and the waiting_input transition atomic.
+                with transaction.atomic():
+                    artifact, _event, _created = record_artifact(
+                        run_id=active.claimed.run.id,
+                        organization_id=active.claimed.run.organization_id,
+                        attempt_id=active.claimed.attempt.id,
+                        lease_fence=self._fence(active),
+                        kind="checkpoint",
+                        object_key=checkpoint_key,
+                        content_hash=hashlib.sha256(encoded).hexdigest(),
+                        mime_type="application/json",
+                        size=len(encoded),
+                        metadata={"checkpoint": checkpoint_data},
+                    )
+                    suspend_attempt_for_input(
+                        run_id=active.claimed.run.id,
+                        organization_id=active.claimed.run.organization_id,
+                        attempt_id=active.claimed.attempt.id,
+                        lease_fence=self._fence(active),
+                        checkpoint_artifact_id=artifact.id,
+                        input_request_id=input_request_id,
+                        input_kind=input_kind,
+                        expires_at=timezone.now() + timedelta(seconds=expires_in),
+                        request_payload=message.get("request_payload") or {},
+                    )
+            except Exception:
+                checkpoint_path.unlink(missing_ok=True)
+                raise
             return True
+        if message.get("kind") == "artifact":
+            content = message.get("content")
+            if not isinstance(content, bytes):
+                self._finish(active, {
+                    "outcome": "failed",
+                    "error_code": "invalid_artifact_content",
+                    "error_message": "Artifact content must be bytes",
+                })
+                return True
+            max_size = int(getattr(
+                settings, "EXECUTION_ARTIFACT_MAX_BYTES", 100 * 1024 * 1024
+            ))
+            if len(content) > max_size:
+                self._finish(active, {
+                    "outcome": "failed",
+                    "error_code": "artifact_too_large",
+                    "error_message": f"Artifact exceeds {max_size} bytes",
+                })
+                return True
+            filename = Path(str(message.get("filename") or "artifact.bin")).name
+            if not filename or filename in {".", ".."}:
+                filename = "artifact.bin"
+            object_key = (
+                f"runs/{active.claimed.run.id}/attempts/"
+                f"{active.claimed.attempt.id}/artifacts/{uuid4().hex}-{filename}"
+            )
+            artifact_path = persist_local_artifact(object_key, content)
+            try:
+                record_artifact(
+                    run_id=active.claimed.run.id,
+                    organization_id=active.claimed.run.organization_id,
+                    attempt_id=active.claimed.attempt.id,
+                    lease_fence=self._fence(active),
+                    kind=str(message.get("artifact_kind") or "result"),
+                    object_key=object_key,
+                    content_hash=hashlib.sha256(content).hexdigest(),
+                    mime_type=str(message.get("mime_type") or "application/octet-stream"),
+                    size=len(content),
+                    metadata={
+                        **dict(message.get("metadata") or {}),
+                        "filename": filename,
+                    },
+                )
+            except Exception:
+                artifact_path.unlink(missing_ok=True)
+                raise
+            return False
         if message.get("kind") == "event":
             if message.get("type") not in ADAPTER_EVENT_TYPES:
                 self._finish(
@@ -405,9 +476,19 @@ class ExecutionCoordinator:
     def _claim_available(self):
         if not self.adapter_entries:
             return
-        organization_ids = list(
-            Organization.objects.filter(is_active=True).values_list("id", flat=True)
-        )
+        now = time.monotonic()
+        if now >= self._next_organization_refresh_at:
+            self._organization_ids = list(
+                Organization.objects.filter(is_active=True)
+                .order_by("id")
+                .values_list("id", flat=True)
+            )
+            self._next_organization_refresh_at = now + 5
+        organization_ids = self._organization_ids
+        if organization_ids:
+            start = self._organization_cursor % len(organization_ids)
+            organization_ids = organization_ids[start:] + organization_ids[:start]
+            self._organization_cursor = (start + 1) % len(organization_ids)
         made_progress = True
         while made_progress and not self._stopping and self.active_count < self.max_children:
             made_progress = False

@@ -185,6 +185,8 @@ EXECUTION_CHILD_ADAPTERS = config(
 )
 EXECUTION_EVENT_QUEUE_SIZE = config(
     'EXECUTION_EVENT_QUEUE_SIZE', default=1000, cast=int)
+EXECUTION_WORKER_MAX_CHILDREN = config(
+    'EXECUTION_WORKER_MAX_CHILDREN', default=2, cast=int)
 EXECUTION_CHECKPOINT_MAX_BYTES = config(
     'EXECUTION_CHECKPOINT_MAX_BYTES', default=1048576, cast=int)
 EXECUTION_WORKFLOW_MAX_PARALLELISM = config(
@@ -204,6 +206,8 @@ RUN_EVENT_COMPACTION_BATCH_SIZE = config(
 
 ARTIFACT_ROOT = Path(config(
     'ARTIFACT_ROOT', default=str(BASE_DIR / 'artifacts')))
+EXECUTION_ARTIFACT_MAX_BYTES = config(
+    'EXECUTION_ARTIFACT_MAX_BYTES', default=100 * 1024 * 1024, cast=int)
 ARTIFACT_ACCESS_TTL_SECONDS = config(
     'ARTIFACT_ACCESS_TTL_SECONDS', default=300, cast=int)
 ARTIFACT_ACCESS_URL_FACTORY = config(
@@ -267,7 +271,7 @@ STORAGES = {
 
 # Media files (User uploaded content)
 MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

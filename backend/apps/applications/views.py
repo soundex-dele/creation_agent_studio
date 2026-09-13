@@ -77,8 +77,8 @@ class SkillViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         organization = resolve_organization(self.request, required=False)
         return Skill.objects.filter(
-                Q(owner=self.request.user) | Q(organization=organization) |
-                Q(visibility=Skill.Visibility.PUBLIC))
+            Q(organization=organization) | Q(visibility=Skill.Visibility.PUBLIC)
+        )
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user,
@@ -89,12 +89,15 @@ class SkillViewSet(viewsets.ModelViewSet):
         skill = serializer.instance
         membership = getattr(self.request, 'organization_membership', None)
         if (
-            skill.owner_id != self.request.user.id
-            and not self.request.user.is_superuser
+            not self.request.user.is_superuser
             and not (
                 membership
                 and membership.organization_id == skill.organization_id
-                and membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN)
+                and membership.role in (
+                    Membership.Role.OWNER,
+                    Membership.Role.ADMIN,
+                    Membership.Role.DEVELOPER,
+                )
             )
         ):
             raise PermissionDenied('无权修改该 Skill。')
@@ -103,8 +106,7 @@ class SkillViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         membership = getattr(self.request, 'organization_membership', None)
         if (
-            instance.owner_id != self.request.user.id
-            and not self.request.user.is_superuser
+            not self.request.user.is_superuser
             and not (
                 membership
                 and membership.organization_id == instance.organization_id

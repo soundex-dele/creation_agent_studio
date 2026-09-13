@@ -279,11 +279,14 @@ _PII_PATTERNS = [
 ]
 
 
-def apply_input_guardrails(organization, content):
-    if organization is None:
+def _apply_content_guardrails(policy, content):
+    if isinstance(content, dict):
+        return {key: _apply_content_guardrails(policy, value)
+                for key, value in content.items()}
+    if isinstance(content, list):
+        return [_apply_content_guardrails(policy, value) for value in content]
+    if not isinstance(content, str):
         return content
-    from .models import GovernancePolicy
-    policy, _ = GovernancePolicy.objects.get_or_create(organization=organization)
     lowered = content.lower()
     matched = [term for term in policy.blocked_terms
                if str(term).lower() in lowered]
@@ -296,8 +299,43 @@ def apply_input_guardrails(organization, content):
     return content
 
 
+def apply_input_guardrails(organization, content):
+    if organization is None:
+        return content
+    from .models import GovernancePolicy
+    policy, _ = GovernancePolicy.objects.get_or_create(organization=organization)
+    return _apply_content_guardrails(policy, content)
+
+
 def apply_output_guardrails(organization, content):
     return apply_input_guardrails(organization, content)
+
+
+def enforce_model_policy(organization, model):
+    if organization is None or not model:
+        return model
+    from .models import GovernancePolicy
+    policy, _ = GovernancePolicy.objects.get_or_create(organization=organization)
+    if policy.allowed_models and model not in {str(value) for value in policy.allowed_models}:
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied(f'Model is not allowlisted: {model}')
+    return model
+
+
+def execution_governance_snapshot(organization):
+    """Freeze runtime-relevant governance values into a Run definition."""
+    if organization is None:
+        return {}
+    from .models import GovernancePolicy
+    policy, _ = GovernancePolicy.objects.get_or_create(organization=organization)
+    return {
+        'require_tool_approval': policy.require_tool_approval,
+        'allowed_models': list(policy.allowed_models),
+        'allowed_tool_patterns': list(policy.allowed_tool_patterns),
+        'blocked_tool_patterns': list(policy.blocked_tool_patterns),
+        'network_allowlist': list(policy.network_allowlist),
+        'export_enabled': policy.export_enabled,
+    }
 
 
 def tenant_working_directory(organization):

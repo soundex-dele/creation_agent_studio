@@ -1,6 +1,7 @@
 import multiprocessing
 import queue
 import threading
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -93,7 +94,10 @@ def test_child_reports_one_canonical_suspend_message():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_coordinator_persists_suspend_as_checkpoint_and_waiting_input():
+def test_coordinator_persists_suspend_as_checkpoint_and_waiting_input(
+    settings, tmp_path,
+):
+    settings.ARTIFACT_ROOT = tmp_path
     actor = get_user_model().objects.create_user(username="suspend-owner")
     organization = actor.owned_organizations.get()
     run = create_run(
@@ -132,9 +136,61 @@ def test_coordinator_persists_suspend_as_checkpoint_and_waiting_input():
     assert run.pending_input_kind == Run.InputKind.ANSWER
     checkpoint = run.artifacts.get(kind="checkpoint")
     assert checkpoint.metadata["checkpoint"]["messages"][0]["content"] == "hello"
+    assert (tmp_path / checkpoint.object_key).read_text() == (
+        '{"messages":[{"content":"hello","role":"user"}]}'
+    )
     assert list(run.events.values_list("type", flat=True)) == [
         "run.queued", "run.started", "artifact.created", "input.required",
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_coordinator_persists_adapter_artifact_and_metadata(settings, tmp_path):
+    settings.ARTIFACT_ROOT = tmp_path
+    actor = get_user_model().objects.create_user(username="artifact-owner")
+    organization = actor.owned_organizations.get()
+    run = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.MEDIA,
+        executor_key="batch-transcribe",
+        source_type="application",
+        source_id="1",
+        definition_snapshot={},
+        input_data={},
+    )
+    claimed = claim_next_run(
+        worker_id="artifact-coordinator",
+        worker_pool=Run.ExecutorKind.MEDIA,
+        lease_seconds=30,
+        executor_keys=("batch-transcribe",),
+    )
+    coordinator = ExecutionCoordinator(
+        worker_id="artifact-coordinator",
+        worker_pool=Run.ExecutorKind.MEDIA,
+        adapter_entries={"batch-transcribe": "unused:adapter"},
+    )
+    content = b"durable transcript\n"
+
+    terminal = coordinator._handle_message(SimpleNamespace(claimed=claimed), {
+        "kind": "artifact",
+        "artifact_kind": "transcript",
+        "filename": "../unsafe.txt",
+        "content": content,
+        "mime_type": "text/plain",
+        "metadata": {"language": "zh"},
+    })
+
+    assert terminal is False
+    artifact = run.artifacts.get(kind="transcript")
+    assert artifact.content_hash == hashlib.sha256(content).hexdigest()
+    assert artifact.size == len(content)
+    assert artifact.mime_type == "text/plain"
+    assert artifact.metadata == {"language": "zh", "filename": "unsafe.txt"}
+    assert (tmp_path / artifact.object_key).read_bytes() == content
+    event = run.events.get(type="artifact.created")
+    assert event.payload["artifact_id"] == str(artifact.id)
+    assert event.payload["content_hash"] == artifact.content_hash
 
 
 @pytest.mark.django_db(transaction=True)

@@ -44,6 +44,14 @@ class Run(TenantOwnedModel):
         on_delete=models.PROTECT,
         related_name="execution_runs",
     )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="child_runs",
+    )
+    node_key = models.CharField(max_length=160, blank=True, default="")
     executor_kind = models.CharField(
         max_length=20,
         choices=ExecutorKind.choices,
@@ -116,12 +124,18 @@ class Run(TenantOwnedModel):
                 ),
                 name="run_pending_input_consistent",
             ),
+            models.UniqueConstraint(
+                fields=("parent", "node_key"),
+                condition=models.Q(parent__isnull=False),
+                name="unique_child_run_node_key",
+            ),
         ]
         indexes = [
             models.Index(
                 fields=("executor_kind", "status", "-priority", "created_at"),
                 name="run_claim_idx",
-            )
+            ),
+            models.Index(fields=("parent", "status"), name="run_parent_status_idx"),
         ]
 
 

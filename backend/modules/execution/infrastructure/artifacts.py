@@ -1,3 +1,5 @@
+import os
+import tempfile
 from pathlib import Path
 
 from django.conf import settings
@@ -64,3 +66,29 @@ def open_local_artifact(artifact):
     if not path.is_file():
         raise ArtifactObjectUnavailable("Artifact object is not available")
     return path.open("rb")
+
+
+def persist_local_artifact(object_key, content):
+    """Atomically persist artifact bytes below the configured local root."""
+
+    if not isinstance(content, bytes):
+        raise TypeError("Artifact content must be bytes")
+    target = resolve_local_artifact_path(object_key)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=target.parent, prefix=".artifact-", delete=False
+        ) as handle:
+            temporary_name = handle.name
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, target)
+    finally:
+        if temporary_name:
+            try:
+                Path(temporary_name).unlink(missing_ok=True)
+            except OSError:
+                pass
+    return target

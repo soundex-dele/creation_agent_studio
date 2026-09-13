@@ -1,6 +1,4 @@
 """Workflow authoring with durable Run execution only."""
-from uuid import uuid4
-
 from django.conf import settings
 from django.db.models import Count, Q
 from rest_framework import status, viewsets
@@ -13,6 +11,7 @@ from apps.enterprise.models import Membership
 from apps.enterprise.permissions import OrganizationRolePermission, resolve_organization
 from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
 from modules.execution.api.serializers import RunSerializer
+from modules.execution.application.errors import IdempotencyKeyReused
 from modules.execution.application.start_runs import start_workflow_run
 
 from .models import Workflow
@@ -64,6 +63,12 @@ class WorkflowViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         workflow = self.get_object()
+        idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
+        if not idempotency_key or len(idempotency_key) > 160:
+            return Response(
+                {"detail": "Idempotency-Key must contain between 1 and 160 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         steps = list(
             workflow.steps.select_related("application").order_by("order", "id")
         )
@@ -99,6 +104,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 "max_attempts": step.max_attempts,
                 "application_id": step.application_id,
                 "application_revision_id": str(deployment.revision_id),
+                "application_content_hash": deployment.revision.content_hash,
                 "executor_kind": kind,
                 "executor_key": key,
                 "content": content,
@@ -108,16 +114,22 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     **dict(step.config or {}),
                 },
             })
-        run, _ = start_workflow_run(
-            organization=workflow.organization,
-            workflow_id=workflow.id,
-            workflow_name=workflow.name,
-            steps=snapshots,
-            actor=request.user,
-            input_data=request.data.get("input") or {},
-            priority=int(request.data.get("priority") or 0),
-            idempotency_key=request.headers.get("Idempotency-Key") or str(uuid4()),
-        )
+        try:
+            run, replayed = start_workflow_run(
+                organization=workflow.organization,
+                workflow_id=workflow.id,
+                workflow_name=workflow.name,
+                steps=snapshots,
+                actor=request.user,
+                input_data=request.data.get("input") or {},
+                priority=int(request.data.get("priority") or 0),
+                idempotency_key=idempotency_key,
+            )
+        except IdempotencyKeyReused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         body = RunSerializer(run).data
         body["organization_id"] = str(workflow.organization_id)
-        return Response(body, status=status.HTTP_202_ACCEPTED)
+        response = Response(body, status=status.HTTP_202_ACCEPTED)
+        if replayed:
+            response["Idempotent-Replay"] = "true"
+        return response

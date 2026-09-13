@@ -1,6 +1,4 @@
 """Conversation resources backed exclusively by the durable Run plane."""
-from uuid import uuid4
-
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -24,6 +22,7 @@ from apps.projects.services.workspace_paths import conversation_working_director
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import (
     DeploymentUnavailable,
+    IdempotencyKeyReused,
     InvalidExecutionDefinition,
 )
 from modules.execution.application.start_runs import start_agent_run
@@ -258,24 +257,21 @@ class ConversationViewSet(viewsets.ViewSet):
             return Response({"detail": "文件不存在或已被删除。"}, status=404)
 
     @transaction.atomic
-    def _create_run(self, request, conversation, message, requested_agent_id=None):
+    def _create_run(
+        self,
+        request,
+        conversation,
+        message,
+        idempotency_key,
+        requested_agent_id=None,
+    ):
         organization = conversation.organization
         agent = resolve_agent(requested_agent_id or conversation.agent_id, organization)
-        if conversation.agent_id != agent.id:
-            conversation.agent = agent
-        if not conversation.title:
-            conversation.title = message[:50]
-        conversation.save(update_fields=["agent", "title", "updated_at"])
-        Message.objects.create(
-            conversation=conversation,
-            role="user",
-            content=message,
-            metadata={"run_request_id": getattr(request, "request_id", "")},
-        )
         history = list(
             conversation.messages.order_by("created_at", "id").values("role", "content")
-        )[-100:]
-        return start_agent_run(
+        )[-99:]
+        history.append({"role": "user", "content": message})
+        run, replayed = start_agent_run(
             organization_id=organization.id,
             agent_id=agent.id,
             actor=request.user,
@@ -285,25 +281,51 @@ class ConversationViewSet(viewsets.ViewSet):
                 "messages": history,
                 "working_directory": conversation.working_directory,
             },
-            idempotency_key=(
-                request.headers.get("Idempotency-Key") or str(uuid4())
-            ),
+            idempotency_key=idempotency_key,
+            idempotency_input_data={"message": message},
             source_type="conversation",
             source_id=conversation.id,
         )
+        if not replayed:
+            if conversation.agent_id != agent.id:
+                conversation.agent = agent
+            if not conversation.title:
+                conversation.title = message[:50]
+            conversation.save(update_fields=["agent", "title", "updated_at"])
+            Message.objects.create(
+                conversation=conversation,
+                role="user",
+                content=message,
+                metadata={"run_request_id": getattr(request, "request_id", "")},
+            )
+        return run, replayed
 
     @action(detail=True, methods=["post"])
     def send_message(self, request, pk=None):
         conversation = self.get_conversation(request, pk)
         serializer = SendMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
+        if not idempotency_key or len(idempotency_key) > 160:
+            return Response(
+                {"detail": "Idempotency-Key must contain between 1 and 160 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
-            run, _ = self._create_run(
-                request, conversation, serializer.validated_data["content"]
+            run, replayed = self._create_run(
+                request,
+                conversation,
+                serializer.validated_data["content"],
+                idempotency_key,
             )
         except (DeploymentUnavailable, InvalidExecutionDefinition) as exc:
             return Response({"detail": str(exc)}, status=409)
-        return Response(RunSerializer(run).data, status=202)
+        except IdempotencyKeyReused as exc:
+            return Response({"detail": str(exc)}, status=409)
+        response = Response(RunSerializer(run).data, status=202)
+        if replayed:
+            response["Idempotent-Replay"] = "true"
+        return response
 
     @action(detail=True, methods=["delete"])
     def clear(self, request, pk=None):

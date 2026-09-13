@@ -11,7 +11,13 @@ from jsonschema import SchemaError, ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
 
 from apps.agents.models import Agent
-from apps.enterprise.services import enforce_quota
+from apps.enterprise.services import (
+    apply_input_guardrails,
+    enforce_model_policy,
+    enforce_quota,
+    enforce_skill_policy,
+    execution_governance_snapshot,
+)
 from modules.catalog.models import (
     AgentDeployment,
     Application,
@@ -121,6 +127,35 @@ def _effective_config(content, config_override):
     return {**defaults, **config_override}
 
 
+def _skill_policy_keys(bindings):
+    values = []
+    for binding in bindings or []:
+        if isinstance(binding, dict):
+            value = (
+                binding.get("slug")
+                or binding.get("skill_id")
+                or binding.get("id")
+            )
+        else:
+            value = binding
+        if value:
+            values.append(str(value))
+    return values
+
+
+def _enforce_definition_governance(organization, content, effective_config):
+    model = str(
+        effective_config.get("model")
+        or (content.get("model_config") or {}).get("model")
+        or ""
+    )
+    enforce_model_policy(organization, model)
+    dependencies = content.get("dependencies") or {}
+    skill_bindings = content.get("skill_bindings") or dependencies.get("skills") or []
+    enforce_skill_policy(organization, _skill_policy_keys(skill_bindings))
+    return execution_governance_snapshot(organization)
+
+
 def _start_once(
     *,
     organization_id,
@@ -186,6 +221,10 @@ def _start_once(
         effective_config = _effective_config(
             revision.content, deployment.config_override
         )
+        governance = _enforce_definition_governance(
+            application.organization, revision.content, effective_config
+        )
+        guarded_input = apply_input_guardrails(application.organization, input_data)
         record = IdempotencyRecord.objects.create(
             organization_id=organization_id,
             actor=actor,
@@ -212,9 +251,10 @@ def _start_once(
                 "deployment_version": deployment.version,
                 "config_override": deployment.config_override,
                 "effective_config": effective_config,
+                "governance": governance,
                 "content": revision.content,
             },
-            input_data=input_data,
+            input_data=guarded_input,
             priority=priority,
             max_attempts=max_attempts,
             retry_safe=retry_safe,
@@ -280,6 +320,7 @@ def start_agent_run(
     source_type="agent",
     source_id="",
     priority=0,
+    idempotency_input_data=None,
 ):
     """Create the sole durable execution representation for an Agent call."""
     if not idempotency_key or len(idempotency_key) > 160:
@@ -287,7 +328,15 @@ def start_agent_run(
     fingerprint = hashlib.sha256(json.dumps({
         "agent_id": str(agent_id),
         "environment": environment,
-        "input": input_data,
+        # Callers such as Conversation build part of the Run input from
+        # server-side history. That derived history can change after the first
+        # successful request and must not make an otherwise identical HTTP
+        # retry look like a conflicting idempotency-key reuse.
+        "input": (
+            input_data
+            if idempotency_input_data is None
+            else idempotency_input_data
+        ),
         "source_type": source_type,
         "source_id": str(source_id),
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -308,17 +357,23 @@ def start_agent_run(
         ).first()
         if agent is None:
             raise DeploymentUnavailable("Agent is not available")
-        deployment = None
-        if agent.organization_id == organization_id:
-            deployment = AgentDeployment.objects.for_organization(
-                organization_id).select_related("revision").filter(
-                    agent=agent, environment=environment).first()
-        elif agent.is_public:
-            deployment = AgentDeployment.objects.select_related("revision").filter(
-                agent=agent, environment=environment).first()
-        if (agent.organization_id == organization_id
-                and deployment is None):
+        deployment = AgentDeployment.objects.for_organization(
+            organization_id
+        ).select_related("revision").filter(
+            agent=agent,
+            environment=environment,
+        ).first()
+        if deployment is None:
             raise DeploymentUnavailable(f"Agent has no {environment} deployment")
+        if (
+            agent.organization_id != organization_id
+            or deployment.organization_id != organization_id
+            or deployment.revision.organization_id != organization_id
+            or deployment.revision.agent_id != agent.id
+        ):
+            raise InvalidExecutionDefinition(
+                "Agent deployment crosses an agent or organization boundary"
+            )
         registered = getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get("agent", {})
         executor_key = "agent-completion"
         if executor_key not in registered:
@@ -326,11 +381,15 @@ def start_agent_run(
         from apps.enterprise.models import Organization
         run_organization = Organization.objects.get(pk=organization_id)
         enforce_quota(run_organization)
-        agent_definition = (
-            deployment.revision.content
-            if deployment is not None
-            else dict(agent.draft.content if hasattr(agent, "draft") else {})
+        agent_definition = deployment.revision.content
+        effective_config = {
+            **dict(agent_definition.get("model_config") or {}),
+            **dict(deployment.config_override or {}),
+        }
+        governance = _enforce_definition_governance(
+            run_organization, agent_definition, effective_config
         )
+        guarded_input = apply_input_guardrails(run_organization, input_data)
         record = IdempotencyRecord.objects.create(
             organization_id=organization_id,
             actor=actor,
@@ -348,19 +407,17 @@ def start_agent_run(
             source_id=source_id or agent.id,
             definition_snapshot={
                 "agent_id": str(agent.id),
-                "agent_revision_id": str(deployment.revision_id) if deployment else None,
-                "agent_revision_no": deployment.revision.revision_no if deployment else None,
-                "agent_content_hash": deployment.revision.content_hash if deployment else "",
-                "deployment_id": str(deployment.id) if deployment else None,
-                "deployment_environment": deployment.environment if deployment else "global",
-                "deployment_version": deployment.version if deployment else 0,
+                "agent_revision_id": str(deployment.revision_id),
+                "agent_revision_no": deployment.revision.revision_no,
+                "agent_content_hash": deployment.revision.content_hash,
+                "deployment_id": str(deployment.id),
+                "deployment_environment": deployment.environment,
+                "deployment_version": deployment.version,
                 "agent_definition": agent_definition,
-                "effective_config": {
-                    **dict(agent_definition.get("model_config") or {}),
-                    **(dict(deployment.config_override or {}) if deployment else {}),
-                },
+                "effective_config": effective_config,
+                "governance": governance,
             },
-            input_data=input_data,
+            input_data=guarded_input,
             priority=priority,
             max_attempts=3,
             retry_safe=True,
@@ -396,6 +453,13 @@ def start_workflow_run(
         return replay, True
     with transaction.atomic():
         enforce_quota(organization)
+        for step in steps:
+            content = step.get("content") or {}
+            _enforce_definition_governance(
+                organization, content, step.get("effective_config") or {}
+            )
+        governance = execution_governance_snapshot(organization)
+        guarded_input = apply_input_guardrails(organization, input_data)
         replay = _load_replay(
             organization_id=organization.id,
             actor_id=actor.id,
@@ -424,11 +488,13 @@ def start_workflow_run(
                 "workflow_id": str(workflow_id),
                 "workflow_name": workflow_name,
                 "workflow_steps": steps,
+                "governance": governance,
+                "durable_children": True,
             },
-            input_data=input_data,
+            input_data=guarded_input,
             priority=priority,
-            max_attempts=1,
-            retry_safe=False,
+            max_attempts=3,
+            retry_safe=True,
         )
         record.status = IdempotencyRecord.Status.COMPLETED
         record.response_status = 202

@@ -9,7 +9,7 @@ from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 def _agent_permissions(agent, request):
     if not request or not request.user.is_authenticated:
         return False, False
-    if request.user.is_superuser or request.user.role == 'admin':
+    if request.user.is_superuser:
         return True, True
     from apps.enterprise.models import Membership
     role = getattr(agent, 'current_user_org_role', None)

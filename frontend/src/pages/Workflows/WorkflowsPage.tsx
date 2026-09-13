@@ -55,7 +55,11 @@ const WorkflowsPage = () => {
 
   const start = async (workflow: Workflow) => {
     try {
-      const run = await api.post<{ id: string }>(`/workflows/${workflow.id}/start/`);
+      const run = await api.post<{ id: string }>(
+        `/workflows/${workflow.id}/start/`,
+        undefined,
+        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      );
       navigate(`/runs/${run.id}`);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '工作流启动失败');

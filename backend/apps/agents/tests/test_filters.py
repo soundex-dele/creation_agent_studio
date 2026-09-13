@@ -82,6 +82,32 @@ class AgentFilterTest(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 403)
 
+    def test_global_user_role_does_not_bypass_organization_membership(self):
+        owner = User.objects.create_user(username='other-agent-owner', password='p')
+        organization = owner.organization_memberships.get().organization
+        agent = Agent.objects.create(
+            name='Other public agent',
+            slug='other-public-agent',
+            description='x',
+            category=self.cat_video,
+            is_public=True,
+            created_by=owner,
+            organization=organization,
+        )
+        self.user.role = User.Role.ADMIN
+        self.user.save(update_fields=['role'])
+
+        self.client.credentials(HTTP_X_ORGANIZATION_ID=str(organization.id))
+        response = self.client.patch(
+            f'/api/agents/{agent.id}/',
+            {'description': 'unauthorized', 'system_prompt': 'x'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        agent.refresh_from_db()
+        self.assertEqual(agent.description, 'x')
+
     def test_mine_filter_is_tenant_scoped(self):
         organization = self.user.organization_memberships.get().organization
         mine = Agent.objects.get(slug='video-script-generator')

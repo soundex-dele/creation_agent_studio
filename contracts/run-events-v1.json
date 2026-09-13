@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "run_id": "run-contract",
+  "events": [
+    {"sequence": 1, "type": "run.queued", "payload": {}},
+    {"sequence": 2, "type": "run.started", "payload": {}},
+    {"sequence": 3, "type": "output.delta", "payload": {"text": "hello "}},
+    {"sequence": 4, "type": "tool.started", "payload": {"tool_call_id": "call-1", "name": "search"}},
+    {"sequence": 5, "type": "tool.completed", "payload": {"tool_call_id": "call-1", "result": "ok"}},
+    {"sequence": 6, "type": "input.required", "payload": {"input_request_id": "request-1", "input_kind": "answer"}},
+    {"sequence": 7, "type": "input.accepted", "payload": {"input_request_id": "request-1"}},
+    {"sequence": 8, "type": "output.snapshot", "payload": {"result": "final"}},
+    {"sequence": 9, "type": "artifact.created", "payload": {"artifact_id": "artifact-1"}},
+    {"sequence": 10, "type": "workflow.step.completed", "payload": {"workflow_step_key": "compose", "output": {"ok": true}}},
+    {"sequence": 11, "type": "run.succeeded", "payload": {}}
+  ],
+  "projection": {
+    "runId": "run-contract",
+    "nextSequence": 12,
+    "status": "succeeded",
+    "output": "final",
+    "progress": null,
+    "tools": {
+      "call-1": {"tool_call_id": "call-1", "name": "search", "result": "ok", "event_type": "tool.completed"},
+      "workflow:compose": {"workflow_step_key": "compose", "output": {"ok": true}, "event_type": "workflow.step.completed"}
+    },
+    "pendingInput": null,
+    "artifactIds": ["artifact-1"]
+  }
+}

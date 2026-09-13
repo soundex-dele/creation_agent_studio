@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -12,8 +10,14 @@ services:
       REDIS_HOST: redis
       REQUIRED_EXECUTION_WORKER_POOLS: agent,media,workflow
       REQUIRE_AUTOMATION_SCHEDULER: "true"
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
     ports:
       - "8080:8080"
+    volumes:
+      - runtime_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,6 +38,12 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
       REDIS_HOST: redis
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+    volumes:
+      - runtime_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +64,12 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
       REDIS_HOST: redis
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+    volumes:
+      - runtime_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +90,12 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
       REDIS_HOST: redis
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+    volumes:
+      - runtime_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +124,31 @@ services:
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--scheduler"]
       interval: 30s
+      timeout: 5s
+      retries: 5
+
+  maintenance:
+    build: .
+    restart: unless-stopped
+    command: python manage.py enforce_retention --loop --poll-interval 3600
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+    volumes:
+      - runtime_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--maintenance"]
+      interval: 60s
       timeout: 5s
       retries: 5
 
@@ -154,4 +201,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  runtime_data:
     driver: local

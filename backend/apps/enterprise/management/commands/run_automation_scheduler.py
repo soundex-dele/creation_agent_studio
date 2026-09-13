@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.enterprise.models import AutomationTrigger
 from apps.enterprise.services import cron_matches, dispatch_automation
+from modules.tenancy.database import tenant_database_context
 
 
 class Command(BaseCommand):
@@ -24,10 +25,18 @@ class Command(BaseCommand):
                 max(30, int(options['poll_interval'] * 3)),
             )
             now = timezone.now().replace(second=0, microsecond=0)
-            trigger_ids = AutomationTrigger.objects.filter(
-                is_active=True, trigger_type='schedule').values_list('id', flat=True)
-            for trigger_id in trigger_ids:
-                with transaction.atomic():
+            triggers = list(AutomationTrigger.objects.filter(
+                is_active=True,
+                trigger_type='schedule',
+            ).values_list('id', 'organization_id'))
+            for trigger_id, organization_id in triggers:
+                # Execution and Catalog tables use FORCE ROW LEVEL SECURITY in
+                # PostgreSQL. Scheduler work must establish the same tenant
+                # context as HTTP requests and execution workers.
+                with (
+                    tenant_database_context(organization_id),
+                    transaction.atomic(),
+                ):
                     trigger = AutomationTrigger.objects.select_for_update().select_related(
                         'organization__owner').get(pk=trigger_id)
                     already_ran = trigger.last_triggered_at and \

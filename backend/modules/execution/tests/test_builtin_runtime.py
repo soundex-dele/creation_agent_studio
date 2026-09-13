@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 
 from core.agent_engine.models import LLMResponse, TokenUsage
 from modules.execution.runtime import builtin
+from modules.execution.application.runs import create_run
+from modules.execution.models import Run
 
 
 _dag_attempts = {}
@@ -26,6 +28,7 @@ def _fake_dag_adapter(run_payload, sink):
 class _Sink:
     def __init__(self):
         self.events = []
+        self.artifacts = []
 
     @property
     def cancelled(self):
@@ -33,6 +36,9 @@ class _Sink:
 
     def emit(self, event_type, payload):
         self.events.append((event_type, payload))
+
+    def create_artifact(self, **artifact):
+        self.artifacts.append(artifact)
 
 
 class _SuspendSink(_Sink):
@@ -82,6 +88,120 @@ def test_batch_transcribe_uses_durable_event_protocol(monkeypatch, tmp_path):
     ]
     assert result["status"] == "completed"
     assert len(result["files"]) == 1
+    assert sink.artifacts[0]["kind"] == "transcript"
+    assert sink.artifacts[0]["filename"] == "a.txt"
+    assert sink.artifacts[0]["content"] == b"hello\n"
+
+
+def test_batch_transcribe_rejects_output_outside_runtime_roots(tmp_path):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+
+    with pytest.raises(PermissionError, match="output is outside runtime roots"):
+        builtin.execute_batch_transcribe(
+            {
+                "allowed_roots": [str(allowed)],
+                "input": {
+                    "folder": str(allowed),
+                    "output_dir": str(outside),
+                },
+            },
+            _Sink(),
+        )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
+    actor = get_user_model().objects.create_user(username="durable-dag-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="dag-1",
+        definition_snapshot={},
+        input_data={"topic": "durable"},
+    )
+    steps = [
+        {
+            "id": "step-1", "key": "first", "name": "First",
+            "depends_on": [], "condition": {}, "max_attempts": 2,
+            "application_id": 1, "application_revision_id": "revision-1",
+            "application_content_hash": "a" * 64,
+            "executor_kind": "media", "executor_key": "batch-transcribe",
+            "content": {"retry_policy": {"retry_safe": True}},
+            "effective_config": {},
+        },
+        {
+            "id": "step-2", "key": "second", "name": "Second",
+            "depends_on": ["first"], "condition": {}, "max_attempts": 1,
+            "application_id": 2, "application_revision_id": "revision-2",
+            "application_content_hash": "b" * 64,
+            "executor_kind": "agent", "executor_key": "agent-completion",
+            "content": {}, "effective_config": {},
+        },
+    ]
+
+    def finish_children(_root, children, _sink, _organization_id, poll_interval=0.25):
+        return {
+            key: {
+                "status": "completed", "attempts": 1,
+                "output": {"node": key}, "child_run_id": str(child_id),
+            }
+            for key, child_id in children.items()
+        }
+
+    monkeypatch.setattr(builtin, "_wait_for_step_runs", finish_children)
+    sink = _Sink()
+    payload = {
+        "run_id": str(root.id),
+        "organization_id": str(organization.id),
+        "definition_snapshot": {
+            "durable_children": True,
+            "workflow_steps": steps,
+            "governance": {"require_tool_approval": True},
+        },
+        "input": {"topic": "durable"},
+    }
+
+    first_result = builtin.execute_workflow(payload, sink)
+    second_result = builtin.execute_workflow(payload, _Sink())
+
+    assert first_result["status"] == "completed"
+    assert second_result["status"] == "completed"
+    assert root.child_runs.count() == 2
+    first = root.child_runs.get(node_key="first")
+    second = root.child_runs.get(node_key="second")
+    assert first.executor_kind == Run.ExecutorKind.MEDIA
+    assert first.max_attempts == 2
+    assert second.executor_kind == Run.ExecutorKind.AGENT
+    assert second.input["dependency_outputs"]["first"] == {"node": "first"}
+    assert second.definition_snapshot["governance"]["require_tool_approval"] is True
+
+
+@pytest.mark.parametrize(
+    ("steps", "error"),
+    [
+        ([{"key": "same"}, {"key": "same"}], "duplicate step keys"),
+        ([{"key": "one", "depends_on": ["missing"]}], "unknown dependencies"),
+    ],
+)
+def test_durable_workflow_validates_graph_before_database_access(steps, error):
+    with pytest.raises(RuntimeError, match=error):
+        builtin.execute_workflow(
+            {
+                "definition_snapshot": {
+                    "durable_children": True,
+                    "workflow_steps": steps,
+                },
+                "input": {},
+            },
+            _Sink(),
+        )
 
 
 @pytest.mark.django_db

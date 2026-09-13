@@ -15,6 +15,7 @@ class RunSerializer(serializers.ModelSerializer):
     organization_id = serializers.UUIDField(read_only=True)
     owner_id = serializers.ReadOnlyField()
     current_attempt_id = serializers.UUIDField(read_only=True, allow_null=True)
+    parent_id = serializers.UUIDField(read_only=True, allow_null=True)
 
     class Meta:
         model = Run
@@ -22,6 +23,8 @@ class RunSerializer(serializers.ModelSerializer):
             "id",
             "organization_id",
             "owner_id",
+            "parent_id",
+            "node_key",
             "executor_kind",
             "executor_key",
             "source_type",

@@ -506,8 +506,8 @@ def _sandbox(sdk):
         ) from exc
 
 
-def _approval_mode(sdk):
-    configured = settings.CODEX_APPROVAL_MODE.strip().lower()
+def _approval_mode(sdk, configured=None):
+    configured = str(configured or settings.CODEX_APPROVAL_MODE).strip().lower()
     values = {
         "auto_review": sdk.ApprovalMode.auto_review,
         "deny_all": sdk.ApprovalMode.deny_all,
@@ -554,7 +554,10 @@ class CodexAdapter(AgentAdapter):
         input_request = None
         try:
             thread = client.thread_start(
-                approval_mode=_approval_mode(sdk),
+                approval_mode=_approval_mode(
+                    sdk,
+                    "auto_review" if options.get("require_tool_approval") else None,
+                ),
                 base_instructions=system_prompt or None,
                 cwd=cwd,
                 model=self.model or None,

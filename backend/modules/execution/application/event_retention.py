@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 
 from django.db import transaction
 
@@ -45,9 +46,15 @@ def apply_projection_event(projection, event):
             payload.get("text", "")
         )
     elif event.type == "output.snapshot":
-        next_projection["output"] = str(
-            payload.get("text", payload.get("output", ""))
-        )
+        value = payload.get("text", payload.get("output", payload.get("result", "")))
+        if isinstance(value, str):
+            next_projection["output"] = value
+        elif value == "":
+            next_projection["output"] = ""
+        else:
+            next_projection["output"] = json.dumps(
+                value, ensure_ascii=False, indent=2
+            )
     elif event.type == "progress.updated":
         next_projection["progress"] = payload
     elif event.type == "input.required":
@@ -70,6 +77,24 @@ def apply_projection_event(projection, event):
             or payload.get("call_id")
             or f"sequence-{event.sequence}"
         )
+        tools = next_projection.setdefault("tools", {})
+        tools[tool_id] = {
+            **tools.get(tool_id, {}),
+            **payload,
+            "event_type": event.type,
+        }
+    elif event.type in {
+        "workflow.step.started",
+        "workflow.step.completed",
+        "workflow.step.failed",
+        "workflow.step.skipped",
+    }:
+        key = str(
+            payload.get("workflow_step_key")
+            or payload.get("workflow_step_id")
+            or event.sequence
+        )
+        tool_id = f"workflow:{key}"
         tools = next_projection.setdefault("tools", {})
         tools[tool_id] = {
             **tools.get(tool_id, {}),
@@ -128,8 +153,10 @@ def compact_run_events(*, run_id, before, batch_size=500, include_active=False):
         return snapshot
 
 
-def compact_eligible_runs(*, before, batch_size=500, run_id=None):
+def compact_eligible_runs(*, before, batch_size=500, run_id=None, organization_id=None):
     queryset = Run.objects.filter(status__in=TERMINAL_STATUSES)
+    if organization_id is not None:
+        queryset = queryset.filter(organization_id=organization_id)
     if run_id is not None:
         queryset = queryset.filter(pk=run_id)
     compacted = 0

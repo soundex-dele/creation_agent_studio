@@ -110,14 +110,22 @@ def create_run(
     priority=0,
     max_attempts=3,
     retry_safe=True,
+    parent=None,
+    node_key="",
 ):
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least one")
+    if parent is not None and parent.organization_id != organization.id:
+        raise OrganizationMismatch("Parent Run belongs to another organization")
+    if parent is not None and not node_key:
+        raise ValueError("Child Runs require a node_key")
     now = timezone.now()
     with transaction.atomic():
         run = Run.objects.create(
             organization=organization,
             owner=owner,
+            parent=parent,
+            node_key=node_key,
             executor_kind=executor_kind,
             executor_key=executor_key,
             source_type=source_type,
@@ -499,13 +507,17 @@ def fail_attempt(
             event_type = "run.retry_scheduled"
             payload = {
                 "error_code": error_code,
+                "error_message": error_message,
                 "previous_attempt_no": attempt.attempt_no,
                 "next_attempt_no": attempt.attempt_no + 1,
             }
         else:
             next_status = Run.Status.FAILED
             event_type = "run.failed"
-            payload = {"error_code": error_code}
+            payload = {
+                "error_code": error_code,
+                "error_message": error_message,
+            }
 
         run.status = next_status
         run.current_attempt = None

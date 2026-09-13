@@ -1,4 +1,6 @@
 import asyncio
+import json
+from types import SimpleNamespace
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -25,11 +27,29 @@ from modules.execution.application.runs import (
 )
 from modules.execution.api.streaming import stream_run_events
 from modules.execution.infrastructure.claim import claim_next_run
-from modules.execution.application.event_retention import compact_run_events
+from modules.execution.application.event_retention import (
+    apply_projection_event,
+    compact_run_events,
+    empty_projection,
+)
 from modules.execution.application.runs import append_event_and_transition
 from modules.execution.models import IdempotencyRecord, Run, RunArtifact
 from modules.tenancy.models import Membership, Organization
 from apps.applications.models import ApplicationCategory
+
+
+def test_run_event_contract_fixture_matches_backend_projection():
+    contract_path = Path(__file__).resolve().parents[4] / "contracts" / "run-events-v1.json"
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    projection = empty_projection(contract["run_id"])
+    for item in contract["events"]:
+        projection = apply_projection_event(projection, SimpleNamespace(
+            run_id=contract["run_id"],
+            sequence=item["sequence"],
+            type=item["type"],
+            payload=item["payload"],
+        ))
+    assert projection == contract["projection"]
 
 
 @pytest.fixture
@@ -247,6 +267,18 @@ def test_compacted_event_cursor_returns_snapshot_recovery_contract(
         event_type="progress.updated",
         payload={"current": 1, "total": 2},
     )
+    append_event_and_transition(
+        run_id=api_run.id,
+        organization_id=api_organization.id,
+        event_type="output.snapshot",
+        payload={"result": "final answer", "model": "test"},
+    )
+    append_event_and_transition(
+        run_id=api_run.id,
+        organization_id=api_organization.id,
+        event_type="workflow.step.completed",
+        payload={"workflow_step_key": "write", "output": {"ok": True}},
+    )
     snapshot = compact_run_events(
         run_id=api_run.id,
         before=timezone.now() + timedelta(seconds=1),
@@ -267,14 +299,19 @@ def test_compacted_event_cursor_returns_snapshot_recovery_contract(
 
     assert compacted.status_code == 410
     assert compacted.data["code"] == "event_history_compacted"
-    assert compacted.data["resume_after"] == 3
+    assert compacted.data["resume_after"] == 5
     assert recovered.status_code == 200
-    assert recovered.data["through_sequence"] == 3
-    assert recovered.data["projection"]["output"] == "hello"
+    assert recovered.data["through_sequence"] == 5
+    assert recovered.data["projection"]["output"] == "final answer"
     assert recovered.data["projection"]["progress"] == {"current": 1, "total": 2}
+    assert recovered.data["projection"]["tools"]["workflow:write"] == {
+        "workflow_step_key": "write",
+        "output": {"ok": True},
+        "event_type": "workflow.step.completed",
+    }
     assert resumed.status_code == 200
     assert resumed.data["results"] == []
-    assert resumed.data["high_water"] == 3
+    assert resumed.data["high_water"] == 5
 
 
 @pytest.mark.django_db
@@ -535,6 +572,34 @@ def test_start_application_run_pins_deployed_revision_and_replays(
     assert run.definition_snapshot["application_content_hash"] == revision.content_hash
     assert created.data["stream_url"].endswith(f"/runs/{run.id}/stream")
     assert created["Location"].endswith(f"/runs/{run.id}")
+
+
+@pytest.mark.django_db
+def test_start_application_run_applies_governance_to_nested_input(
+    authenticated_client, api_organization, deployed_application
+):
+    from apps.enterprise.models import GovernancePolicy
+    policy, _ = GovernancePolicy.objects.get_or_create(
+        organization=api_organization
+    )
+    policy.require_tool_approval = True
+    policy.save(update_fields=["require_tool_approval"])
+    url = (
+        f"/api/organizations/{api_organization.id}/applications/"
+        f"{deployed_application.id}/runs"
+    )
+
+    response = authenticated_client.post(
+        url,
+        {"input": {"owner": {"email": "person@example.com"}}},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY="governed-start",
+    )
+
+    assert response.status_code == 202
+    run = Run.objects.get(pk=response.data["id"])
+    assert run.input["owner"]["email"] == "[REDACTED]"
+    assert run.definition_snapshot["governance"]["require_tool_approval"] is True
 
 
 @pytest.mark.django_db

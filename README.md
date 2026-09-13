@@ -102,7 +102,9 @@ SINGLE_TENANT_DEFAULT_ROLE=viewer
 - `GET runs/{run_id}/attempts`
 - `GET runs/{run_id}/artifacts`
 
-创建 Run 和提交命令都应携带幂等键。运行事件是可重放事实，前端通过 sequence 游标恢复，不维护第二套运行状态。
+创建 Run（包括 Agent execute、Conversation send_message 和 Workflow start
+薄入口）和提交命令都必须携带幂等键。运行事件是可重放事实，前端通过
+sequence 游标恢复，不维护第二套运行状态。
 
 ## Compose 部署
 
@@ -124,7 +126,9 @@ cd backend
 docker compose up --build
 ```
 
-Compose 分别启动 Web、Agent Worker、Media Worker、Workflow Worker、Scheduler、PostgreSQL 和 Redis。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`。
+Compose 分别启动 Web、Agent Worker、Media Worker、Workflow Worker、Scheduler、Maintenance、PostgreSQL 和 Redis。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`。
+
+Web 与全部后台进程共享 `runtime_data:/data`，其中包含 Run Artifact、Agent workspace 和上传媒体。Maintenance 默认每小时执行 Retention 和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。
 
 如果数据库 volume 是旧版本创建的，需要在尚未承载数据的前提下重建 volume，使新的账号与 RLS 初始化生效。
 

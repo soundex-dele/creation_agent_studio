@@ -3,12 +3,41 @@ from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
+from rest_framework.exceptions import PermissionDenied
 
 from apps.enterprise.models import Connector, IdentityProvider, Membership, ProviderConfig
 from apps.enterprise.views import ProviderConfigViewSet
 from core.throttles import OrganizationRateThrottle
+from apps.enterprise.services import (
+    apply_input_guardrails,
+    enforce_model_policy,
+    execution_governance_snapshot,
+)
 
 pytestmark = pytest.mark.django_db
+
+
+def test_governance_recursively_redacts_input_and_enforces_model_allowlist():
+    user = get_user_model().objects.create_user(username='governance-runtime-owner')
+    organization = user.organization_memberships.get().organization
+    policy = organization.governance_policy
+    policy.allowed_models = ['approved-model']
+    policy.require_tool_approval = True
+    policy.save(update_fields=['allowed_models', 'require_tool_approval'])
+
+    guarded = apply_input_guardrails(organization, {
+        'message': 'contact me at person@example.com',
+        'history': ['call 13800138000'],
+    })
+
+    assert guarded == {
+        'message': 'contact me at [REDACTED]',
+        'history': ['call [REDACTED]'],
+    }
+    assert enforce_model_policy(organization, 'approved-model') == 'approved-model'
+    with pytest.raises(PermissionDenied, match='Model is not allowlisted'):
+        enforce_model_policy(organization, 'blocked-model')
+    assert execution_governance_snapshot(organization)['require_tool_approval'] is True
 
 
 def authenticated_client(user, organization=None):

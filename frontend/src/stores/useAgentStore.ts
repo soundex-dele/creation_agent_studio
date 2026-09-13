@@ -84,7 +84,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     try {
       const response = await api.post<RunResource>(`/agents/${agentId}/execute/`, {
         input_data: inputData,
-      });
+      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
       return response;
     } catch (error) {
       console.error('Failed to execute agent:', error);

@@ -6,7 +6,6 @@ from django.db.models import OuterRef, Q, Subquery
 from django.db.models.deletion import ProtectedError
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
-from uuid import uuid4
 from .models import AgentCategory, Agent
 from modules.catalog.errors import (
     DeploymentRollbackUnavailable, DeploymentVersionConflict,
@@ -26,6 +25,11 @@ from .serializers import (
     AgentRevisionSerializer,
 )
 from modules.execution.api.serializers import RunSerializer
+from modules.execution.application.errors import (
+    DeploymentUnavailable,
+    IdempotencyKeyReused,
+    InvalidExecutionDefinition,
+)
 from modules.execution.application.start_runs import start_agent_run
 from modules.execution.models import Run
 from .filters import AgentFilter
@@ -116,7 +120,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
     def require_agent_role(self, request, agent, roles):
         from apps.enterprise.models import Membership
-        if request.user.role == 'admin':
+        if request.user.is_superuser:
             return
         membership = Membership.objects.filter(
             organization=agent.organization, user=request.user,
@@ -237,27 +241,62 @@ class AgentViewSet(viewsets.ModelViewSet):
     def execute(self, request, pk=None):
         agent = self.get_object()
         from apps.enterprise.models import Membership
-        self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN,
-            Membership.Role.OPERATOR, Membership.Role.DEVELOPER,
-        ))
+        from apps.enterprise.permissions import resolve_organization
+        organization = resolve_organization(request)
+        if organization is None:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('An active organization membership is required.')
+        membership = getattr(request, 'organization_membership', None)
+        if (
+            not request.user.is_superuser
+            and (
+                membership is None
+                or membership.organization_id != organization.id
+                or membership.role not in (
+                    Membership.Role.OWNER,
+                    Membership.Role.ADMIN,
+                    Membership.Role.OPERATOR,
+                    Membership.Role.DEVELOPER,
+                )
+            )
+        ):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Operator role is required to execute an agent.')
         serializer = ExecuteAgentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        run, _ = start_agent_run(
-            organization_id=agent.organization_id,
-            agent_id=agent.id,
-            actor=request.user,
-            environment=request.data.get('environment', 'production'),
-            input_data=serializer.validated_data['input_data'],
-            idempotency_key=(
-                request.headers.get('Idempotency-Key') or str(uuid4())
-            ),
-        )
-        return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
+        idempotency_key = (request.headers.get('Idempotency-Key') or '').strip()
+        if not idempotency_key or len(idempotency_key) > 160:
+            return Response(
+                {'detail': 'Idempotency-Key must contain between 1 and 160 characters.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            run, replayed = start_agent_run(
+                organization_id=organization.id,
+                agent_id=agent.id,
+                actor=request.user,
+                environment=request.data.get('environment', 'production'),
+                input_data=serializer.validated_data['input_data'],
+                idempotency_key=idempotency_key,
+            )
+        except IdempotencyKeyReused as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_409_CONFLICT)
+        except DeploymentUnavailable as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_409_CONFLICT)
+        except InvalidExecutionDefinition as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response = Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
+        if replayed:
+            response['Idempotent-Replay'] = 'true'
+        return response
 
     @action(detail=False, methods=['get'])
     def my_executions(self, request):
+        from apps.enterprise.permissions import resolve_organization
+        organization = resolve_organization(request)
         runs = Run.objects.filter(
-            owner=request.user, executor_kind=Run.ExecutorKind.AGENT
+            organization=organization,
+            owner=request.user,
+            executor_kind=Run.ExecutorKind.AGENT,
         ).order_by('-created_at')[:20]
         return Response(RunSerializer(runs, many=True).data)

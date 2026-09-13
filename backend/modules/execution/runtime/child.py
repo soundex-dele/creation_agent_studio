@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 
 
 class _SuspendExecution(Exception):
@@ -45,6 +46,24 @@ class ChildEventSink:
                 "payload": dict(payload or {}),
             }
         )
+
+    def create_artifact(
+        self, *, kind, filename, content, mime_type="application/octet-stream", metadata=None
+    ):
+        """Submit artifact content; only the coordinator chooses its object key."""
+
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        if not isinstance(content, bytes):
+            raise TypeError("Artifact content must be bytes or text")
+        self._queue.put({
+            "kind": "artifact",
+            "artifact_kind": str(kind),
+            "filename": Path(str(filename)).name,
+            "content": content,
+            "mime_type": str(mime_type),
+            "metadata": dict(metadata or {}),
+        })
 
     def request_input(
         self,

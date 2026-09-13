@@ -23,7 +23,11 @@ class Command(BaseCommand):
             choices=Run.ExecutorKind.values,
             default=Run.ExecutorKind.MEDIA,
         )
-        parser.add_argument("--max-children", type=int, default=2)
+        parser.add_argument(
+            "--max-children",
+            type=int,
+            default=settings.EXECUTION_WORKER_MAX_CHILDREN,
+        )
         parser.add_argument("--lease-seconds", type=int, default=30)
         parser.add_argument("--poll-interval", type=float, default=0.25)
         parser.add_argument("--once", action="store_true")

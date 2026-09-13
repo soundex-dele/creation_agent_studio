@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { AgentQuestion, AgentToolCall, RunEventEnvelope } from '@/entities/run';
+import {
+  createRunEventState,
+  ingestRunEvent,
+  restoreRunEventSnapshot,
+  type AgentQuestion,
+  type AgentToolCall,
+  type RunEventEnvelope,
+  type RunEventState,
+} from '@/entities/run';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
@@ -51,7 +59,9 @@ const asQuestion = (payload: Record<string, unknown>): AgentQuestion => {
   return {
     header: String(source.header ?? 'Agent 提问'),
     question: String(source.question ?? source.prompt ?? '请提供继续执行所需的信息'),
-    kind: String(payload.kind ?? source.kind) === 'permission' ? 'permission' : 'question',
+    kind: String(payload.input_kind ?? payload.kind ?? source.kind) === 'permission'
+      ? 'permission'
+      : 'question',
     options: options.map((option: any) => ({
       label: String(option?.label ?? option?.value ?? ''),
       value: String(option?.value ?? option?.label ?? ''),
@@ -133,7 +143,39 @@ export const useConversationStore = create<ConversationState>()(
         void get().fetchConversations().catch(() => undefined);
       };
 
-      const consumeEvent = (conversationId: string, event: RunEventEnvelope) => {
+      const applyRunProjection = (
+        conversationId: string,
+        projection: RunEventState,
+        event?: RunEventEnvelope,
+      ) => {
+        const pendingQuestion = projection.pendingInput
+          ? asQuestion(projection.pendingInput)
+          : null;
+        set((state) => ({
+          pendingQuestion,
+          activeRun: state.activeRun ? {
+            ...state.activeRun,
+            status: projection.status ?? state.activeRun.status,
+            pending_input_request_id: projection.pendingInput
+              ? String(projection.pendingInput.input_request_id ?? '')
+              : null,
+            pending_input_kind: projection.pendingInput
+              ? String(projection.pendingInput.input_kind ?? '')
+              : '',
+          } : null,
+        }));
+        get().replaceStreamContent(projection.output || '');
+        if (!event) {
+          set({
+            agentActivity: pendingQuestion
+              ? '等待你的回答'
+              : projection.status === 'running' ? 'Agent 正在运行…' : null,
+          });
+          if (projection.status && ['succeeded', 'failed', 'cancelled'].includes(projection.status)) {
+            finishRun(conversationId);
+          }
+          return;
+        }
         switch (event.type) {
           case 'run.queued':
             set({ agentActivity: 'Run 已排队…' });
@@ -142,14 +184,10 @@ export const useConversationStore = create<ConversationState>()(
             set({ agentActivity: 'Agent 正在运行…' });
             break;
           case 'output.delta':
-            get().appendStreamContent(String(event.payload.text ?? ''));
             set({ agentActivity: '正在生成…' });
             break;
-          case 'output.snapshot': {
-            const output = event.payload.text ?? event.payload.output ?? event.payload.result;
-            if (output !== undefined) get().replaceStreamContent(String(output));
+          case 'output.snapshot':
             break;
-          }
           case 'tool.started':
           case 'tool.completed':
           case 'tool.failed': {
@@ -163,10 +201,10 @@ export const useConversationStore = create<ConversationState>()(
             break;
           }
           case 'input.required':
-            set({ pendingQuestion: asQuestion(event.payload), agentActivity: '等待你的回答' });
+            set({ agentActivity: '等待你的回答' });
             break;
           case 'input.accepted':
-            set({ pendingQuestion: null, agentActivity: 'Run 已继续执行…' });
+            set({ agentActivity: 'Run 已继续执行…' });
             break;
           case 'run.succeeded':
             finishRun(conversationId);
@@ -303,12 +341,17 @@ export const useConversationStore = create<ConversationState>()(
           void get().sendMessage(conversationId, content).then((run) => {
             if (controller.signal.aborted) return;
             set({ activeRun: run, isLoading: false });
+            let projection = createRunEventState(run.id);
             stream = streamRunEvents({
               organizationId: run.organization_id,
               runId: run.id,
-              onEvent: (event) => consumeEvent(conversationId, event),
-              onSnapshot: () => {
-                void get().fetchConversationDetail(conversationId);
+              onEvent: (event) => {
+                projection = ingestRunEvent(projection, event).state;
+                applyRunProjection(conversationId, projection, event);
+              },
+              onSnapshot: (snapshot) => {
+                projection = restoreRunEventSnapshot(snapshot);
+                applyRunProjection(conversationId, projection);
               },
               onError: (error) => {
                 if (!controller.signal.aborted && get().streamingMessageId) {

@@ -64,6 +64,9 @@ class GraphFlowAdapter(AgentAdapter):
         config = build_config(
             system_prompt=system_prompt,
             working_directory=options.get("working_directory", ""),
+            enable_permissions=(
+                True if options.get("require_tool_approval") else None
+            ),
             provider_override=options.get("provider_override"),
         )
         with sdk.Engine(

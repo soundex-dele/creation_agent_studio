@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import {
   createRunEventState,
@@ -24,6 +25,31 @@ function event(
 }
 
 describe('RunEvent reducer', () => {
+  it('matches the shared v1 projection contract', () => {
+    const contract = JSON.parse(readFileSync(
+      new URL('../../../../../contracts/run-events-v1.json', import.meta.url),
+      'utf8',
+    )) as {
+      run_id: string;
+      events: Array<{ sequence: number; type: string; payload: Record<string, unknown> }>;
+      projection: Record<string, unknown>;
+    };
+    let state = createRunEventState(contract.run_id);
+    for (const item of contract.events) {
+      state = ingestRunEvent(state, {
+        schema_version: 1,
+        run_id: contract.run_id,
+        attempt_id: null,
+        sequence: item.sequence,
+        type: item.type,
+        payload: item.payload,
+        created_at: '2026-09-13T00:00:00Z',
+      }).state;
+    }
+    const { buffered: _buffered, ...projection } = state;
+    expect(projection).toEqual(contract.projection);
+  });
+
   it('applies contiguous deltas once', () => {
     const first = ingestRunEvent(
       createRunEventState('run-1'),

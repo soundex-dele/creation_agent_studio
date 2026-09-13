@@ -47,18 +47,20 @@ class GraphFlowIntegrationTest(TestCase):
         GRAPHFLOW_BASE_URL="https://api.deepseek.com/v1",
         GRAPHFLOW_ENABLE_STREAMING=True,
     )
-    def test_blank_provider_overrides_fall_back_to_global_settings(self):
+    @patch("core.agent_engine.adapters.graphflow.load_sdk")
+    def test_blank_provider_overrides_fall_back_to_global_settings(self, load_sdk):
         config = build_config(provider_override={
             "provider": "",
             "model": "",
             "base_url": "",
         })
 
-        payload = config.to_dict()
-        self.assertEqual(payload["openai"]["model"], "deepseek-chat")
-        self.assertEqual(payload["llm"]["provider"], "openai")
-        self.assertEqual(payload["llm"]["base_url"], "https://api.deepseek.com/v1")
-        self.assertTrue(payload["llm"]["streaming"])
+        self.assertEqual(config, load_sdk.return_value.EngineConfig.return_value)
+        kwargs = load_sdk.return_value.EngineConfig.call_args.kwargs
+        self.assertEqual(kwargs["default_provider"], "openai")
+        self.assertEqual(kwargs["llm_model"], "deepseek-chat")
+        self.assertEqual(kwargs["llm_base_url"], "https://api.deepseek.com/v1")
+        self.assertTrue(kwargs["enable_streaming"])
 
 
 class CodexIntegrationTest(TestCase):

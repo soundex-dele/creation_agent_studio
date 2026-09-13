@@ -4,13 +4,17 @@ Creation Agent Studio now uses a control-plane/data-plane architecture:
 
 - Django is the durable control plane for organizations, RBAC, agents, versions,
   deployments, policy, audit, quota, knowledge, evaluations and integrations.
-- `run_job_worker` claims persistent application jobs from PostgreSQL. Job
-  events, retries, heartbeat and reconnect state survive web-process restarts.
-- GraphFlow provides the interactive runtime. Every tenant receives an isolated
-  working directory and organization-specific model routing.
-- Redis carries WebSocket events, cache and API throttling. PostgreSQL remains
-  the source of truth. Uploaded assets use Django Storage so S3/OSS can be
-  enabled without changing business APIs.
+- The agent, media and workflow execution coordinators claim durable
+  `modules.execution.Run` records from PostgreSQL. Attempts, leases, ordered
+  events, retries, commands and reconnect state survive web-process restarts.
+- Codex is the default Agent adapter. GraphFlow is optional and is loaded only
+  when an Agent definition selects it and the SDK is installed.
+- Redis carries event notifications, cache data and process heartbeats. SSE
+  clients always replay factual `RunEvent` records from PostgreSQL; Redis is
+  not an execution source of truth.
+- Uploaded assets use Django Storage. Durable Run artifacts are atomically
+  persisted to shared runtime storage, content-hashed, and exposed through
+  controlled, short-lived access URLs.
 
 ## Production start
 
@@ -22,8 +26,11 @@ Creation Agent Studio now uses a control-plane/data-plane architecture:
 4. Verify `GET /healthz/` and `GET /readyz/`.
 5. Open `http://localhost:3000/enterprise` after signing in.
 
-The stack starts frontend, ASGI web, PostgreSQL, Redis, a persistent job worker
-and the automation scheduler. Apply retention periodically with:
+The stack starts frontend, ASGI web, PostgreSQL, Redis, three execution workers
+(agent, media and workflow), the automation scheduler, and a maintenance
+process. All application processes mount `runtime_data:/data`; the maintenance
+process enforces retention and compacts old Run events every hour. A one-shot
+run is also available with:
 
 ```shell
 python manage.py enforce_retention
@@ -31,10 +38,10 @@ python manage.py enforce_retention
 
 ## Tenant and identity
 
-Every user receives a personal organization. Requests select a tenant using
-`X-Organization-ID`. Membership roles are owner, admin, developer, operator,
-auditor and viewer. Enterprise APIs include OIDC/SAML provider discovery and a
-SCIM 2.0 Users surface at `/api/enterprise/scim/v2/Users`.
+Membership roles are owner, admin, developer, operator, auditor and viewer.
+Multi-tenant deployments select a tenant using `X-Organization-ID` or an
+organization-scoped API path. Enterprise APIs include OIDC/SAML provider
+discovery and a SCIM 2.0 Users surface at `/api/enterprise/scim/v2/Users`.
 
 SSO metadata, client IDs and claim mappings are stored in IdentityProvider.
 Client secrets are SecretReference values. OIDC uses Authorization Code + PKCE,
@@ -54,21 +61,28 @@ in place for policy, audit and defense in depth.
 
 ## Agent release lifecycle
 
-1. Create a draft containing prompt, model, tools, skills, knowledge,
-   guardrails and a validated DAG workflow.
-2. Submit it and have an organization administrator approve it.
-3. Run an EvaluationSuite. Production deployment is blocked when a configured
-   suite has no passing result for that version.
-4. Deploy independently to development, staging or production. Rollback swaps
-   the current and previous version atomically.
+1. A developer edits the Agent draft containing prompt, model, tools, skills,
+   knowledge, guardrails and workflow configuration.
+2. Publishing creates or reuses an immutable, content-hashed Agent revision.
+3. An operator, administrator or owner deploys a revision independently to
+   development, staging or production. Rollback atomically swaps the current
+   and previous revision.
+
+EvaluationSuite is currently an explicit control-plane operation. It records
+deterministic evaluation results but does not yet act as an automatic
+production-deployment quality gate.
 
 ## Governance and observability
 
 - GovernancePolicy controls retention, PII redaction, model/tool allowlists,
   blocked terms, network allowlists and export policy.
+- Run admission enforces quota, model and Skill policies and recursively guards
+  input. Runtime output is guarded before successful completion, and required
+  tool approval is forwarded to supported Agent adapters.
 - API keys are hashed, scoped, expirable, auditable and revocable.
-- RunTrace, TraceSpan, UsageRecord and AuditLog expose lifecycle, latency,
-  tokens, cost, actor, request ID and resource context.
+- Durable Run/RunEvent records expose execution lifecycle and output history.
+  RunTrace/TraceSpan remain control-plane observability records; UsageRecord and
+  AuditLog capture cost, actor, request ID and resource context.
 - QuotaPolicy enforces token, cost and concurrent-run budgets.
 - OrganizationRateThrottle applies the organization-specific per-minute limit.
 - Knowledge APIs ingest, chunk and return ranked results with citations.
