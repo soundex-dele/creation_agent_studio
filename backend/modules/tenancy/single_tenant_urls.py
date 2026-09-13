@@ -23,7 +23,7 @@ def _single_tenant_view(callback):
             return JsonResponse({
                 'detail': (
                     'The single-tenant organization has not been provisioned. '
-                    'Load /api/enterprise/deployment-context/ after signing in.'
+                    'Load /api/v1/enterprise/deployment-context/ after signing in.'
                 ),
             }, status=503)
         return callback(

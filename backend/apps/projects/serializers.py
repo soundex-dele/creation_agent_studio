@@ -79,7 +79,7 @@ class CreateProjectSerializer(serializers.ModelSerializer):
         application_id = validated_data.pop('application_id', None)
         project = Project.objects.create(
             user=self.context['request'].user,
-            organization=getattr(self.context['request'], 'organization', None),
+            organization=self.context['request'].organization,
             application_id=application_id,
             **validated_data
         )

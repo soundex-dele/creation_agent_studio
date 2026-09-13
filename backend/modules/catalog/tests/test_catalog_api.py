@@ -2,9 +2,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from modules.catalog.models import Application, ApplicationRevision
-from modules.tenancy.models import Membership, Organization
-from apps.applications.models import ApplicationCategory
+from modules.catalog.models import ApplicationDeployment, ApplicationRevision
+from apps.applications.models import Application, ApplicationCategory
+from apps.enterprise.models import Membership, Organization
 
 
 @pytest.fixture
@@ -35,12 +35,12 @@ def catalog_api_client(catalog_api_owner):
 
 
 def _applications_url(organization):
-    return f"/api/organizations/{organization.id}/applications"
+    return f"/api/v1/organizations/{organization.id}/applications"
 
 
 def _application_url(organization, application, suffix=""):
     return (
-        f"/api/organizations/{organization.id}/applications/"
+        f"/api/v1/organizations/{organization.id}/applications/"
         f"{application.id}{suffix}"
     )
 
@@ -232,6 +232,10 @@ def test_deployment_switch_and_rollback_are_versioned(
         {"expected_version": 2},
         format="json",
     )
+    database_version_after_rollback = ApplicationDeployment.objects.get(
+        application=application,
+        environment="development",
+    ).version
     stale = catalog_api_client.put(
         deployment_url,
         {
@@ -248,9 +252,10 @@ def test_deployment_switch_and_rollback_are_versioned(
     assert switched.data["previous_revision_id"] == str(first_revision.id)
     assert rolled_back.status_code == 200
     assert rolled_back.data["version"] == 3
+    assert database_version_after_rollback == 3
     assert rolled_back.data["revision_id"] == str(first_revision.id)
     assert rolled_back.data["previous_revision_id"] == str(second_revision.id)
-    assert stale.status_code == 409
+    assert stale.status_code == 409, stale.data
     assert stale.data["code"] == "deployment_version_conflict"
 
 

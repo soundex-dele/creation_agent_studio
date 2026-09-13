@@ -27,7 +27,7 @@ class ApplicationWorkspaceTest(TestCase):
     def test_create_application_project_allocates_its_own_directory(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            response = self.client.post('/api/projects/', {
+            response = self.client.post('/api/v1/projects/', {
                 'title': 'Copy run',
                 'application_id': self.application.id,
             }, format='json')
@@ -52,7 +52,7 @@ class ApplicationWorkspaceTest(TestCase):
         self.application.is_public = False
         self.application.save(update_fields=['created_by', 'is_public'])
 
-        response = self.client.post('/api/projects/', {
+        response = self.client.post('/api/v1/projects/', {
             'title': 'Forbidden run',
             'application_id': self.application.id,
         }, format='json')
@@ -63,7 +63,7 @@ class ApplicationWorkspaceTest(TestCase):
     def test_workspace_files_lists_and_previews_generated_files(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            response = self.client.post('/api/projects/', {
+            response = self.client.post('/api/v1/projects/', {
                 'title': 'File producing chat',
                 'application_id': self.application.id,
             }, format='json')
@@ -73,7 +73,7 @@ class ApplicationWorkspaceTest(TestCase):
             (output / 'summary.md').write_bytes(b'# Summary\nGenerated.')
 
             listing = self.client.get(
-                f'/api/projects/{project.id}/workspace-files/')
+                f'/api/v1/projects/{project.id}/workspace-files/')
             self.assertEqual(listing.status_code, 200, listing.data)
             self.assertEqual(listing.data['working_directory'], project.working_directory)
             self.assertEqual(listing.data['file_count'], 1)
@@ -83,7 +83,7 @@ class ApplicationWorkspaceTest(TestCase):
             )
 
             preview = self.client.get(
-                f'/api/projects/{project.id}/workspace-files/',
+                f'/api/v1/projects/{project.id}/workspace-files/',
                 {'path': 'reports/summary.md'},
             )
             self.assertEqual(preview.status_code, 200, preview.data)
@@ -93,12 +93,12 @@ class ApplicationWorkspaceTest(TestCase):
     def test_workspace_file_preview_rejects_path_traversal(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            response = self.client.post('/api/projects/', {
+            response = self.client.post('/api/v1/projects/', {
                 'title': 'Safe chat',
                 'application_id': self.application.id,
             }, format='json')
             response = self.client.get(
-                f"/api/projects/{response.data['id']}/workspace-files/",
+                f"/api/v1/projects/{response.data['id']}/workspace-files/",
                 {'path': '../outside.txt'},
             )
             self.assertEqual(response.status_code, 400)

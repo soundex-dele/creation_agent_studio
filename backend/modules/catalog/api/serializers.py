@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
 from modules.catalog.models import (
-    Application,
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
 )
+from apps.applications.models import Application
 
 
 def validate_json_object(value, field_name):

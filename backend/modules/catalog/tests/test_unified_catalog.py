@@ -10,13 +10,12 @@ from apps.agents.models import Agent as ProductAgent, AgentCategory
 from apps.applications.models import Application as ProductApplication
 from apps.enterprise.models import Membership, Organization
 from modules.catalog.models import (
-    Agent,
     AgentDeployment,
     AgentDraft,
     AgentRevision,
-    Application,
     ApplicationDraft,
 )
+from modules.catalog import models as catalog_models
 
 
 @pytest.fixture
@@ -37,9 +36,10 @@ def unified_context(db):
     return user, organization, client
 
 
-def test_catalog_exports_the_product_entities():
-    assert Agent is ProductAgent
-    assert Application is ProductApplication
+def test_catalog_does_not_implicitly_export_product_entities():
+    assert not hasattr(catalog_models, "Agent")
+    assert not hasattr(catalog_models, "Application")
+    assert not hasattr(catalog_models, "Skill")
 
 
 @pytest.mark.django_db
@@ -66,7 +66,7 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     user, organization, client = unified_context
     category = AgentCategory.objects.create(name="Unified", slug="unified")
     response = client.post(
-        "/api/agents/",
+        "/api/v1/agents/",
         {
             "category": category.id,
             "name": "Unified Agent",
@@ -84,7 +84,7 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     assert draft.organization_id == organization.id
 
     version = client.post(
-        f"/api/agents/{agent.id}/versions/",
+        f"/api/v1/agents/{agent.id}/versions/",
         {"release_notes": "first unified revision"},
         format="json",
         HTTP_X_ORGANIZATION_ID=str(organization.id),
@@ -93,7 +93,7 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     revision = AgentRevision.objects.get(pk=version.data["id"])
 
     deployed = client.post(
-        f"/api/agents/{agent.id}/deploy/",
+        f"/api/v1/agents/{agent.id}/deploy/",
         {
             "environment": "development",
             "revision_id": str(revision.id),
@@ -112,7 +112,7 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
 def test_catalog_application_is_the_same_product_application(unified_context):
     _user, organization, client = unified_context
     response = client.post(
-        f"/api/organizations/{organization.id}/applications",
+        f"/api/v1/organizations/{organization.id}/applications",
         {
             "name": "Unified Application",
             "slug": "unified-application",
@@ -126,11 +126,10 @@ def test_catalog_application_is_the_same_product_application(unified_context):
     )
     assert response.status_code == 201
     application = ProductApplication.objects.get(pk=response.data["id"])
-    assert Application.objects.get(pk=application.pk) == application
     assert ApplicationDraft.objects.get(application=application).organization_id == organization.id
 
     product_response = client.get(
-        f"/api/apps/{application.slug}/",
+        f"/api/v1/apps/{application.slug}/",
         HTTP_X_ORGANIZATION_ID=str(organization.id),
     )
     assert product_response.status_code == 200

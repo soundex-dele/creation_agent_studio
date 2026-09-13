@@ -47,19 +47,19 @@ class TemplateFilterTest(TestCase):
 
     def test_searches_title_author_and_platform(self):
         for query in ['信息整理', '林间笔记', '少数派']:
-            response = self.client.get('/api/templates/', {'search': query})
+            response = self.client.get('/api/v1/templates/', {'search': query})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(len(self.results(response)), 1)
 
     def test_filters_by_category_and_content_type(self):
-        response = self.client.get('/api/templates/', {'category': 'video-scripts'})
+        response = self.client.get('/api/v1/templates/', {'category': 'video-scripts'})
         self.assertEqual(len(self.results(response)), 1)
-        response = self.client.get('/api/templates/', {'content_type': 'article'})
+        response = self.client.get('/api/v1/templates/', {'content_type': 'article'})
         self.assertEqual(len(self.results(response)), 1)
 
     def test_detail_contains_analysis_and_increments_views(self):
         template = Template.objects.get(title='信息整理方法')
-        response = self.client.get(f'/api/templates/{template.id}/')
+        response = self.client.get(f'/api/v1/templates/{template.id}/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['analysis_sections']), 1)
         template.refresh_from_db()
@@ -67,7 +67,7 @@ class TemplateFilterTest(TestCase):
 
     def test_create_case_with_nested_analysis(self):
         category = TemplateCategory.objects.get(slug='articles')
-        response = self.client.post('/api/templates/', {
+        response = self.client.post('/api/v1/templates/', {
             'category': category.id,
             'title': '新案例',
             'summary': '待分析的文章案例',

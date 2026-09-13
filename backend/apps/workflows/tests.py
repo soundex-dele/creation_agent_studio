@@ -67,7 +67,7 @@ class WorkflowApiTest(TestCase):
             self.applications.append(application)
 
     def test_start_creates_single_durable_run_with_step_snapshot(self):
-        response = self.client.post("/api/workflows/", {
+        response = self.client.post("/api/v1/workflows/", {
             "name": "Content flow",
             "steps": [
                 {
@@ -85,7 +85,7 @@ class WorkflowApiTest(TestCase):
         workflow = Workflow.objects.get(pk=response.data["id"])
 
         response = self.client.post(
-            f"/api/workflows/{workflow.id}/start/",
+            f"/api/v1/workflows/{workflow.id}/start/",
             {"input": {"folder": "example"}},
             format="json",
             HTTP_IDEMPOTENCY_KEY="workflow-run-1",
@@ -104,7 +104,7 @@ class WorkflowApiTest(TestCase):
         )
 
         replay = self.client.post(
-            f"/api/workflows/{workflow.id}/start/",
+            f"/api/v1/workflows/{workflow.id}/start/",
             {"input": {"folder": "example"}},
             format="json",
             HTTP_IDEMPOTENCY_KEY="workflow-run-1",
@@ -119,7 +119,7 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
 
     def test_rejects_cyclic_workflow(self):
-        response = self.client.post("/api/workflows/", {
+        response = self.client.post("/api/v1/workflows/", {
             "name": "Cycle",
             "steps": [
                 {

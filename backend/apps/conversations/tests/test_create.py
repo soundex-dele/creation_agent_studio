@@ -36,7 +36,7 @@ class CreateConversationTest(TestCase):
 
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            response = self.client.post('/api/conversations/', {})
+            response = self.client.post('/api/v1/conversations/', {})
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['agent']['id'], general.id)
@@ -49,7 +49,7 @@ class CreateConversationTest(TestCase):
 
     def test_create_with_agent_id_binds_specified(self):
         """指定 agent_id 时绑定到该 agent。"""
-        response = self.client.post('/api/conversations/', {'agent_id': self.agent.id})
+        response = self.client.post('/api/v1/conversations/', {'agent_id': self.agent.id})
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['agent']['id'], self.agent.id)
@@ -57,12 +57,12 @@ class CreateConversationTest(TestCase):
 
     def test_retrieve_created_conversation_resolves_organization(self):
         created = self.client.post(
-            '/api/conversations/', {'agent_id': self.agent.id})
+            '/api/v1/conversations/', {'agent_id': self.agent.id})
         conversation = self.user.conversations.get(id=created.data['id'])
         Message.objects.create(
             conversation=conversation, role='user', content='保留的历史消息')
 
-        response = self.client.get(f'/api/conversations/{conversation.id}/')
+        response = self.client.get(f'/api/v1/conversations/{conversation.id}/')
 
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['messages'][0]['content'], '保留的历史消息')
@@ -71,7 +71,7 @@ class CreateConversationTest(TestCase):
         """无效 agent_id 回退到通用 agent，而不是报错。"""
         general = Agent.objects.get(slug='general')
 
-        response = self.client.post('/api/conversations/', {'agent_id': 999999})
+        response = self.client.post('/api/v1/conversations/', {'agent_id': 999999})
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['agent']['id'], general.id)
@@ -82,7 +82,7 @@ class CreateConversationTest(TestCase):
             selected.mkdir()
             with override_settings(APPLICATION_RUNTIME_ALLOWED_ROOTS=[directory]):
                 response = self.client.post(
-                    '/api/conversations/',
+                    '/api/v1/conversations/',
                     {'working_directory': str(selected)},
                     format='json',
                 )
@@ -95,7 +95,7 @@ class CreateConversationTest(TestCase):
         with TemporaryDirectory() as allowed, TemporaryDirectory() as outside:
             with override_settings(APPLICATION_RUNTIME_ALLOWED_ROOTS=[allowed]):
                 response = self.client.post(
-                    '/api/conversations/',
+                    '/api/v1/conversations/',
                     {'working_directory': outside},
                     format='json',
                 )
@@ -106,20 +106,20 @@ class CreateConversationTest(TestCase):
     def test_workspace_files_lists_and_previews_system_conversation_files(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            created = self.client.post('/api/conversations/', {}, format='json')
+            created = self.client.post('/api/v1/conversations/', {}, format='json')
             workspace = Path(created.data['working_directory'])
             (workspace / 'test.txt').write_text(
                 'created by agent', encoding='utf-8')
 
             listing = self.client.get(
-                f"/api/conversations/{created.data['id']}/workspace-files/")
+                f"/api/v1/conversations/{created.data['id']}/workspace-files/")
             self.assertEqual(listing.status_code, 200, listing.data)
             self.assertEqual(listing.data['working_directory'], str(workspace))
             self.assertEqual(listing.data['file_count'], 1)
             self.assertEqual(listing.data['entries'][0]['path'], 'test.txt')
 
             preview = self.client.get(
-                f"/api/conversations/{created.data['id']}/workspace-files/",
+                f"/api/v1/conversations/{created.data['id']}/workspace-files/",
                 {'path': 'test.txt'},
             )
             self.assertEqual(preview.status_code, 200, preview.data)
@@ -129,9 +129,9 @@ class CreateConversationTest(TestCase):
     def test_workspace_file_preview_rejects_path_traversal(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
-            created = self.client.post('/api/conversations/', {}, format='json')
+            created = self.client.post('/api/v1/conversations/', {}, format='json')
             response = self.client.get(
-                f"/api/conversations/{created.data['id']}/workspace-files/",
+                f"/api/v1/conversations/{created.data['id']}/workspace-files/",
                 {'path': '../outside.txt'},
             )
 

@@ -8,6 +8,8 @@ def remove_unscoped_conversations(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ("conversations", "0005_remove_parallel_execution_models"),
         ("execution", "0002_postgresql_rls"),

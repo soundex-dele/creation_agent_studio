@@ -11,11 +11,11 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from modules.catalog.models import (
-    Application,
     ApplicationDeployment,
     ApplicationRevision,
     DeploymentEnvironment,
 )
+from apps.applications.models import Application
 from modules.catalog.services import canonical_content_hash
 from django.utils import timezone
 
@@ -34,7 +34,7 @@ from modules.execution.application.event_retention import (
 )
 from modules.execution.application.runs import append_event_and_transition
 from modules.execution.models import IdempotencyRecord, Run, RunArtifact
-from modules.tenancy.models import Membership, Organization
+from apps.enterprise.models import Membership, Organization
 from apps.applications.models import ApplicationCategory
 
 
@@ -133,21 +133,21 @@ def deployed_application(api_actor, api_organization):
 
 
 def _run_url(organization, run, suffix=""):
-    return f"/api/organizations/{organization.id}/runs/{run.id}{suffix}"
+    return f"/api/v1/organizations/{organization.id}/runs/{run.id}{suffix}"
 
 
 def test_run_list_uses_canonical_history_and_source_filter(
     authenticated_client, api_organization, api_run,
 ):
     response = authenticated_client.get(
-        f"/api/organizations/{api_organization.id}/runs",
+        f"/api/v1/organizations/{api_organization.id}/runs",
         {"source_type": "application"},
     )
     assert response.status_code == 200
     assert [item["id"] for item in response.data] == [str(api_run.id)]
 
     invalid = authenticated_client.get(
-        f"/api/organizations/{api_organization.id}/runs",
+        f"/api/v1/organizations/{api_organization.id}/runs",
         {"source_type": "legacy-job"},
     )
     assert invalid.status_code == 400
@@ -541,7 +541,7 @@ def test_start_application_run_pins_deployed_revision_and_replays(
     authenticated_client, api_actor, api_organization, deployed_application
 ):
     url = (
-        f"/api/organizations/{api_organization.id}/applications/"
+        f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
     body = {"environment": "production", "input": {"files": ["one.mp4"]}}
@@ -585,7 +585,7 @@ def test_start_application_run_applies_governance_to_nested_input(
     policy.require_tool_approval = True
     policy.save(update_fields=["require_tool_approval"])
     url = (
-        f"/api/organizations/{api_organization.id}/applications/"
+        f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
 
@@ -607,7 +607,7 @@ def test_start_application_run_rejects_changed_idempotent_request(
     authenticated_client, api_organization, deployed_application
 ):
     url = (
-        f"/api/organizations/{api_organization.id}/applications/"
+        f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
     headers = {"HTTP_IDEMPOTENCY_KEY": "start-reused"}
@@ -635,7 +635,7 @@ def test_start_application_run_requires_idempotency_key(
     authenticated_client, api_organization, deployed_application
 ):
     url = (
-        f"/api/organizations/{api_organization.id}/applications/"
+        f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
 
@@ -658,7 +658,7 @@ def test_viewer_cannot_start_or_cancel_runs(
     client = APIClient()
     client.force_authenticate(viewer)
     start_url = (
-        f"/api/organizations/{api_organization.id}/applications/"
+        f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
 

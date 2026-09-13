@@ -26,7 +26,8 @@ Creation Agent Studio now uses a control-plane/data-plane architecture:
 4. Verify `GET /healthz/` and `GET /readyz/`.
 5. Open `http://localhost:3000/enterprise` after signing in.
 
-The stack starts frontend, ASGI web, PostgreSQL, Redis, three execution workers
+The stack first completes migrations in a one-shot service, then starts the
+frontend, ASGI web, PostgreSQL 16, Redis 7.4, three execution workers
 (agent, media and workflow), the automation scheduler, and a maintenance
 process. All application processes mount `runtime_data:/data`; the maintenance
 process enforces retention and compacts old Run events every hour. A one-shot
@@ -41,7 +42,7 @@ python manage.py enforce_retention
 Membership roles are owner, admin, developer, operator, auditor and viewer.
 Multi-tenant deployments select a tenant using `X-Organization-ID` or an
 organization-scoped API path. Enterprise APIs include OIDC/SAML provider
-discovery and a SCIM 2.0 Users surface at `/api/enterprise/scim/v2/Users`.
+discovery and a SCIM 2.0 Users surface at `/api/v1/enterprise/scim/v2/Users`.
 
 SSO metadata, client IDs and claim mappings are stored in IdentityProvider.
 Client secrets are SecretReference values. OIDC uses Authorization Code + PKCE,
@@ -55,9 +56,13 @@ Private installations default to `SINGLE_TENANT_MODE=True`; multi-tenant
 operators must explicitly set it to `False`. The first user provisions the configured enterprise
 workspace and becomes its owner; later users join with
 `SINGLE_TENANT_DEFAULT_ROLE`. The browser no longer selects or submits a tenant,
-and organization-free `/api/runs` and `/api/applications/...` aliases are
+and organization-free `/api/v1/runs` and `/api/v1/applications/...` aliases are
 enabled. The canonical Organization foreign keys and PostgreSQL RLS scope stay
 in place for policy, audit and defense in depth.
+
+Browser sessions keep access tokens in memory and rotate refresh tokens in an
+`HttpOnly`, `SameSite=Strict` cookie. Refresh credentials are never returned in
+JSON or persisted in browser storage; production cookies are `Secure`.
 
 ## Agent release lifecycle
 
@@ -80,6 +85,9 @@ production-deployment quality gate.
   input. Runtime output is guarded before successful completion, and required
   tool approval is forwarded to supported Agent adapters.
 - API keys are hashed, scoped, expirable, auditable and revocable.
+- Audit values are bounded and normalized, and audit writes use an isolated
+  savepoint so an audit-storage failure cannot roll back a successful business
+  mutation.
 - Durable Run/RunEvent records expose execution lifecycle and output history.
   RunTrace/TraceSpan remain control-plane observability records; UsageRecord and
   AuditLog capture cost, actor, request ID and resource context.
@@ -88,7 +96,7 @@ production-deployment quality gate.
 - Knowledge APIs ingest, chunk and return ranked results with citations.
 - Automation supports API dispatch and five-field cron scheduling.
 
-Enterprise endpoints under `/api/enterprise/` include `organizations`,
+Enterprise endpoints under `/api/v1/enterprise/` include `organizations`,
 `providers`, `secrets`, `identity-providers`, `governance`, `quota`, `usage`,
 `traces`, `audit-logs`, `knowledge-bases`, `evaluations`, `connectors` and
 `automations`.

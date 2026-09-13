@@ -56,7 +56,7 @@ class DurableConversationRunTest(TestCase):
 
     def test_send_message_creates_run_instead_of_synchronous_execution(self):
         response = self.client.post(
-            f"/api/conversations/{self.conversation.id}/send_message/",
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
             {"content": "hello"},
             format="json",
             HTTP_IDEMPOTENCY_KEY="conversation-message-1",
@@ -80,7 +80,7 @@ class DurableConversationRunTest(TestCase):
         )
 
         response = self.client.post(
-            f"/api/conversations/{self.conversation.id}/send_message/",
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
             {"content": "must roll back"},
             format="json",
             HTTP_IDEMPOTENCY_KEY="conversation-message-failure",
@@ -95,7 +95,7 @@ class DurableConversationRunTest(TestCase):
         ).exists())
 
     def test_idempotent_replay_does_not_duplicate_user_message(self):
-        url = f"/api/conversations/{self.conversation.id}/send_message/"
+        url = f"/api/v1/conversations/{self.conversation.id}/send_message/"
         first = self.client.post(
             url,
             {"content": "hello once"},
@@ -123,7 +123,7 @@ class DurableConversationRunTest(TestCase):
 
     def test_send_message_requires_client_idempotency_key(self):
         response = self.client.post(
-            f"/api/conversations/{self.conversation.id}/send_message/",
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
             {"content": "hello"},
             format="json",
             **self.headers,

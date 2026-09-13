@@ -19,7 +19,7 @@ def test_scan_runtime_folder_lists_only_videos(tmp_path, settings):
     (tmp_path / "b.txt").write_text("x")
 
     response = _client().post(
-        "/api/apps/runtime-files/scan/",
+        "/api/v1/apps/runtime-files/scan/",
         {"path": str(tmp_path)},
         format="json",
     )
@@ -36,7 +36,7 @@ def test_runtime_folder_browser_cannot_escape_configured_root(tmp_path, settings
     settings.APPLICATION_RUNTIME_ALLOWED_ROOTS = [str(allowed)]
 
     response = _client().get(
-        "/api/apps/runtime-files/list/",
+        "/api/v1/apps/runtime-files/list/",
         {"path": str(outside)},
     )
 

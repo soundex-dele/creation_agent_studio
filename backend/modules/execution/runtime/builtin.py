@@ -1,8 +1,6 @@
 """Built-in adapters for the unified durable execution plane."""
 import os
-import importlib
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
@@ -228,66 +226,6 @@ def _validate_workflow_steps(steps):
     return by_key
 
 
-def _load_workflow_adapter(step, settings):
-    entrypoint = settings.EXECUTION_CHILD_ADAPTERS.get(
-        step["executor_kind"], {}
-    ).get(step["executor_key"])
-    if not entrypoint or step["executor_kind"] == "workflow":
-        raise RuntimeError(
-            f"Workflow step executor is unavailable: {step['executor_kind']}/{step['executor_key']}"
-        )
-    module_name, attribute_name = entrypoint.split(":", 1)
-    return getattr(importlib.import_module(module_name), attribute_name)
-
-
-def _execute_workflow_step(step, run_payload, workflow_input, dependency_results, sink, settings):
-    adapter = _load_workflow_adapter(step, settings)
-    definition_snapshot = dict(step)
-    dependencies = (step.get("content") or {}).get("dependencies") or {}
-    default_agents = [
-        value for value in dependencies.get("agents", []) if value.get("is_default")
-    ]
-    if default_agents:
-        definition_snapshot["agent_definition"] = default_agents[0].get("definition") or {}
-    step_sink = _WorkflowSink(sink, step)
-    max_attempts = int(step.get("max_attempts") or 1)
-    for attempt_no in range(1, max_attempts + 1):
-        if sink.cancelled:
-            return {"status": "cancelled"}
-        step_sink.emit("workflow.step.started", {
-            "attempt_no": attempt_no,
-            "max_attempts": max_attempts,
-        })
-        try:
-            output = adapter({
-                **run_payload,
-                "definition_snapshot": definition_snapshot,
-                "effective_config": step.get("effective_config") or {},
-                "input": {
-                    **workflow_input,
-                    "dependency_outputs": {
-                        key: value.get("output", {})
-                        for key, value in dependency_results.items()
-                    },
-                },
-            }, step_sink) or {}
-            step_sink.emit("workflow.step.completed", {
-                "attempt_no": attempt_no,
-                "output": output,
-            })
-            return {"status": "completed", "attempts": attempt_no, "output": output}
-        except Exception as exc:
-            retrying = attempt_no < max_attempts
-            step_sink.emit("workflow.step.failed", {
-                "attempt_no": attempt_no,
-                "error": str(exc)[:1000],
-                "retrying": retrying,
-            })
-            if not retrying:
-                raise
-    raise RuntimeError(f"Workflow step exhausted attempts: {step['key']}")
-
-
 def _durable_step_snapshot(step, governance):
     content = step.get("content") or {}
     snapshot = {
@@ -506,7 +444,18 @@ def _execute_workflow_durable(run_payload, sink):
                 "max_attempts": child.max_attempts,
             })
         layer_results = _wait_for_step_runs(
-            root, children, sink, organization_id
+            root,
+            children,
+            sink,
+            organization_id,
+            poll_interval=max(
+                0.1,
+                float(getattr(
+                    settings,
+                    "EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS",
+                    1.0,
+                )),
+            ),
         )
         if layer_results is None:
             return {"status": "cancelled", "steps": []}
@@ -527,87 +476,9 @@ def _execute_workflow_durable(run_payload, sink):
     }
 
 
-def _execute_workflow_inline(run_payload, sink):
-    """Execute legacy in-memory fixtures; production definitions use child Runs."""
-    from django.conf import settings
-
-    steps = list((run_payload.get("definition_snapshot") or {}).get("workflow_steps") or [])
-    by_key = _validate_workflow_steps(steps)
-
-    workflow_input = dict(run_payload.get("input") or {})
-    results = {}
-    pending = set(by_key)
-    completed = 0
-    max_parallelism = max(
-        1, int(getattr(settings, "EXECUTION_WORKFLOW_MAX_PARALLELISM", 4))
-    )
-    while pending:
-        if sink.cancelled:
-            break
-        ready = sorted(
-            key for key in pending
-            if set(by_key[key].get("depends_on") or []).issubset(results)
-        )
-        if not ready:
-            raise RuntimeError("Workflow snapshot contains a dependency cycle")
-
-        runnable = []
-        for key in ready:
-            step = by_key[key]
-            dependencies = {
-                dependency: results[dependency]
-                for dependency in step.get("depends_on") or []
-            }
-            if _condition_matches(step.get("condition") or {}, workflow_input, results):
-                runnable.append((key, step, dependencies))
-            else:
-                results[key] = {"status": "skipped", "attempts": 0, "output": {}}
-                _WorkflowSink(sink, step).emit("workflow.step.skipped", {
-                    "condition": step.get("condition") or {},
-                })
-                pending.remove(key)
-                completed += 1
-                sink.emit("progress.updated", {"current": completed, "total": len(steps)})
-
-        failures = []
-        with ThreadPoolExecutor(max_workers=min(max_parallelism, max(1, len(runnable)))) as pool:
-            futures = {
-                pool.submit(
-                    _execute_workflow_step,
-                    step,
-                    run_payload,
-                    workflow_input,
-                    dependencies,
-                    sink,
-                    settings,
-                ): key
-                for key, step, dependencies in runnable
-            }
-            for future in as_completed(futures):
-                key = futures[future]
-                try:
-                    results[key] = future.result()
-                except Exception as exc:
-                    failures.append((key, exc))
-                pending.remove(key)
-                completed += 1
-                sink.emit("progress.updated", {"current": completed, "total": len(steps)})
-        if failures:
-            key, error = failures[0]
-            raise RuntimeError(f"Workflow step {key} failed: {error}") from error
-
-    ordered_results = [
-        {"step_id": step["id"], "step_key": step["key"], **results[step["key"]]}
-        for step in steps
-        if step["key"] in results
-    ]
-    status = "cancelled" if sink.cancelled else "completed"
-    return {"status": status, "steps": ordered_results}
-
-
 def execute_workflow(run_payload, sink):
-    """Execute a DAG using durable child Runs when requested by its snapshot."""
+    """Execute a DAG exclusively through durable child Runs."""
     snapshot = run_payload.get("definition_snapshot") or {}
-    if snapshot.get("durable_children"):
-        return _execute_workflow_durable(run_payload, sink)
-    return _execute_workflow_inline(run_payload, sink)
+    if not snapshot.get("durable_children"):
+        raise RuntimeError("Workflow execution requires durable child Runs")
+    return _execute_workflow_durable(run_payload, sink)

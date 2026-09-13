@@ -56,7 +56,7 @@ def _client(user):
 
 def _url(context, contact=None):
     base = (
-        f"/api/organizations/{context['organization'].id}/applications/"
+        f"/api/v1/organizations/{context['organization'].id}/applications/"
         f"{context['application'].id}/contacts"
     )
     return f"{base}/{contact.id}" if contact else base

@@ -511,7 +511,6 @@ export const useConversationStore = create<ConversationState>()(
       },
       partialize: (state) => ({
         conversations: state.conversations,
-        currentConversation: state.currentConversation,
       }),
     },
   ),

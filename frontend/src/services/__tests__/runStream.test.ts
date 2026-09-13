@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { RunEventEnvelope } from '@/entities/run';
 import {
@@ -8,6 +8,7 @@ import {
   streamRunEvents,
 } from '../runStream';
 import type { RunEventSnapshotEnvelope } from '@/entities/run';
+import * as authSession from '../authSession';
 
 function event(sequence: number, text = String(sequence)): RunEventEnvelope {
   return {
@@ -22,6 +23,7 @@ function event(sequence: number, text = String(sequence)): RunEventEnvelope {
 }
 
 describe('V2 Run stream transport', () => {
+  afterEach(() => vi.restoreAllMocks());
   it('parses multiline and chunked SSE frames', () => {
     const parser = new SSEFrameBuffer();
     const json = JSON.stringify(event(1));
@@ -129,5 +131,38 @@ describe('V2 Run stream transport', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(snapshots).toEqual([durableSnapshot]);
     expect(handle.cursor).toBe(10);
+  });
+
+  it('refreshes an expired access token once and resumes the same cursor', async () => {
+    let token = 'expired';
+    vi.spyOn(authSession, 'getAccessToken').mockImplementation(() => token);
+    vi.spyOn(authSession, 'refreshAccessToken').mockImplementation(async () => {
+      token = 'fresh';
+    });
+    const terminal = { ...event(1), type: 'run.succeeded', payload: {} };
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response(
+        `data: ${JSON.stringify(terminal)}\n\n`,
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      ));
+    const delivered: RunEventEnvelope[] = [];
+
+    const handle = streamRunEvents({
+      organizationId: 'organization-1',
+      runId: 'run-1',
+      baseUrl: '/api',
+      fetchImpl,
+      onEvent: (item) => { delivered.push(item); },
+    });
+    await handle.done;
+
+    expect(authSession.refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetchImpl.mock.calls[0][1]?.headers).get('Authorization'))
+      .toBe('Bearer expired');
+    expect(new Headers(fetchImpl.mock.calls[1][1]?.headers).get('Authorization'))
+      .toBe('Bearer fresh');
+    expect(delivered).toEqual([terminal]);
   });
 });

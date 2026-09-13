@@ -211,11 +211,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='run',
-            constraint=models.CheckConstraint(check=models.Q(('max_attempts__gte', 1)), name='run_max_attempts_at_least_one'),
+            constraint=models.CheckConstraint(condition=models.Q(('max_attempts__gte', 1)), name='run_max_attempts_at_least_one'),
         ),
         migrations.AddConstraint(
             model_name='run',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('pending_input_expires_at__isnull', False), ('pending_input_kind__in', ('answer', 'permission')), ('pending_input_request_id__isnull', False), ('status', 'waiting_input')), models.Q(models.Q(('status', 'waiting_input'), _negated=True), ('pending_input_request_id__isnull', True), ('pending_input_kind', ''), ('pending_input_expires_at__isnull', True)), _connector='OR'), name='run_pending_input_consistent'),
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('pending_input_expires_at__isnull', False), ('pending_input_kind__in', ('answer', 'permission')), ('pending_input_request_id__isnull', False), ('status', 'waiting_input')), models.Q(models.Q(('status', 'waiting_input'), _negated=True), ('pending_input_request_id__isnull', True), ('pending_input_kind', ''), ('pending_input_expires_at__isnull', True)), _connector='OR'), name='run_pending_input_consistent'),
         ),
         migrations.AddConstraint(
             model_name='runcommand',
@@ -231,7 +231,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='runeventsnapshot',
-            constraint=models.CheckConstraint(check=models.Q(('through_sequence__gte', 1)), name='run_snapshot_sequence_positive'),
+            constraint=models.CheckConstraint(condition=models.Q(('through_sequence__gte', 1)), name='run_snapshot_sequence_positive'),
         ),
         migrations.AddConstraint(
             model_name='runlease',

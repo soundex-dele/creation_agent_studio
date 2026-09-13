@@ -4,8 +4,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from apps.agents.models import Agent
-from apps.applications.models import Application, Skill
 from modules.tenancy.models import TenantOwnedModel
 
 
@@ -52,14 +50,16 @@ class ImmutableRevision(TenantOwnedModel):
 
 
 class AgentDraft(DefinitionDraft):
-    agent = models.OneToOneField(Agent, on_delete=models.CASCADE, related_name="draft")
+    agent = models.OneToOneField(
+        "agents.Agent", on_delete=models.CASCADE, related_name="draft")
 
     class Meta:
         db_table = "agent_drafts"
 
 
 class AgentRevision(ImmutableRevision):
-    agent = models.ForeignKey(Agent, on_delete=models.PROTECT, related_name="revisions")
+    agent = models.ForeignKey(
+        "agents.Agent", on_delete=models.PROTECT, related_name="revisions")
 
     class Meta:
         db_table = "agent_revisions"
@@ -77,14 +77,16 @@ class AgentRevision(ImmutableRevision):
 
 
 class SkillDraft(DefinitionDraft):
-    skill = models.OneToOneField(Skill, on_delete=models.CASCADE, related_name="draft")
+    skill = models.OneToOneField(
+        "applications.Skill", on_delete=models.CASCADE, related_name="draft")
 
     class Meta:
         db_table = "skill_drafts"
 
 
 class SkillRevision(ImmutableRevision):
-    skill = models.ForeignKey(Skill, on_delete=models.PROTECT, related_name="revisions")
+    skill = models.ForeignKey(
+        "applications.Skill", on_delete=models.PROTECT, related_name="revisions")
 
     class Meta:
         db_table = "skill_revisions"
@@ -103,7 +105,7 @@ class SkillRevision(ImmutableRevision):
 
 class ApplicationDraft(DefinitionDraft):
     application = models.OneToOneField(
-        Application,
+        "applications.Application",
         on_delete=models.CASCADE,
         related_name="draft",
     )
@@ -114,7 +116,7 @@ class ApplicationDraft(DefinitionDraft):
 
 class ApplicationRevision(ImmutableRevision):
     application = models.ForeignKey(
-        Application,
+        "applications.Application",
         on_delete=models.PROTECT,
         related_name="revisions",
     )
@@ -156,7 +158,8 @@ class DeploymentEnvironment(models.TextChoices):
 
 class AgentDeployment(TenantOwnedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="deployments")
+    agent = models.ForeignKey(
+        "agents.Agent", on_delete=models.CASCADE, related_name="deployments")
     environment = models.CharField(max_length=20, choices=DeploymentEnvironment.choices)
     revision = models.ForeignKey(AgentRevision, on_delete=models.PROTECT, related_name="deployments")
     previous_revision = models.ForeignKey(
@@ -184,7 +187,7 @@ class AgentDeployment(TenantOwnedModel):
 class ApplicationDeployment(TenantOwnedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application = models.ForeignKey(
-        Application,
+        "applications.Application",
         on_delete=models.CASCADE,
         related_name="deployments",
     )

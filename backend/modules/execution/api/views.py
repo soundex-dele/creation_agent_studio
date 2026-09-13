@@ -33,7 +33,7 @@ from modules.execution.models import (
     RunEvent,
     RunEventSnapshot,
 )
-from modules.tenancy.models import Membership
+from apps.enterprise.models import Membership
 from modules.tenancy.permissions import HasPathOrganizationRole
 
 from .base import ProblemDetailsAPIView
@@ -81,7 +81,7 @@ def _parse_non_negative_int(request, name, default):
 
 def _compacted_problem(request, snapshot):
     snapshot_url = reverse(
-        "execution:run-event-snapshot",
+        "execution-v1:run-event-snapshot",
         kwargs={
             "organization_id": snapshot.organization_id,
             "run_id": snapshot.run_id,
@@ -275,7 +275,7 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
         )
         if access_url is None:
             content_url = reverse(
-                "execution:run-artifact-content",
+                "execution-v1:run-artifact-content",
                 kwargs={
                     "organization_id": organization_id,
                     "run_id": run_id,
@@ -538,11 +538,11 @@ class OrganizationApplicationRunsView(ProblemDetailsAPIView):
             )
 
         detail_url = reverse(
-            "execution:run-detail",
+            "execution-v1:run-detail",
             kwargs={"organization_id": organization_id, "run_id": run.id},
         )
         stream_url = reverse(
-            "execution:run-stream",
+            "execution-v1:run-stream",
             kwargs={"organization_id": organization_id, "run_id": run.id},
         )
         body = RunSerializer(run).data
@@ -591,7 +591,7 @@ class OrganizationAgentRunsView(ProblemDetailsAPIView):
                             title="Invalid execution definition", detail=str(exc))
         body = RunSerializer(run).data
         body["stream_url"] = request.build_absolute_uri(reverse(
-            "execution:run-stream",
+            "execution-v1:run-stream",
             kwargs={"organization_id": organization_id, "run_id": run.id},
         ))
         response = Response(body, status=status.HTTP_202_ACCEPTED)

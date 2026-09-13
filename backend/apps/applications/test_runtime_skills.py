@@ -15,7 +15,7 @@ class CanonicalSkillApiTest(TestCase):
 
     def test_skill_crud_uses_database_catalog(self):
         created = self.client.post(
-            "/api/apps/skills/",
+            "/api/v1/apps/skills/",
             {
                 "slug": "storyboard",
                 "name": "Storyboard",
@@ -33,7 +33,7 @@ class CanonicalSkillApiTest(TestCase):
         self.assertEqual(skill.organization_id, self.organization.id)
 
         updated = self.client.patch(
-            "/api/apps/skills/storyboard/",
+            "/api/v1/apps/skills/storyboard/",
             {"description": "Updated"},
             format="json",
             **self.headers,
@@ -42,5 +42,5 @@ class CanonicalSkillApiTest(TestCase):
         self.assertEqual(updated.data["description"], "Updated")
 
     def test_removed_filesystem_skill_api_is_not_routable(self):
-        response = self.client.get("/api/apps/runtime-skills/", **self.headers)
+        response = self.client.get("/api/v1/apps/runtime-skills/", **self.headers)
         self.assertEqual(response.status_code, 404)

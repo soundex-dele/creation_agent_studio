@@ -57,7 +57,7 @@ class ChatApplicationBoundaryTest(TestCase):
 
     def _create_chat(self, *, slug='chat-test'):
         response = self.client.post(
-            f'/api/organizations/{self.organization.id}/applications', {
+            f'/api/v1/organizations/{self.organization.id}/applications', {
             'category_id': self.app_category.id,
             'name': 'Chat',
             'slug': slug,
@@ -94,7 +94,7 @@ class ChatApplicationBoundaryTest(TestCase):
         }, format='json', **self.headers)
         self.assertEqual(response.status_code, 201, response.data)
         application = Application.objects.get(slug=slug)
-        runtime = self.client.get(f'/api/apps/{slug}/', **self.headers)
+        runtime = self.client.get(f'/api/v1/apps/{slug}/', **self.headers)
         self.assertEqual(runtime.status_code, 200, runtime.data)
         return runtime, application
 
@@ -110,7 +110,7 @@ class ChatApplicationBoundaryTest(TestCase):
 
     def test_non_chat_runtime_has_no_chat_members(self):
         response = self.client.post(
-            f'/api/organizations/{self.organization.id}/applications', {
+            f'/api/v1/organizations/{self.organization.id}/applications', {
             'category_id': self.app_category.id,
             'name': 'Task', 'slug': 'task-test', 'description': 'Task app',
             'content': {
@@ -119,7 +119,7 @@ class ChatApplicationBoundaryTest(TestCase):
             },
         }, format='json', **self.headers)
         self.assertEqual(response.status_code, 201, response.data)
-        runtime = self.client.get('/api/apps/task-test/', **self.headers)
+        runtime = self.client.get('/api/v1/apps/task-test/', **self.headers)
         self.assertNotIn('agent_bindings', runtime.data)
         self.assertNotIn('skill_bindings', runtime.data)
         self.assertNotIn('guided_prompts', runtime.data)
@@ -136,14 +136,14 @@ class ChatApplicationBoundaryTest(TestCase):
     def test_compose_and_conversation_use_chat_definition(self):
         _response, application = self._create_chat()
         composed = self.client.post(
-            f'/api/apps/{application.slug}/compose-prompt/',
+            f'/api/v1/apps/{application.slug}/compose-prompt/',
             {'prompt_id': 'copy', 'answers': {
                 'topic': '咖啡', 'tone': 'friendly'}},
             format='json', **self.headers)
         self.assertEqual(composed.status_code, 200, composed.data)
         self.assertEqual(composed.data['prompt'], '主题：咖啡\n语气：亲切')
 
-        created = self.client.post('/api/conversations/', {
+        created = self.client.post('/api/v1/conversations/', {
             'application_id': application.id,
         }, format='json', **self.headers)
         self.assertEqual(created.status_code, 201, created.data)
@@ -167,7 +167,7 @@ class ChatApplicationBoundaryTest(TestCase):
         }]
         application.draft.save(update_fields=['content'])
 
-        created = self.client.post('/api/conversations/', {
+        created = self.client.post('/api/v1/conversations/', {
             'application_id': application.id,
             'skill_ids': [str(skill.id)],
         }, format='json', **self.headers)
@@ -183,7 +183,7 @@ class ChatApplicationBoundaryTest(TestCase):
         content['chat_profile'] = {
             **content['chat_profile'], 'welcome_message': 'Updated'}
         response = self.client.put(
-            f'/api/organizations/{self.organization.id}/applications/'
+            f'/api/v1/organizations/{self.organization.id}/applications/'
             f'{application.id}/draft',
             {'expected_version': version, 'content': content},
             format='json', **self.headers)
@@ -209,7 +209,7 @@ class ChatApplicationBoundaryTest(TestCase):
         }]
         application.draft.save(update_fields=['content'])
         response = self.client.post(
-            f'/api/organizations/{self.organization.id}/applications/'
+            f'/api/v1/organizations/{self.organization.id}/applications/'
             f'{application.id}/revisions',
             {'expected_draft_version': application.draft.version},
             format='json', **self.headers)

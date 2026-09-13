@@ -3,6 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class Workflow(models.Model):
@@ -19,6 +20,8 @@ class Workflow(models.Model):
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = TenantOwnedQuerySet.as_manager()
 
     class Meta:
         db_table = 'workflows'
@@ -54,6 +57,6 @@ class WorkflowStep(models.Model):
             models.UniqueConstraint(
                 fields=['workflow', 'key'], name='unique_workflow_step_key'),
             models.CheckConstraint(
-                check=models.Q(max_attempts__gte=1),
+                condition=models.Q(max_attempts__gte=1),
                 name='workflow_step_attempts_at_least_one'),
         ]

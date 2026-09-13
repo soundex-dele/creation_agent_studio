@@ -6,9 +6,6 @@ tenant identity for every product and durable-execution resource.
 """
 from django.db import models
 
-from apps.enterprise.models import Membership, Organization
-
-
 class TenantOwnedQuerySet(models.QuerySet):
     def for_organization(self, organization_id):
         if organization_id is None:
@@ -20,7 +17,7 @@ class TenantOwnedModel(models.Model):
     """Base model with an explicit canonical organization scope."""
 
     organization = models.ForeignKey(
-        Organization,
+        "enterprise.Organization",
         on_delete=models.CASCADE,
         related_name="+",
     )
@@ -31,9 +28,4 @@ class TenantOwnedModel(models.Model):
         abstract = True
 
 
-__all__ = [
-    "Membership",
-    "Organization",
-    "TenantOwnedModel",
-    "TenantOwnedQuerySet",
-]
+__all__ = ["TenantOwnedModel", "TenantOwnedQuerySet"]

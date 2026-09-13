@@ -3,7 +3,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from django.db.models import Q
 from .models import Project, ProjectAsset
 from .serializers import ProjectListSerializer, ProjectDetailSerializer, CreateProjectSerializer, ProjectAssetSerializer
 from .services.workspace_files import (
@@ -17,7 +16,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         from apps.enterprise.permissions import resolve_organization
         organization = resolve_organization(self.request)
         return Project.objects.filter(
-            Q(organization=organization) | Q(organization__isnull=True),
+            organization=organization,
             user=self.request.user,
         ).select_related('application', 'workflow').prefetch_related('conversations')
 

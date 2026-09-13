@@ -59,7 +59,7 @@ class OidcLoginView(APIView):
             hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
         state = secrets.token_urlsafe(32)
         redirect_uri = request.build_absolute_uri(
-            f'/api/enterprise/sso/oidc/{provider.id}/callback')
+            f'/api/v1/enterprise/sso/oidc/{provider.id}/callback')
         cache.set(f'oidc-state:{state}', {
             'provider_id': provider.id, 'verifier': verifier,
             'redirect_uri': redirect_uri,
@@ -151,6 +151,8 @@ class SsoExchangeView(APIView):
             return Response({'detail': 'Invalid or expired SSO exchange.'}, status=400)
         user = get_user_model().objects.get(id=value['user_id'])
         from apps.users.serializers import UserSerializer
-        return Response({'user': UserSerializer(user).data, 'tokens': {
-            'access': value['access'], 'refresh': value['refresh'],
+        from apps.users.session import set_refresh_cookie
+        response = Response({'user': UserSerializer(user).data, 'tokens': {
+            'access': value['access'],
         }}, status=status.HTTP_200_OK)
+        return set_refresh_cookie(response, value['refresh'])

@@ -9,19 +9,21 @@ REPOSITORY_ROOT = BACKEND_ROOT.parent
 # Domain integrations are explicit exceptions. Any new modules -> apps edge
 # must be reviewed here instead of silently growing another dependency path.
 ALLOWED_DOMAIN_IMPORTS = {
-    "modules/catalog/api/views.py": {"apps.applications.models"},
-    "modules/catalog/models.py": {
-        "apps.agents.models",
+    "modules/catalog/api/serializers.py": {"apps.applications.models"},
+    "modules/catalog/api/views.py": {
         "apps.applications.models",
+        "apps.enterprise.models",
     },
     "modules/catalog/services.py": {
         "apps.agents.models",
         "apps.applications.models",
     },
     "modules/execution/api/streaming.py": {"apps.enterprise.models"},
+    "modules/execution/api/views.py": {"apps.enterprise.models"},
     "modules/execution/application/projections.py": {"apps.conversations.models"},
     "modules/execution/application/start_runs.py": {
         "apps.agents.models",
+        "apps.applications.models",
         "apps.enterprise.models",
         "apps.enterprise.services",
     },
@@ -30,7 +32,6 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.enterprise.services",
     },
     "modules/execution/runtime/builtin.py": {"apps.enterprise.models"},
-    "modules/tenancy/models.py": {"apps.enterprise.models"},
     "modules/tenancy/middleware.py": {"apps.enterprise.tenancy"},
     "modules/tenancy/permissions.py": {
         "apps.enterprise.models",
@@ -77,6 +78,7 @@ def test_removed_parallel_execution_implementations_do_not_return():
         "sse" + "Client.ts",
         "/api/agent/" + "v2/",
         "workflow-" + "sequential",
+        "_execute_workflow_" + "inline",
     )
     offenders = []
     roots = (BACKEND_ROOT / "apps", BACKEND_ROOT / "modules", REPOSITORY_ROOT / "frontend" / "src")
@@ -92,3 +94,62 @@ def test_removed_parallel_execution_implementations_do_not_return():
                 if fragment in content:
                     offenders.append(f"{relative}: {fragment}")
     assert not offenders, "Removed execution implementation references found:\n" + "\n".join(offenders)
+
+
+def test_public_application_routes_are_versioned():
+    from backend.urls import urlpatterns
+
+    api_patterns = [
+        str(pattern.pattern)
+        for pattern in urlpatterns
+        if str(pattern.pattern).startswith("api/")
+    ]
+    assert api_patterns
+    assert all(pattern.startswith("api/v1/") for pattern in api_patterns)
+
+
+def test_data_before_schema_migrations_are_non_atomic():
+    schema_operations = (
+        "migrations.AddField(",
+        "migrations.RemoveField(",
+        "migrations.AlterField(",
+        "migrations.CreateModel(",
+        "migrations.DeleteModel(",
+        "migrations.AddConstraint(",
+        "migrations.RemoveConstraint(",
+    )
+    offenders = []
+    for root in (BACKEND_ROOT / "apps", BACKEND_ROOT / "modules"):
+        for path in root.glob("*/migrations/*.py"):
+            content = path.read_text(encoding="utf-8")
+            data_position = content.find("migrations.RunPython")
+            if data_position < 0:
+                continue
+            has_later_schema_change = any(
+                content.find(operation, data_position + 1) >= 0
+                for operation in schema_operations
+            )
+            if has_later_schema_change and "atomic = False" not in content:
+                offenders.append(path.relative_to(REPOSITORY_ROOT).as_posix())
+    assert not offenders, (
+        "PostgreSQL can retain deferred trigger events when data and later "
+        "schema changes share one migration transaction:\n" + "\n".join(offenders)
+    )
+
+
+def test_browser_auth_credentials_are_not_persisted():
+    frontend_root = REPOSITORY_ROOT / "frontend" / "src"
+    banned_fragments = ("refreshToken", "refresh_token", "tokens.refresh", "token: state.token")
+    offenders = []
+    for path in frontend_root.rglob("*"):
+        if not path.is_file() or path.suffix not in {".ts", ".tsx"}:
+            continue
+        if "/__tests__/" in f"/{path.as_posix()}/":
+            continue
+        content = path.read_text(encoding="utf-8")
+        for fragment in banned_fragments:
+            if fragment in content:
+                offenders.append(
+                    f"{path.relative_to(REPOSITORY_ROOT).as_posix()}: {fragment}"
+                )
+    assert not offenders, "Browser credential persistence found:\n" + "\n".join(offenders)

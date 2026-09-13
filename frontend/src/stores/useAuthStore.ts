@@ -16,7 +16,6 @@ interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
@@ -37,7 +36,6 @@ interface RegisterData {
 
 interface AuthTokens {
   access: string;
-  refresh: string;
 }
 
 interface AuthResponse {
@@ -47,7 +45,6 @@ interface AuthResponse {
 
 interface RefreshResponse {
   access: string;
-  refresh?: string;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -55,7 +52,6 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
-      refreshToken: null,
       isAuthenticated: false,
 
       login: async (username: string, password: string) => {
@@ -65,7 +61,6 @@ export const useAuthStore = create<AuthState>()(
         set({
           user,
           token: tokens.access,
-          refreshToken: tokens.refresh,
           isAuthenticated: true,
         });
       },
@@ -77,7 +72,6 @@ export const useAuthStore = create<AuthState>()(
         set({
           user,
           token: tokens.access,
-          refreshToken: tokens.refresh,
           isAuthenticated: true,
         });
       },
@@ -85,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
       completeSso: async (exchange: string) => {
         const response = await api.post<AuthResponse>('/enterprise/sso/exchange', { exchange });
         const { user, tokens } = response;
-        set({ user, token: tokens.access, refreshToken: tokens.refresh, isAuthenticated: true });
+        set({ user, token: tokens.access, isAuthenticated: true });
       },
 
       clearAuth: () => {
@@ -96,36 +90,27 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           token: null,
-          refreshToken: null,
           isAuthenticated: false,
         });
       },
 
       logout: async () => {
-        const { refreshToken } = get();
         // Clear local state first so an aborted request can't strand tokens.
         get().clearAuth();
-        if (refreshToken) {
-          try {
-            await api.post('/auth/logout/', { refresh: refreshToken });
-          } catch (error) {
-            console.error('Logout error:', error);
-          }
+        try {
+          await api.post('/auth/logout/', {});
+        } catch (error) {
+          console.error('Logout error:', error);
         }
       },
 
       refreshAccessToken: async () => {
         try {
-          const { refreshToken } = get();
-          if (!refreshToken) throw new Error('No refresh token');
-
-          const response = await api.post<RefreshResponse>('/auth/token/refresh/', {
-            refresh: refreshToken,
-          });
+          const response = await api.post<RefreshResponse>('/auth/token/refresh/', {});
 
           set({
             token: response.access,
-            refreshToken: response.refresh || refreshToken,
+            isAuthenticated: true,
           });
         } catch (error) {
           // Refresh failed (token invalid/expired/blacklisted). Clear local
@@ -146,8 +131,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

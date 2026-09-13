@@ -187,6 +187,7 @@ def migrate_application_definitions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('applications', '0005_application_unique_global_application_slug_and_more'),

@@ -84,6 +84,11 @@ def migrate_agent_definitions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL cannot drop the legacy columns while deferred foreign-key
+    # trigger events from the data copy are pending in the same transaction.
+    # Commit each operation independently so the data copy is durable before
+    # the schema cleanup begins.
+    atomic = False
 
     dependencies = [
         ('agents', '0005_remove_agentexecution_agent_and_more'),

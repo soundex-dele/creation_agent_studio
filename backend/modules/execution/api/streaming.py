@@ -4,6 +4,7 @@ import time
 
 from asgiref.sync import sync_to_async
 from channels.layers import get_channel_layer
+from django.db import close_old_connections
 
 from modules.execution.api.serializers import RunEventSerializer
 from modules.execution.models import Run, RunEvent
@@ -26,21 +27,28 @@ def encode_event(event):
 
 @sync_to_async(thread_sensitive=True)
 def _load_event_batch(*, user, organization_id, run_id, after, limit):
-    with tenant_database_context(organization_id):
-        has_access = (
-            Organization.objects.visible_to(user)
-            .filter(pk=organization_id, is_active=True)
-            .exists()
-        )
-        if not has_access:
-            raise StreamAccessLost
-        if not Run.objects.for_organization(organization_id).filter(pk=run_id).exists():
-            raise StreamAccessLost
-        return list(
-            RunEvent.objects.for_organization(organization_id)
-            .filter(run_id=run_id, sequence__gt=after)
-            .order_by("sequence")[:limit]
-        )
+    close_old_connections()
+    try:
+        with tenant_database_context(organization_id):
+            has_access = (
+                Organization.objects.visible_to(user)
+                .filter(pk=organization_id, is_active=True)
+                .exists()
+            )
+            if not has_access:
+                raise StreamAccessLost
+            if not Run.objects.for_organization(organization_id).filter(pk=run_id).exists():
+                raise StreamAccessLost
+            return list(
+                RunEvent.objects.for_organization(organization_id)
+                .filter(run_id=run_id, sequence__gt=after)
+                .order_by("sequence")[:limit]
+            )
+    finally:
+        # sync_to_async's thread-sensitive executor is long lived; without an
+        # explicit close, an SSE read can pin a PostgreSQL connection after the
+        # stream has ended.
+        close_old_connections()
 
 
 async def stream_run_events(

@@ -3,10 +3,10 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 
-from modules.catalog.models import Agent, AgentDraft, AgentRevision
+from modules.catalog.models import AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash, publish_agent
-from modules.tenancy.models import Organization
-from apps.agents.models import AgentCategory
+from apps.agents.models import Agent, AgentCategory
+from apps.enterprise.models import Organization
 
 
 @pytest.fixture

@@ -34,7 +34,7 @@ python manage.py runserver 0.0.0.0:8080
 Windows 使用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。开发环境不复制
 `.env.example` 时默认使用 SQLite；该示例文件默认配置 PostgreSQL，供部署时按实际环境修改后使用。
 项目已通过 Daphne 将 `runserver` 注册为 ASGI 服务，以支持 Run 的异步 SSE
-事件流；不要改用同步 WSGI 服务器承载 `/api/runs/.../stream`。
+事件流；不要改用同步 WSGI 服务器承载 `/api/v1/runs/.../stream`。
 
 开发环境默认使用 SQLite。另开终端启动需要的执行 Worker：
 
@@ -54,7 +54,7 @@ npm ci
 npm run dev
 ```
 
-浏览器访问 `http://localhost:3030`。Vite 将 `/api` 代理到 `http://localhost:8080`。
+浏览器访问 `http://localhost:3030`。Vite 将 `/api` 代理到 `http://localhost:8080`；产品 API 的稳定入口统一为 `/api/v1`。
 
 ## 认证地址
 
@@ -63,14 +63,14 @@ npm run dev
 - `/auth/login`
 - `/auth/register`
 
-REST API 带 `/api` 前缀：
+REST API 统一使用版本化前缀 `/api/v1`：
 
-- `POST /api/auth/login/`
-- `POST /api/auth/register/`
-- `POST /api/auth/token/refresh/`
-- `POST /api/auth/logout/`
+- `POST /api/v1/auth/login/`
+- `POST /api/v1/auth/register/`
+- `POST /api/v1/auth/token/refresh/`
+- `POST /api/v1/auth/logout/`
 
-直接向 `http://localhost:3030/auth/register/` 发送 POST 会命中前端开发服务器，不是后端 API；正确地址是 `http://localhost:3030/api/auth/register/`。
+登录和注册响应只返回短期 access token；refresh token 仅保存在 `HttpOnly`、`SameSite=Strict` Cookie 中并在刷新时轮换，不会写入 JSON 或浏览器存储。直接向 `http://localhost:3030/auth/register/` 发送 POST 会命中前端开发服务器，不是后端 API；正确地址是 `http://localhost:3030/api/v1/auth/register/`。
 
 ## 单企业私有部署
 
@@ -83,13 +83,13 @@ SINGLE_TENANT_ORGANIZATION_NAME=Enterprise Workspace
 SINGLE_TENANT_DEFAULT_ROLE=viewer
 ```
 
-首个用户会初始化并拥有默认企业，后续用户自动以默认角色加入。前端隐藏企业选择器，服务端忽略客户端提交的组织头，并提供 `/api/runs`、`/api/applications/...` 等无组织 ID 别名。数据库仍保留 `organization_id`，用于权限、审计、配额与行级安全。多租户部署必须显式设置 `SINGLE_TENANT_MODE=False`。
+首个用户会初始化并拥有默认企业，后续用户自动以默认角色加入。前端隐藏企业选择器，服务端忽略客户端提交的组织头，并提供 `/api/v1/runs`、`/api/v1/applications/...` 等无组织 ID 别名。数据库仍保留 `organization_id`，用于权限、审计、配额与行级安全。多租户部署必须显式设置 `SINGLE_TENANT_MODE=False`。
 
 已有数据的部署应将 `SINGLE_TENANT_ORGANIZATION_ID` 设置为需要保留的现有组织 UUID；不要只修改 slug，否则系统会创建新的默认企业，原组织数据不会自动迁移。
 
 ## Durable Run API
 
-组织级执行接口统一位于 `/api/organizations/{organization_id}/`：
+组织级执行接口统一位于 `/api/v1/organizations/{organization_id}/`：
 
 - `POST agents/{agent_id}/runs`
 - `POST applications/{application_id}/runs`
@@ -126,7 +126,7 @@ cd backend
 docker compose up --build
 ```
 
-Compose 分别启动 Web、Agent Worker、Media Worker、Workflow Worker、Scheduler、Maintenance、PostgreSQL 和 Redis。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`。
+Compose 先以一次性 `migrate` 服务完成迁移，再启动 Web、Agent Worker、Media Worker、Workflow Worker、Scheduler、Maintenance、PostgreSQL 16 和 Redis 7.4。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`；PostgreSQL 和 Redis 不暴露宿主机端口。
 
 Web 与全部后台进程共享 `runtime_data:/data`，其中包含 Run Artifact、Agent workspace 和上传媒体。Maintenance 默认每小时执行 Retention 和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。
 

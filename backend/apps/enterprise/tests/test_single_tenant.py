@@ -42,14 +42,14 @@ def test_deployment_context_provisions_existing_user_and_ignores_client_tenant()
     client = APIClient()
     client.force_authenticate(user)
     client.credentials(HTTP_X_ORGANIZATION_ID=str(personal_organization.id))
-    response = client.get('/api/enterprise/deployment-context/')
+    response = client.get('/api/v1/enterprise/deployment-context/')
 
     assert response.status_code == 200
     assert response.data['single_tenant_mode'] is True
     assert [item['slug'] for item in response.data['organizations']] == ['acme']
     assert Membership.objects.filter(
         organization__slug='acme', user=user, is_active=True).exists()
-    assert client.get('/api/enterprise/providers/').status_code == 200
+    assert client.get('/api/v1/enterprise/providers/').status_code == 200
 
 
 @override_settings(**SINGLE_TENANT_SETTINGS)
@@ -62,10 +62,10 @@ def test_organization_free_api_alias_is_available_only_in_single_tenant_mode():
     client = APIClient()
     client.force_authenticate(user)
 
-    assert client.get('/api/applications').status_code == 200
-    assert client.get(f'/api/organizations/{other.id}/applications').status_code == 403
+    assert client.get('/api/v1/applications').status_code == 200
+    assert client.get(f'/api/v1/organizations/{other.id}/applications').status_code == 403
     with override_settings(SINGLE_TENANT_MODE=False):
-        assert client.get('/api/applications').status_code == 404
+        assert client.get('/api/v1/applications').status_code == 404
 
 
 @override_settings(**SINGLE_TENANT_SETTINGS)
@@ -74,7 +74,7 @@ def test_additional_organization_creation_is_disabled():
     client = APIClient()
     client.force_authenticate(user)
 
-    response = client.post('/api/enterprise/organizations/', {
+    response = client.post('/api/v1/enterprise/organizations/', {
         'name': 'Another Organization',
         'slug': 'another-organization',
     }, format='json')
@@ -92,7 +92,7 @@ def test_inactive_membership_is_not_automatically_reactivated():
     client = APIClient()
     client.force_authenticate(user)
 
-    response = client.get('/api/enterprise/deployment-context/')
+    response = client.get('/api/v1/enterprise/deployment-context/')
 
     assert response.status_code == 200
     assert response.data['organizations'] == []

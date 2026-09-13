@@ -11,6 +11,7 @@ from jsonschema import SchemaError, ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
 
 from apps.agents.models import Agent
+from apps.applications.models import Application
 from apps.enterprise.services import (
     apply_input_guardrails,
     enforce_model_policy,
@@ -20,7 +21,6 @@ from apps.enterprise.services import (
 )
 from modules.catalog.models import (
     AgentDeployment,
-    Application,
     ApplicationDeployment,
 )
 from modules.execution.models import IdempotencyRecord, Run

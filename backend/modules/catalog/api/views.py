@@ -12,13 +12,12 @@ from modules.catalog.errors import (
     InvalidDeploymentRevision,
 )
 from modules.catalog.models import (
-    Application,
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
     DeploymentEnvironment,
 )
-from apps.applications.models import ApplicationCategory, ChatApplication
+from apps.applications.models import Application, ApplicationCategory, ChatApplication
 from modules.catalog.services import (
     canonical_content_hash,
     publish_application,
@@ -27,7 +26,7 @@ from modules.catalog.services import (
     update_application_draft,
 )
 from modules.execution.api.base import ProblemDetailsAPIView
-from modules.tenancy.models import Membership
+from apps.enterprise.models import Membership
 from modules.tenancy.permissions import HasPathOrganizationRole, ROLE_LEVEL
 
 from .pagination import ApplicationCursorPagination, ApplicationRevisionCursorPagination

@@ -4,25 +4,25 @@ interface AuthSessionBridge {
   clear: () => void;
 }
 
-const persistedAccessToken = (): string | null => {
-  try {
-    const persisted = JSON.parse(localStorage.getItem('auth-storage') || '{}');
-    return persisted?.state?.token || null;
-  } catch {
-    return null;
-  }
-};
-
 let bridge: AuthSessionBridge = {
-  accessToken: persistedAccessToken,
+  accessToken: () => null,
   refresh: async () => { throw new Error('Auth session is not initialized'); },
   clear: () => localStorage.removeItem('auth-storage'),
 };
+
+let refreshInFlight: Promise<void> | null = null;
 
 export const registerAuthSession = (next: AuthSessionBridge): void => {
   bridge = next;
 };
 
 export const getAccessToken = (): string | null => bridge.accessToken();
-export const refreshAccessToken = (): Promise<void> => bridge.refresh();
+export const refreshAccessToken = (): Promise<void> => {
+  if (!refreshInFlight) {
+    refreshInFlight = bridge.refresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+};
 export const clearAuthSession = (): void => bridge.clear();

@@ -32,7 +32,7 @@ from modules.execution.infrastructure.coordinator_lock import (
     CoordinatorFileLock,
 )
 from modules.execution.models import Run, RunAttempt, RunEvent, RunLease
-from modules.tenancy.models import Membership, Organization
+from apps.enterprise.models import Membership, Organization
 
 
 @pytest.fixture

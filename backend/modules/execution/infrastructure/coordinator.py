@@ -524,12 +524,20 @@ class ExecutionCoordinator:
     def tick(self, *, allow_claim=True):
         now = time.monotonic()
         if now >= self._next_maintenance_at:
-            for organization_id in Organization.objects.filter(
-                is_active=True
-            ).values_list("id", flat=True):
-                with tenant_database_context(organization_id):
-                    reap_expired_leases(limit=100)
-                    expire_waiting_inputs(limit=100)
+            # All PostgreSQL workers share Redis, so one short-lived leader is
+            # enough to reap global execution state. SQLite already permits a
+            # single coordinator and its local cache therefore behaves the same.
+            if cache.add(
+                "execution-reaper-leader",
+                self.worker_id,
+                timeout=4,
+            ):
+                for organization_id in Organization.objects.filter(
+                    is_active=True
+                ).values_list("id", flat=True):
+                    with tenant_database_context(organization_id):
+                        reap_expired_leases(limit=100)
+                        expire_waiting_inputs(limit=100)
             cache.set(f"execution-worker:{self.worker_pool}", self.worker_id, 15)
             self._next_maintenance_at = now + 5
         for attempt_id, active in list(self._active.items()):

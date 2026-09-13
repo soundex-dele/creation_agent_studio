@@ -43,36 +43,31 @@ urlpatterns += [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 
-    # REST API authentication (using custom views)
-    path('api/auth/', include('apps.users.urls')),
-
-    # API endpoints for each app
-    path('api/agents/', include('apps.agents.urls')),
-    path('api/apps/', include('apps.applications.urls')),
-    path('api/templates/', include('apps.templates.urls')),
-    path('api/conversations/', include('apps.conversations.urls')),
-    path('api/projects/', include('apps.projects.urls')),
-    path('api/marketplace/', include('apps.marketplace.urls')),
-    path('api/enterprise/', include('apps.enterprise.urls')),
-    path('api/workflows/', include('apps.workflows.urls')),
-
-    # Private deployments use these aliases without exposing an organization
-    # selector. They return 404 unless SINGLE_TENANT_MODE is enabled.
-    path('api/', include('modules.tenancy.single_tenant_urls')),
-
-    # Versioned definitions and durable Runs share the canonical organization.
+    # Stable public contract. The project is pre-launch, so every application
+    # route uses one versioned surface instead of carrying compatibility aliases.
+    path('api/v1/auth/', include('apps.users.urls')),
+    path('api/v1/agents/', include('apps.agents.urls')),
+    path('api/v1/apps/', include('apps.applications.urls')),
+    path('api/v1/templates/', include('apps.templates.urls')),
+    path('api/v1/conversations/', include('apps.conversations.urls')),
+    path('api/v1/projects/', include('apps.projects.urls')),
+    path('api/v1/marketplace/', include('apps.marketplace.urls')),
+    path('api/v1/enterprise/', include('apps.enterprise.urls')),
+    path('api/v1/workflows/', include('apps.workflows.urls')),
+    path('api/v1/', include('modules.tenancy.single_tenant_urls')),
     path(
-        'api/organizations/<uuid:organization_id>/',
-        include('modules.catalog.api.urls'),
+        'api/v1/organizations/<uuid:organization_id>/',
+        include('modules.catalog.api.urls', namespace='catalog-v1'),
     ),
     path(
-        'api/organizations/<uuid:organization_id>/',
-        include('modules.execution.api.urls'),
+        'api/v1/organizations/<uuid:organization_id>/',
+        include('modules.execution.api.urls', namespace='execution-v1'),
     ),
     path(
-        'api/organizations/<uuid:organization_id>/',
+        'api/v1/organizations/<uuid:organization_id>/',
         include('apps.contacts.urls'),
     ),
+
 ]
 
 # Serve media files in development

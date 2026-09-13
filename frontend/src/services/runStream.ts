@@ -1,4 +1,5 @@
 import type { RunEventEnvelope, RunEventSnapshotEnvelope } from '@/entities/run';
+import { getAccessToken, refreshAccessToken } from './authSession';
 import { API_BASE_URL } from './apiBaseUrl';
 import { tenantApiRoot } from './tenantContext';
 
@@ -192,16 +193,7 @@ export class RunEventSequencer {
   }
 }
 
-function storedToken(): string | null {
-  try {
-    const direct = localStorage.getItem('token');
-    if (direct) return direct;
-    const authStorage = localStorage.getItem('auth-storage');
-    return authStorage ? JSON.parse(authStorage)?.state?.token ?? null : null;
-  } catch {
-    return null;
-  }
-}
+class RunStreamAuthenticationError extends Error {}
 
 function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -218,16 +210,38 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = options.baseUrl ?? API_BASE_URL;
   const root = `${baseUrl}${tenantApiRoot(options.organizationId)}/runs/${options.runId}`;
-  const authToken = options.authToken === undefined ? storedToken() : options.authToken;
-  const headers = {
-    Accept: 'text/event-stream',
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+  const managedAuthentication = options.authToken === undefined;
+  const currentToken = (): string | null => (
+    managedAuthentication ? getAccessToken() : options.authToken ?? null
+  );
+  const authenticatedFetch = async (
+    url: string,
+    init: RequestInit,
+  ): Promise<Response> => {
+    const send = () => {
+      const token = currentToken();
+      const headers = new Headers(init.headers);
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      else headers.delete('Authorization');
+      return fetchImpl(url, { ...init, headers });
+    };
+    let response = await send();
+    if (response.status !== 401 || !managedAuthentication) return response;
+    try {
+      await refreshAccessToken();
+    } catch {
+      throw new RunStreamAuthenticationError('Run stream authentication expired');
+    }
+    response = await send();
+    if (response.status === 401) {
+      throw new RunStreamAuthenticationError('Run stream authentication expired');
+    }
+    return response;
   };
 
   const fetchPage = async (after: number): Promise<RunEventsPage> => {
-    const response = await fetchImpl(`${root}/events?after=${after}&limit=500`, {
+    const response = await authenticatedFetch(`${root}/events?after=${after}&limit=500`, {
       credentials: 'include',
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       signal: controller.signal,
     });
     if (response.status === 410) throw await compactedError(response);
@@ -244,9 +258,8 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const recoverCompactedHistory = async (
     problem: EventHistoryCompactedProblem,
   ): Promise<void> => {
-    const response = await fetchImpl(problem.snapshot_url, {
+    const response = await authenticatedFetch(problem.snapshot_url, {
       credentials: 'include',
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -267,10 +280,10 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
     let retryDelay = 250;
     while (!controller.signal.aborted) {
       try {
-        const response = await fetchImpl(`${root}/stream?after=${sequencer.cursor}`, {
+        const response = await authenticatedFetch(`${root}/stream?after=${sequencer.cursor}`, {
           credentials: 'include',
           headers: {
-            ...headers,
+            Accept: 'text/event-stream',
             'Last-Event-ID': String(sequencer.cursor),
           },
           signal: controller.signal,
@@ -307,6 +320,11 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
       } catch (value) {
         options.onConnectionChange?.(false);
         if (controller.signal.aborted) break;
+        if (value instanceof RunStreamAuthenticationError) {
+          options.onError?.(value);
+          controller.abort();
+          break;
+        }
         let handledError = value;
         if (value instanceof RunHistoryCompactedError) {
           try {

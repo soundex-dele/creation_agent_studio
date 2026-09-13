@@ -5,7 +5,13 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework.exceptions import PermissionDenied
 
-from apps.enterprise.models import Connector, IdentityProvider, Membership, ProviderConfig
+from apps.enterprise.models import (
+    AuditLog,
+    Connector,
+    IdentityProvider,
+    Membership,
+    ProviderConfig,
+)
 from apps.enterprise.views import ProviderConfigViewSet
 from core.throttles import OrganizationRateThrottle
 from apps.enterprise.services import (
@@ -50,7 +56,7 @@ def authenticated_client(user, organization=None):
 
 def test_user_cannot_register_as_admin():
     client = APIClient()
-    response = client.post('/api/auth/register/', {
+    response = client.post('/api/v1/auth/register/', {
         'username': 'no-admin', 'email': 'x@example.com',
         'password': 'A-secure-password-123!',
         'password_confirm': 'A-secure-password-123!',
@@ -68,7 +74,7 @@ def test_provider_is_isolated_by_membership():
     org_b = user_b.organization_memberships.get().organization
     ProviderConfig.objects.create(
         organization=org_b, name='private', base_url='https://example.com/v1')
-    response = authenticated_client(user_a, org_a).get('/api/enterprise/providers/')
+    response = authenticated_client(user_a, org_a).get('/api/v1/enterprise/providers/')
     assert response.status_code == 200
     values = response.data.get('results', response.data)
     assert values == []
@@ -82,7 +88,7 @@ def test_viewer_cannot_create_provider():
     Membership.objects.create(organization=organization, user=viewer,
                               role=Membership.Role.VIEWER)
     response = authenticated_client(viewer, organization).post(
-        '/api/enterprise/providers/',
+        '/api/v1/enterprise/providers/',
         {'name': 'blocked', 'base_url': 'https://example.com/v1'}, format='json')
     assert response.status_code == 403
 
@@ -91,7 +97,7 @@ def test_api_key_is_hashed_and_authenticates():
     User = get_user_model()
     user = User.objects.create_user(username='api-user', password='p')
     client = authenticated_client(user)
-    created = client.post('/api/auth/me/generate-api-key/', {
+    created = client.post('/api/v1/auth/me/generate-api-key/', {
         'name': 'ci', 'scopes': ['read']}, format='json')
     assert created.status_code == 201
     raw_key = created.data['api_key']
@@ -100,14 +106,31 @@ def test_api_key_is_hashed_and_authenticates():
     assert raw_key not in stored.key_hash
     api_client = APIClient()
     api_client.credentials(HTTP_X_API_KEY=raw_key)
-    assert api_client.get('/api/auth/me/').status_code == 200
+    assert api_client.get('/api/v1/auth/me/').status_code == 200
 
 
 def test_invalid_organization_header_does_not_raise_server_error():
     user = get_user_model().objects.create_user(username='bad-org-header', password='p')
     client = authenticated_client(user)
     client.credentials(HTTP_X_ORGANIZATION_ID='not-a-uuid')
-    assert client.get('/api/enterprise/providers/').status_code == 403
+    assert client.get('/api/v1/enterprise/providers/').status_code == 403
+
+
+def test_untrusted_request_id_is_replaced_before_response_and_audit():
+    user = get_user_model().objects.create_user(
+        username='safe-request-id-owner', password='p')
+    organization = user.organization_memberships.get().organization
+    response = authenticated_client(user, organization).post(
+        '/api/v1/enterprise/providers/',
+        {'name': 'request-id-test', 'base_url': 'https://example.com/v1'},
+        format='json',
+        HTTP_X_REQUEST_ID='invalid request id\r\n' + ('x' * 200),
+    )
+
+    assert response.status_code == 201
+    request_id = response['X-Request-ID']
+    assert len(request_id) == 32
+    assert AuditLog.objects.filter(request_id=request_id).exists()
 
 
 def test_viewer_cannot_rename_organization():
@@ -118,7 +141,7 @@ def test_viewer_cannot_rename_organization():
     Membership.objects.create(organization=organization, user=viewer,
                               role=Membership.Role.VIEWER)
     response = authenticated_client(viewer, organization).patch(
-        f'/api/enterprise/organizations/{organization.id}/',
+        f'/api/v1/enterprise/organizations/{organization.id}/',
         {'name': 'Hijacked'}, format='json')
     assert response.status_code == 403
 
@@ -127,7 +150,7 @@ def test_scim_provision_update_and_deactivate_user():
     owner = get_user_model().objects.create_user(username='scim-owner', password='p')
     organization = owner.organization_memberships.get().organization
     client = authenticated_client(owner, organization)
-    created = client.post('/api/enterprise/scim/v2/Users', {
+    created = client.post('/api/v1/enterprise/scim/v2/Users', {
         'userName': 'scim-user', 'emails': [{'value': 'old@example.com'}],
         'roles': [{'value': Membership.Role.OPERATOR}],
     }, format='json')
@@ -136,7 +159,7 @@ def test_scim_provision_update_and_deactivate_user():
     assert not user.has_usable_password()
     membership = Membership.objects.get(organization=organization, user=user)
     assert membership.role == Membership.Role.OPERATOR
-    updated = client.patch(f'/api/enterprise/scim/v2/Users/{user.id}', {
+    updated = client.patch(f'/api/v1/enterprise/scim/v2/Users/{user.id}', {
         'schemas': ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         'Operations': [{'op': 'replace', 'path': 'active', 'value': False}],
     }, format='json')
@@ -155,7 +178,7 @@ def test_connector_rejects_private_network(monkeypatch):
         (2, 1, 6, '', ('127.0.0.1', 443)),
     ])
     response = authenticated_client(owner, organization).post(
-        f'/api/enterprise/connectors/{connector.id}/invoke/', {'event': 'test'}, format='json')
+        f'/api/v1/enterprise/connectors/{connector.id}/invoke/', {'event': 'test'}, format='json')
     assert response.status_code == 403
 
 
@@ -163,7 +186,7 @@ def test_schedule_requires_valid_cron_expression():
     owner = get_user_model().objects.create_user(username='cron-owner', password='p')
     organization = owner.organization_memberships.get().organization
     response = authenticated_client(owner, organization).post(
-        '/api/enterprise/automations/', {
+        '/api/v1/enterprise/automations/', {
             'name': 'bad cron', 'trigger_type': 'schedule', 'target_type': 'agent',
             'target_id': '1', 'schedule': 'not cron',
         }, format='json')
@@ -178,11 +201,11 @@ def test_viewer_can_read_but_cannot_update_governance_and_quota():
     Membership.objects.create(organization=organization, user=viewer,
                               role=Membership.Role.VIEWER)
     client = authenticated_client(viewer, organization)
-    assert client.get('/api/enterprise/governance/').status_code == 200
-    assert client.get('/api/enterprise/quota/').status_code == 200
-    assert client.patch('/api/enterprise/governance/current/', {'export_enabled': True},
+    assert client.get('/api/v1/enterprise/governance/').status_code == 200
+    assert client.get('/api/v1/enterprise/quota/').status_code == 200
+    assert client.patch('/api/v1/enterprise/governance/current/', {'export_enabled': True},
                         format='json').status_code == 403
-    assert client.patch('/api/enterprise/quota/current/', {'hard_limit': False},
+    assert client.patch('/api/v1/enterprise/quota/current/', {'hard_limit': False},
                         format='json').status_code == 403
 
 
@@ -196,8 +219,8 @@ def test_organization_request_rate_limit_is_enforced(monkeypatch):
     quota.requests_per_minute = 1
     quota.save(update_fields=['requests_per_minute'])
     client = authenticated_client(user, organization)
-    assert client.get('/api/enterprise/providers/').status_code == 200
-    response = client.get('/api/enterprise/providers/')
+    assert client.get('/api/v1/enterprise/providers/').status_code == 200
+    response = client.get('/api/v1/enterprise/providers/')
     assert response.status_code == 429
     cache.clear()
 
@@ -206,12 +229,12 @@ def test_api_key_accepts_future_expiration_and_rejects_past():
     user = get_user_model().objects.create_user(username='expiring-key', password='p')
     client = authenticated_client(user)
     future = (timezone.now() + timezone.timedelta(days=1)).isoformat()
-    created = client.post('/api/auth/me/generate-api-key/', {
+    created = client.post('/api/v1/auth/me/generate-api-key/', {
         'name': 'temporary', 'expires_at': future}, format='json')
     assert created.status_code == 201
     assert created.data['expires_at'] is not None
     past = (timezone.now() - timezone.timedelta(days=1)).isoformat()
-    rejected = client.post('/api/auth/me/generate-api-key/', {
+    rejected = client.post('/api/v1/auth/me/generate-api-key/', {
         'name': 'expired', 'expires_at': past}, format='json')
     assert rejected.status_code == 400
 
@@ -224,9 +247,12 @@ def test_oidc_exchange_is_single_use():
         'user_id': user.id, 'access': str(refresh.access_token), 'refresh': str(refresh),
     }, timeout=60)
     client = APIClient()
-    assert client.post('/api/enterprise/sso/exchange', {'exchange': 'one-time'},
-                       format='json').status_code == 200
-    assert client.post('/api/enterprise/sso/exchange', {'exchange': 'one-time'},
+    response = client.post('/api/v1/enterprise/sso/exchange', {'exchange': 'one-time'},
+                           format='json')
+    assert response.status_code == 200
+    assert 'refresh' not in response.data['tokens']
+    assert response.cookies['creation_refresh']['httponly']
+    assert client.post('/api/v1/enterprise/sso/exchange', {'exchange': 'one-time'},
                        format='json').status_code == 400
 
 
@@ -239,7 +265,7 @@ def test_oidc_login_uses_pkce_and_state(monkeypatch):
     monkeypatch.setattr('apps.enterprise.sso._discovery', lambda _provider: {
         'authorization_endpoint': 'https://id.example.com/authorize',
     })
-    response = APIClient().get(f'/api/enterprise/sso/oidc/{provider.id}/login')
+    response = APIClient().get(f'/api/v1/enterprise/sso/oidc/{provider.id}/login')
     assert response.status_code == 302
     assert 'code_challenge=' in response.url
     assert 'state=' in response.url
@@ -252,8 +278,8 @@ def test_public_sso_discovery_matches_exact_domain_only():
         organization=organization, name='corp login', protocol='oidc',
         issuer='https://id.example.com', client_id='client', domains=['example.com'])
     client = APIClient()
-    response = client.get('/api/enterprise/sso/discovery', {'domain': 'example.com'})
+    response = client.get('/api/v1/enterprise/sso/discovery', {'domain': 'example.com'})
     assert response.status_code == 200
     assert response.data[0]['id'] == provider.id
-    assert client.get('/api/enterprise/sso/discovery', {
+    assert client.get('/api/v1/enterprise/sso/discovery', {
         'domain': 'evil-example.com'}).data == []

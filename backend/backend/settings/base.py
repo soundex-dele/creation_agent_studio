@@ -191,6 +191,8 @@ EXECUTION_CHECKPOINT_MAX_BYTES = config(
     'EXECUTION_CHECKPOINT_MAX_BYTES', default=1048576, cast=int)
 EXECUTION_WORKFLOW_MAX_PARALLELISM = config(
     'EXECUTION_WORKFLOW_MAX_PARALLELISM', default=4, cast=int)
+EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS = config(
+    'EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS', default=1.0, cast=float)
 REQUIRED_EXECUTION_WORKER_POOLS = tuple(
     value.strip()
     for value in config('REQUIRED_EXECUTION_WORKER_POOLS', default='').split(',')
@@ -348,6 +350,19 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+# Browser refresh tokens never need to be readable by JavaScript. The access
+# token remains short lived and in memory; this cookie only reaches auth URLs.
+JWT_REFRESH_COOKIE_NAME = config(
+    'JWT_REFRESH_COOKIE_NAME', default='creation_refresh')
+JWT_REFRESH_COOKIE_PATH = config(
+    'JWT_REFRESH_COOKIE_PATH', default='/api/v1/')
+JWT_REFRESH_COOKIE_SECURE = config(
+    'JWT_REFRESH_COOKIE_SECURE', default=not DEBUG, cast=bool)
+JWT_REFRESH_COOKIE_SAMESITE = config(
+    'JWT_REFRESH_COOKIE_SAMESITE', default='Strict')
+JWT_REFRESH_COOKIE_MAX_AGE = config(
+    'JWT_REFRESH_COOKIE_MAX_AGE', default=7 * 24 * 3600, cast=int)
 
 # Logging
 LOGGING = {

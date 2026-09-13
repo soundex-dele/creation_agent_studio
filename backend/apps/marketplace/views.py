@@ -67,7 +67,7 @@ class MarketViewSet(viewsets.GenericViewSet):
         if not query:
             return Response({'detail': 'Please provide search keyword'}, status=status.HTTP_400_BAD_REQUEST)
         templates = Template.objects.filter(
-            Q(title__icontains=query) | Q(description__icontains=query) | Q(tags__icontains=query),
+            Q(title__icontains=query) | Q(summary__icontains=query) | Q(tags__icontains=query),
             status='published'
         )[:20]
         serializer = TemplateListSerializer(templates, many=True)

@@ -3,6 +3,7 @@ Models for conversations app.
 """
 from django.db import models
 from apps.users.models import User
+from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class Conversation(models.Model):
@@ -30,6 +31,8 @@ class Conversation(models.Model):
     working_directory = models.CharField(max_length=1000, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = TenantOwnedQuerySet.as_manager()
 
     class Meta:
         ordering = ['-updated_at']

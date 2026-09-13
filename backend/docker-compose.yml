@@ -1,9 +1,22 @@
 services:
+  migrate:
+    build: .
+    restart: "no"
+    command: python manage.py migrate --noinput
+    env_file: ${BACKEND_ENV_FILE:-.env}
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   web:
     build: .
     restart: unless-stopped
-    command: sh -c "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8080 backend.asgi:application"
-    env_file: .env
+    command: daphne -b 0.0.0.0 -p 8080 backend.asgi:application
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -23,8 +36,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz/"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -32,8 +47,9 @@ services:
   agent-worker:
     build: .
     restart: unless-stopped
+    init: true
     command: python manage.py run_execution_coordinator --worker-pool agent
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -49,6 +65,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "agent"]
       interval: 15s
@@ -58,8 +76,9 @@ services:
   media-worker:
     build: .
     restart: unless-stopped
+    init: true
     command: python manage.py run_execution_coordinator --worker-pool media
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -75,6 +94,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "media"]
       interval: 15s
@@ -84,8 +105,9 @@ services:
   workflow-worker:
     build: .
     restart: unless-stopped
+    init: true
     command: python manage.py run_execution_coordinator --worker-pool workflow
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -101,6 +123,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "workflow"]
       interval: 15s
@@ -111,7 +135,7 @@ services:
     build: .
     restart: unless-stopped
     command: python manage.py run_automation_scheduler
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -121,6 +145,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--scheduler"]
       interval: 30s
@@ -131,7 +157,7 @@ services:
     build: .
     restart: unless-stopped
     command: python manage.py enforce_retention --loop --poll-interval 3600
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings.production
       DB_HOST: postgres
@@ -146,6 +172,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--maintenance"]
       interval: 60s
@@ -153,7 +181,7 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:14
+    image: postgres:16-alpine
     restart: unless-stopped
     container_name: creation_studio_postgres
     environment:
@@ -163,8 +191,6 @@ services:
       APP_DB_NAME: ${DB_NAME:?DB_NAME must be configured}
       APP_DB_USER: ${DB_USER:?DB_USER must be configured}
       APP_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be configured}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init-app-db.sh:/docker-entrypoint-initdb.d/10-app-db.sh:ro
@@ -175,11 +201,9 @@ services:
       retries: 5
 
   redis:
-    image: redis:7
+    image: redis:7.4-alpine
     restart: unless-stopped
     container_name: creation_studio_redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:

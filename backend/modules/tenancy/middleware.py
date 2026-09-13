@@ -8,7 +8,7 @@ from .database import set_local_organization
 
 
 ORGANIZATION_PATH = re.compile(
-    r"^/api/organizations/(?P<organization_id>[0-9a-fA-F-]{36})(?:/|$)"
+    r"^/api/v1/organizations/(?P<organization_id>[0-9a-fA-F-]{36})(?:/|$)"
 )
 
 

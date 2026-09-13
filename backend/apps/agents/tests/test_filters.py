@@ -39,33 +39,33 @@ class AgentFilterTest(TestCase):
         )
 
     def test_search_by_name(self):
-        response = self.client.get('/api/agents/', {'search': '脚本'})
+        response = self.client.get('/api/v1/agents/', {'search': '脚本'})
         self.assertEqual(response.status_code, 200)
         results = response.data['results']
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['name'], '视频脚本生成器')
 
     def test_search_by_description(self):
-        response = self.client.get('/api/agents/', {'search': '种草'})
+        response = self.client.get('/api/v1/agents/', {'search': '种草'})
         self.assertEqual(response.status_code, 200)
         results = response.data['results']
         self.assertEqual(len(results), 1)
 
     def test_filter_by_category_slug(self):
-        response = self.client.get('/api/agents/', {'category': 'video'})
+        response = self.client.get('/api/v1/agents/', {'category': 'video'})
         self.assertEqual(response.status_code, 200)
         results = response.data['results']
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['name'], '视频脚本生成器')
 
     def test_search_returns_empty_for_no_match(self):
-        response = self.client.get('/api/agents/', {'search': '不存在的智能体'})
+        response = self.client.get('/api/v1/agents/', {'search': '不存在的智能体'})
         self.assertEqual(response.status_code, 200)
         results = response.data['results']
         self.assertEqual(len(results), 0)
 
     def test_combined_search_and_filter(self):
-        response = self.client.get('/api/agents/', {'search': '视频', 'category': 'video'})
+        response = self.client.get('/api/v1/agents/', {'search': '视频', 'category': 'video'})
         self.assertEqual(response.status_code, 200)
         results = response.data['results']
         self.assertEqual(len(results), 1)
@@ -76,7 +76,7 @@ class AgentFilterTest(TestCase):
         Membership.objects.create(organization=organization, user=self.user,
                                   role=Membership.Role.VIEWER)
         self.client.credentials(HTTP_X_ORGANIZATION_ID=str(organization.id))
-        response = self.client.post('/api/agents/', {
+        response = self.client.post('/api/v1/agents/', {
             'category': self.cat_video.id, 'name': 'Blocked', 'slug': 'blocked-agent',
             'description': 'x', 'system_prompt': 'x', 'is_public': False,
         }, format='json')
@@ -99,7 +99,7 @@ class AgentFilterTest(TestCase):
 
         self.client.credentials(HTTP_X_ORGANIZATION_ID=str(organization.id))
         response = self.client.patch(
-            f'/api/agents/{agent.id}/',
+            f'/api/v1/agents/{agent.id}/',
             {'description': 'unauthorized', 'system_prompt': 'x'},
             format='json',
         )
@@ -114,7 +114,7 @@ class AgentFilterTest(TestCase):
         mine.organization = organization
         mine.save(update_fields=['organization'])
         self.client.credentials(HTTP_X_ORGANIZATION_ID=str(organization.id))
-        response = self.client.get('/api/agents/', {'mine': '1'})
+        response = self.client.get('/api/v1/agents/', {'mine': '1'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([item['id'] for item in response.data['results']], [mine.id])
 
@@ -127,7 +127,7 @@ class AgentFilterTest(TestCase):
             name='故事结构',
             visibility=Skill.Visibility.ORGANIZATION,
         )
-        response = self.client.post('/api/agents/', {
+        response = self.client.post('/api/v1/agents/', {
             'category': self.cat_write.id,
             'name': '故事助手',
             'slug': 'story-helper',
@@ -145,12 +145,12 @@ class AgentFilterTest(TestCase):
             str(skill.id),
         )
 
-        detail = self.client.get(f'/api/agents/{agent.id}/')
+        detail = self.client.get(f'/api/v1/agents/{agent.id}/')
         self.assertTrue(detail.data['can_edit'])
         self.assertTrue(detail.data['can_delete'])
         self.assertEqual(detail.data['skill_bindings'][0]['name'], '故事结构')
 
-        response = self.client.patch(f'/api/agents/{agent.id}/', {
+        response = self.client.patch(f'/api/v1/agents/{agent.id}/', {
             'system_prompt': '你是一位资深故事结构顾问。',
             'skill_ids': [],
         }, format='json')
@@ -160,7 +160,7 @@ class AgentFilterTest(TestCase):
         self.assertEqual(agent.draft.content['system_prompt'], '你是一位资深故事结构顾问。')
         self.assertEqual(agent.draft.content['skill_bindings'], [])
 
-        response = self.client.delete(f'/api/agents/{agent.id}/')
+        response = self.client.delete(f'/api/v1/agents/{agent.id}/')
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Agent.objects.filter(id=agent.id).exists())
 
@@ -173,7 +173,7 @@ class AgentFilterTest(TestCase):
             name='私有技能',
             visibility=Skill.Visibility.PRIVATE,
         )
-        response = self.client.post('/api/agents/', {
+        response = self.client.post('/api/v1/agents/', {
             'category': self.cat_write.id,
             'name': 'Invalid Skill Agent',
             'slug': 'invalid-skill-agent',
@@ -214,7 +214,7 @@ class AgentFilterTest(TestCase):
                 'agent_bindings': [{'agent_id': agent.id, 'is_default': True}],
             })
 
-        response = self.client.delete(f'/api/agents/{agent.id}/')
+        response = self.client.delete(f'/api/v1/agents/{agent.id}/')
 
         self.assertEqual(response.status_code, 409)
         self.assertTrue(Agent.objects.filter(id=agent.id).exists())

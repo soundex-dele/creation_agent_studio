@@ -17,7 +17,7 @@ class RemovedConversationStreamTest(TestCase):
 
     def test_conversation_does_not_expose_a_second_stream_implementation(self):
         response = self.client.post(
-            f"/api/conversations/{self.conversation.id}/stream/",
+            f"/api/v1/conversations/{self.conversation.id}/stream/",
             {"message": "hello"},
             format="json",
             HTTP_X_ORGANIZATION_ID=str(self.organization.id),

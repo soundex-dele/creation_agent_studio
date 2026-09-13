@@ -68,10 +68,10 @@ Redis 只承担通知和进程心跳，不是执行事实源。Run、RunAttempt 
 Application 写入只有组织级 Catalog API：
 
 ```text
-/api/organizations/{organization_id}/applications...
+/api/v1/organizations/{organization_id}/applications...
 ```
 
-`/api/apps/` 只保留只读发现和少量非 CRUD 工具能力，不再创建、修改或删除 Application，也不再从 Application 主表向 Draft 单向同步。运行定义的唯一可变来源是 Draft，唯一可执行来源是 Deployment 指向的 Revision。
+`/api/v1/apps/` 只保留只读发现和少量非 CRUD 工具能力，不再创建、修改或删除 Application，也不再从 Application 主表向 Draft 单向同步。运行定义的唯一可变来源是 Draft，唯一可执行来源是 Deployment 指向的 Revision。
 
 ### 2.3 Execution
 
@@ -164,12 +164,15 @@ Conversation Store 复用 `entities/run` 的 sequencer、reducer 和 snapshot �
 - 组织路径、资源 Organization 和 Membership 必须一致。
 - Application、Agent、Skill 的写操作校验组织角色；删除要求 Owner/Admin。
 - PostgreSQL Catalog 和 Execution 租户表启用并强制 RLS。
+- Agent、Application、Skill、Project、Conversation、Workflow、Template 及其租户子表也启用并强制 RLS；全局/已发布内容只允许跨租户读取，写策略仍严格限制为当前租户。Project 的 Organization 已改为必填，迁移会为历史记录回填工作区。
 - Scheduler、HTTP 请求与 Execution Worker 在访问上述表前均设置数据库租户上下文。
 - 生产 Compose 使用独立应用数据库账号，显式设置 `NOSUPERUSER` 和 `NOBYPASSRLS`；管理员账号只用于初始化数据库。
 - Revision 只能选择服务端注册的 executor key，不能通过 JSON 注入 Python import path。
 - Artifact 使用短期签名访问，且本地 object key 必须位于配置根目录。
 - Run 入队时执行并冻结配额、模型 allowlist、Skill allow/block、递归输入脱敏/禁词策略；成功输出在落库前再次执行递归 guardrail。需要人工批准工具调用时，策略会传递到 Codex/GraphFlow adapter。
 - 共享模块对产品 App 的依赖由 AST 架构测试形成可执行白名单；新增跨边界 import 必须显式评审。
+- 所有产品路由只允许出现在 `/api/v1` 下；架构测试阻止非版本化产品入口重新出现。
+- 浏览器只在内存保存 access token，refresh token 仅通过 `HttpOnly`、`SameSite=Strict` Cookie 轮换；SSE 与普通 REST 共用单次刷新协调器并从原 sequence 恢复。
 
 ## 6. 部署与可观测性
 
@@ -178,6 +181,7 @@ Conversation Store 复用 `entities/run` 的 sequencer、reducer 和 snapshot �
 | 进程 | 职责 |
 | --- | --- |
 | web | Django ASGI、REST、SSE |
+| migrate | 启动前一次性执行数据库迁移 |
 | agent-worker | Agent Run |
 | media-worker | Media Run |
 | workflow-worker | Workflow Run |
@@ -188,11 +192,13 @@ Conversation Store 复用 `entities/run` 的 sequencer、reducer 和 snapshot �
 
 Coordinator 每 5 秒写入 Worker Pool 心跳，Scheduler 和 Maintenance 也写入带 TTL 的心跳。`/readyz/` 在生产配置下同时校验数据库、Redis、三个 Worker Pool 和 Scheduler；Compose 对每个后台进程也配置了心跳健康检查。
 
-所有 Compose 运行进程挂载同一个 `runtime_data:/data` volume，Artifact、Agent workspace 和上传媒体不会再被困在单个容器的可写层。Maintenance 周期性按组织策略清理旧数据、过期幂等记录和终态 Run，数据库删除成功后才删除对应文件；保留的旧 RunEvent 会压缩为可恢复快照。
+所有 Compose 运行进程挂载同一个 `runtime_data:/data` volume，Artifact、Agent workspace 和上传媒体不会再被困在单个容器的可写层。Maintenance 周期性按组织策略清理旧数据、过期幂等记录和终态 Run，数据库删除成功后才删除对应文件；保留的旧 RunEvent 会压缩为可恢复快照。Web 不再在启动命令中并发执行迁移，而是等待唯一的 `migrate` 服务成功；数据库与 Redis 仅在 Compose 内网开放。
 
 Worker 将活跃组织列表短期缓存并轮转扫描起点，减少高频全表读取并改善租户公平性；单进程并发子进程数可通过环境变量配置。
 
 Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触发器 ID + 分钟时间桶”作为 Run 幂等键，多 Scheduler 副本不会为同一时刻重复创建 Run。
+
+审计中间件会限制请求 ID 和字段长度、校验来源 IP，并在独立数据库保存点中写入 AuditLog。即使审计存储异常，也不会污染外围事务、造成接口返回成功但业务写入被回滚。
 
 ## 7. 破坏性迁移影响
 
@@ -208,32 +214,33 @@ Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触�
 
 ## 8. 当前约束
 
-本轮已直接替换 REST 双入口、顺序 Workflow、不可达的交互 checkpoint 和单一大前端包，没有保留旧实现。当前仍需明确的运行约束是：
+本轮已直接替换 REST 双入口、顺序 Workflow、不可达的交互 checkpoint 和单一大前端包，没有保留旧实现。以下是有意保留的能力边界，不是当前实现缺陷：
 
 1. Django 是模块化单体，Catalog、Execution、Tenancy 与产品 App 仍有少量必要集成边；这些边已由架构测试精确锁定，但还不是可独立部署的服务边界。
 2. SQLite 只用于单进程本地开发和测试；多 Worker、RLS、`skip_locked` 与生产一致性验证必须使用 PostgreSQL。生产配置默认且仅支持 PostgreSQL 部署形态。
 3. GraphFlow 只有在其 SDK 返回 `input_request`/`pending_question` 时才能进入 durable suspend；SDK 本身不暴露交互请求时，平台无法从最终 completion 反向推断问题。
 4. SkillDraft / SkillRevision 模型已存在，但当前 Skill 管理接口仍直接维护数据库 Skill Catalog，尚没有独立 Skill Deployment；不要把它当作已完成的三阶段发布链路。
 5. `runtime_data` 解决的是单机 Compose 多容器共享，不是跨节点对象存储。扩展到多主机前应把 Artifact writer 抽象为 S3/MinIO，并保留当前受控下载协议。
-6. Worker 的组织扫描已降低频率并增加轮转公平性，但租户规模继续增长时仍应演进为全局可领取队列或安全的数据库 claim 存储过程。
-7. 当前指标以数据库记录和健康心跳为主；下一阶段应补 OpenTelemetry trace/metrics，并把 RunTrace 与 durable Run 建立规范关联。
-8. Evaluation 尚未实际执行目标 Revision，也未成为生产 Deployment 的强制质量门禁。
+6. Workflow 根 Run 以可配置的低频轮询等待 durable child Run，因此执行期间会占用一个 Workflow 子进程；当前并发模型有界，扩展到大量长工作流前应改为 child 终态事件唤醒根 Run。
+7. Worker 的组织扫描已降低频率、增加轮转公平性；全局 reaper/过期输入扫描使用短租约单领导者。租户规模继续增长时仍应演进为全局可领取队列或安全的数据库 claim 存储过程。
+8. 当前指标以数据库记录和健康心跳为主；下一阶段应补 OpenTelemetry trace/metrics，并把 RunTrace 与 durable Run 建立规范关联。
+9. Evaluation 尚未实际执行目标 Revision，也未成为生产 Deployment 的强制质量门禁。
 
 ## 9. 后续演进顺序
 
 1. 完成 Skill Draft → immutable Revision → Deployment 的公开 API，并让 Run 只引用已部署的 Skill Revision。
 2. 抽象 Artifact object writer，先实现 S3/MinIO，再支持多机 Worker 和生命周期存储策略。
-3. 将租户轮询 claim 演进为全局公平队列，同时保留 PostgreSQL lease/fencing 作为最终一致性保护。
-4. 接入 OpenTelemetry，统一 Run、Attempt、Provider 调用、Usage 与审计 correlation ID。
-5. 让 Evaluation 执行真实目标 Revision，并在 production deploy/rollback 流程中实施质量门禁。
-6. 继续收敛前端 feature slice 与 OpenAPI 类型生成，降低手写接口类型和页面 Store 耦合。
+3. 把 Workflow 根 Run 的 child 状态轮询改为终态事件唤醒，使长时间等待不占用 Worker 子进程。
+4. 将租户轮询 claim 演进为全局公平队列，同时保留 PostgreSQL lease/fencing 作为最终一致性保护。
+5. 接入 OpenTelemetry，统一 Run、Attempt、Provider 调用、Usage 与审计 correlation ID。
+6. 让 Evaluation 执行真实目标 Revision，并在 production deploy/rollback 流程中实施质量门禁。
+7. 继续收敛前端 feature slice 与 OpenAPI 类型生成，降低手写接口类型和页面 Store 耦合。
 
 ## 10. 验证结果
 
 - Django system check：通过。
 - `makemigrations --check --dry-run`：无遗漏模型变化。
-- 后端全量测试基线：150 passed，4 skipped；最终边界修改的定向回归：39 passed，随后 Artifact/Retention 收尾回归：11 passed。
-- 前端全量测试：22 passed。
+- 后端与前端测试数字以当前 CI 运行结果为准，避免在文档中保存会过期的快照。
 - TypeScript 与 Vite 生产构建：通过。
 - 前端已按页面和第三方组件拆包。
-- CI 使用 PostgreSQL 14 运行 Django check、迁移检查和后端全量测试，并独立运行前端 lint、test、build。
+- CI 使用 PostgreSQL 16 运行 Django check、迁移检查、非特权 `NOBYPASSRLS` 应用账号迁移、生产 `check --deploy`、后端全量测试与生产镜像构建，并独立运行前端 lint、test、build 和生产镜像构建。

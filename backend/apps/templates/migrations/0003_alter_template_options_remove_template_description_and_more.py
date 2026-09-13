@@ -13,6 +13,8 @@ def discard_legacy_template_data(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
 
     dependencies = [
         ('templates', '0002_template_organization'),

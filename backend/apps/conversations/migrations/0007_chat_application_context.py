@@ -44,6 +44,8 @@ def preserve_chat_context_and_memberships(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ('applications', '0006_chat_application_subtype'),
         ('conversations', '0006_require_organization_and_message_run'),

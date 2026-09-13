@@ -27,6 +27,8 @@ def migrate_workflow_origins(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ('applications', '0006_chat_application_subtype'),
         ('enterprise', '0005_external_identity'),
@@ -51,7 +53,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='project',
             constraint=models.CheckConstraint(
-                check=models.Q(
+                condition=models.Q(
                     ('application__isnull', True),
                     ('workflow__isnull', True),
                     _connector='OR',

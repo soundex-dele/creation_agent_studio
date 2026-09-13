@@ -19,6 +19,7 @@ from .serializers import (
 )
 from .models import User
 from .models import UserAPIKey
+from .session import clear_refresh_cookie, refresh_cookie_name, set_refresh_cookie
 
 
 class RegisterView(generics.CreateAPIView):
@@ -35,13 +36,13 @@ class RegisterView(generics.CreateAPIView):
         # 生成 JWT token
         refresh = RefreshToken.for_user(user)
 
-        return Response({
+        response = Response({
             'user': UserSerializer(user).data,
             'tokens': {
-                'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }
         }, status=status.HTTP_201_CREATED)
+        return set_refresh_cookie(response, refresh)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -66,13 +67,34 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         refresh = RefreshToken.for_user(user)
 
-        return Response({
+        response = Response({
             'user': UserSerializer(user).data,
             'tokens': {
-                'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }
         })
+        return set_refresh_cookie(response, refresh)
+
+
+class BrowserTokenRefreshView(TokenRefreshView):
+    """Rotate the browser refresh token without exposing it to JavaScript."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.data.get('refresh') or request.COOKIES.get(
+            refresh_cookie_name())
+        if not refresh_token:
+            return Response(
+                {'detail': 'Refresh token is required.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        serializer = self.get_serializer(data={'refresh': refresh_token})
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        rotated_refresh = payload.pop('refresh', refresh_token)
+        response = Response(payload, status=status.HTTP_200_OK)
+        return set_refresh_cookie(response, rotated_refresh)
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -175,10 +197,12 @@ def logout_view(request):
     to blacklist it.
     """
     try:
-        refresh_token = request.data.get('refresh')
+        refresh_token = request.data.get('refresh') or request.COOKIES.get(
+            refresh_cookie_name())
         if refresh_token:
             token = RefreshToken(refresh_token)
             token.blacklist()
-        return Response({'detail': '登出成功'})
+        return clear_refresh_cookie(Response({'detail': '登出成功'}))
     except Exception:
-        return Response({'detail': '登出失败'}, status=status.HTTP_400_BAD_REQUEST)
+        return clear_refresh_cookie(Response(
+            {'detail': '登出失败'}, status=status.HTTP_400_BAD_REQUEST))

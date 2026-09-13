@@ -1,5 +1,6 @@
 from django.db import models
 from apps.users.models import User
+from modules.tenancy.models import TenantOwnedQuerySet
 
 class Project(models.Model):
     STATUS_CHOICES = [
@@ -11,7 +12,7 @@ class Project(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
     organization = models.ForeignKey(
-        'enterprise.Organization', on_delete=models.CASCADE, null=True, blank=True,
+        'enterprise.Organization', on_delete=models.CASCADE,
         related_name='projects'
     )
     application = models.ForeignKey(
@@ -29,12 +30,14 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = TenantOwnedQuerySet.as_manager()
+
     class Meta:
         ordering = ['-updated_at']
         db_table = 'projects'
         constraints = [models.CheckConstraint(
-            check=(models.Q(application__isnull=True) |
-                   models.Q(workflow__isnull=True)),
+            condition=(models.Q(application__isnull=True) |
+                       models.Q(workflow__isnull=True)),
             name='project_has_single_origin')]
 
     def __str__(self):

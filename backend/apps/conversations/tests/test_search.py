@@ -22,17 +22,17 @@ class ConversationSearchTest(TestCase):
             user=self.user, organization=organization, title='旅行 Vlog 策划')
 
     def test_search_by_title(self):
-        response = self.client.get('/api/conversations/', {'search': '咖啡'})
+        response = self.client.get('/api/v1/conversations/', {'search': '咖啡'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['title'], '咖啡制作技巧')
 
     def test_search_no_match(self):
-        response = self.client.get('/api/conversations/', {'search': '不存在的对话'})
+        response = self.client.get('/api/v1/conversations/', {'search': '不存在的对话'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 0)
 
     def test_list_without_search(self):
-        response = self.client.get('/api/conversations/')
+        response = self.client.get('/api/v1/conversations/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 3)

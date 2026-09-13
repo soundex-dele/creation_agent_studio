@@ -20,6 +20,8 @@ def convert_ordered_steps(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [("workflows", "0003_remove_workflowsteprun_workflow_run_and_more")]
 
     operations = [
@@ -54,7 +56,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="workflowstep",
             constraint=models.CheckConstraint(
-                check=models.Q(max_attempts__gte=1),
+                condition=models.Q(max_attempts__gte=1),
                 name="workflow_step_attempts_at_least_one",
             ),
         ),

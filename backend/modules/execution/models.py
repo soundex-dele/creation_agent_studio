@@ -104,11 +104,11 @@ class Run(TenantOwnedModel):
         ordering = ("-priority", "created_at", "id")
         constraints = [
             models.CheckConstraint(
-                check=models.Q(max_attempts__gte=1),
+                condition=models.Q(max_attempts__gte=1),
                 name="run_max_attempts_at_least_one",
             ),
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(
                         status="waiting_input",
                         pending_input_request_id__isnull=False,
@@ -263,7 +263,7 @@ class RunEventSnapshot(TenantOwnedModel):
         db_table = "run_event_snapshots"
         constraints = [
             models.CheckConstraint(
-                check=models.Q(through_sequence__gte=1),
+                condition=models.Q(through_sequence__gte=1),
                 name="run_snapshot_sequence_positive",
             )
         ]

@@ -199,7 +199,7 @@ class PublicIdentityDiscoveryView(APIView):
             'id': provider.id, 'name': provider.name,
             'organization': provider.organization.name,
             'login_url': request.build_absolute_uri(
-                f'/api/enterprise/sso/oidc/{provider.id}/login'),
+                f'/api/v1/enterprise/sso/oidc/{provider.id}/login'),
         } for provider in providers if domain in {
             str(value).lower() for value in provider.domains}]
         return Response(values)

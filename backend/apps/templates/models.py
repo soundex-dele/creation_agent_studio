@@ -1,6 +1,7 @@
 from django.db import models
 
 from apps.users.models import User
+from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class TemplateCategory(models.Model):
@@ -76,6 +77,8 @@ class Template(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     view_count = models.PositiveIntegerField(default=0)
+
+    objects = TenantOwnedQuerySet.as_manager()
 
     class Meta:
         ordering = ['-is_featured', '-updated_at']
