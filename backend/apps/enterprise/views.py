@@ -22,7 +22,7 @@ from .serializers import (
     OrganizationSerializer, ProviderConfigSerializer, QuotaPolicySerializer,
     RunTraceSerializer, SecretReferenceSerializer, UsageRecordSerializer,
 )
-from .services import dispatch_automation, index_document, run_evaluation, search_knowledge
+from .services import dispatch_automation, index_document, search_knowledge, start_evaluation
 from .tenancy import (
     get_single_tenant_organization,
     provision_single_tenant_user,
@@ -297,11 +297,15 @@ class EvaluationSuiteViewSet(TenantModelViewSet):
     @action(detail=True, methods=['post'])
     def run(self, request, pk=None):
         suite = self.get_object()
-        run = EvaluationRun.objects.create(
-            suite=suite, created_by=request.user, status='pending',
-            target_version=str(request.data.get('target_version') or ''),
-        )
-        run_evaluation(run, request.data.get('outputs') or {})
+        try:
+            run = start_evaluation(
+                suite,
+                request.user,
+                target_version=str(request.data.get('target_version') or ''),
+                environment=str(request.data.get('environment') or 'staging'),
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=422)
         return Response(EvaluationRunSerializer(run).data, status=202)
 
 

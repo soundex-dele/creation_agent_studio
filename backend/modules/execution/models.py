@@ -29,6 +29,7 @@ class Run(TenantOwnedModel):
         QUEUED = "queued", "Queued"
         RUNNING = "running", "Running"
         WAITING_INPUT = "waiting_input", "Waiting for input"
+        WAITING_CHILDREN = "waiting_children", "Waiting for child runs"
         CANCELLING = "cancelling", "Cancelling"
         SUCCEEDED = "succeeded", "Succeeded"
         FAILED = "failed", "Failed"
@@ -136,6 +137,32 @@ class Run(TenantOwnedModel):
                 name="run_claim_idx",
             ),
             models.Index(fields=("parent", "status"), name="run_parent_status_idx"),
+        ]
+
+
+class RunQueueEntry(models.Model):
+    """Global claim index; authoritative execution state remains on ``Run``."""
+
+    run = models.OneToOneField(
+        Run,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="queue_entry",
+    )
+    organization_id = models.UUIDField(db_index=True)
+    worker_pool = models.CharField(max_length=20, db_index=True)
+    executor_key = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    priority = models.SmallIntegerField(default=0)
+    enqueued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "run_queue_entries"
+        ordering = ("-priority", "enqueued_at", "run_id")
+        indexes = [
+            models.Index(
+                fields=("worker_pool", "-priority", "enqueued_at"),
+                name="run_queue_claim_idx",
+            )
         ]
 
 

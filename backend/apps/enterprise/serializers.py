@@ -149,7 +149,7 @@ class EvaluationRunSerializer(serializers.ModelSerializer):
         model = EvaluationRun
         fields = '__all__'
         read_only_fields = ['id', 'created_by', 'created_at', 'finished_at',
-                            'score', 'passed', 'results', 'error']
+                            'execution_run', 'score', 'passed', 'results', 'error']
 
 
 class EvaluationSuiteSerializer(serializers.ModelSerializer):

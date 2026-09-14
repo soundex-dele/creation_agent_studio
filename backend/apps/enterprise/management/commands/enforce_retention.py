@@ -14,7 +14,7 @@ from apps.enterprise.models import (
 from modules.execution.application.event_retention import compact_eligible_runs
 from modules.execution.infrastructure.artifacts import (
     UnsafeArtifactObjectKey,
-    resolve_local_artifact_path,
+    delete_artifact_object,
 )
 from modules.execution.models import IdempotencyRecord, Run
 from modules.tenancy.database import tenant_database_context
@@ -60,7 +60,7 @@ class Command(BaseCommand):
             deleted += deleted_runs
             for object_key in filter(None, object_keys):
                 try:
-                    resolve_local_artifact_path(object_key).unlink(missing_ok=True)
+                    delete_artifact_object(object_key)
                 except (OSError, UnsafeArtifactObjectKey):
                     continue
         return deleted

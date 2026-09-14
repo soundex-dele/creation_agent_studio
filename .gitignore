@@ -46,6 +46,7 @@ node_modules/
 dist/
 dist-ssr/
 coverage/
+contracts/swagger.json
 
 # Editors and operating systems
 .vscode/

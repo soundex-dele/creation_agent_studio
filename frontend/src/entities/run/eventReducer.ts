@@ -11,6 +11,8 @@ const STATUS_BY_EVENT: Record<string, RunStatus> = {
   'run.queued': 'queued',
   'run.started': 'running',
   'run.waiting_input': 'waiting_input',
+  'run.waiting_children': 'waiting_children',
+  'run.dependencies_ready': 'queued',
   'run.cancelling': 'cancelling',
   'run.retry_scheduled': 'queued',
   'run.succeeded': 'succeeded',

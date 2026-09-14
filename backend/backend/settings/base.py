@@ -175,14 +175,36 @@ EXECUTION_CHILD_ADAPTERS = config(
     'EXECUTION_CHILD_ADAPTERS',
     default=(
         '{"agent":{"agent-completion":'
-        '"modules.execution.runtime.builtin:execute_agent_completion"},'
+        '"apps.agents.execution:execute_agent_completion"},'
         '"media":{"batch-transcribe":'
         '"modules.execution.runtime.builtin:execute_batch_transcribe"},'
         '"workflow":{"workflow-dag":'
-        '"modules.execution.runtime.builtin:execute_workflow"}}'
+        '"modules.execution.runtime.builtin:execute_workflow"},'
+        '"evaluation":{"evaluation-suite":'
+        '"apps.enterprise.execution:execute_evaluation"}}'
     ),
     cast=json.loads,
 )
+EXECUTION_DOMAIN_PORT = config(
+    'EXECUTION_DOMAIN_PORT',
+    default='apps.enterprise.execution_port.DjangoExecutionDomainPort',
+)
+CATALOG_DOMAIN_PORT = config(
+    'CATALOG_DOMAIN_PORT',
+    default='apps.applications.catalog_port.DjangoCatalogDomainPort',
+)
+
+# OpenTelemetry remains opt-in locally. Deployed environments can point the
+# OTLP exporter at a collector to retain HTTP and durable-execution spans.
+OTEL_ENABLED = config('OTEL_ENABLED', default=False, cast=bool)
+OTEL_SERVICE_NAME = config(
+    'OTEL_SERVICE_NAME', default='creation-agent-studio-backend')
+OTEL_DEPLOYMENT_ENVIRONMENT = config(
+    'OTEL_DEPLOYMENT_ENVIRONMENT', default='development')
+OTEL_EXPORTER_OTLP_ENDPOINT = config(
+    'OTEL_EXPORTER_OTLP_ENDPOINT', default='')
+OTEL_EXPORTER_OTLP_INSECURE = config(
+    'OTEL_EXPORTER_OTLP_INSECURE', default=False, cast=bool)
 EXECUTION_EVENT_QUEUE_SIZE = config(
     'EXECUTION_EVENT_QUEUE_SIZE', default=1000, cast=int)
 EXECUTION_WORKER_MAX_CHILDREN = config(
@@ -191,8 +213,6 @@ EXECUTION_CHECKPOINT_MAX_BYTES = config(
     'EXECUTION_CHECKPOINT_MAX_BYTES', default=1048576, cast=int)
 EXECUTION_WORKFLOW_MAX_PARALLELISM = config(
     'EXECUTION_WORKFLOW_MAX_PARALLELISM', default=4, cast=int)
-EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS = config(
-    'EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS', default=1.0, cast=float)
 REQUIRED_EXECUTION_WORKER_POOLS = tuple(
     value.strip()
     for value in config('REQUIRED_EXECUTION_WORKER_POOLS', default='').split(',')
@@ -208,6 +228,13 @@ RUN_EVENT_COMPACTION_BATCH_SIZE = config(
 
 ARTIFACT_ROOT = Path(config(
     'ARTIFACT_ROOT', default=str(BASE_DIR / 'artifacts')))
+ARTIFACT_STORAGE_BACKEND = config('ARTIFACT_STORAGE_BACKEND', default='local')
+ARTIFACT_S3_BUCKET = config('ARTIFACT_S3_BUCKET', default='')
+ARTIFACT_S3_PREFIX = config('ARTIFACT_S3_PREFIX', default='')
+ARTIFACT_S3_ENDPOINT_URL = config('ARTIFACT_S3_ENDPOINT_URL', default='')
+ARTIFACT_S3_REGION = config('ARTIFACT_S3_REGION', default='')
+ARTIFACT_S3_ACCESS_KEY = config('ARTIFACT_S3_ACCESS_KEY', default='')
+ARTIFACT_S3_SECRET_KEY = config('ARTIFACT_S3_SECRET_KEY', default='')
 EXECUTION_ARTIFACT_MAX_BYTES = config(
     'EXECUTION_ARTIFACT_MAX_BYTES', default=100 * 1024 * 1024, cast=int)
 ARTIFACT_ACCESS_TTL_SECONDS = config(
@@ -303,6 +330,10 @@ REST_FRAMEWORK = {
         'anon': config('ANON_RATE_LIMIT', default='30/minute'),
         'user': config('USER_RATE_LIMIT', default='300/minute'),
     },
+}
+
+SWAGGER_SETTINGS = {
+    'DEFAULT_INFO': 'backend.schema.api_info',
 }
 
 # Deployed environments keep API throttling enabled. Development overrides

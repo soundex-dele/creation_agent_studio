@@ -4,8 +4,16 @@ from datetime import timedelta
 from django.db import connection, transaction
 from django.utils import timezone
 
-from modules.execution.models import Run, RunAttempt, RunCommand, RunEvent, RunLease
+from modules.execution.models import (
+    Run,
+    RunAttempt,
+    RunCommand,
+    RunEvent,
+    RunLease,
+    RunQueueEntry,
+)
 from modules.execution.application.runs import _publish_event_notification
+from modules.tenancy.database import set_local_organization
 
 
 @dataclass(frozen=True)
@@ -78,6 +86,7 @@ def _claim_locked_run(run, *, worker_id, worker_pool, lease_seconds):
             "next_event_sequence",
         )
     )
+    RunQueueEntry.objects.filter(run=run)._raw_delete(using=RunQueueEntry.objects.db)
     RunEvent.objects.create(
         organization_id=run.organization_id,
         run=run,
@@ -106,20 +115,33 @@ def _claim_locked_run(run, *, worker_id, worker_pool, lease_seconds):
 
 def _claim_postgresql(*, worker_id, worker_pool, lease_seconds, executor_keys):
     with transaction.atomic():
-        run = (
-            Run.objects.select_for_update(skip_locked=True)
-            .queued_for_pool(worker_pool, executor_keys)
-            .first()
+        entries = RunQueueEntry.objects.select_for_update(skip_locked=True).filter(
+            worker_pool=worker_pool,
         )
-        if run is None:
+        if executor_keys is not None:
+            entries = entries.filter(executor_key__in=executor_keys)
+        entry = entries.first()
+        if entry is None:
             claimed = None
         else:
-            claimed = _claim_locked_run(
-                run,
-                worker_id=worker_id,
-                worker_pool=worker_pool,
-                lease_seconds=lease_seconds,
-            )
+            set_local_organization(entry.organization_id)
+            run = Run.objects.select_for_update().filter(pk=entry.run_id).first()
+            if run is None:
+                RunQueueEntry.objects.filter(pk=entry.pk)._raw_delete(
+                    using=RunQueueEntry.objects.db
+                )
+                claimed = None
+            else:
+                claimed = _claim_locked_run(
+                    run,
+                    worker_id=worker_id,
+                    worker_pool=worker_pool,
+                    lease_seconds=lease_seconds,
+                )
+                if claimed is None:
+                    RunQueueEntry.objects.filter(pk=entry.pk)._raw_delete(
+                        using=RunQueueEntry.objects.db
+                    )
     if claimed is not None:
         _publish_event_notification(claimed.run.id, claimed.run.next_event_sequence)
     return claimed
@@ -132,7 +154,11 @@ def _claim_sqlite(*, worker_id, worker_pool, lease_seconds, executor_keys):
     with connection.cursor() as cursor:
         cursor.execute("BEGIN IMMEDIATE")
     try:
-        run = Run.objects.queued_for_pool(worker_pool, executor_keys).first()
+        entries = RunQueueEntry.objects.filter(worker_pool=worker_pool)
+        if executor_keys is not None:
+            entries = entries.filter(executor_key__in=executor_keys)
+        entry = entries.first()
+        run = Run.objects.filter(pk=entry.run_id).first() if entry is not None else None
         claimed = None
         if run is not None:
             claimed = _claim_locked_run(
@@ -141,6 +167,10 @@ def _claim_sqlite(*, worker_id, worker_pool, lease_seconds, executor_keys):
                 worker_pool=worker_pool,
                 lease_seconds=lease_seconds,
             )
+            if claimed is None:
+                RunQueueEntry.objects.filter(pk=entry.pk)._raw_delete(
+                    using=RunQueueEntry.objects.db
+                )
         connection.commit()
         if claimed is not None:
             _publish_event_notification(claimed.run.id, claimed.run.next_event_sequence)

@@ -10,12 +10,24 @@ from .views import (
     OrganizationApplicationsView,
     OrganizationApplicationView,
     OrganizationApplicationRuntimeView,
+    OrganizationSkillDeploymentRollbackView,
+    OrganizationSkillDeploymentView,
+    OrganizationSkillDeploymentsView,
+    OrganizationSkillDraftView,
+    OrganizationSkillRevisionView,
+    OrganizationSkillRevisionsView,
 )
 
 
 app_name = "catalog"
 
 urlpatterns = [
+    path("skills/<uuid:skill_id>/draft", OrganizationSkillDraftView.as_view(), name="skill-draft"),
+    path("skills/<uuid:skill_id>/revisions", OrganizationSkillRevisionsView.as_view(), name="skill-revisions"),
+    path("skills/<uuid:skill_id>/revisions/<uuid:revision_id>", OrganizationSkillRevisionView.as_view(), name="skill-revision-detail"),
+    path("skills/<uuid:skill_id>/deployments", OrganizationSkillDeploymentsView.as_view(), name="skill-deployments"),
+    path("skills/<uuid:skill_id>/deployments/<str:environment>", OrganizationSkillDeploymentView.as_view(), name="skill-deployment"),
+    path("skills/<uuid:skill_id>/deployments/<str:environment>/rollback", OrganizationSkillDeploymentRollbackView.as_view(), name="skill-deployment-rollback"),
     path("applications", OrganizationApplicationsView.as_view(), name="application-list"),
     path(
         "applications/<int:application_id>",

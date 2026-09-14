@@ -1,27 +1,20 @@
 import hashlib
 import json
 import time
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, OperationalError, transaction
-from django.db.models import Q
 from django.utils import timezone
 from jsonschema import SchemaError, ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
 
-from apps.agents.models import Agent
-from apps.applications.models import Application
-from apps.enterprise.services import (
-    apply_input_guardrails,
-    enforce_model_policy,
-    enforce_quota,
-    enforce_skill_policy,
-    execution_governance_snapshot,
-)
 from modules.catalog.models import (
     AgentDeployment,
     ApplicationDeployment,
+    DeploymentEnvironment,
+    SkillDeployment,
 )
 from modules.execution.models import IdempotencyRecord, Run
 
@@ -30,6 +23,7 @@ from .errors import (
     IdempotencyKeyReused,
     InvalidExecutionDefinition,
 )
+from .ports import execution_domain_port
 from .runs import create_run
 
 
@@ -143,17 +137,95 @@ def _skill_policy_keys(bindings):
     return values
 
 
+def freeze_skill_revisions(*, organization_id, environment, content):
+    """Resolve every Skill binding to one immutable deployed revision."""
+
+    dependencies = content.get("dependencies") or {}
+    bindings = content.get("skill_bindings") or dependencies.get("skills") or []
+    if not isinstance(bindings, list):
+        raise InvalidExecutionDefinition("Skill bindings must be a list")
+
+    normalized = []
+    skill_ids = []
+    for index, binding in enumerate(bindings):
+        if isinstance(binding, dict):
+            skill_id = binding.get("skill_id") or binding.get("id")
+            binding_config = dict(binding)
+        else:
+            skill_id = binding
+            binding_config = {"skill_id": str(binding)}
+        try:
+            parsed_id = uuid.UUID(str(skill_id))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise InvalidExecutionDefinition(
+                f"Skill binding at index {index} must contain a valid skill_id"
+            ) from exc
+        normalized.append((parsed_id, binding_config))
+        skill_ids.append(parsed_id)
+
+    if len(skill_ids) != len(set(skill_ids)):
+        raise InvalidExecutionDefinition("Skill bindings must be unique")
+    if not skill_ids:
+        return []
+
+    deployments = {
+        deployment.skill_id: deployment
+        for deployment in SkillDeployment.objects.for_organization(organization_id)
+        .select_related("revision", "skill")
+        .filter(
+            skill_id__in=skill_ids,
+            skill__is_active=True,
+            environment=environment,
+        )
+    }
+    missing = [str(skill_id) for skill_id in skill_ids if skill_id not in deployments]
+    if missing:
+        raise DeploymentUnavailable(
+            f"Skills have no {environment} deployment: {', '.join(missing)}"
+        )
+
+    frozen = []
+    for skill_id, binding in normalized:
+        deployment = deployments[skill_id]
+        revision = deployment.revision
+        if (
+            deployment.organization_id != organization_id
+            or revision.organization_id != organization_id
+            or revision.skill_id != skill_id
+        ):
+            raise InvalidExecutionDefinition(
+                "Skill deployment crosses a skill or organization boundary"
+            )
+        frozen.append(
+            {
+                "skill_id": str(skill_id),
+                "skill_slug": deployment.skill.slug,
+                "binding": binding,
+                "deployment_id": str(deployment.id),
+                "deployment_environment": deployment.environment,
+                "deployment_version": deployment.version,
+                "revision_id": str(revision.id),
+                "revision_no": revision.revision_no,
+                "content_hash": revision.content_hash,
+                "schema_version": revision.schema_version,
+                "content": revision.content,
+            }
+        )
+    return frozen
+
+
 def _enforce_definition_governance(organization, content, effective_config):
+    port = execution_domain_port()
     model = str(
         effective_config.get("model")
         or (content.get("model_config") or {}).get("model")
         or ""
     )
-    enforce_model_policy(organization, model)
+    port.enforce_model_policy(organization, model)
     dependencies = content.get("dependencies") or {}
     skill_bindings = content.get("skill_bindings") or dependencies.get("skills") or []
-    enforce_skill_policy(organization, _skill_policy_keys(skill_bindings))
-    return execution_governance_snapshot(organization)
+    port.enforce_skill_policy(organization, _skill_policy_keys(skill_bindings))
+    return port.governance_snapshot(organization)
 
 
 def _start_once(
@@ -178,15 +250,11 @@ def _start_once(
         return replay, True
 
     with transaction.atomic():
-        application = (
-            Application.objects.for_organization(organization_id)
-            .select_for_update()
-            .filter(pk=application_id, is_active=True)
-            .first()
-        )
+        port = execution_domain_port()
+        application = port.application_for_update(organization_id, application_id)
         if application is None:
             raise DeploymentUnavailable("Application is not available")
-        enforce_quota(application.organization)
+        port.enforce_quota(application.organization)
         deployment = (
             ApplicationDeployment.objects.for_organization(organization_id)
             .select_related("revision")
@@ -221,10 +289,15 @@ def _start_once(
         effective_config = _effective_config(
             revision.content, deployment.config_override
         )
+        skill_revisions = freeze_skill_revisions(
+            organization_id=organization_id,
+            environment=environment,
+            content=revision.content,
+        )
         governance = _enforce_definition_governance(
             application.organization, revision.content, effective_config
         )
-        guarded_input = apply_input_guardrails(application.organization, input_data)
+        guarded_input = port.apply_input_guardrails(application.organization, input_data)
         record = IdempotencyRecord.objects.create(
             organization_id=organization_id,
             actor=actor,
@@ -252,6 +325,7 @@ def _start_once(
                 "config_override": deployment.config_override,
                 "effective_config": effective_config,
                 "governance": governance,
+                "skill_revisions": skill_revisions,
                 "content": revision.content,
             },
             input_data=guarded_input,
@@ -350,11 +424,8 @@ def start_agent_run(
     if replay is not None:
         return replay, True
     with transaction.atomic():
-        agent = Agent.objects.select_for_update().filter(
-            Q(organization_id=organization_id) | Q(is_public=True),
-            pk=agent_id,
-            is_active=True,
-        ).first()
+        port = execution_domain_port()
+        agent = port.agent_for_update(organization_id, agent_id)
         if agent is None:
             raise DeploymentUnavailable("Agent is not available")
         deployment = AgentDeployment.objects.for_organization(
@@ -378,18 +449,22 @@ def start_agent_run(
         executor_key = "agent-completion"
         if executor_key not in registered:
             raise InvalidExecutionDefinition("Agent executor is not registered")
-        from apps.enterprise.models import Organization
-        run_organization = Organization.objects.get(pk=organization_id)
-        enforce_quota(run_organization)
+        run_organization = port.organization(organization_id)
+        port.enforce_quota(run_organization)
         agent_definition = deployment.revision.content
         effective_config = {
             **dict(agent_definition.get("model_config") or {}),
             **dict(deployment.config_override or {}),
         }
+        skill_revisions = freeze_skill_revisions(
+            organization_id=organization_id,
+            environment=environment,
+            content=agent_definition,
+        )
         governance = _enforce_definition_governance(
             run_organization, agent_definition, effective_config
         )
-        guarded_input = apply_input_guardrails(run_organization, input_data)
+        guarded_input = port.apply_input_guardrails(run_organization, input_data)
         record = IdempotencyRecord.objects.create(
             organization_id=organization_id,
             actor=actor,
@@ -416,6 +491,7 @@ def start_agent_run(
                 "agent_definition": agent_definition,
                 "effective_config": effective_config,
                 "governance": governance,
+                "skill_revisions": skill_revisions,
             },
             input_data=guarded_input,
             priority=priority,
@@ -452,14 +528,23 @@ def start_workflow_run(
     if replay is not None:
         return replay, True
     with transaction.atomic():
-        enforce_quota(organization)
+        port = execution_domain_port()
+        port.enforce_quota(organization)
+        frozen_steps = []
         for step in steps:
             content = step.get("content") or {}
             _enforce_definition_governance(
                 organization, content, step.get("effective_config") or {}
             )
-        governance = execution_governance_snapshot(organization)
-        guarded_input = apply_input_guardrails(organization, input_data)
+            frozen_step = dict(step)
+            frozen_step["skill_revisions"] = freeze_skill_revisions(
+                organization_id=organization.id,
+                environment=DeploymentEnvironment.PRODUCTION,
+                content=content,
+            )
+            frozen_steps.append(frozen_step)
+        governance = port.governance_snapshot(organization)
+        guarded_input = port.apply_input_guardrails(organization, input_data)
         replay = _load_replay(
             organization_id=organization.id,
             actor_id=actor.id,
@@ -487,7 +572,7 @@ def start_workflow_run(
             definition_snapshot={
                 "workflow_id": str(workflow_id),
                 "workflow_name": workflow_name,
-                "workflow_steps": steps,
+                "workflow_steps": frozen_steps,
                 "governance": governance,
                 "durable_children": True,
             },

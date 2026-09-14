@@ -2,6 +2,7 @@ export type RunStatus =
   | 'queued'
   | 'running'
   | 'waiting_input'
+  | 'waiting_children'
   | 'cancelling'
   | 'succeeded'
   | 'failed'

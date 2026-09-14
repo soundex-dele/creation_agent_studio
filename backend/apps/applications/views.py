@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
@@ -9,6 +10,7 @@ from rest_framework.response import Response
 
 from apps.enterprise.models import Membership
 from apps.enterprise.permissions import OrganizationRolePermission, resolve_organization
+from modules.catalog.models import SkillDraft
 from .filters import ApplicationFilter
 from .models import (
     Application, ApplicationCategory, Skill,
@@ -80,11 +82,27 @@ class SkillViewSet(viewsets.ModelViewSet):
             Q(organization=organization) | Q(visibility=Skill.Visibility.PUBLIC)
         )
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user,
-                        organization=resolve_organization(
-                            self.request, required=False))
+        organization = resolve_organization(self.request)
+        skill = serializer.save(
+            owner=self.request.user,
+            organization=organization,
+        )
+        SkillDraft.objects.create(
+            organization=organization,
+            skill=skill,
+            updated_by=self.request.user,
+            content={
+                "source_type": skill.source_type,
+                "source_uri": skill.source_uri,
+                "artifact_key": skill.artifact_key,
+                "manifest": skill.manifest,
+                "content_hash": skill.content_hash,
+            },
+        )
 
+    @transaction.atomic
     def perform_update(self, serializer):
         skill = serializer.instance
         membership = getattr(self.request, 'organization_membership', None)
@@ -101,7 +119,22 @@ class SkillViewSet(viewsets.ModelViewSet):
             )
         ):
             raise PermissionDenied('无权修改该 Skill。')
-        serializer.save()
+        definition_fields = {
+            key: value
+            for key, value in serializer.validated_data.items()
+            if key in {
+                "source_type", "source_uri", "artifact_key", "manifest", "content_hash"
+            }
+        }
+        skill = serializer.save()
+        if definition_fields and skill.organization_id is not None:
+            draft = SkillDraft.objects.select_for_update().get(skill=skill)
+            draft.content = {**draft.content, **definition_fields}
+            draft.version += 1
+            draft.updated_by = self.request.user
+            draft.save(
+                update_fields=("content", "version", "updated_by", "updated_at")
+            )
 
     def perform_destroy(self, instance):
         membership = getattr(self.request, 'organization_membership', None)

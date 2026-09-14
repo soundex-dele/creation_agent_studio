@@ -4,6 +4,9 @@ from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
+    SkillDeployment,
+    SkillDraft,
+    SkillRevision,
 )
 from apps.applications.models import Application
 
@@ -132,3 +135,50 @@ class SwitchApplicationDeploymentSerializer(serializers.Serializer):
 
 class RollbackApplicationDeploymentSerializer(serializers.Serializer):
     expected_version = serializers.IntegerField(min_value=1)
+
+
+class SkillDraftSerializer(serializers.ModelSerializer):
+    skill_id = serializers.UUIDField(read_only=True)
+    organization_id = serializers.UUIDField(read_only=True)
+    updated_by_id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = SkillDraft
+        fields = (
+            "id", "organization_id", "skill_id", "content", "version",
+            "updated_by_id", "created_at", "updated_at",
+        )
+
+
+class SkillRevisionSerializer(serializers.ModelSerializer):
+    skill_id = serializers.UUIDField(read_only=True)
+    organization_id = serializers.UUIDField(read_only=True)
+    created_by_id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = SkillRevision
+        fields = (
+            "id", "organization_id", "skill_id", "revision_no",
+            "schema_version", "content", "content_hash", "release_notes",
+            "created_by_id", "created_at",
+        )
+
+
+class SkillDeploymentSerializer(serializers.ModelSerializer):
+    skill_id = serializers.UUIDField(read_only=True)
+    organization_id = serializers.UUIDField(read_only=True)
+    revision_id = serializers.UUIDField(read_only=True)
+    previous_revision_id = serializers.UUIDField(read_only=True, allow_null=True)
+    updated_by_id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = SkillDeployment
+        fields = (
+            "id", "organization_id", "skill_id", "environment", "revision_id",
+            "previous_revision_id", "version", "updated_by_id", "updated_at",
+        )
+
+
+class SwitchSkillDeploymentSerializer(serializers.Serializer):
+    revision_id = serializers.UUIDField()
+    expected_version = serializers.IntegerField(min_value=0)

@@ -19,7 +19,7 @@ import {
   ApplicationRuntimeProvider,
   useApplicationRuntime,
 } from '@/components/Applications/ApplicationRuntimeContext';
-import { useRunStream } from '@/hooks/useRunStream';
+import { useRunStream } from '@/features/run-stream';
 import {
   loadApplicationRuntime,
   type ApplicationRuntimeDescriptor,

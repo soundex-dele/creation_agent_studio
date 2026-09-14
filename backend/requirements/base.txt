@@ -17,6 +17,11 @@ whitenoise==6.6.0
 django-redis==5.4.0
 djangorestframework-simplejwt==5.3.1
 pydantic==2.13.4
+boto3~=1.40.0
+opentelemetry-api~=1.37.0
+opentelemetry-sdk~=1.37.0
+opentelemetry-exporter-otlp-proto-grpc~=1.37.0
+opentelemetry-instrumentation-django==0.58b0
 channels==4.1.0
 daphne==4.1.2
 channels_redis==4.2.1

@@ -7,7 +7,7 @@ from django.test.utils import override_settings
 from apps.users.models import User
 from core.agent_engine.models import LLMResponse, TokenUsage
 from core.llm.factory import build_agent_engine
-from modules.execution.runtime.builtin import execute_agent_completion
+from apps.agents.execution import execute_agent_completion
 
 
 class BuildAgentEngineTest(TestCase):
@@ -31,7 +31,7 @@ class DurableAgentAdapterTest(TestCase):
             "input": {"message": "hi"},
         }
 
-    @patch("core.llm.factory.build_agent_engine")
+    @patch("apps.agents.execution.build_agent_engine")
     def test_success_returns_normalized_output(self, mock_factory):
         engine = MagicMock()
         engine.complete.return_value = LLMResponse(
@@ -44,7 +44,7 @@ class DurableAgentAdapterTest(TestCase):
         self.assertEqual(output["model"], "deepseek-chat")
         sink.emit.assert_any_call("output.delta", {"text": "hello"})
 
-    @patch("core.llm.factory.build_agent_engine")
+    @patch("apps.agents.execution.build_agent_engine")
     def test_failure_raises_for_coordinator(self, mock_factory):
         mock_factory.return_value.complete.return_value = LLMResponse(
             content="", usage=TokenUsage(), model="deepseek-chat",
@@ -55,7 +55,7 @@ class DurableAgentAdapterTest(TestCase):
                 self._payload(self.organization.id), MagicMock(cancelled=False)
             )
 
-    @patch("core.llm.factory.build_agent_engine")
+    @patch("apps.agents.execution.build_agent_engine")
     def test_success_serializes_usage(self, mock_factory):
         mock_factory.return_value.complete.return_value = LLMResponse(
             content="hello",

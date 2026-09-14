@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import AgentCategory, Agent
 from modules.catalog.errors import (
     DeploymentRollbackUnavailable, DeploymentVersionConflict,
-    InvalidDeploymentRevision,
+    InvalidDeploymentRevision, QualityGateNotPassed,
 )
 from modules.catalog.models import (
     AgentDeployment, AgentDraft, AgentRevision, DeploymentEnvironment,
@@ -189,6 +189,10 @@ class AgentViewSet(viewsets.ModelViewSet):
         environment = request.data.get('environment', 'development')
         if environment not in dict(DeploymentEnvironment.choices):
             return Response({'environment': 'Invalid deployment environment.'}, status=400)
+        if environment == DeploymentEnvironment.PRODUCTION:
+            self.require_agent_role(request, agent, (
+                Membership.Role.OWNER, Membership.Role.ADMIN,
+            ))
         revision_id = request.data.get('revision_id') or request.data.get('version_id')
         if not revision_id:
             revision_id = AgentRevision.objects.filter(
@@ -209,7 +213,8 @@ class AgentViewSet(viewsets.ModelViewSet):
                 config_override=(request.data.get('config_override')
                                  or request.data.get('config_overrides') or {}),
             )
-        except (DeploymentVersionConflict, InvalidDeploymentRevision) as exc:
+        except (DeploymentVersionConflict, InvalidDeploymentRevision,
+                QualityGateNotPassed) as exc:
             return Response({'detail': str(exc)}, status=409)
         return Response(AgentDeploymentSerializer(deployment).data)
 
@@ -222,6 +227,10 @@ class AgentViewSet(viewsets.ModelViewSet):
             Membership.Role.OPERATOR,
         ))
         environment = request.data.get('environment', 'development')
+        if environment == DeploymentEnvironment.PRODUCTION:
+            self.require_agent_role(request, agent, (
+                Membership.Role.OWNER, Membership.Role.ADMIN,
+            ))
         current = AgentDeployment.objects.filter(
             agent=agent, environment=environment).first()
         expected_version = request.data.get(

@@ -13,8 +13,8 @@ from django.core.cache import cache
 from django.db import connections, transaction
 from django.utils import timezone
 
-from apps.enterprise.models import Organization
 from modules.execution.application.errors import LeaseLost
+from modules.execution.application.ports import execution_domain_port
 from modules.execution.application.reaper import (
     expire_waiting_inputs,
     reap_expired_leases,
@@ -25,10 +25,19 @@ from modules.execution.application.runs import (
     fail_attempt,
     finish_attempt,
     record_artifact,
+    suspend_attempt_for_children,
     suspend_attempt_for_input,
 )
 from modules.execution.infrastructure.claim import claim_next_run, renew_lease
-from modules.execution.infrastructure.artifacts import persist_local_artifact
+from modules.execution.infrastructure.artifacts import (
+    delete_artifact_object,
+    persist_artifact,
+)
+from modules.execution.telemetry import (
+    annotate_execution_span,
+    finish_execution_span,
+    start_execution_span,
+)
 from modules.execution.models import Run, RunCommand
 from modules.execution.runtime.child import execute_child
 from modules.tenancy.database import tenant_database_context
@@ -55,6 +64,7 @@ class ActiveChild:
     messages: object
     cancel_event: object
     next_heartbeat_at: float
+    span: object = None
     exited_at: float | None = None
 
 
@@ -90,9 +100,6 @@ class ExecutionCoordinator:
         self._active = {}
         self._stopping = False
         self._next_maintenance_at = 0.0
-        self._organization_ids = []
-        self._next_organization_refresh_at = 0.0
-        self._organization_cursor = 0
 
     @property
     def active_count(self):
@@ -138,6 +145,9 @@ class ExecutionCoordinator:
         }
 
     def _start_claimed(self, claimed):
+        span = start_execution_span(
+            "execution.attempt", run=claimed.run, attempt=claimed.attempt
+        )
         messages = self._context.Queue(
             maxsize=int(getattr(settings, "EXECUTION_EVENT_QUEUE_SIZE", 1000))
         )
@@ -154,13 +164,18 @@ class ExecutionCoordinator:
             ),
             name=f"run-{self.worker_pool}-{claimed.run.id}",
         )
-        process.start()
+        try:
+            process.start()
+        except Exception as exc:
+            finish_execution_span(span, outcome="start_failed", error=exc)
+            raise
         self._active[claimed.attempt.id] = ActiveChild(
             claimed=claimed,
             process=process,
             messages=messages,
             cancel_event=cancel_event,
             next_heartbeat_at=time.monotonic() + self.lease_seconds / 3,
+            span=span,
         )
 
     @staticmethod
@@ -174,11 +189,17 @@ class ExecutionCoordinator:
         claimed = active.claimed
         fence = self._fence(active)
         outcome = message.get("outcome")
+        annotate_execution_span(
+            getattr(active, "span", None),
+            "execution.child.outcome",
+            str(outcome or "failed"),
+        )
         if outcome == "succeeded":
             output = message.get("output") or {}
             try:
-                from apps.enterprise.services import apply_output_guardrails
-                output = apply_output_guardrails(claimed.run.organization, output)
+                output = execution_domain_port().apply_output_guardrails(
+                    claimed.run.organization, output
+                )
             except Exception as exc:
                 fail_attempt(
                     run_id=claimed.run.id,
@@ -252,9 +273,7 @@ class ExecutionCoordinator:
 
     @staticmethod
     def _record_usage(claimed, output, status):
-        from apps.enterprise.services import record_usage
-
-        record_usage(
+        execution_domain_port().record_usage(
             organization=claimed.run.organization,
             user=claimed.run.owner,
             resource_type="run",
@@ -269,6 +288,59 @@ class ExecutionCoordinator:
         )
 
     def _handle_message(self, active, message):
+        if message.get("kind") == "wait_for_children":
+            checkpoint_data = message.get("checkpoint") or {}
+            encoded = json.dumps(
+                checkpoint_data,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            max_size = int(getattr(settings, "EXECUTION_CHECKPOINT_MAX_BYTES", 1048576))
+            if len(encoded) > max_size:
+                self._finish(active, {
+                    "outcome": "failed",
+                    "error_code": "checkpoint_too_large",
+                    "error_message": f"Checkpoint exceeds {max_size} bytes",
+                })
+                return True
+            child_run_ids = message.get("child_run_ids") or []
+            checkpoint_key = (
+                f"runs/{active.claimed.run.id}/attempts/"
+                f"{active.claimed.attempt.id}/checkpoint.json"
+            )
+            persist_artifact(checkpoint_key, encoded)
+            try:
+                with transaction.atomic():
+                    artifact, _event, _created = record_artifact(
+                        run_id=active.claimed.run.id,
+                        organization_id=active.claimed.run.organization_id,
+                        attempt_id=active.claimed.attempt.id,
+                        lease_fence=self._fence(active),
+                        kind="checkpoint",
+                        object_key=checkpoint_key,
+                        content_hash=hashlib.sha256(encoded).hexdigest(),
+                        mime_type="application/json",
+                        size=len(encoded),
+                        metadata={"checkpoint": checkpoint_data},
+                    )
+                    suspend_attempt_for_children(
+                        run_id=active.claimed.run.id,
+                        organization_id=active.claimed.run.organization_id,
+                        attempt_id=active.claimed.attempt.id,
+                        lease_fence=self._fence(active),
+                        checkpoint_artifact_id=artifact.id,
+                        child_run_ids=child_run_ids,
+                    )
+                annotate_execution_span(
+                    getattr(active, "span", None),
+                    "execution.suspension.reason",
+                    "waiting_children",
+                )
+            except Exception:
+                delete_artifact_object(checkpoint_key)
+                raise
+            return True
         if message.get("kind") == "suspend":
             checkpoint_data = message.get("checkpoint") or {}
             encoded = json.dumps(
@@ -299,7 +371,7 @@ class ExecutionCoordinator:
                 f"runs/{active.claimed.run.id}/attempts/"
                 f"{active.claimed.attempt.id}/checkpoint.json"
             )
-            checkpoint_path = persist_local_artifact(checkpoint_key, encoded)
+            persist_artifact(checkpoint_key, encoded)
             try:
                 # Both helper functions use inner savepoints. The outer transaction
                 # makes artifact creation and the waiting_input transition atomic.
@@ -327,8 +399,13 @@ class ExecutionCoordinator:
                         expires_at=timezone.now() + timedelta(seconds=expires_in),
                         request_payload=message.get("request_payload") or {},
                     )
+                annotate_execution_span(
+                    getattr(active, "span", None),
+                    "execution.suspension.reason",
+                    "waiting_input",
+                )
             except Exception:
-                checkpoint_path.unlink(missing_ok=True)
+                delete_artifact_object(checkpoint_key)
                 raise
             return True
         if message.get("kind") == "artifact":
@@ -357,7 +434,7 @@ class ExecutionCoordinator:
                 f"runs/{active.claimed.run.id}/attempts/"
                 f"{active.claimed.attempt.id}/artifacts/{uuid4().hex}-{filename}"
             )
-            artifact_path = persist_local_artifact(object_key, content)
+            persist_artifact(object_key, content)
             try:
                 record_artifact(
                     run_id=active.claimed.run.id,
@@ -375,7 +452,7 @@ class ExecutionCoordinator:
                     },
                 )
             except Exception:
-                artifact_path.unlink(missing_ok=True)
+                delete_artifact_object(object_key)
                 raise
             return False
         if message.get("kind") == "event":
@@ -472,54 +549,40 @@ class ExecutionCoordinator:
             active.process.join(timeout=1)
         active.messages.close()
         self._active.pop(attempt_id, None)
+        run_status = Run.objects.filter(pk=active.claimed.run.id).values_list(
+            "status", flat=True
+        ).first()
+        finish_execution_span(
+            getattr(active, "span", None), outcome=run_status or "unknown"
+        )
 
     def _claim_available(self):
         if not self.adapter_entries:
             return
-        now = time.monotonic()
-        if now >= self._next_organization_refresh_at:
-            self._organization_ids = list(
-                Organization.objects.filter(is_active=True)
-                .order_by("id")
-                .values_list("id", flat=True)
+        while not self._stopping and self.active_count < self.max_children:
+            claimed = claim_next_run(
+                worker_id=self.worker_id,
+                worker_pool=self.worker_pool,
+                lease_seconds=self.lease_seconds,
+                executor_keys=tuple(self.adapter_entries),
             )
-            self._next_organization_refresh_at = now + 5
-        organization_ids = self._organization_ids
-        if organization_ids:
-            start = self._organization_cursor % len(organization_ids)
-            organization_ids = organization_ids[start:] + organization_ids[:start]
-            self._organization_cursor = (start + 1) % len(organization_ids)
-        made_progress = True
-        while made_progress and not self._stopping and self.active_count < self.max_children:
-            made_progress = False
-            for organization_id in organization_ids:
-                if self.active_count >= self.max_children:
-                    break
-                with tenant_database_context(organization_id):
-                    claimed = claim_next_run(
-                        worker_id=self.worker_id,
-                        worker_pool=self.worker_pool,
-                        lease_seconds=self.lease_seconds,
-                        executor_keys=tuple(self.adapter_entries),
+            if claimed is None:
+                break
+            try:
+                self._start_claimed(claimed)
+            except Exception as exc:
+                with tenant_database_context(claimed.run.organization_id):
+                    fail_attempt(
+                        run_id=claimed.run.id,
+                        organization_id=claimed.run.organization_id,
+                        attempt_id=claimed.attempt.id,
+                        lease_fence=LeaseFence(
+                            token=claimed.lease.token,
+                            epoch=claimed.lease.epoch,
+                        ),
+                        error_code="child_process_start_failed",
+                        error_message=str(exc),
                     )
-                if claimed is None:
-                    continue
-                made_progress = True
-                try:
-                    self._start_claimed(claimed)
-                except Exception as exc:
-                    with tenant_database_context(organization_id):
-                        fail_attempt(
-                            run_id=claimed.run.id,
-                            organization_id=claimed.run.organization_id,
-                            attempt_id=claimed.attempt.id,
-                            lease_fence=LeaseFence(
-                                token=claimed.lease.token,
-                                epoch=claimed.lease.epoch,
-                            ),
-                            error_code="child_process_start_failed",
-                            error_message=str(exc),
-                        )
 
     def tick(self, *, allow_claim=True):
         now = time.monotonic()
@@ -532,9 +595,7 @@ class ExecutionCoordinator:
                 self.worker_id,
                 timeout=4,
             ):
-                for organization_id in Organization.objects.filter(
-                    is_active=True
-                ).values_list("id", flat=True):
+                for organization_id in execution_domain_port().active_organization_ids():
                     with tenant_database_context(organization_id):
                         reap_expired_leases(limit=100)
                         expire_waiting_inputs(limit=100)
@@ -569,3 +630,6 @@ class ExecutionCoordinator:
                 active.process.join(timeout=1)
             active.messages.close()
             self._active.pop(attempt_id, None)
+            finish_execution_span(
+                getattr(active, "span", None), outcome="coordinator_stopped"
+            )

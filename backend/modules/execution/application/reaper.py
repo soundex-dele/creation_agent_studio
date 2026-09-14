@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from modules.execution.models import Run, RunAttempt, RunEvent, RunLease
 
-from .runs import _publish_event_notification
+from .runs import _publish_event_notification, sync_run_queue_entry
 
 
 def _reap_one(lease_id, now):
@@ -76,6 +76,7 @@ def _reap_one(lease_id, now):
                 "next_event_sequence",
             )
         )
+        sync_run_queue_entry(run)
         event = RunEvent.objects.create(
             organization_id=run.organization_id,
             run=run,

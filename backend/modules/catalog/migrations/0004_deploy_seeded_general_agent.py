@@ -25,6 +25,14 @@ def deploy_seeded_general_agent(apps, schema_editor):
     AgentDeployment = apps.get_model('catalog', 'AgentDeployment')
 
     for agent in Agent.objects.filter(slug='general', is_public=True).iterator():
+        if agent.organization_id is None:
+            continue
+        if schema_editor.connection.vendor == 'postgresql':
+            with schema_editor.connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('app.organization_id', %s, true)",
+                    [str(agent.organization_id)],
+                )
         if AgentDeployment.objects.filter(
             agent_id=agent.id,
             environment='production',

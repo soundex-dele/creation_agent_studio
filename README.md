@@ -6,14 +6,16 @@
 
 ## 核心结构
 
-- `backend/modules/catalog`：Draft、不可变 Revision、Deployment。
-- `backend/modules/execution`：Run、Attempt、Lease、Event、Command、Artifact、幂等记录。
+- `backend/modules/catalog`：Agent、Skill、Application 的 Draft、不可变 Revision、Deployment。
+- `backend/modules/execution`：Run、全局领取队列、Attempt、Lease、Event、Command、Artifact、幂等记录。
 - `backend/apps`：Agent、Application、Conversation、Workflow、Enterprise 等产品域。
 - `frontend/src/entities/run`：唯一 Run 事件投影。
+- `frontend/src/features/run-stream`：Run 流连接与页面级状态编排。
+- `frontend/src/api/generated.ts`：由后端 OpenAPI 契约机械生成的接口类型。
 - `frontend/src/services/api.ts`：唯一 REST 客户端入口。
 - `frontend/src/services/runStream.ts`：唯一流式事件客户端。
 
-Workflow 使用唯一的 `workflow-dag` 执行器，支持显式依赖、条件分支、节点级重试和有界并行。交互请求通过同一 durable checkpoint / `RunCommand` 机制暂停与恢复。
+Workflow 使用唯一的 `workflow-dag` 执行器，支持显式依赖、条件分支、节点级重试和有界并行。等待子 Run 时根 Attempt 进入 `waiting_children` 并释放 Worker，由子 Run 终态事件重新入队。交互请求通过同一 durable checkpoint / `RunCommand` 机制暂停与恢复。
 
 ## 本地启动
 
@@ -44,6 +46,7 @@ source .venv/bin/activate
 python manage.py run_execution_coordinator --worker-pool agent
 python manage.py run_execution_coordinator --worker-pool media
 python manage.py run_execution_coordinator --worker-pool workflow
+python manage.py run_execution_coordinator --worker-pool evaluation
 ```
 
 前端：
@@ -51,6 +54,7 @@ python manage.py run_execution_coordinator --worker-pool workflow
 ```bash
 cd frontend
 npm ci
+npm run generate:api
 npm run dev
 ```
 
@@ -126,9 +130,9 @@ cd backend
 docker compose up --build
 ```
 
-Compose 先以一次性 `migrate` 服务完成迁移，再启动 Web、Agent Worker、Media Worker、Workflow Worker、Scheduler、Maintenance、PostgreSQL 16 和 Redis 7.4。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`；PostgreSQL 和 Redis 不暴露宿主机端口。
+Compose 先以一次性 `migrate` 服务完成迁移，再启动 Web、Agent Worker、Media Worker、Workflow Worker、Evaluation Worker、Scheduler、Maintenance、PostgreSQL 16 和 Redis 7.4。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`；PostgreSQL 和 Redis 不暴露宿主机端口。
 
-Web 与全部后台进程共享 `runtime_data:/data`，其中包含 Run Artifact、Agent workspace 和上传媒体。Maintenance 默认每小时执行 Retention 和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。
+Artifact 默认写入共享 `runtime_data:/data`，也可用 `ARTIFACT_STORAGE_BACKEND=s3` 切换到 AWS S3 或 MinIO；下载接口会返回对应后端的短期签名访问。Maintenance 默认每小时执行 Retention、对象删除和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。配置 OTLP Collector 后可启用 HTTP、Run 创建和 Attempt 生命周期追踪。
 
 如果数据库 volume 是旧版本创建的，需要在尚未承载数据的前提下重建 volume，使新的账号与 RLS 初始化生效。
 
@@ -141,6 +145,8 @@ python manage.py makemigrations --check --dry-run
 pytest -q
 
 cd ../frontend
+npm run generate:api
+npm run lint
 npm test
 npm run build
 ```

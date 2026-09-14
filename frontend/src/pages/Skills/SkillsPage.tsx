@@ -4,10 +4,13 @@ import {
 } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
+import type { components } from '@/api/generated';
 import { api } from '@/services/api';
 import './SkillsPage.css';
 
-interface SkillResource {
+type GeneratedSkill = components['schemas']['Skill'];
+
+interface SkillResource extends Omit<GeneratedSkill, 'manifest'> {
   id: string;
   slug: string;
   name: string;

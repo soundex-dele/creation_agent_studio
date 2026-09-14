@@ -8,7 +8,15 @@ from channels.layers import get_channel_layer
 from django.db import OperationalError, transaction
 from django.utils import timezone
 
-from modules.execution.models import Run, RunArtifact, RunAttempt, RunEvent, RunLease
+from modules.execution.models import (
+    Run,
+    RunArtifact,
+    RunAttempt,
+    RunEvent,
+    RunLease,
+    RunQueueEntry,
+)
+from modules.execution.telemetry import finish_execution_span, start_execution_span
 
 from .errors import (
     ConcurrentRunUpdate,
@@ -31,12 +39,14 @@ ALLOWED_TRANSITIONS = {
     Run.Status.QUEUED: {Run.Status.RUNNING, Run.Status.CANCELLED},
     Run.Status.RUNNING: {
         Run.Status.WAITING_INPUT,
+        Run.Status.WAITING_CHILDREN,
         Run.Status.CANCELLING,
         Run.Status.QUEUED,
         Run.Status.SUCCEEDED,
         Run.Status.FAILED,
     },
     Run.Status.WAITING_INPUT: {Run.Status.QUEUED, Run.Status.CANCELLED},
+    Run.Status.WAITING_CHILDREN: {Run.Status.QUEUED, Run.Status.CANCELLED},
     Run.Status.CANCELLING: {Run.Status.CANCELLED},
     Run.Status.SUCCEEDED: set(),
     Run.Status.FAILED: set(),
@@ -97,6 +107,23 @@ def _validate_lease(run, fence, now):
     return lease
 
 
+def sync_run_queue_entry(run):
+    """Keep the global claim index consistent with the locked Run projection."""
+
+    if run.status == Run.Status.QUEUED and run.current_attempt_id is None:
+        RunQueueEntry.objects.update_or_create(
+            run=run,
+            defaults={
+                "organization_id": run.organization_id,
+                "worker_pool": run.executor_kind,
+                "executor_key": run.executor_key,
+                "priority": run.priority,
+            },
+        )
+    else:
+        RunQueueEntry.objects.filter(run=run).delete()
+
+
 def create_run(
     *,
     organization,
@@ -146,9 +173,12 @@ def create_run(
             type="run.queued",
             payload={"queued_at": now.isoformat()},
         )
+        sync_run_queue_entry(run)
         transaction.on_commit(
             lambda: _publish_event_notification(run.id, event.sequence)
         )
+    span = start_execution_span("execution.run.create", run=run)
+    finish_execution_span(span, outcome=Run.Status.QUEUED)
     return run
 
 
@@ -287,6 +317,7 @@ def suspend_attempt_for_input(
                 "next_event_sequence",
             )
         )
+        sync_run_queue_entry(run)
         event = RunEvent.objects.create(
             organization_id=run.organization_id,
             run=run,
@@ -301,9 +332,130 @@ def suspend_attempt_for_input(
                 "checkpoint_artifact_id": str(checkpoint.id),
             },
         )
+        parent_id = run.parent_id
         transaction.on_commit(
             lambda: _publish_event_notification(run.id, event.sequence)
         )
+        if parent_id:
+            transaction.on_commit(
+                lambda: wake_waiting_parent(
+                    parent_id=parent_id,
+                    organization_id=organization_id,
+                    child_run_id=run.id,
+                )
+            )
+    return event
+
+
+def suspend_attempt_for_children(
+    *,
+    run_id,
+    organization_id,
+    attempt_id,
+    lease_fence,
+    checkpoint_artifact_id,
+    child_run_ids,
+):
+    """Release a workflow Worker until one of its durable children changes state."""
+
+    child_run_ids = tuple(dict.fromkeys(child_run_ids))
+    if not child_run_ids:
+        raise ValueError("At least one child Run is required")
+    with transaction.atomic():
+        run = Run.objects.select_for_update().get(pk=run_id)
+        if str(run.organization_id) != str(organization_id):
+            raise OrganizationMismatch("Run belongs to another organization")
+        now = timezone.now()
+        lease = _validate_lease(run, lease_fence, now)
+        if run.current_attempt_id != attempt_id:
+            raise LeaseLost("Attempt is no longer current")
+        _validate_transition(run.status, Run.Status.WAITING_CHILDREN)
+        checkpoint = RunArtifact.objects.select_for_update().get(
+            pk=checkpoint_artifact_id,
+            organization_id=run.organization_id,
+            run=run,
+            attempt_id=attempt_id,
+            kind="checkpoint",
+        )
+        children = Run.objects.filter(
+            parent=run,
+            id__in=child_run_ids,
+        )
+        if children.count() != len(child_run_ids):
+            raise OrganizationMismatch("A dependency Run is not a child of this workflow")
+        has_active_children = children.exclude(status__in=TERMINAL_STATUSES).exists()
+        next_status = (
+            Run.Status.WAITING_CHILDREN
+            if has_active_children
+            else Run.Status.QUEUED
+        )
+        attempt = RunAttempt.objects.select_for_update().get(pk=attempt_id, run=run)
+        attempt.status = RunAttempt.Status.SUSPENDED
+        attempt.checkpoint_artifact = checkpoint
+        attempt.finished_at = now
+        attempt.save(update_fields=("status", "checkpoint_artifact", "finished_at"))
+        lease.released_at = now
+        lease.save(update_fields=("released_at",))
+
+        run.status = next_status
+        run.current_attempt = None
+        run.version += 1
+        run.next_event_sequence += 1
+        run.save(update_fields=(
+            "status", "current_attempt", "version", "next_event_sequence",
+        ))
+        sync_run_queue_entry(run)
+        event = RunEvent.objects.create(
+            organization_id=run.organization_id,
+            run=run,
+            attempt=attempt,
+            sequence=run.next_event_sequence,
+            type=(
+                "run.waiting_children"
+                if has_active_children
+                else "run.dependencies_ready"
+            ),
+            payload={
+                "child_run_ids": [str(value) for value in child_run_ids],
+                "checkpoint_artifact_id": str(checkpoint.id),
+            },
+        )
+        transaction.on_commit(
+            lambda: _publish_event_notification(run.id, event.sequence)
+        )
+    return event
+
+
+def wake_waiting_parent(*, parent_id, organization_id, child_run_id):
+    """Requeue a suspended workflow after a child terminal/input transition."""
+
+    from modules.tenancy.database import tenant_database_context
+
+    with tenant_database_context(organization_id):
+        with transaction.atomic():
+            parent = Run.objects.select_for_update().filter(
+                pk=parent_id,
+                organization_id=organization_id,
+                status=Run.Status.WAITING_CHILDREN,
+                current_attempt__isnull=True,
+            ).first()
+            if parent is None:
+                return None
+            parent.status = Run.Status.QUEUED
+            parent.version += 1
+            parent.next_event_sequence += 1
+            parent.save(update_fields=("status", "version", "next_event_sequence"))
+            sync_run_queue_entry(parent)
+            event = RunEvent.objects.create(
+                organization_id=parent.organization_id,
+                run=parent,
+                sequence=parent.next_event_sequence,
+                type="run.dependencies_ready",
+                payload={"child_run_id": str(child_run_id)},
+            )
+            transaction.on_commit(
+                lambda: _publish_event_notification(parent.id, event.sequence)
+            )
     return event
 
 
@@ -341,6 +493,10 @@ def append_event_and_transition(
                     raise InvalidRunTransition(
                         "Use suspend_attempt_for_input() to enter waiting_input"
                     )
+                if new_status == Run.Status.WAITING_CHILDREN:
+                    raise InvalidRunTransition(
+                        "Use suspend_attempt_for_children() to enter waiting_children"
+                    )
                 if (
                     run.status == Run.Status.WAITING_INPUT
                     and new_status == Run.Status.QUEUED
@@ -367,6 +523,12 @@ def append_event_and_transition(
                 )
                 if updated != 1:
                     raise ConcurrentRunUpdate("Run projection changed concurrently")
+
+                if new_status is not None:
+                    run.status = new_status
+                run.version = updates["version"]
+                run.next_event_sequence = next_sequence
+                sync_run_queue_entry(run)
 
                 event = RunEvent.objects.create(
                     organization_id=run.organization_id,
@@ -448,6 +610,7 @@ def finish_attempt(
                 "next_event_sequence",
             )
         )
+        sync_run_queue_entry(run)
         event = RunEvent.objects.create(
             organization_id=run.organization_id,
             run=run,
@@ -459,9 +622,18 @@ def finish_attempt(
                 "error_code": error_code,
             },
         )
+        parent_id = run.parent_id
         transaction.on_commit(
             lambda: _publish_event_notification(run.id, event.sequence)
         )
+        if parent_id:
+            transaction.on_commit(
+                lambda: wake_waiting_parent(
+                    parent_id=parent_id,
+                    organization_id=organization_id,
+                    child_run_id=run.id,
+                )
+            )
     return event
 
 
@@ -537,6 +709,7 @@ def fail_attempt(
                 "next_event_sequence",
             )
         )
+        sync_run_queue_entry(run)
         event = RunEvent.objects.create(
             organization_id=run.organization_id,
             run=run,
@@ -545,7 +718,16 @@ def fail_attempt(
             type=event_type,
             payload=payload,
         )
+        parent_id = run.parent_id if next_status in TERMINAL_STATUSES else None
         transaction.on_commit(
             lambda: _publish_event_notification(run.id, event.sequence)
         )
+        if parent_id:
+            transaction.on_commit(
+                lambda: wake_waiting_parent(
+                    parent_id=parent_id,
+                    organization_id=organization_id,
+                    child_run_id=run.id,
+                )
+            )
     return event

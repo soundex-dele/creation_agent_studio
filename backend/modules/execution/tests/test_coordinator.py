@@ -8,7 +8,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from modules.execution.infrastructure.coordinator import ExecutionCoordinator
-from modules.execution.application.runs import create_run
+from modules.execution.application.runs import LeaseFence, create_run, finish_attempt
 from modules.execution.infrastructure.claim import claim_next_run
 from modules.execution.models import Run
 from modules.execution.runtime.child import execute_child
@@ -20,6 +20,13 @@ def _suspending_adapter(_payload, sink):
         request_payload={"question": "Continue?"},
         checkpoint={"cursor": 3},
         expires_in_seconds=120,
+    )
+
+
+def _waiting_adapter(_payload, sink):
+    sink.wait_for_children(
+        child_run_ids=["00000000-0000-0000-0000-000000000001"],
+        checkpoint={"layer": 1},
     )
 
 
@@ -91,6 +98,95 @@ def test_child_reports_one_canonical_suspend_message():
     }
     with pytest.raises(queue.Empty):
         messages.get_nowait()
+
+
+def test_child_reports_one_canonical_child_wait_message():
+    messages = queue.Queue()
+    execute_child(
+        {"input": {}},
+        messages,
+        threading.Event(),
+        "modules.execution.tests.test_coordinator:_waiting_adapter",
+    )
+
+    assert messages.get_nowait() == {
+        "kind": "wait_for_children",
+        "child_run_ids": ["00000000-0000-0000-0000-000000000001"],
+        "checkpoint": {"layer": 1},
+    }
+    with pytest.raises(queue.Empty):
+        messages.get_nowait()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_releases_worker_and_is_requeued_by_child_completion(settings, tmp_path):
+    settings.ARTIFACT_ROOT = tmp_path
+    actor = get_user_model().objects.create_user(username="workflow-wait-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="1",
+        definition_snapshot={},
+        input_data={},
+    )
+    child = create_run(
+        organization=organization,
+        owner=actor,
+        parent=root,
+        node_key="step",
+        executor_kind=Run.ExecutorKind.MEDIA,
+        executor_key="batch-transcribe",
+        source_type="workflow_step",
+        source_id="step",
+        definition_snapshot={},
+        input_data={},
+    )
+    claimed_root = claim_next_run(
+        worker_id="workflow-coordinator",
+        worker_pool=Run.ExecutorKind.WORKFLOW,
+        executor_keys=("workflow-dag",),
+    )
+    coordinator = ExecutionCoordinator(
+        worker_id="workflow-coordinator",
+        worker_pool=Run.ExecutorKind.WORKFLOW,
+        adapter_entries={"workflow-dag": "unused:adapter"},
+    )
+
+    terminal = coordinator._handle_message(SimpleNamespace(claimed=claimed_root), {
+        "kind": "wait_for_children",
+        "child_run_ids": [str(child.id)],
+        "checkpoint": {"layer": [str(child.id)]},
+    })
+
+    assert terminal is True
+    root.refresh_from_db()
+    assert root.status == Run.Status.WAITING_CHILDREN
+    assert root.current_attempt_id is None
+
+    claimed_child = claim_next_run(
+        worker_id="media-coordinator",
+        worker_pool=Run.ExecutorKind.MEDIA,
+        executor_keys=("batch-transcribe",),
+    )
+    finish_attempt(
+        run_id=child.id,
+        organization_id=organization.id,
+        attempt_id=claimed_child.attempt.id,
+        lease_fence=LeaseFence(
+            token=claimed_child.lease.token,
+            epoch=claimed_child.lease.epoch,
+        ),
+        outcome=Run.Status.SUCCEEDED,
+        output_summary={"ok": True},
+    )
+
+    root.refresh_from_db()
+    assert root.status == Run.Status.QUEUED
+    assert root.events.filter(type="run.dependencies_ready").exists()
 
 
 @pytest.mark.django_db(transaction=True)

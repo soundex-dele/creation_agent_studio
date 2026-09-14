@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Descriptions, List, Progress, Space, Spin, Tag, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 
-import { useRunStream } from '@/hooks/useRunStream';
+import { useRunStream } from '@/features/run-stream';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';

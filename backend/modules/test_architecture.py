@@ -14,24 +14,9 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.applications.models",
         "apps.enterprise.models",
     },
-    "modules/catalog/services.py": {
-        "apps.agents.models",
-        "apps.applications.models",
-    },
     "modules/execution/api/streaming.py": {"apps.enterprise.models"},
     "modules/execution/api/views.py": {"apps.enterprise.models"},
     "modules/execution/application/projections.py": {"apps.conversations.models"},
-    "modules/execution/application/start_runs.py": {
-        "apps.agents.models",
-        "apps.applications.models",
-        "apps.enterprise.models",
-        "apps.enterprise.services",
-    },
-    "modules/execution/infrastructure/coordinator.py": {
-        "apps.enterprise.models",
-        "apps.enterprise.services",
-    },
-    "modules/execution/runtime/builtin.py": {"apps.enterprise.models"},
     "modules/tenancy/middleware.py": {"apps.enterprise.tenancy"},
     "modules/tenancy/permissions.py": {
         "apps.enterprise.models",

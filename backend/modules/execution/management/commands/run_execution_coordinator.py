@@ -12,6 +12,7 @@ from modules.execution.infrastructure.coordinator_lock import (
     CoordinatorFileLock,
 )
 from modules.execution.models import Run
+from modules.execution.telemetry import configure_telemetry
 
 
 class Command(BaseCommand):
@@ -33,6 +34,7 @@ class Command(BaseCommand):
         parser.add_argument("--once", action="store_true")
 
     def handle(self, *args, **options):
+        configure_telemetry()
         database_path = connection.settings_dict.get("NAME")
         if connection.vendor == "sqlite" and (
             not database_path or str(database_path) == ":memory:"

@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.applications.models import Skill
+from modules.catalog.models import SkillDraft
 
 
 class CanonicalSkillApiTest(TestCase):
@@ -31,6 +32,10 @@ class CanonicalSkillApiTest(TestCase):
         self.assertEqual(created.status_code, 201, created.data)
         skill = Skill.objects.get(pk=created.data["id"])
         self.assertEqual(skill.organization_id, self.organization.id)
+        draft = SkillDraft.objects.get(skill=skill)
+        self.assertEqual(draft.organization_id, self.organization.id)
+        self.assertEqual(draft.version, 1)
+        self.assertEqual(draft.content["manifest"], {"entrypoint": "SKILL.md"})
 
         updated = self.client.patch(
             "/api/v1/apps/skills/storyboard/",
@@ -40,6 +45,26 @@ class CanonicalSkillApiTest(TestCase):
         )
         self.assertEqual(updated.status_code, 200, updated.data)
         self.assertEqual(updated.data["description"], "Updated")
+
+        definition_updated = self.client.patch(
+            "/api/v1/apps/skills/storyboard/",
+            {
+                "source_uri": "https://example.invalid/storyboard-v2.git",
+                "manifest": {"entrypoint": "skills/storyboard.py"},
+            },
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(definition_updated.status_code, 200, definition_updated.data)
+        draft.refresh_from_db()
+        self.assertEqual(draft.version, 2)
+        self.assertEqual(
+            draft.content["source_uri"],
+            "https://example.invalid/storyboard-v2.git",
+        )
+        self.assertEqual(
+            draft.content["manifest"], {"entrypoint": "skills/storyboard.py"}
+        )
 
     def test_removed_filesystem_skill_api_is_not_routable(self):
         response = self.client.get("/api/v1/apps/runtime-skills/", **self.headers)

@@ -16,7 +16,7 @@ from .errors import (
     InputRequestMismatch,
     OrganizationMismatch,
 )
-from .runs import _publish_event_notification
+from .runs import _publish_event_notification, sync_run_queue_entry
 
 
 SUBMIT_RUN_COMMAND_OPERATION = "run.command.submit"
@@ -184,7 +184,11 @@ def _submit_run_command_once(
             event_type = "input.accepted"
             finished_at = None
             clear_pending_input = True
-        elif run.status in {Run.Status.QUEUED, Run.Status.WAITING_INPUT}:
+        elif run.status in {
+            Run.Status.QUEUED,
+            Run.Status.WAITING_INPUT,
+            Run.Status.WAITING_CHILDREN,
+        }:
             new_status = Run.Status.CANCELLED
             event_type = "run.cancelled"
             finished_at = now
@@ -245,6 +249,7 @@ def _submit_run_command_once(
                 run.pending_input_request_id = None
                 run.pending_input_kind = ""
                 run.pending_input_expires_at = None
+            sync_run_queue_entry(run)
 
         command.result = {
             "accepted": event is not None,
@@ -262,6 +267,26 @@ def _submit_run_command_once(
         if event is not None:
             transaction.on_commit(
                 lambda: _publish_event_notification(run.id, event.sequence)
+            )
+    if command_type == RunCommand.Type.CANCEL:
+        child_ids = Run.objects.filter(
+            parent_id=run_id,
+            status__in=(
+                Run.Status.QUEUED,
+                Run.Status.RUNNING,
+                Run.Status.WAITING_INPUT,
+                Run.Status.WAITING_CHILDREN,
+                Run.Status.CANCELLING,
+            ),
+        ).values_list("id", flat=True)
+        for child_id in child_ids:
+            submit_run_command(
+                run_id=child_id,
+                organization_id=organization_id,
+                actor=actor,
+                command_type=RunCommand.Type.CANCEL,
+                idempotency_key=f"cascade-cancel:{run_id}:{child_id}",
+                payload={"reason": "parent_cancelled"},
             )
     return command, False
 

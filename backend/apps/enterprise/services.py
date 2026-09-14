@@ -8,6 +8,7 @@ import socket
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from decimal import Decimal
 
 from django.db import transaction
@@ -74,7 +75,8 @@ def enforce_quota(organization):
     from modules.execution.models import Run
     running = Run.objects.for_organization(organization.id).filter(
         status__in=[Run.Status.QUEUED, Run.Status.RUNNING,
-                    Run.Status.WAITING_INPUT, Run.Status.CANCELLING],
+                    Run.Status.WAITING_INPUT, Run.Status.WAITING_CHILDREN,
+                    Run.Status.CANCELLING],
     ).count()
     if quota.hard_limit and (totals['tokens'] or 0) >= quota.monthly_token_limit:
         raise Throttled(detail='Monthly token quota exceeded.')
@@ -244,32 +246,164 @@ def evaluate_value(actual, expected, evaluator):
     return {'type': kind, 'passed': passed, 'score': 1.0 if passed else 0.0}
 
 
-def run_evaluation(evaluation_run, outputs=None):
-    """Execute deterministic evaluators and apply the suite quality gate."""
-    suite = evaluation_run.suite
-    outputs = outputs or {}
-    case_results = []
-    for case in suite.cases.all():
-        actual = outputs.get(str(case.id), outputs.get(case.name, case.input.get('actual')))
-        expected = case.expected.get('value', case.expected)
-        evaluators = suite.evaluators or [{'type': 'exact'}]
-        evaluations = [evaluate_value(actual, expected, evaluator)
-                       for evaluator in evaluators]
-        score = sum(item['score'] for item in evaluations) / len(evaluations)
-        case_results.append({'case_id': case.id, 'name': case.name, 'actual': actual,
-                             'expected': expected, 'score': score,
-                             'passed': all(item['passed'] for item in evaluations),
-                             'evaluators': evaluations})
-    overall = sum(item['score'] for item in case_results) / max(1, len(case_results))
-    threshold = float(suite.quality_gate.get('minimum_score', 1.0))
-    evaluation_run.status = 'completed'
-    evaluation_run.score = overall
-    evaluation_run.passed = overall >= threshold
-    evaluation_run.results = case_results
-    evaluation_run.finished_at = timezone.now()
-    evaluation_run.save(update_fields=['status', 'score', 'passed', 'results',
-                                       'finished_at'])
-    return evaluation_run
+@transaction.atomic
+def start_evaluation(suite, actor, target_version="", environment="staging"):
+    """Create a durable Evaluation Run pinned to an immutable target revision."""
+
+    from django.conf import settings
+
+    from apps.agents.models import Agent
+    from apps.applications.models import Application
+    from modules.catalog.models import (
+        AgentRevision,
+        ApplicationRevision,
+        DeploymentEnvironment,
+    )
+    from modules.execution.application.errors import DeploymentUnavailable
+    from modules.execution.application.runs import create_run
+    from modules.execution.application.start_runs import freeze_skill_revisions
+    from modules.execution.models import Run
+
+    target_type = str(suite.target_type or "").lower()
+    if environment not in DeploymentEnvironment.values:
+        raise ValueError("environment must be development, staging, or production")
+    revision_id = None
+    if target_version:
+        try:
+            revision_id = uuid.UUID(str(target_version))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("target_version must be a Revision UUID") from exc
+    try:
+        target_id = int(suite.target_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Evaluation target_id must identify an Agent or Application") from exc
+    if target_type == "agent":
+        identity = Agent.objects.filter(
+            pk=target_id,
+            organization_id=suite.organization_id,
+            is_active=True,
+        ).first()
+        revisions = AgentRevision.objects.filter(
+            agent=identity, organization_id=suite.organization_id
+        ) if identity else AgentRevision.objects.none()
+        revision = (
+            revisions.filter(pk=revision_id).first()
+            if revision_id
+            else revisions.order_by("-revision_no").first()
+        )
+        executor_kind = Run.ExecutorKind.AGENT
+        executor_key = "agent-completion"
+        definition_snapshot = {
+            "agent_id": str(identity.id) if identity else "",
+            "agent_revision_id": str(revision.id) if revision else "",
+            "agent_revision_no": revision.revision_no if revision else 0,
+            "agent_content_hash": revision.content_hash if revision else "",
+            "agent_definition": revision.content if revision else {},
+            "effective_config": (
+                dict((revision.content or {}).get("model_config") or {})
+                if revision else {}
+            ),
+            "governance": execution_governance_snapshot(suite.organization),
+        }
+        max_attempts, retry_safe = 3, True
+    elif target_type == "application":
+        identity = Application.objects.filter(
+            pk=target_id,
+            organization_id=suite.organization_id,
+            is_active=True,
+        ).first()
+        revisions = ApplicationRevision.objects.filter(
+            application=identity, organization_id=suite.organization_id
+        ) if identity else ApplicationRevision.objects.none()
+        revision = (
+            revisions.filter(pk=revision_id).first()
+            if revision_id
+            else revisions.order_by("-revision_no").first()
+        )
+        content = revision.content if revision else {}
+        executor_kind = content.get("executor_kind", "")
+        executor_key = content.get("executor_key", "")
+        retry_policy = content.get("retry_policy") or {}
+        max_attempts = int(retry_policy.get("max_attempts", 3))
+        retry_safe = bool(retry_policy.get("retry_safe", True))
+        definition_snapshot = {
+            "application_id": str(identity.id) if identity else "",
+            "application_revision_id": str(revision.id) if revision else "",
+            "application_revision_no": revision.revision_no if revision else 0,
+            "application_content_hash": revision.content_hash if revision else "",
+            "content": content,
+            "effective_config": dict(content.get("default_config") or {}),
+            "governance": execution_governance_snapshot(suite.organization),
+        }
+    else:
+        raise ValueError("Evaluation target_type must be agent or application")
+
+    if revision is None:
+        raise ValueError("Evaluation target revision does not exist")
+    if executor_key not in getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
+        executor_kind, {}
+    ):
+        raise ValueError(
+            f"Evaluation target executor is not registered: {executor_kind}/{executor_key}"
+        )
+    try:
+        definition_snapshot["skill_revisions"] = freeze_skill_revisions(
+            organization_id=suite.organization_id,
+            environment=environment,
+            content=revision.content,
+        )
+    except DeploymentUnavailable as exc:
+        raise ValueError(str(exc)) from exc
+    cases = [
+        {
+            "id": str(case.id),
+            "name": case.name,
+            "input": case.input,
+            "expected": case.expected,
+            "tags": case.tags,
+        }
+        for case in suite.cases.order_by("id")
+    ]
+    if not cases:
+        raise ValueError("Evaluation suite must contain at least one case")
+
+    evaluation = suite.runs.create(
+        created_by=actor,
+        status="queued",
+        target_version=str(revision.id),
+    )
+    run = create_run(
+        organization=suite.organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.EVALUATION,
+        executor_key="evaluation-suite",
+        source_type="evaluation",
+        source_id=evaluation.id,
+        definition_snapshot={
+            "evaluation_run_id": str(evaluation.id),
+            "suite_id": str(suite.id),
+            "target_type": target_type,
+            "target_id": str(suite.target_id),
+            "target_version": str(revision.id),
+            "target_environment": environment,
+            "evaluators": suite.evaluators,
+            "quality_gate": suite.quality_gate,
+            "cases": cases,
+            "target": {
+                "executor_kind": executor_kind,
+                "executor_key": executor_key,
+                "max_attempts": max_attempts,
+                "retry_safe": retry_safe,
+                "definition_snapshot": definition_snapshot,
+            },
+        },
+        input_data={},
+        max_attempts=3,
+        retry_safe=True,
+    )
+    evaluation.execution_run = run
+    evaluation.save(update_fields=["execution_run"])
+    return evaluation
 
 
 _PII_PATTERNS = [

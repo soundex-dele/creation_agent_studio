@@ -9,7 +9,10 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate:api-schema": "python ../backend/manage.py generate_swagger ../contracts/swagger.json --overwrite --format json && swagger2openapi ../contracts/swagger.json -o ../contracts/openapi.json",
+    "generate:api-types": "openapi-typescript ../contracts/openapi.json -o src/api/generated.ts",
+    "generate:api": "npm run generate:api-schema && npm run generate:api-types"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
@@ -20,6 +23,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.2",
     "sass": "^1.100.0",
+    "swagger2openapi": "^7.0.8",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
@@ -35,6 +39,7 @@
     "eslint": "^8.56.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.23",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.3.3",

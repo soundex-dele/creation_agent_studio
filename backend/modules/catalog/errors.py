@@ -37,3 +37,7 @@ class InvalidDeploymentRevision(CatalogError):
 
 class DeploymentRollbackUnavailable(CatalogError):
     code = "deployment_rollback_unavailable"
+
+
+class QualityGateNotPassed(CatalogError):
+    code = "quality_gate_not_passed"

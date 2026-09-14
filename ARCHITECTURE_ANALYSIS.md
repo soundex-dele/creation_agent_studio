@@ -1,6 +1,6 @@
 # Creation Agent Studio 当前架构分析
 
-> 分析日期：2026-09-13
+> 分析日期：2026-09-14
 >
 > 分析方式：只检查当前源码、配置、迁移和可执行测试，没有引用仓库中原有说明文档。
 > 迁移策略：项目尚未上线，本轮按破坏性合并处理，不提供旧执行协议兼容层。
@@ -16,11 +16,11 @@ flowchart LR
     UI[React SPA]
     API[Django REST API]
     CAT[Catalog<br/>Draft / Revision / Deployment]
-    RUN[Durable Run]
+    RUN[Durable Run / Global Queue]
     EVT[RunEvent / Command / Artifact]
     WA[Agent Worker]
     WM[Media Worker]
-    WW[Workflow Worker]
+    WW[Workflow / Evaluation Worker]
     DB[(PostgreSQL)]
     REDIS[(Redis 通知与心跳)]
     EXT[LLM / Codex / Media Provider]
@@ -60,10 +60,10 @@ Redis 只承担通知和进程心跳，不是执行事实源。Run、RunAttempt 
 | 实体 | 稳定身份 | 版本生命周期 |
 | --- | --- | --- |
 | Agent | `apps.agents.Agent` | AgentDraft → AgentRevision → AgentDeployment |
-| Skill | `apps.applications.Skill` | 当前由数据库 Catalog 直接管理；SkillDraft / SkillRevision 尚未接入公开发布流程 |
+| Skill | `apps.applications.Skill` | SkillDraft → SkillRevision → SkillDeployment |
 | Application | `apps.applications.Application` | ApplicationDraft → ApplicationRevision → ApplicationDeployment |
 
-`modules.catalog` 不复制产品实体；Agent 和 Application 的草稿、不可变修订及环境部署保存在该模块。Skill 的预留版本模型见“当前约束”。Revision 内容以规范 JSON hash 去重，并受应用层校验和数据库触发器双重不可变保护。
+`modules.catalog` 不复制产品实体；三类定义的草稿、不可变修订及环境部署保存在该模块。Revision 内容以规范 JSON hash 去重，并受应用层校验和数据库触发器双重不可变保护。Skill 创建时原子初始化 Draft，发布按内容 hash 幂等，环境切换和回滚使用乐观版本。
 
 Application 写入只有组织级 Catalog API：
 
@@ -85,6 +85,7 @@ Application 写入只有组织级 Catalog API：
 | RunCommand | answer、permission、cancel 等幂等命令 |
 | RunArtifact | 产物元数据、hash 和受控访问 |
 | IdempotencyRecord | Application、Agent、Workflow 启动去重 |
+| RunQueueEntry | 不受租户 RLS 限制的最小全局调度索引；只保存领取所需字段，真实 Run 仍受 RLS 保护 |
 
 Run 的主要状态机为：
 
@@ -92,6 +93,7 @@ Run 的主要状态机为：
 queued → running → succeeded
              ├──→ failed
              ├──→ waiting_input → queued
+             ├──→ waiting_children → queued
              └──→ cancelling → cancelled
 ```
 
@@ -102,7 +104,7 @@ queued → running → succeeded
 ### Application
 
 1. 客户端向组织级 Application Run API 提交输入和 `Idempotency-Key`。
-2. 服务端读取指定环境 Deployment，冻结 Revision、依赖和有效配置。
+2. 服务端读取指定环境 Deployment，冻结 Application Revision、已部署 Skill Revision、依赖和有效配置；任何 Skill 缺少对应环境 Deployment 都会拒绝启动。
 3. JSON Schema 校验输入后创建 Run。
 4. 对应 Worker Pool 领取 Run，在隔离子进程中执行白名单 adapter。
 5. 客户端通过统一 RunEvent SSE 查看输出、进度、工具和产物。
@@ -123,8 +125,8 @@ queued → running → succeeded
 - 手工 `select-step/complete-step` 状态机已删除。
 - Workflow 启动时冻结每一步的 Application Deployment Revision、依赖、条件和重试策略，创建一个 `workflow/workflow-dag` Run。
 - DAG 使用稳定 step key 描述依赖；重复 key、未知依赖和循环依赖均在执行前拒绝。
-- 每个可执行节点创建或复用一个 durable child Run，由对应 Agent/Media Worker 独立领取；Workflow Worker 只负责拓扑编排和聚合。
-- 节点支持独立 `max_attempts`、基于输入或依赖输出的条件分支，并产生 `workflow.step.*` RunEvent。根 Worker 重启后复用已有 child Run，不重复启动已完成节点。
+- 每个可执行节点创建或复用一个 durable child Run，由对应 Agent/Media Worker 独立领取；Workflow Worker 只负责拓扑编排和聚合。根 Attempt 等待子节点时持久化 checkpoint 并进入 `waiting_children`，立即释放子进程槽位。
+- 节点支持独立 `max_attempts`、基于输入或依赖输出的条件分支，并产生 `workflow.step.*` RunEvent。子 Run 完成或需要输入时，通过父子关系事件唤醒根 Run；根 Worker 重启后复用已有 child Run，不重复启动已完成节点。
 - 子 Run 的 waiting_input 会挂起根 Run；恢复命令转发到对应子 Run。用户取消根 Run 时，取消命令向仍活跃的子 Run 传播。
 - 步骤状态通过统一 RunEvent 投影展示；历史和详情读取通用 Run API。
 - Workflow 启动使用请求幂等键，防止重复创建。
@@ -146,6 +148,8 @@ Page / Store
 ```
 
 所有 REST 请求只从 `services/api.ts` 进入，`axios.ts` 是不对业务代码暴露的传输实现。路由页面全部使用动态 import，第三方依赖按 React、Ant Design 组件、Markdown 和公共库拆包。
+
+后端 Swagger 2 契约先规范转换为 OpenAPI 3，再由 `openapi-typescript` 生成 `src/api/generated.ts`；页面类型可以直接引用生成的 schema。Run 流式场景收敛在 `features/run-stream` feature slice，事实投影仍由 `entities/run` 独立维护。
 
 已经删除：
 
@@ -185,16 +189,21 @@ Conversation Store 复用 `entities/run` 的 sequencer、reducer 和 snapshot �
 | agent-worker | Agent Run |
 | media-worker | Media Run |
 | workflow-worker | Workflow Run |
+| evaluation-worker | Evaluation 根 Run、真实目标 Revision 的 Case 子 Run 编排与质量评分 |
 | scheduler | 自动化触发 |
 | maintenance | Retention 删除、RunEvent 压缩和维护心跳 |
 | postgres | 领域状态和执行事实源 |
 | redis | 通知、缓存和心跳 |
 
-Coordinator 每 5 秒写入 Worker Pool 心跳，Scheduler 和 Maintenance 也写入带 TTL 的心跳。`/readyz/` 在生产配置下同时校验数据库、Redis、三个 Worker Pool 和 Scheduler；Compose 对每个后台进程也配置了心跳健康检查。
+Coordinator 每 5 秒写入 Worker Pool 心跳，Scheduler 和 Maintenance 也写入带 TTL 的心跳。`/readyz/` 在生产配置下同时校验数据库、Redis、四个 Worker Pool 和 Scheduler；Compose 对每个后台进程也配置了心跳健康检查。
 
-所有 Compose 运行进程挂载同一个 `runtime_data:/data` volume，Artifact、Agent workspace 和上传媒体不会再被困在单个容器的可写层。Maintenance 周期性按组织策略清理旧数据、过期幂等记录和终态 Run，数据库删除成功后才删除对应文件；保留的旧 RunEvent 会压缩为可恢复快照。Web 不再在启动命令中并发执行迁移，而是等待唯一的 `migrate` 服务成功；数据库与 Redis 仅在 Compose 内网开放。
+Artifact 通过存储端口写入 Local 或 S3/MinIO；Local Compose 仍使用共享 `runtime_data:/data`，多机部署使用对象存储和原生预签名 URL。Maintenance 周期性按组织策略清理旧数据、过期幂等记录和终态 Run，数据库删除成功后才删除对应对象；保留的旧 RunEvent 会压缩为可恢复快照。Web 不再在启动命令中并发执行迁移，而是等待唯一的 `migrate` 服务成功；数据库与 Redis 仅在 Compose 内网开放。
 
-Worker 将活跃组织列表短期缓存并轮转扫描起点，减少高频全表读取并改善租户公平性；单进程并发子进程数可通过环境变量配置。
+Worker 从 `RunQueueEntry` 按优先级和入队时间全局领取；PostgreSQL 使用 `skip_locked` 支持多 Coordinator 并发。领取索引后才进入对应租户数据库上下文并锁定真实 Run，租约和 fencing 仍是最终一致性保护。
+
+OpenTelemetry 为可选能力。启用后 Django HTTP 请求自动埋点，Run 创建和 Attempt 生命周期产生带 organization/run/attempt/executor 关联属性的 span，并通过 OTLP gRPC 导出。
+
+Evaluation API 会创建 `evaluation/evaluation-suite` durable Run，并将指定 Agent/Application Revision 固定在快照。Evaluation Worker 为每个 Case 创建真实目标子 Run，全部完成后执行确定性 evaluator。存在非空质量门禁的套件时，production Deployment 必须找到该 Revision 最近一次通过的 EvaluationRun。
 
 Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触发器 ID + 分钟时间桶”作为 Run 幂等键，多 Scheduler 副本不会为同一时刻重复创建 Run。
 
@@ -214,27 +223,22 @@ Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触�
 
 ## 8. 当前约束
 
-本轮已直接替换 REST 双入口、顺序 Workflow、不可达的交互 checkpoint 和单一大前端包，没有保留旧实现。以下是有意保留的能力边界，不是当前实现缺陷：
+本轮已按风险和依赖顺序完成核心演进，没有保留旧执行实现。以下是仍然存在的明确边界：
 
 1. Django 是模块化单体，Catalog、Execution、Tenancy 与产品 App 仍有少量必要集成边；这些边已由架构测试精确锁定，但还不是可独立部署的服务边界。
 2. SQLite 只用于单进程本地开发和测试；多 Worker、RLS、`skip_locked` 与生产一致性验证必须使用 PostgreSQL。生产配置默认且仅支持 PostgreSQL 部署形态。
 3. GraphFlow 只有在其 SDK 返回 `input_request`/`pending_question` 时才能进入 durable suspend；SDK 本身不暴露交互请求时，平台无法从最终 completion 反向推断问题。
-4. SkillDraft / SkillRevision 模型已存在，但当前 Skill 管理接口仍直接维护数据库 Skill Catalog，尚没有独立 Skill Deployment；不要把它当作已完成的三阶段发布链路。
-5. `runtime_data` 解决的是单机 Compose 多容器共享，不是跨节点对象存储。扩展到多主机前应把 Artifact writer 抽象为 S3/MinIO，并保留当前受控下载协议。
-6. Workflow 根 Run 以可配置的低频轮询等待 durable child Run，因此执行期间会占用一个 Workflow 子进程；当前并发模型有界，扩展到大量长工作流前应改为 child 终态事件唤醒根 Run。
-7. Worker 的组织扫描已降低频率、增加轮转公平性；全局 reaper/过期输入扫描使用短租约单领导者。租户规模继续增长时仍应演进为全局可领取队列或安全的数据库 claim 存储过程。
-8. 当前指标以数据库记录和健康心跳为主；下一阶段应补 OpenTelemetry trace/metrics，并把 RunTrace 与 durable Run 建立规范关联。
-9. Evaluation 尚未实际执行目标 Revision，也未成为生产 Deployment 的强制质量门禁。
+4. OpenTelemetry 当前覆盖 Django HTTP、Run 创建和 Attempt 生命周期；Provider 细分 span 与 metrics 尚可继续扩充。
+5. Evaluation 当前支持 Agent/Application 作为可执行目标；Skill 的质量验证仍需由外部评测或后续静态 Skill evaluator 产生通过记录。
+6. 生成契约仍源自 drf-yasg 的 Swagger 2，因此生成流程包含一次确定性的 OpenAPI 3 转换；后续可直接迁移到原生 OpenAPI 3 schema provider。
 
-## 9. 后续演进顺序
+## 9. 本轮落地顺序
 
-1. 完成 Skill Draft → immutable Revision → Deployment 的公开 API，并让 Run 只引用已部署的 Skill Revision。
-2. 抽象 Artifact object writer，先实现 S3/MinIO，再支持多机 Worker 和生命周期存储策略。
-3. 把 Workflow 根 Run 的 child 状态轮询改为终态事件唤醒，使长时间等待不占用 Worker 子进程。
-4. 将租户轮询 claim 演进为全局公平队列，同时保留 PostgreSQL lease/fencing 作为最终一致性保护。
-5. 接入 OpenTelemetry，统一 Run、Attempt、Provider 调用、Usage 与审计 correlation ID。
-6. 让 Evaluation 执行真实目标 Revision，并在 production deploy/rollback 流程中实施质量门禁。
-7. 继续收敛前端 feature slice 与 OpenAPI 类型生成，降低手写接口类型和页面 Store 耦合。
+1. 先统一依赖版本和 CI 基线。
+2. 再实现 Workflow 事件唤醒、全局 Run Queue 与 Artifact 存储端口，消除扩展瓶颈。
+3. 随后通过 Catalog/Execution ports 收紧模块依赖方向。
+4. 在稳定执行基础上完成 Skill 生命周期和 Run Skill Revision 快照。
+5. 最后接入 OpenTelemetry、真实 Evaluation 质量门禁以及前端 feature/OpenAPI 契约生成。
 
 ## 10. 验证结果
 
@@ -243,4 +247,4 @@ Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触�
 - 后端与前端测试数字以当前 CI 运行结果为准，避免在文档中保存会过期的快照。
 - TypeScript 与 Vite 生产构建：通过。
 - 前端已按页面和第三方组件拆包。
-- CI 使用 PostgreSQL 16 运行 Django check、迁移检查、非特权 `NOBYPASSRLS` 应用账号迁移、生产 `check --deploy`、后端全量测试与生产镜像构建，并独立运行前端 lint、test、build 和生产镜像构建。
+- CI 使用 PostgreSQL 16 和 Redis 7.4 运行 Django check、迁移检查、迁移与后端全量测试，并独立校验前端生成类型、lint、test 和生产 build。

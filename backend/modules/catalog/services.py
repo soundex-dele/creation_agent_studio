@@ -3,7 +3,6 @@ import json
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
-from django.db.models import Q
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
@@ -26,8 +25,10 @@ from .models import (
     ApplicationRevision,
     ChatApplicationRevision,
     SkillDraft,
+    SkillDeployment,
     SkillRevision,
 )
+from .ports import catalog_domain_port
 
 
 def canonical_content_hash(content):
@@ -133,6 +134,121 @@ def publish_skill(*, skill, actor, expected_draft_version, release_notes=""):
     )
 
 
+def update_skill_draft(*, skill, actor, expected_version, content):
+    draft = SkillDraft.objects.filter(skill=skill).first()
+    if draft is None or draft.organization_id != skill.organization_id:
+        raise CatalogInvariantViolation(
+            "Draft and definition must belong to the same organization"
+        )
+    updated = SkillDraft.objects.filter(
+        pk=draft.pk,
+        organization_id=skill.organization_id,
+        version=expected_version,
+    ).update(
+        content=content,
+        version=F("version") + 1,
+        updated_by=actor,
+        updated_at=timezone.now(),
+    )
+    if updated != 1:
+        current_version = SkillDraft.objects.filter(pk=draft.pk).values_list(
+            "version", flat=True
+        ).first()
+        raise DraftVersionConflict(
+            f"Draft version changed: expected {expected_version}, found {current_version}"
+        )
+    return SkillDraft.objects.get(pk=draft.pk)
+
+
+def switch_skill_deployment(
+    *, skill, actor, environment, revision_id, expected_version
+):
+    revision = SkillRevision.objects.filter(
+        pk=revision_id,
+        organization_id=skill.organization_id,
+        skill=skill,
+    ).first()
+    if revision is None:
+        raise InvalidDeploymentRevision(
+            "The revision does not belong to this skill and organization."
+        )
+    if environment == "production":
+        catalog_domain_port().enforce_production_quality_gate(
+            organization_id=skill.organization_id,
+            target_type="skill",
+            target_id=skill.id,
+            revision_id=revision.id,
+        )
+    try:
+        with transaction.atomic():
+            deployment = SkillDeployment.objects.select_for_update().filter(
+                skill=skill,
+                organization_id=skill.organization_id,
+                environment=environment,
+            ).first()
+            current_version = deployment.version if deployment else 0
+            if current_version != expected_version:
+                raise DeploymentVersionConflict(
+                    f"Deployment version changed: expected {expected_version}, "
+                    f"found {current_version}"
+                )
+            if deployment is None:
+                return SkillDeployment.objects.create(
+                    organization_id=skill.organization_id,
+                    skill=skill,
+                    environment=environment,
+                    revision=revision,
+                    updated_by=actor,
+                )
+            previous_revision_id = (
+                deployment.revision_id
+                if deployment.revision_id != revision.id
+                else deployment.previous_revision_id
+            )
+            deployment.revision = revision
+            deployment.previous_revision_id = previous_revision_id
+            deployment.version += 1
+            deployment.updated_by = actor
+            deployment.save()
+            return deployment
+    except IntegrityError as exc:
+        current_version = SkillDeployment.objects.filter(
+            skill=skill,
+            organization_id=skill.organization_id,
+            environment=environment,
+        ).values_list("version", flat=True).first()
+        if current_version is not None:
+            raise DeploymentVersionConflict(
+                f"Deployment version changed: expected {expected_version}, "
+                f"found {current_version}"
+            ) from exc
+        raise
+
+
+def rollback_skill_deployment(*, skill, actor, environment, expected_version):
+    with transaction.atomic():
+        deployment = SkillDeployment.objects.select_for_update().filter(
+            skill=skill,
+            organization_id=skill.organization_id,
+            environment=environment,
+        ).first()
+        if deployment is None or deployment.previous_revision_id is None:
+            raise DeploymentRollbackUnavailable(
+                "No previous revision is available for this deployment."
+            )
+        if deployment.version != expected_version:
+            raise DeploymentVersionConflict(
+                f"Deployment version changed: expected {expected_version}, found {deployment.version}"
+            )
+        current_revision_id = deployment.revision_id
+        deployment.revision_id = deployment.previous_revision_id
+        deployment.previous_revision_id = current_revision_id
+        deployment.version += 1
+        deployment.updated_by = actor
+        deployment.save()
+        return deployment
+
+
 def publish_application(*, application, actor, expected_draft_version, release_notes=""):
     draft = ApplicationDraft.objects.filter(application=application).first()
     if draft is None:
@@ -155,29 +271,7 @@ def publish_application(*, application, actor, expected_draft_version, release_n
             errors=[{"field": "kind", "code": "kind_mismatch", "message": "Stable identity and definition kind differ."}],
         )
     if application.kind == application.Kind.CHAT:
-        from apps.agents.models import Agent
-        from apps.applications.models import Skill
-        agent_ids = {binding.agent_id for binding in parsed.agent_bindings}
-        allowed_agents = set(Agent.objects.filter(
-            Q(organization=application.organization) | Q(is_public=True),
-            id__in=agent_ids, is_active=True,
-        ).values_list('id', flat=True))
-        if agent_ids != allowed_agents:
-            raise InvalidApplicationDefinition(
-                "Chat definition references unavailable agents.",
-                errors=[{"field": "agent_bindings", "code": "invalid_reference", "message": "Agent is unavailable in this organization."}],
-            )
-        skill_ids = {binding.skill_id for binding in parsed.skill_bindings}
-        allowed_skills = {str(value) for value in Skill.objects.filter(
-            Q(organization=application.organization) |
-            Q(visibility=Skill.Visibility.PUBLIC),
-            id__in=skill_ids, is_active=True,
-        ).values_list('id', flat=True)}
-        if skill_ids != allowed_skills:
-            raise InvalidApplicationDefinition(
-                "Chat definition references unavailable skills.",
-                errors=[{"field": "skill_bindings", "code": "invalid_reference", "message": "Skill is unavailable in this organization."}],
-            )
+        catalog_domain_port().validate_chat_references(application, parsed)
     revision = _publish(
         definition=application,
         draft_model=ApplicationDraft,
@@ -205,6 +299,13 @@ def switch_agent_deployment(
     if revision is None:
         raise InvalidDeploymentRevision(
             "The revision does not belong to this agent and organization."
+        )
+    if environment == "production":
+        catalog_domain_port().enforce_production_quality_gate(
+            organization_id=agent.organization_id,
+            target_type="agent",
+            target_id=agent.id,
+            revision_id=revision.id,
         )
     config_override = config_override or {}
     with transaction.atomic():
@@ -308,6 +409,13 @@ def switch_application_deployment(
     """Create or switch a deployment using version 0 as the create precondition."""
 
     revision = _deployment_revision(application=application, revision_id=revision_id)
+    if environment == "production":
+        catalog_domain_port().enforce_production_quality_gate(
+            organization_id=application.organization_id,
+            target_type="application",
+            target_id=application.id,
+            revision_id=revision.id,
+        )
     config_override = config_override or {}
 
     try:

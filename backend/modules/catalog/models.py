@@ -184,6 +184,38 @@ class AgentDeployment(TenantOwnedModel):
         ]
 
 
+class SkillDeployment(TenantOwnedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    skill = models.ForeignKey(
+        "applications.Skill", on_delete=models.CASCADE, related_name="deployments"
+    )
+    environment = models.CharField(max_length=20, choices=DeploymentEnvironment.choices)
+    revision = models.ForeignKey(
+        SkillRevision, on_delete=models.PROTECT, related_name="deployments"
+    )
+    previous_revision = models.ForeignKey(
+        SkillRevision,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="previous_deployments",
+    )
+    version = models.PositiveBigIntegerField(default=1)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "skill_deployments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("skill", "environment"),
+                name="unique_skill_deployment_environment",
+            )
+        ]
+
+
 class ApplicationDeployment(TenantOwnedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application = models.ForeignKey(

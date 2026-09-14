@@ -24,7 +24,7 @@ from modules.execution.infrastructure.artifacts import (
     artifact_token,
     decode_artifact_token,
     external_artifact_access_url,
-    open_local_artifact,
+    open_artifact,
 )
 from modules.execution.models import (
     Run,
@@ -129,7 +129,9 @@ class OrganizationRunsView(ProblemDetailsAPIView):
     """Canonical Run history for every executor kind."""
 
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
-    allowed_source_types = {"application", "agent", "conversation", "workflow"}
+    allowed_source_types = {
+        "application", "agent", "conversation", "workflow", "evaluation"
+    }
 
     def get(self, request, organization_id):
         runs = Run.objects.for_organization(organization_id).select_related(
@@ -143,7 +145,10 @@ class OrganizationRunsView(ProblemDetailsAPIView):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     code="invalid_run_source_type",
                     title="Invalid Run source type",
-                    detail="source_type must be application, agent, conversation, or workflow.",
+                    detail=(
+                        "source_type must be application, agent, conversation, "
+                        "workflow, or evaluation."
+                    ),
                 )
             runs = runs.filter(source_type=source_type)
         return Response(RunSerializer(runs[:100], many=True).data)
@@ -336,7 +341,7 @@ class RunArtifactContentView(ProblemDetailsAPIView):
                 detail="The requested artifact is no longer available.",
             )
         try:
-            content = open_local_artifact(artifact)
+            content = open_artifact(artifact)
         except UnsafeArtifactObjectKey:
             return _problem(
                 request,

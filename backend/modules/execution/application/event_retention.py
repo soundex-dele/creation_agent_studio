@@ -12,6 +12,8 @@ STATUS_BY_EVENT = {
     "run.queued": Run.Status.QUEUED,
     "run.started": Run.Status.RUNNING,
     "run.waiting_input": Run.Status.WAITING_INPUT,
+    "run.waiting_children": Run.Status.WAITING_CHILDREN,
+    "run.dependencies_ready": Run.Status.QUEUED,
     "run.cancelling": Run.Status.CANCELLING,
     "run.retry_scheduled": Run.Status.QUEUED,
     "run.succeeded": Run.Status.SUCCEEDED,

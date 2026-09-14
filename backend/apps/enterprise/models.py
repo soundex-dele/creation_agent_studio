@@ -363,6 +363,9 @@ class EvaluationRun(models.Model):
     error = models.TextField(blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
                                    on_delete=models.SET_NULL)
+    execution_run = models.OneToOneField(
+        'execution.Run', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='evaluation_record')
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 

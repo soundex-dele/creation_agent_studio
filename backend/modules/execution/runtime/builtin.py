@@ -1,6 +1,5 @@
 """Built-in adapters for the unified durable execution plane."""
 import os
-import time
 from pathlib import Path
 
 
@@ -60,7 +59,7 @@ def execute_batch_transcribe(run_payload, sink):
         })
         segments, info = whisper.transcribe(video, language=language)
         target = os.path.join(output_dir, f"{Path(video).stem}.txt")
-        with open(target, "w", encoding="utf-8") as handle:
+        with open(target, "w", encoding="utf-8", newline="\n") as handle:
             for segment in segments:
                 handle.write(segment.text.strip() + "\n")
         outputs.append(target)
@@ -78,84 +77,6 @@ def execute_batch_transcribe(run_payload, sink):
         })
         sink.emit("progress.updated", {"current": index, "total": total})
     return {"status": "completed", "files": outputs}
-
-
-def execute_agent_completion(run_payload, sink):
-    """Execute a snapshotted Agent definition as a durable Run."""
-    from apps.enterprise.models import Organization
-    from core.llm.factory import build_agent_engine
-
-    snapshot = dict(run_payload.get("definition_snapshot") or {})
-    definition = dict(snapshot.get("agent_definition") or {})
-    model_config = dict(definition.get("model_config") or {})
-    organization = Organization.objects.get(pk=run_payload["organization_id"])
-    engine = build_agent_engine(
-        organization,
-        model_config.get("model", ""),
-        adapter_name=model_config.get("adapter", ""),
-        working_directory=str((run_payload.get("input") or {}).get("working_directory") or ""),
-    )
-    input_data = dict(run_payload.get("input") or {})
-    checkpoint = ((run_payload.get("checkpoint") or {}).get("metadata") or {}).get(
-        "checkpoint"
-    ) or {}
-    messages = checkpoint.get("messages")
-    if not isinstance(messages, list):
-        history = input_data.get("messages")
-        if not isinstance(history, list):
-            history = [{
-                "role": "user",
-                "content": str(input_data.get("message") or input_data),
-            }]
-        messages = [
-            {"role": "system", "content": str(definition.get("system_prompt") or "")},
-            *history,
-        ]
-
-    resume_command = run_payload.get("resume_command") or {}
-    governance = snapshot.get("governance") or {}
-    approval_decision = ""
-    if resume_command:
-        command_type = resume_command.get("type")
-        command_payload = resume_command.get("payload") or {}
-        if command_type == "answer":
-            answer = command_payload.get("text")
-            if not answer:
-                answer = ", ".join(command_payload.get("selections") or [])
-            messages = [*messages, {"role": "user", "content": str(answer or "")}]
-        elif command_type == "grant_permission":
-            approval_decision = "grant"
-        elif command_type == "deny_permission":
-            approval_decision = "deny"
-            messages = [
-                *messages,
-                {"role": "user", "content": "The requested permission was denied."},
-            ]
-
-    response = engine.complete(
-        messages,
-        approval_decision=approval_decision,
-        require_tool_approval=bool(governance.get("require_tool_approval", False)),
-    )
-    if response.input_request:
-        request = dict(response.input_request)
-        input_kind = request.pop("input_kind", "answer")
-        sink.request_input(
-            input_kind=input_kind,
-            request_payload=request,
-            checkpoint={"messages": messages},
-            expires_in_seconds=int(request.pop("expires_in_seconds", 86400)),
-        )
-    if not response.success:
-        raise RuntimeError(response.error or "Agent execution failed")
-    sink.emit("output.delta", {"text": response.content})
-    output = {
-        "result": response.content,
-        "model": response.model,
-        "usage": response.usage.model_dump(),
-    }
-    sink.emit("output.snapshot", output)
-    return output
 
 
 class _WorkflowSink:
@@ -323,7 +244,7 @@ def _cancel_children(root):
 
     active = root.child_runs.filter(status__in=(
         Run.Status.QUEUED, Run.Status.RUNNING, Run.Status.WAITING_INPUT,
-        Run.Status.CANCELLING,
+        Run.Status.WAITING_CHILDREN, Run.Status.CANCELLING,
     ))
     for child in active:
         if child.status == Run.Status.CANCELLING:
@@ -338,58 +259,68 @@ def _cancel_children(root):
         )
 
 
-def _wait_for_step_runs(root, children, sink, organization_id, poll_interval=0.25):
+def _wait_for_step_runs(root, children, sink, organization_id, poll_interval=None):
+    """Collect completed children or durably release the workflow Worker.
+
+    ``poll_interval`` remains as a compatibility argument for custom adapters;
+    the durable workflow no longer sleeps while its children execute.
+    """
+
     from django.utils import timezone
     from modules.execution.models import Run
     from modules.tenancy.database import tenant_database_context
 
-    pending = dict(children)
     results = {}
-    while pending:
-        with tenant_database_context(organization_id):
-            if sink.cancelled:
-                root.refresh_from_db(fields=("status",))
-                if root.status == Run.Status.CANCELLING:
-                    _cancel_children(root)
-                return None
-            for key, child_id in list(pending.items()):
-                child = Run.objects.get(pk=child_id)
-                if child.status == Run.Status.WAITING_INPUT:
-                    event = child.events.filter(type="input.required").order_by(
-                        "-sequence"
-                    ).first()
-                    request = dict(event.payload if event else {})
-                    input_kind = request.pop("input_kind", child.pending_input_kind)
-                    request.pop("input_request_id", None)
-                    sink.request_input(
-                        input_kind=input_kind,
-                        request_payload=request,
-                        checkpoint={"workflow_child_run_id": str(child.id)},
-                        expires_in_seconds=max(
-                            60,
-                            int((child.pending_input_expires_at - timezone.now()).total_seconds()),
-                        ),
-                    )
-                if child.status == Run.Status.SUCCEEDED:
-                    results[key] = {
-                        "status": "completed",
-                        "attempts": child.attempt_count,
-                        "output": child.output_summary,
-                        "child_run_id": str(child.id),
-                    }
-                    pending.pop(key)
-                elif child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
-                    raise RuntimeError(
-                        f"Workflow step {key} {child.status}: "
-                        f"{child.error_message or child.error_code}"
-                    )
-        if pending:
-            time.sleep(poll_interval)
+    active_ids = []
+    with tenant_database_context(organization_id):
+        if sink.cancelled:
+            root.refresh_from_db(fields=("status",))
+            if root.status == Run.Status.CANCELLING:
+                _cancel_children(root)
+            return None
+        for key, child_id in children.items():
+            child = Run.objects.get(pk=child_id)
+            if child.status == Run.Status.WAITING_INPUT:
+                event = child.events.filter(type="input.required").order_by(
+                    "-sequence"
+                ).first()
+                request = dict(event.payload if event else {})
+                input_kind = request.pop("input_kind", child.pending_input_kind)
+                request.pop("input_request_id", None)
+                sink.request_input(
+                    input_kind=input_kind,
+                    request_payload=request,
+                    checkpoint={"workflow_child_run_id": str(child.id)},
+                    expires_in_seconds=max(
+                        60,
+                        int((child.pending_input_expires_at - timezone.now()).total_seconds()),
+                    ),
+                )
+            if child.status == Run.Status.SUCCEEDED:
+                results[key] = {
+                    "status": "completed",
+                    "attempts": child.attempt_count,
+                    "output": child.output_summary,
+                    "child_run_id": str(child.id),
+                }
+            elif child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
+                raise RuntimeError(
+                    f"Workflow step {key} {child.status}: "
+                    f"{child.error_message or child.error_code}"
+                )
+            else:
+                active_ids.append(child.id)
+    if active_ids:
+        sink.wait_for_children(
+            child_run_ids=active_ids,
+            checkpoint={"workflow_child_run_ids": [str(value) for value in active_ids]},
+        )
     return results
 
 
 def _execute_workflow_durable(run_payload, sink):
     from django.conf import settings
+    from modules.execution.models import Run
     from modules.tenancy.database import tenant_database_context
 
     steps = list((run_payload.get("definition_snapshot") or {}).get("workflow_steps") or [])
@@ -397,8 +328,6 @@ def _execute_workflow_durable(run_payload, sink):
     workflow_input = dict(run_payload.get("input") or {})
     governance = (run_payload.get("definition_snapshot") or {}).get("governance") or {}
     results = {}
-    pending = set(by_key)
-    completed = 0
     max_parallelism = max(1, int(getattr(
         settings, "EXECUTION_WORKFLOW_MAX_PARALLELISM", 4
     )))
@@ -406,6 +335,40 @@ def _execute_workflow_durable(run_payload, sink):
     with tenant_database_context(organization_id):
         root = _load_root_run(run_payload)
         _forward_resume_to_child(root, run_payload)
+        emitted = {
+            event_type: set(
+                root.events.filter(type=event_type).values_list(
+                    "payload__workflow_step_key", flat=True
+                )
+            )
+            for event_type in (
+                "workflow.step.completed",
+                "workflow.step.skipped",
+            )
+        }
+        for child in root.child_runs.all():
+            if child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
+                raise RuntimeError(
+                    f"Workflow step {child.node_key} {child.status}: "
+                    f"{child.error_message or child.error_code}"
+                )
+            if child.status == Run.Status.SUCCEEDED:
+                result = {
+                    "status": "completed",
+                    "attempts": child.attempt_count,
+                    "output": child.output_summary,
+                    "child_run_id": str(child.id),
+                }
+                results[child.node_key] = result
+                if child.node_key not in emitted["workflow.step.completed"]:
+                    _WorkflowSink(sink, by_key[child.node_key]).emit(
+                        "workflow.step.completed", result
+                    )
+        for key in emitted["workflow.step.skipped"]:
+            if key in by_key:
+                results[key] = {"status": "skipped", "attempts": 0, "output": {}}
+    pending = set(by_key) - set(results)
+    completed = len(results)
     while pending:
         ready = sorted(
             key for key in pending
@@ -420,9 +383,10 @@ def _execute_workflow_durable(run_payload, sink):
                 runnable.append(key)
             else:
                 results[key] = {"status": "skipped", "attempts": 0, "output": {}}
-                _WorkflowSink(sink, step).emit(
-                    "workflow.step.skipped", {"condition": step.get("condition") or {}}
-                )
+                if key not in emitted["workflow.step.skipped"]:
+                    _WorkflowSink(sink, step).emit(
+                        "workflow.step.skipped", {"condition": step.get("condition") or {}}
+                    )
                 pending.remove(key)
                 completed += 1
         runnable = runnable[:max_parallelism]
@@ -434,28 +398,21 @@ def _execute_workflow_durable(run_payload, sink):
                 for dependency in step.get("depends_on") or []
             }
             with tenant_database_context(organization_id):
-                child, _created = _create_or_load_step_run(
+                child, created = _create_or_load_step_run(
                     root, step, workflow_input, dependencies, governance
                 )
             children[key] = child.id
-            _WorkflowSink(sink, step).emit("workflow.step.started", {
-                "child_run_id": str(child.id),
-                "status": child.status,
-                "max_attempts": child.max_attempts,
-            })
+            if created:
+                _WorkflowSink(sink, step).emit("workflow.step.started", {
+                    "child_run_id": str(child.id),
+                    "status": child.status,
+                    "max_attempts": child.max_attempts,
+                })
         layer_results = _wait_for_step_runs(
             root,
             children,
             sink,
             organization_id,
-            poll_interval=max(
-                0.1,
-                float(getattr(
-                    settings,
-                    "EXECUTION_WORKFLOW_POLL_INTERVAL_SECONDS",
-                    1.0,
-                )),
-            ),
         )
         if layer_results is None:
             return {"status": "cancelled", "steps": []}

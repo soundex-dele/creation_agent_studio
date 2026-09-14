@@ -14,8 +14,10 @@ from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationRevision,
     DeploymentEnvironment,
+    SkillDeployment,
+    SkillRevision,
 )
-from apps.applications.models import Application
+from apps.applications.models import Application, Skill
 from modules.catalog.services import canonical_content_hash
 from django.utils import timezone
 
@@ -572,6 +574,124 @@ def test_start_application_run_pins_deployed_revision_and_replays(
     assert run.definition_snapshot["application_content_hash"] == revision.content_hash
     assert created.data["stream_url"].endswith(f"/runs/{run.id}/stream")
     assert created["Location"].endswith(f"/runs/{run.id}")
+
+
+@pytest.mark.django_db
+def test_start_application_run_freezes_deployed_skill_revision(
+    authenticated_client, api_actor, api_organization, deployed_application
+):
+    skill = Skill.objects.create(
+        organization=api_organization,
+        owner=api_actor,
+        slug="storyboard-runtime",
+        name="Storyboard Runtime",
+        visibility=Skill.Visibility.ORGANIZATION,
+    )
+    first_content = {"artifact_key": "skills/storyboard/v1"}
+    first = SkillRevision.objects.create(
+        organization=api_organization,
+        skill=skill,
+        revision_no=1,
+        content=first_content,
+        content_hash=canonical_content_hash(first_content),
+        created_by=api_actor,
+    )
+    deployment = SkillDeployment.objects.create(
+        organization=api_organization,
+        skill=skill,
+        environment=DeploymentEnvironment.PRODUCTION,
+        revision=first,
+        updated_by=api_actor,
+    )
+    application_revision = deployed_application.revisions.get()
+    application_content = {
+        **application_revision.content,
+        "dependencies": {"agents": [], "skills": [{"skill_id": str(skill.id)}]},
+    }
+    application_revision = ApplicationRevision.objects.create(
+        organization=api_organization,
+        application=deployed_application,
+        revision_no=2,
+        content=application_content,
+        content_hash=canonical_content_hash(application_content),
+        created_by=api_actor,
+    )
+    ApplicationDeployment.objects.filter(application=deployed_application).update(
+        revision=application_revision, version=2
+    )
+    url = (
+        f"/api/v1/organizations/{api_organization.id}/applications/"
+        f"{deployed_application.id}/runs"
+    )
+
+    created = authenticated_client.post(
+        url, {"environment": "production", "input": {}}, format="json",
+        HTTP_IDEMPOTENCY_KEY="freeze-skill-revision",
+    )
+    assert created.status_code == 202, created.data
+    run = Run.objects.get(pk=created.data["id"])
+    frozen = run.definition_snapshot["skill_revisions"][0]
+
+    second_content = {"artifact_key": "skills/storyboard/v2"}
+    second = SkillRevision.objects.create(
+        organization=api_organization,
+        skill=skill,
+        revision_no=2,
+        content=second_content,
+        content_hash=canonical_content_hash(second_content),
+        created_by=api_actor,
+    )
+    SkillDeployment.objects.filter(pk=deployment.pk).update(
+        revision=second, previous_revision=first, version=2
+    )
+    run.refresh_from_db()
+
+    assert frozen["revision_id"] == str(first.id)
+    assert frozen["deployment_version"] == 1
+    assert frozen["content"] == first_content
+    assert run.definition_snapshot["skill_revisions"][0] == frozen
+
+
+@pytest.mark.django_db
+def test_start_application_run_rejects_undeployed_skill(
+    authenticated_client, api_actor, api_organization, deployed_application
+):
+    skill = Skill.objects.create(
+        organization=api_organization,
+        owner=api_actor,
+        slug="undeployed-skill",
+        name="Undeployed Skill",
+    )
+    base_revision = deployed_application.revisions.get()
+    content = {
+        **base_revision.content,
+        "dependencies": {"agents": [], "skills": [{"skill_id": str(skill.id)}]},
+    }
+    revision = ApplicationRevision.objects.create(
+        organization=api_organization,
+        application=deployed_application,
+        revision_no=2,
+        content=content,
+        content_hash=canonical_content_hash(content),
+        created_by=api_actor,
+    )
+    ApplicationDeployment.objects.filter(application=deployed_application).update(
+        revision=revision, version=2
+    )
+    url = (
+        f"/api/v1/organizations/{api_organization.id}/applications/"
+        f"{deployed_application.id}/runs"
+    )
+
+    response = authenticated_client.post(
+        url, {"environment": "production", "input": {}}, format="json",
+        HTTP_IDEMPOTENCY_KEY="undeployed-skill",
+    )
+
+    assert response.status_code == 409
+    assert response.data["code"] == "deployment_unavailable"
+    assert str(skill.id) in response.data["detail"]
+    assert Run.objects.count() == 0
 
 
 @pytest.mark.django_db

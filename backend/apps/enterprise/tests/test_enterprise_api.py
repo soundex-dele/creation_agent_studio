@@ -8,6 +8,9 @@ from rest_framework.exceptions import PermissionDenied
 from apps.enterprise.models import (
     AuditLog,
     Connector,
+    EvaluationCase,
+    EvaluationRun,
+    EvaluationSuite,
     IdentityProvider,
     Membership,
     ProviderConfig,
@@ -283,3 +286,82 @@ def test_public_sso_discovery_matches_exact_domain_only():
     assert response.data[0]['id'] == provider.id
     assert client.get('/api/v1/enterprise/sso/discovery', {
         'domain': 'evil-example.com'}).data == []
+
+
+def test_evaluation_run_pins_revision_and_uses_durable_execution():
+    from apps.applications.models import Application, ApplicationCategory
+    from apps.enterprise.execution import execute_evaluation
+    from modules.catalog.models import ApplicationRevision
+    from modules.catalog.services import canonical_content_hash
+    from modules.execution.models import Run
+
+    owner = get_user_model().objects.create_user(
+        username='evaluation-owner', password='p')
+    organization = owner.organization_memberships.get().organization
+    category, _ = ApplicationCategory.objects.get_or_create(
+        slug='evaluation-targets', defaults={'name': 'Evaluation Targets'})
+    application = Application.objects.create(
+        organization=organization,
+        created_by=owner,
+        category=category,
+        name='Evaluation Target',
+        slug='evaluation-target',
+        description='Target',
+    )
+    content = {'executor_kind': 'media', 'executor_key': 'batch-transcribe'}
+    revision = ApplicationRevision.objects.create(
+        organization=organization,
+        application=application,
+        revision_no=1,
+        content=content,
+        content_hash=canonical_content_hash(content),
+        created_by=owner,
+    )
+    suite = EvaluationSuite.objects.create(
+        organization=organization,
+        name='Release quality',
+        target_type='application',
+        target_id=str(application.id),
+        evaluators=[{'type': 'exact'}],
+        quality_gate={'minimum_score': 1.0},
+    )
+    case = EvaluationCase.objects.create(
+        suite=suite,
+        name='happy path',
+        input={'text': 'hello'},
+        expected={'value': 'ok'},
+    )
+    client = authenticated_client(owner, organization)
+
+    response = client.post(
+        f'/api/v1/enterprise/evaluations/{suite.id}/run/',
+        {'target_version': str(revision.id)},
+        format='json',
+    )
+
+    assert response.status_code == 202, response.data
+    evaluation = EvaluationRun.objects.get(pk=response.data['id'])
+    root = Run.objects.get(pk=evaluation.execution_run_id)
+    assert evaluation.status == 'queued'
+    assert evaluation.target_version == str(revision.id)
+    assert root.executor_kind == Run.ExecutorKind.EVALUATION
+    assert root.definition_snapshot['target_version'] == str(revision.id)
+    assert root.definition_snapshot['cases'][0]['id'] == str(case.id)
+
+    class Sink:
+        def emit(self, _event_type, _payload):
+            pass
+
+    result = execute_evaluation(
+        {
+            'run_id': str(root.id),
+            'organization_id': str(organization.id),
+            'definition_snapshot': root.definition_snapshot,
+            'input': {'outputs': {str(case.id): {'result': 'ok'}}},
+        },
+        Sink(),
+    )
+    evaluation.refresh_from_db()
+    assert result['passed'] is True
+    assert evaluation.status == 'completed'
+    assert evaluation.passed is True

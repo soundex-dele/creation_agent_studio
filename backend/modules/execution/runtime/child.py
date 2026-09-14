@@ -83,6 +83,19 @@ class ChildEventSink:
         })
         raise _SuspendExecution()
 
+    def wait_for_children(self, *, child_run_ids, checkpoint):
+        """Suspend a workflow attempt without presenting a user-input request."""
+
+        values = [str(value) for value in child_run_ids]
+        if not values:
+            raise ValueError("At least one child Run is required")
+        self._queue.put({
+            "kind": "wait_for_children",
+            "child_run_ids": values,
+            "checkpoint": dict(checkpoint or {}),
+        })
+        raise _SuspendExecution()
+
 
 def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint):
     """Spawn-safe process entry point; adapters receive data and an IPC sink."""

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
+from backend.schema import api_info
 from core.health import health, readiness
 
 # Debug Toolbar URLs - must be first in urlpatterns
@@ -20,14 +20,7 @@ else:
     urlpatterns = []
 
 schema_view = get_schema_view(
-    openapi.Info(
-        title="Creation Agent Studio API",
-        default_version='v1',
-        description="API for Creation Agent Studio - AI-powered video creation platform",
-        terms_of_service="https://www.example.com/terms/",
-        contact=openapi.Contact(email="contact@example.com"),
-        license=openapi.License(name="MIT License"),
-    ),
+    api_info,
     public=True,
     permission_classes=(permissions.AllowAny,),
 )

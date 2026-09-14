@@ -10,20 +10,28 @@ from modules.catalog.errors import (
     DraftVersionConflict,
     InvalidApplicationDefinition,
     InvalidDeploymentRevision,
+    QualityGateNotPassed,
 )
 from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
     DeploymentEnvironment,
+    SkillDeployment,
+    SkillDraft,
+    SkillRevision,
 )
-from apps.applications.models import Application, ApplicationCategory, ChatApplication
+from apps.applications.models import Application, ApplicationCategory, ChatApplication, Skill
 from modules.catalog.services import (
     canonical_content_hash,
     publish_application,
     rollback_application_deployment,
+    rollback_skill_deployment,
     switch_application_deployment,
+    switch_skill_deployment,
     update_application_draft,
+    update_skill_draft,
+    publish_skill,
 )
 from modules.execution.api.base import ProblemDetailsAPIView
 from apps.enterprise.models import Membership
@@ -40,6 +48,10 @@ from .serializers import (
     RollbackApplicationDeploymentSerializer,
     SwitchApplicationDeploymentSerializer,
     UpdateApplicationDraftSerializer,
+    SkillDeploymentSerializer,
+    SkillDraftSerializer,
+    SkillRevisionSerializer,
+    SwitchSkillDeploymentSerializer,
 )
 
 
@@ -79,6 +91,23 @@ def _not_found(request):
     )
 
 
+def _skill(organization_id, skill_id):
+    return Skill.objects.for_organization(organization_id).filter(
+        pk=skill_id,
+        is_active=True,
+    ).first()
+
+
+def _skill_not_found(request):
+    return _problem(
+        request,
+        status_code=status.HTTP_404_NOT_FOUND,
+        code="skill_not_found",
+        title="Skill not found",
+        detail="The requested skill does not exist or is not accessible.",
+    )
+
+
 def _can_manage_production(request):
     if request.user.is_superuser:
         return True
@@ -88,7 +117,7 @@ def _can_manage_production(request):
     ]
 
 
-def _validate_environment(request, environment):
+def _validate_environment(request, environment, *, require_production_admin=True):
     if environment not in DeploymentEnvironment.values:
         return _problem(
             request,
@@ -97,8 +126,10 @@ def _validate_environment(request, environment):
             title="Invalid deployment environment",
             detail="environment must be development, staging, or production.",
         )
-    if environment == DeploymentEnvironment.PRODUCTION and not _can_manage_production(
-        request
+    if (
+        require_production_admin
+        and environment == DeploymentEnvironment.PRODUCTION
+        and not _can_manage_production(request)
     ):
         return _problem(
             request,
@@ -474,6 +505,14 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
                 title="Invalid deployment revision",
                 detail=str(exc),
             )
+        except QualityGateNotPassed as exc:
+            return _problem(
+                request,
+                status_code=status.HTTP_409_CONFLICT,
+                code=exc.code,
+                title="Production quality gate not passed",
+                detail=str(exc),
+            )
         return Response(
             ApplicationDeploymentSerializer(deployment).data,
             status=(
@@ -520,3 +559,213 @@ class OrganizationApplicationDeploymentRollbackView(ProblemDetailsAPIView):
                 detail=str(exc),
             )
         return Response(ApplicationDeploymentSerializer(deployment).data)
+
+
+class OrganizationSkillDraftView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def get(self, request, organization_id, skill_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        draft = SkillDraft.objects.for_organization(organization_id).filter(
+            skill=skill
+        ).first()
+        if draft is None:
+            return _problem(
+                request,
+                status_code=409,
+                code="skill_draft_missing",
+                title="Skill draft missing",
+                detail="The skill does not have an editable draft.",
+            )
+        return Response(SkillDraftSerializer(draft).data)
+
+    def put(self, request, organization_id, skill_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        serializer = UpdateApplicationDraftSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            draft = update_skill_draft(
+                skill=skill,
+                actor=request.user,
+                expected_version=serializer.validated_data["expected_version"],
+                content=serializer.validated_data["content"],
+            )
+        except DraftVersionConflict as exc:
+            return _problem(
+                request, status_code=409, code=exc.problem_code,
+                title="Draft version conflict", detail=_validation_detail(exc),
+            )
+        return Response(SkillDraftSerializer(draft).data)
+
+
+class OrganizationSkillRevisionsView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def get(self, request, organization_id, skill_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        revisions = SkillRevision.objects.for_organization(organization_id).filter(
+            skill=skill
+        ).order_by("revision_no")
+        return Response(SkillRevisionSerializer(revisions, many=True).data)
+
+    def post(self, request, organization_id, skill_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        serializer = PublishApplicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        draft = SkillDraft.objects.for_organization(organization_id).filter(
+            skill=skill
+        ).first()
+        content_hash = canonical_content_hash(draft.content) if draft else None
+        existed = bool(
+            content_hash
+            and SkillRevision.objects.for_organization(organization_id).filter(
+                skill=skill, content_hash=content_hash
+            ).exists()
+        )
+        try:
+            revision = publish_skill(
+                skill=skill,
+                actor=request.user,
+                expected_draft_version=serializer.validated_data["expected_draft_version"],
+                release_notes=serializer.validated_data["release_notes"],
+            )
+        except DraftVersionConflict as exc:
+            return _problem(
+                request, status_code=409, code=exc.problem_code,
+                title="Draft version conflict", detail=_validation_detail(exc),
+            )
+        response = Response(
+            SkillRevisionSerializer(revision).data,
+            status=200 if existed else 201,
+        )
+        if existed:
+            response["Idempotent-Replay"] = "true"
+        return response
+
+
+class OrganizationSkillRevisionView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def get(self, request, organization_id, skill_id, revision_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        revision = SkillRevision.objects.for_organization(organization_id).filter(
+            pk=revision_id, skill=skill
+        ).first()
+        if revision is None:
+            return _problem(
+                request, status_code=404, code="skill_revision_not_found",
+                title="Skill revision not found",
+                detail="The requested revision does not exist or is not accessible.",
+            )
+        return Response(SkillRevisionSerializer(revision).data)
+
+
+class OrganizationSkillDeploymentsView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def get(self, request, organization_id, skill_id):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        deployments = SkillDeployment.objects.for_organization(organization_id).filter(
+            skill=skill
+        ).order_by("environment")
+        return Response(SkillDeploymentSerializer(deployments, many=True).data)
+
+
+class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def get(self, request, organization_id, skill_id, environment):
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        environment_problem = _validate_environment(
+            request, environment, require_production_admin=False
+        )
+        if environment_problem is not None:
+            return environment_problem
+        deployment = SkillDeployment.objects.for_organization(organization_id).filter(
+            skill=skill, environment=environment
+        ).first()
+        if deployment is None:
+            return _problem(
+                request, status_code=404, code="skill_deployment_not_found",
+                title="Skill deployment not found",
+                detail="The requested deployment has not been configured.",
+            )
+        return Response(SkillDeploymentSerializer(deployment).data)
+
+    def put(self, request, organization_id, skill_id, environment):
+        environment_problem = _validate_environment(request, environment)
+        if environment_problem is not None:
+            return environment_problem
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        serializer = SwitchSkillDeploymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            deployment = switch_skill_deployment(
+                skill=skill,
+                actor=request.user,
+                environment=environment,
+                revision_id=serializer.validated_data["revision_id"],
+                expected_version=serializer.validated_data["expected_version"],
+            )
+        except DeploymentVersionConflict as exc:
+            return _problem(
+                request, status_code=409, code=exc.code,
+                title="Skill deployment rejected", detail=str(exc),
+            )
+        except InvalidDeploymentRevision as exc:
+            return _problem(
+                request, status_code=422, code=exc.code,
+                title="Invalid skill deployment revision", detail=str(exc),
+            )
+        except QualityGateNotPassed as exc:
+            return _problem(
+                request, status_code=409, code=exc.code,
+                title="Production quality gate not passed", detail=str(exc),
+            )
+        return Response(
+            SkillDeploymentSerializer(deployment).data,
+            status=201 if serializer.validated_data["expected_version"] == 0 else 200,
+        )
+
+
+class OrganizationSkillDeploymentRollbackView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def post(self, request, organization_id, skill_id, environment):
+        environment_problem = _validate_environment(request, environment)
+        if environment_problem is not None:
+            return environment_problem
+        skill = _skill(organization_id, skill_id)
+        if skill is None:
+            return _skill_not_found(request)
+        serializer = RollbackApplicationDeploymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            deployment = rollback_skill_deployment(
+                skill=skill,
+                actor=request.user,
+                environment=environment,
+                expected_version=serializer.validated_data["expected_version"],
+            )
+        except (DeploymentVersionConflict, DeploymentRollbackUnavailable) as exc:
+            return _problem(
+                request, status_code=409, code=exc.code,
+                title="Skill rollback rejected", detail=str(exc),
+            )
+        return Response(SkillDeploymentSerializer(deployment).data)

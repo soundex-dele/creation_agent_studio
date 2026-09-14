@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 
 from core.agent_engine.models import LLMResponse, TokenUsage
 from modules.execution.runtime import builtin
+from apps.agents.execution import execute_agent_completion
 from modules.execution.application.runs import create_run
 from modules.execution.models import Run
 
@@ -210,11 +211,11 @@ def test_agent_completion_projects_provider_question_to_durable_suspend(monkeypa
             )
 
     monkeypatch.setattr(
-        "core.llm.factory.build_agent_engine", lambda *_args, **_kwargs: FakeEngine()
+        "apps.agents.execution.build_agent_engine", lambda *_args, **_kwargs: FakeEngine()
     )
     sink = _SuspendSink()
     with pytest.raises(RuntimeError, match="suspended"):
-        builtin.execute_agent_completion({
+        execute_agent_completion({
             "organization_id": str(organization.id),
             "definition_snapshot": {"agent_definition": {}},
             "input": {"message": "hello"},
