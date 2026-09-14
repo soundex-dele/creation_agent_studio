@@ -67,6 +67,21 @@ def project_terminal_run(run_id, output):
         ).first()
         if conversation is None:
             return
+        agent_thread = output.get("agent_thread") or {}
+        provider = str(agent_thread.get("provider") or "")
+        thread_id = str(agent_thread.get("id") or "")
+        if not provider or not thread_id:
+            provider = ""
+            thread_id = ""
+        if (
+            conversation.agent_thread_provider != provider
+            or conversation.agent_thread_id != thread_id
+        ):
+            conversation.agent_thread_provider = provider
+            conversation.agent_thread_id = thread_id
+            conversation.save(update_fields=(
+                "agent_thread_provider", "agent_thread_id", "updated_at",
+            ))
         tool_calls = _project_tool_calls(run)
         metadata = {
             "run_id": str(run.id),

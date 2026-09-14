@@ -500,6 +500,35 @@ class _AppServerCodex:
             thread_id=result["thread"]["id"],
         )
 
+    def thread_resume(
+        self,
+        thread_id: str,
+        *,
+        approval_mode: str,
+        base_instructions: Optional[str],
+        cwd: str,
+        model: Optional[str],
+        sandbox: str,
+    ) -> _AppServerThread:
+        approval_policy, approvals_reviewer = _approval_settings(approval_mode)
+        params = {
+            "threadId": thread_id,
+            "cwd": cwd or self._cwd,
+            "approvalPolicy": approval_policy,
+            "approvalsReviewer": approvals_reviewer,
+            "sandbox": sandbox,
+            "baseInstructions": base_instructions,
+            "model": model,
+        }
+        params = {
+            key: value for key, value in params.items() if value not in (None, "")
+        }
+        result = self._transport.request("thread/resume", params)
+        return _AppServerThread(
+            transport=self._transport,
+            thread_id=result["thread"]["id"],
+        )
+
     def close(self) -> None:
         self._transport.close()
 
@@ -620,6 +649,16 @@ def _approval_mode(sdk, configured=None):
         raise ValueError("CODEX_APPROVAL_MODE must be auto_review or deny_all") from exc
 
 
+def _missing_thread_error(exc: Exception) -> bool:
+    detail = str(exc).lower()
+    return any(marker in detail for marker in (
+        "thread not found",
+        "thread does not exist",
+        "no rollout found",
+        "failed to find thread",
+    ))
+
+
 class CodexAdapter(AgentAdapter):
     name = "codex"
     content_mode = "delta"
@@ -648,6 +687,13 @@ class CodexAdapter(AgentAdapter):
 
     def complete(self, messages: list[dict], **options) -> LLMResponse:
         system_prompt, query = format_messages_for_query(messages)
+        requested_thread_id = str(options.get("thread_id") or "").strip()
+        conversational = [item for item in messages if item.get("role") != "system"]
+        resume_messages = [
+            *[item for item in messages if item.get("role") == "system"],
+            *conversational[-1:],
+        ]
+        resume_system_prompt, _ = format_messages_for_query(resume_messages)
         cwd = options.get("working_directory", "") or settings.CODEX_WORKING_DIRECTORY
         sdk, client = self._client(
             cwd=cwd,
@@ -655,16 +701,35 @@ class CodexAdapter(AgentAdapter):
         )
         input_request = None
         try:
-            thread = client.thread_start(
-                approval_mode=_approval_mode(
+            thread_options = {
+                "approval_mode": _approval_mode(
                     sdk,
                     "auto_review" if options.get("require_tool_approval") else None,
                 ),
-                base_instructions=system_prompt or None,
-                cwd=cwd,
-                model=self.model or None,
-                sandbox=_sandbox(sdk),
-            )
+                "base_instructions": (
+                    resume_system_prompt if requested_thread_id else system_prompt
+                ) or None,
+                "cwd": cwd,
+                "model": self.model or None,
+                "sandbox": _sandbox(sdk),
+            }
+            if requested_thread_id:
+                try:
+                    thread = client.thread_resume(
+                        thread_id=requested_thread_id,
+                        **thread_options,
+                    )
+                except Exception as exc:
+                    if not _missing_thread_error(exc):
+                        raise
+                    logger.warning(
+                        "Codex thread %s is unavailable; starting a replacement",
+                        requested_thread_id,
+                    )
+                    thread_options["base_instructions"] = system_prompt or None
+                    thread = client.thread_start(**thread_options)
+            else:
+                thread = client.thread_start(**thread_options)
             result = _consume_codex_turn(
                 thread,
                 query,
@@ -683,4 +748,5 @@ class CodexAdapter(AgentAdapter):
             success=success,
             error=(getattr(result.error, "message", None) if result.error else None),
             input_request=input_request,
+            thread_id=str(thread.id),
         )

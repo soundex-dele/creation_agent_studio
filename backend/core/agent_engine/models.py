@@ -36,6 +36,7 @@ class LLMResponse(BaseModel):
     success: bool = True
     error: str | None = None
     input_request: dict | None = None
+    thread_id: str | None = None
 
 
 class Conversation(BaseModel):

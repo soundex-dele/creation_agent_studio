@@ -136,6 +136,74 @@ class DurableConversationRunTest(TestCase):
             role="user",
         ).count(), 0)
 
+    def test_send_message_carries_existing_agent_thread(self):
+        self.conversation.agent_thread_provider = "codex"
+        self.conversation.agent_thread_id = "thread-1"
+        self.conversation.save(update_fields=(
+            "agent_thread_provider", "agent_thread_id",
+        ))
+
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "continue"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-thread-resume",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        self.assertEqual(run.input["agent_thread"], {
+            "provider": "codex",
+            "id": "thread-1",
+        })
+
+    def test_rejects_a_second_turn_while_conversation_run_is_active(self):
+        first = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "first"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-active-first",
+            **self.headers,
+        )
+        second = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "second"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-active-second",
+            **self.headers,
+        )
+
+        self.assertEqual(first.status_code, 202, first.data)
+        self.assertEqual(second.status_code, 409, second.data)
+        self.assertEqual(Message.objects.filter(
+            conversation=self.conversation,
+            role="user",
+        ).count(), 1)
+
+    def test_clear_removes_messages_and_agent_thread(self):
+        self.conversation.agent_thread_provider = "codex"
+        self.conversation.agent_thread_id = "thread-1"
+        self.conversation.save(update_fields=(
+            "agent_thread_provider", "agent_thread_id",
+        ))
+        Message.objects.create(
+            conversation=self.conversation,
+            role="user",
+            content="clear me",
+        )
+
+        response = self.client.delete(
+            f"/api/v1/conversations/{self.conversation.id}/clear/",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.conversation.refresh_from_db()
+        self.assertEqual(self.conversation.agent_thread_provider, "")
+        self.assertEqual(self.conversation.agent_thread_id, "")
+        self.assertFalse(self.conversation.messages.exists())
+
     def test_terminal_projection_preserves_tool_history(self):
         response = self.client.post(
             f"/api/v1/conversations/{self.conversation.id}/send_message/",
@@ -172,9 +240,13 @@ class DurableConversationRunTest(TestCase):
             "result": "done",
             "model": "test-model",
             "usage": {"total_tokens": 4},
+            "agent_thread": {"provider": "codex", "id": "thread-1"},
         })
 
         message = Message.objects.get(run=run)
+        self.conversation.refresh_from_db()
+        self.assertEqual(self.conversation.agent_thread_provider, "codex")
+        self.assertEqual(self.conversation.agent_thread_id, "thread-1")
         self.assertEqual(message.content, "done")
         self.assertEqual(message.metadata["agent"]["tool_calls"], [{
             "id": "call-1",

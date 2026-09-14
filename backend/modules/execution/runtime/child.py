@@ -1,4 +1,6 @@
 import importlib
+import logging
+import time
 from pathlib import Path
 
 
@@ -100,8 +102,13 @@ class ChildEventSink:
 def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint):
     """Spawn-safe process entry point; adapters receive data and an IPC sink."""
 
+    started = time.perf_counter()
     try:
         _initialize_django()
+        logging.getLogger(__name__).info(
+            "chat_latency stage=child_django_ready run_id=%s init_ms=%.1f",
+            run_payload.get("run_id", "unknown"), (time.perf_counter() - started) * 1000,
+        )
         adapter = _load_entrypoint(adapter_entrypoint)
         output = adapter(run_payload, ChildEventSink(message_queue, cancel_event))
         outcome = "cancelled" if cancel_event.is_set() else "succeeded"

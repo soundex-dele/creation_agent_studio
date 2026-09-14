@@ -187,6 +187,117 @@ class CodexIntegrationTest(TestCase):
         })
         self.assertEqual(events[-1][1]["result"], "E:/workspace")
 
+    @override_settings(
+        CODEX_SANDBOX="workspace-write",
+        CODEX_APPROVAL_MODE="deny_all",
+        CODEX_WORKING_DIRECTORY="D:/workspace",
+        CODEX_MODEL="",
+    )
+    def test_resumes_existing_thread_with_only_current_system_instructions(self):
+        notifications = [
+            SimpleNamespace(
+                method="item/agentMessage/delta",
+                payload=SimpleNamespace(delta="continued"),
+            ),
+            SimpleNamespace(
+                method="turn/completed",
+                payload=SimpleNamespace(turn=SimpleNamespace(
+                    status="completed", error=None,
+                )),
+            ),
+        ]
+        turn = MagicMock()
+        turn.stream.return_value = iter(notifications)
+        thread = MagicMock(id="thread-1")
+        thread.turn.return_value = turn
+        client = MagicMock()
+        client.input_request = None
+        client.thread_resume.return_value = thread
+        sdk = SimpleNamespace(
+            Sandbox=SimpleNamespace(
+                read_only="read-only",
+                workspace_write="workspace-write",
+                full_access="danger-full-access",
+            ),
+            ApprovalMode=SimpleNamespace(
+                auto_review="auto_review",
+                deny_all="deny_all",
+            ),
+        )
+        adapter = CodexAdapter()
+
+        with patch.object(adapter, "_client", return_value=(sdk, client)):
+            response = adapter.complete(
+                [
+                    {"role": "system", "content": "current instructions"},
+                    {"role": "user", "content": "old question"},
+                    {"role": "assistant", "content": "old answer"},
+                    {"role": "user", "content": "new question"},
+                ],
+                thread_id="thread-1",
+            )
+
+        self.assertEqual(response.content, "continued")
+        self.assertEqual(response.thread_id, "thread-1")
+        client.thread_resume.assert_called_once()
+        resume_options = client.thread_resume.call_args.kwargs
+        self.assertEqual(resume_options["thread_id"], "thread-1")
+        self.assertEqual(resume_options["base_instructions"], "current instructions")
+        self.assertNotIn("old question", resume_options["base_instructions"])
+        thread.turn.assert_called_once_with("new question", model=None)
+        client.thread_start.assert_not_called()
+        client.close.assert_called_once()
+
+    @override_settings(
+        CODEX_SANDBOX="workspace-write",
+        CODEX_APPROVAL_MODE="deny_all",
+        CODEX_WORKING_DIRECTORY="D:/workspace",
+        CODEX_MODEL="",
+    )
+    def test_replaces_a_missing_persisted_thread_with_full_history(self):
+        turn = MagicMock()
+        turn.stream.return_value = iter([
+            SimpleNamespace(
+                method="turn/completed",
+                payload=SimpleNamespace(turn=SimpleNamespace(
+                    status="completed", error=None,
+                )),
+            ),
+        ])
+        thread = MagicMock(id="thread-2")
+        thread.turn.return_value = turn
+        client = MagicMock()
+        client.input_request = None
+        client.thread_resume.side_effect = RuntimeError("thread not found")
+        client.thread_start.return_value = thread
+        sdk = SimpleNamespace(
+            Sandbox=SimpleNamespace(
+                read_only="read-only",
+                workspace_write="workspace-write",
+                full_access="danger-full-access",
+            ),
+            ApprovalMode=SimpleNamespace(
+                auto_review="auto_review",
+                deny_all="deny_all",
+            ),
+        )
+        adapter = CodexAdapter()
+
+        with patch.object(adapter, "_client", return_value=(sdk, client)):
+            response = adapter.complete(
+                [
+                    {"role": "system", "content": "instructions"},
+                    {"role": "user", "content": "old question"},
+                    {"role": "assistant", "content": "old answer"},
+                    {"role": "user", "content": "new question"},
+                ],
+                thread_id="missing-thread",
+            )
+
+        self.assertEqual(response.thread_id, "thread-2")
+        start_options = client.thread_start.call_args.kwargs
+        self.assertIn("old question", start_options["base_instructions"])
+
     @override_settings(CODEX_SDK_PATH="D:/missing-codex-sdk")
     def test_python_sdk_transport_reports_missing_opt_in_dependency(self):
         load_codex_sdk.cache_clear()

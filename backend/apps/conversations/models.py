@@ -29,6 +29,8 @@ class Conversation(models.Model):
     # Template process id (e.g. "cover", "copy") identifying the flow within the workspace.
     process_id = models.CharField(max_length=64, blank=True, default='')
     working_directory = models.CharField(max_length=1000, blank=True, default='')
+    agent_thread_provider = models.CharField(max_length=32, blank=True, default='')
+    agent_thread_id = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -37,6 +39,16 @@ class Conversation(models.Model):
     class Meta:
         ordering = ['-updated_at']
         db_table = 'conversations'
+        constraints = [models.CheckConstraint(
+            condition=(
+                models.Q(agent_thread_provider='', agent_thread_id='')
+                | (
+                    ~models.Q(agent_thread_provider='')
+                    & ~models.Q(agent_thread_id='')
+                )
+            ),
+            name='conversation_agent_thread_consistent',
+        )]
 
     @property
     def application_id(self):

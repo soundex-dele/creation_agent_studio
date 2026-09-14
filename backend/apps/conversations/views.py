@@ -1,4 +1,6 @@
 """Conversation resources backed exclusively by the durable Run plane."""
+import logging
+import time
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -25,8 +27,11 @@ from modules.execution.application.errors import (
     IdempotencyKeyReused,
     InvalidExecutionDefinition,
 )
-from modules.execution.application.start_runs import start_agent_run
-from modules.execution.models import Run
+from modules.execution.application.start_runs import (
+    CREATE_AGENT_RUN_OPERATION,
+    start_agent_run,
+)
+from modules.execution.models import IdempotencyRecord, Run
 
 from .models import Conversation, ConversationSkillBinding, Message
 from .serializers import (
@@ -38,6 +43,11 @@ from .serializers import (
 
 
 GENERAL_AGENT_SLUG = "general"
+logger = logging.getLogger(__name__)
+
+
+class ConversationRunActive(Exception):
+    pass
 
 
 def resolve_agent(agent_id, organization):
@@ -265,8 +275,34 @@ class ConversationViewSet(viewsets.ViewSet):
         idempotency_key,
         requested_agent_id=None,
     ):
+        conversation = Conversation.objects.select_for_update().get(
+            pk=conversation.pk,
+            organization_id=conversation.organization_id,
+            user_id=conversation.user_id,
+        )
         organization = conversation.organization
         agent = resolve_agent(requested_agent_id or conversation.agent_id, organization)
+        is_idempotent_replay = IdempotencyRecord.objects.for_organization(
+            organization.id
+        ).filter(
+            actor=request.user,
+            operation=CREATE_AGENT_RUN_OPERATION,
+            key=idempotency_key,
+        ).exists()
+        if not is_idempotent_replay and Run.objects.for_organization(
+            organization.id
+        ).filter(
+            source_type="conversation",
+            source_id=str(conversation.id),
+            status__in=(
+                Run.Status.QUEUED,
+                Run.Status.RUNNING,
+                Run.Status.WAITING_INPUT,
+                Run.Status.WAITING_CHILDREN,
+                Run.Status.CANCELLING,
+            ),
+        ).exists():
+            raise ConversationRunActive("当前对话仍在执行，请等待本轮完成后再发送。")
         history = list(
             conversation.messages.order_by("created_at", "id").values("role", "content")
         )[-99:]
@@ -280,6 +316,10 @@ class ConversationViewSet(viewsets.ViewSet):
                 "message": message,
                 "messages": history,
                 "working_directory": conversation.working_directory,
+                "agent_thread": {
+                    "provider": conversation.agent_thread_provider,
+                    "id": conversation.agent_thread_id,
+                } if conversation.agent_thread_id else {},
             },
             idempotency_key=idempotency_key,
             idempotency_input_data={"message": message},
@@ -302,6 +342,8 @@ class ConversationViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["post"])
     def send_message(self, request, pk=None):
+        started = time.perf_counter()
+        logger.info("chat_latency stage=request_received conversation_id=%s", pk)
         conversation = self.get_conversation(request, pk)
         serializer = SendMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -322,7 +364,13 @@ class ConversationViewSet(viewsets.ViewSet):
             return Response({"detail": str(exc)}, status=409)
         except IdempotencyKeyReused as exc:
             return Response({"detail": str(exc)}, status=409)
+        except ConversationRunActive as exc:
+            return Response({"detail": str(exc)}, status=409)
         response = Response(RunSerializer(run).data, status=202)
+        logger.info(
+            "chat_latency stage=run_created conversation_id=%s run_id=%s elapsed_ms=%.1f replayed=%s",
+            pk, run.id, (time.perf_counter() - started) * 1000, replayed,
+        )
         if replayed:
             response["Idempotent-Replay"] = "true"
         return response
@@ -330,7 +378,18 @@ class ConversationViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["delete"])
     def clear(self, request, pk=None):
         conversation = self.get_conversation(request, pk)
-        conversation.messages.all().delete()
+        with transaction.atomic():
+            conversation = Conversation.objects.select_for_update().get(
+                pk=conversation.pk,
+                organization_id=conversation.organization_id,
+                user_id=conversation.user_id,
+            )
+            conversation.messages.all().delete()
+            conversation.agent_thread_provider = ''
+            conversation.agent_thread_id = ''
+            conversation.save(update_fields=(
+                'agent_thread_provider', 'agent_thread_id', 'updated_at',
+            ))
         return Response({"detail": "对话已清空"})
 
     @action(detail=True, methods=["delete"])

@@ -1,4 +1,5 @@
 import multiprocessing
+import logging
 import queue
 import time
 import hashlib
@@ -55,6 +56,7 @@ ADAPTER_EVENT_TYPES = {
     "workflow.step.failed",
     "workflow.step.skipped",
 }
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -145,6 +147,12 @@ class ExecutionCoordinator:
         }
 
     def _start_claimed(self, claimed):
+        logger.info(
+            "chat_latency stage=worker_claimed run_id=%s attempt_id=%s run_age_ms=%.1f worker=%s",
+            claimed.run.id, claimed.attempt.id,
+            (timezone.now() - claimed.run.created_at).total_seconds() * 1000,
+            self.worker_id,
+        )
         span = start_execution_span(
             "execution.attempt", run=claimed.run, attempt=claimed.attempt
         )

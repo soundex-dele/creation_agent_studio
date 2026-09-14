@@ -1,10 +1,12 @@
 import asyncio
 import json
+import logging
 import time
 
 from asgiref.sync import sync_to_async
 from channels.layers import InMemoryChannelLayer, get_channel_layer
 from django.db import close_old_connections
+from django.utils import timezone
 
 from modules.execution.api.serializers import RunEventSerializer
 from modules.execution.models import Run, RunEvent
@@ -17,6 +19,7 @@ class StreamAccessLost(Exception):
 
 
 TERMINAL_EVENT_TYPES = {"run.succeeded", "run.failed", "run.cancelled"}
+logger = logging.getLogger(__name__)
 
 
 def _cross_process_channel_layer(layer):
@@ -75,6 +78,12 @@ async def stream_run_events(
     """Subscribe first, then replay and continuously fill from the database."""
 
     channel_layer = _cross_process_channel_layer(get_channel_layer())
+    started = time.monotonic()
+    seen_types = set()
+    logger.info(
+        "chat_latency stage=sse_open run_id=%s after=%s transport=%s",
+        run_id, after, "notifications" if channel_layer else "polling",
+    )
     channel_name = None
     group_name = f"run-{run_id}"
     if channel_layer is not None:
@@ -100,6 +109,14 @@ async def stream_run_events(
                 for event in events:
                     cursor = event.sequence
                     last_write = time.monotonic()
+                    if event.type not in seen_types:
+                        seen_types.add(event.type)
+                        logger.info(
+                            "chat_latency stage=sse_first_event run_id=%s type=%s sequence=%s elapsed_ms=%.1f persisted_age_ms=%.1f",
+                            run_id, event.type, event.sequence,
+                            (last_write - started) * 1000,
+                            (timezone.now() - event.created_at).total_seconds() * 1000,
+                        )
                     yield encode_event(event)
                     if event.type in TERMINAL_EVENT_TYPES:
                         return

@@ -52,3 +52,7 @@ class AgentEngine:
             response.error,
         )
         return response
+
+    @property
+    def adapter_name(self) -> str:
+        return self._adapter.name

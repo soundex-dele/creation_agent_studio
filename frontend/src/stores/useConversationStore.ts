@@ -303,6 +303,15 @@ export const useConversationStore = create<ConversationState>()(
         ),
 
         sendMessageStream: (conversationId, content, options = {}) => {
+          const started = performance.now();
+          const seenEventTypes = new Set<string>();
+          const logTiming = (stage: string, details: Record<string, unknown> = {}) => {
+            console.info('[chat_latency]', {
+              stage, conversationId, elapsedMs: Math.round(performance.now() - started),
+              ...details,
+            });
+          };
+          logTiming('send');
           const controller = new AbortController();
           let stream: RunStreamHandle | null = null;
           const current = get().currentConversation;
@@ -339,6 +348,7 @@ export const useConversationStore = create<ConversationState>()(
           });
 
           void get().sendMessage(conversationId, content).then((run) => {
+            logTiming('run_response', { runId: run.id });
             if (controller.signal.aborted) return;
             set({ activeRun: run, isLoading: false });
             let projection = createRunEventState(run.id);
@@ -346,6 +356,15 @@ export const useConversationStore = create<ConversationState>()(
               organizationId: run.organization_id,
               runId: run.id,
               onEvent: (event) => {
+                if (!seenEventTypes.has(event.type)) {
+                  seenEventTypes.add(event.type);
+                  logTiming('first_event', { runId: run.id, type: event.type, sequence: event.sequence });
+                  if (event.type === 'output.delta' || event.type === 'output.snapshot') {
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                      logTiming('output_paint_opportunity', { runId: run.id });
+                    }));
+                  }
+                }
                 projection = ingestRunEvent(projection, event).state;
                 applyRunProjection(conversationId, projection, event);
               },
@@ -354,6 +373,7 @@ export const useConversationStore = create<ConversationState>()(
                 applyRunProjection(conversationId, projection);
               },
               onError: (error) => {
+                logTiming('stream_error', { runId: run.id, errorType: error.name });
                 if (!controller.signal.aborted && get().streamingMessageId) {
                   set({ error: `Run 事件流错误: ${error.message}` });
                 }

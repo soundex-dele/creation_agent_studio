@@ -106,3 +106,30 @@ class DurableAgentAdapterTest(TestCase):
             self._payload(self.organization.id), MagicMock(cancelled=False)
         )
         self.assertEqual(output["usage"]["total_tokens"], 8)
+
+    @patch("apps.agents.execution.build_agent_engine")
+    def test_reuses_and_returns_provider_thread(self, mock_factory):
+        engine = MagicMock()
+        engine.adapter_name = "codex"
+        engine.complete.return_value = LLMResponse(
+            content="continued",
+            usage=TokenUsage(),
+            model="codex-default",
+            thread_id="thread-1",
+        )
+        mock_factory.return_value = engine
+        payload = self._payload(self.organization.id)
+        payload["input"]["agent_thread"] = {
+            "provider": "codex",
+            "id": "thread-1",
+        }
+
+        output = execute_agent_completion(
+            payload, MagicMock(cancelled=False)
+        )
+
+        self.assertEqual(engine.complete.call_args.kwargs["thread_id"], "thread-1")
+        self.assertEqual(output["agent_thread"], {
+            "provider": "codex",
+            "id": "thread-1",
+        })
