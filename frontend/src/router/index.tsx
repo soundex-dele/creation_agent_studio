@@ -19,6 +19,7 @@ const WorkspacePage = lazy(() => import('@/pages/Workspace/WorkspacePage'));
 const WorkflowsPage = lazy(() => import('@/pages/Workflows/WorkflowsPage'));
 const WorkflowEditorPage = lazy(() => import('@/pages/Workflows/WorkflowEditorPage'));
 const WorkflowRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowRunnerPage'));
+const WorkflowManualRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowManualRunnerPage'));
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
@@ -103,7 +104,7 @@ const router = createBrowserRouter([
     path: '/applications/:applicationId/chat',
     element: (
       <ProtectedRoute>
-        <MainLayout hideSidebar hideHeader>
+        <MainLayout hideSidebar hideHeader fullBleed>
           {page(<ChatApplicationRuntimePage />)}
         </MainLayout>
       </ProtectedRoute>
@@ -146,6 +147,10 @@ const router = createBrowserRouter([
   {
     path: '/workflows/:id/edit',
     element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/workflows/:id/manual',
+    element: <ProtectedRoute><MainLayout hideSidebar hideHeader fullBleed>{page(<WorkflowManualRunnerPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/runs/:runId',

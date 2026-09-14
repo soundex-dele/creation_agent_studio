@@ -9,26 +9,37 @@ interface MainLayoutProps {
   hideSidebar?: boolean;
   /** Hide the top header (nav + account) for a fullscreen launched-app view. */
   hideHeader?: boolean;
+  /** Let the child own all viewport spacing, e.g. a workflow or embedded app shell. */
+  fullBleed?: boolean;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children, hideSidebar, hideHeader }) => {
+const MainLayout: React.FC<MainLayoutProps> = ({
+  children,
+  hideSidebar,
+  hideHeader,
+  fullBleed,
+}) => {
   const location = useLocation();
+  const embedded = new URLSearchParams(location.search).get('embedded') === '1';
+  const shouldHideSidebar = Boolean(hideSidebar || embedded);
+  const shouldHideHeader = Boolean(hideHeader || embedded);
   // Chat page needs full-height content without padding
   const isChatPage = location.pathname === '/' || location.pathname === '';
+  const shouldUseFullBleed = Boolean(isChatPage || fullBleed || embedded);
 
   const layoutClass = [
     'app-layout',
-    hideSidebar && 'app-layout--nosidebar',
-    hideHeader && 'app-layout--noheader',
+    shouldHideSidebar && 'app-layout--nosidebar',
+    shouldHideHeader && 'app-layout--noheader',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
     <div className={layoutClass}>
-      {!hideHeader && <Header />}
-      {!hideSidebar && <Sidebar />}
-      <main className={`app-main ${isChatPage ? '' : 'app-main--padded'}`}>
+      {!shouldHideHeader && <Header />}
+      {!shouldHideSidebar && <Sidebar />}
+      <main className={`app-main ${shouldUseFullBleed ? '' : 'app-main--padded'}`}>
         {children}
       </main>
     </div>

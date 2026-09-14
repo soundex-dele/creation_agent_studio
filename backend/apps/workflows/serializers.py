@@ -23,8 +23,8 @@ class WorkflowListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'is_public', 'step_count',
-                  'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode',
+                  'is_public', 'step_count', 'created_at', 'updated_at']
 
 
 class WorkflowDetailSerializer(serializers.ModelSerializer):
@@ -32,8 +32,8 @@ class WorkflowDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'is_public', 'steps',
-                  'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode',
+                  'is_public', 'steps', 'created_at', 'updated_at']
 
 
 class WorkflowWriteSerializer(serializers.ModelSerializer):
@@ -41,7 +41,8 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'is_public', 'steps']
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode',
+                  'is_public', 'steps']
         read_only_fields = ['id']
 
     def validate_steps(self, value):

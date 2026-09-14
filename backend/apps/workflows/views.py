@@ -2,7 +2,9 @@
 from copy import deepcopy
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -20,6 +22,7 @@ from modules.catalog.services import canonical_content_hash
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import IdempotencyKeyReused
 from modules.execution.application.start_runs import start_workflow_run
+from modules.execution.models import Run, RunEvent
 
 from .models import Workflow
 from .serializers import (
@@ -125,6 +128,40 @@ def _chat_step_snapshot(step, organization):
     }
 
 
+def _backfill_manual_conversations(workflow, run, user):
+    """Recover chat links for manual Runs created before explicit binding."""
+
+    from apps.conversations.models import Conversation
+
+    summary = dict(run.output_summary or {})
+    conversations = dict(summary.get("conversations") or {})
+    changed = False
+    chat_steps = workflow.steps.select_related("application").filter(
+        application__kind=Application.Kind.CHAT,
+    )
+    for step in chat_steps:
+        if step.key in conversations:
+            continue
+        candidates = Conversation.objects.filter(
+            organization=workflow.organization,
+            user=user,
+            chat_application_id=step.application_id,
+        )
+        if run.started_at:
+            candidates = candidates.filter(created_at__gte=run.started_at)
+        if run.finished_at:
+            candidates = candidates.filter(created_at__lte=run.finished_at)
+        conversation = candidates.order_by("-created_at").first()
+        if conversation is not None:
+            conversations[step.key] = str(conversation.id)
+            changed = True
+    if changed:
+        summary["conversations"] = conversations
+        Run.objects.filter(pk=run.pk).update(output_summary=summary)
+        run.output_summary = summary
+    return run
+
+
 class WorkflowViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, OrganizationRolePermission]
 
@@ -163,9 +200,166 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("无权删除该工作流。")
         instance.delete()
 
+    @action(detail=True, methods=["post"], url_path="manual-session")
+    def manual_session(self, request, pk=None):
+        workflow = self.get_object()
+        if workflow.execution_mode != Workflow.ExecutionMode.MANUAL:
+            return Response(
+                {"detail": "只有手动工作流可以创建手动执行记录。"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        run_id = request.data.get("run_id")
+        action_name = request.data.get("action", "open")
+        runs = Run.objects.for_organization(workflow.organization_id).filter(
+            owner=request.user,
+            executor_kind=Run.ExecutorKind.WORKFLOW,
+            executor_key="workflow-manual",
+            source_type="workflow",
+            source_id=str(workflow.id),
+        )
+
+        if run_id:
+            run = runs.filter(pk=run_id).first()
+            if run is None:
+                return Response({"detail": "手动执行记录不存在。"}, status=404)
+        elif action_name == "open":
+            run = runs.filter(status=Run.Status.RUNNING).order_by("-created_at").first()
+        else:
+            run = None
+
+        if action_name == "complete":
+            if run is None:
+                return Response({"detail": "请提供要完成的手动执行记录。"}, status=400)
+            if run.status == Run.Status.RUNNING:
+                with transaction.atomic():
+                    locked = Run.objects.select_for_update().get(pk=run.pk)
+                    if locked.status == Run.Status.RUNNING:
+                        now = timezone.now()
+                        locked.status = Run.Status.SUCCEEDED
+                        locked.finished_at = now
+                        locked.version += 1
+                        locked.next_event_sequence += 1
+                        locked.save(update_fields=(
+                            "status", "finished_at", "version", "next_event_sequence",
+                        ))
+                        RunEvent.objects.create(
+                            organization=workflow.organization,
+                            run=locked,
+                            sequence=locked.next_event_sequence,
+                            type="run.succeeded",
+                            payload={"completed_at": now.isoformat(), "manual": True},
+                        )
+                run.refresh_from_db()
+            return Response(RunSerializer(run).data)
+
+        if action_name == "attach_conversation":
+            if run is None:
+                return Response({"detail": "请提供手动执行记录。"}, status=400)
+            if run.status != Run.Status.RUNNING:
+                return Response({"detail": "已结束的手动执行不能添加对话。"}, status=409)
+            step_key = str(request.data.get("step_key") or "")
+            conversation_id = request.data.get("conversation_id")
+            step = workflow.steps.select_related("application").filter(
+                key=step_key,
+                application__kind=Application.Kind.CHAT,
+            ).first()
+            if step is None:
+                return Response({"detail": "聊天应用步骤不存在。"}, status=400)
+
+            from apps.conversations.models import Conversation
+            conversation = Conversation.objects.filter(
+                pk=conversation_id,
+                organization=workflow.organization,
+                user=request.user,
+                chat_application_id=step.application_id,
+            ).first()
+            if conversation is None:
+                return Response({"detail": "对话与当前工作流应用不匹配。"}, status=400)
+
+            with transaction.atomic():
+                locked = Run.objects.select_for_update().get(pk=run.pk)
+                summary = dict(locked.output_summary or {})
+                conversations = dict(summary.get("conversations") or {})
+                conversations[step.key] = str(conversation.id)
+                summary["conversations"] = conversations
+                locked.output_summary = summary
+                locked.version += 1
+                locked.next_event_sequence += 1
+                locked.save(update_fields=(
+                    "output_summary", "version", "next_event_sequence",
+                ))
+                RunEvent.objects.create(
+                    organization=workflow.organization,
+                    run=locked,
+                    sequence=locked.next_event_sequence,
+                    type="workflow.manual.conversation_attached",
+                    payload={
+                        "step_key": step.key,
+                        "conversation_id": str(conversation.id),
+                    },
+                )
+            run.refresh_from_db()
+            return Response(RunSerializer(run).data)
+
+        if action_name != "open":
+            return Response({"detail": "不支持的手动执行操作。"}, status=400)
+
+        if run is None:
+            steps = list(workflow.steps.select_related("application").order_by("order", "id"))
+            if not steps:
+                return Response({"detail": "工作流至少需要一个应用。"}, status=400)
+            now = timezone.now()
+            with transaction.atomic():
+                # Serialize page mounts so development double-effects and quick
+                # reopen actions reuse the same active manual execution.
+                Workflow.objects.select_for_update().get(pk=workflow.pk)
+                run = runs.filter(status=Run.Status.RUNNING).order_by("-created_at").first()
+                if run is None:
+                    run = Run.objects.create(
+                        organization=workflow.organization,
+                        owner=request.user,
+                        executor_kind=Run.ExecutorKind.WORKFLOW,
+                        executor_key="workflow-manual",
+                        source_type="workflow",
+                        source_id=str(workflow.id),
+                        status=Run.Status.RUNNING,
+                        max_attempts=1,
+                        retry_safe=False,
+                        version=1,
+                        next_event_sequence=1,
+                        started_at=now,
+                        definition_snapshot={
+                            "workflow_id": str(workflow.id),
+                            "workflow_name": workflow.name,
+                            "execution_mode": Workflow.ExecutionMode.MANUAL,
+                            "workflow_steps": [{
+                                "id": str(step.id),
+                                "key": step.key,
+                                "name": step.name or step.application.name,
+                                "application_id": step.application_id,
+                            } for step in steps],
+                        },
+                        input={},
+                    )
+                    RunEvent.objects.create(
+                        organization=workflow.organization,
+                        run=run,
+                        sequence=1,
+                        type="run.started",
+                        payload={"started_at": now.isoformat(), "manual": True},
+                    )
+        run = _backfill_manual_conversations(workflow, run, request.user)
+        return Response(RunSerializer(run).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         workflow = self.get_object()
+        if workflow.execution_mode != Workflow.ExecutionMode.AUTOMATIC:
+            return Response(
+                {"detail": "手动工作流需要从应用列表逐个打开执行，不能自动启动。"},
+                status=status.HTTP_409_CONFLICT,
+            )
         idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
         if not idempotency_key or len(idempotency_key) > 160:
             return Response(

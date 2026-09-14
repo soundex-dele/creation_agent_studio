@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Input, InputNumber, Select, Spin, message } from 'antd';
+import { Button, Card, Empty, Input, InputNumber, Segmented, Select, Spin, message } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -106,6 +106,7 @@ const WorkflowEditorPage = () => {
         name: workflow.name,
         description: workflow.description || '',
         icon: workflow.icon || '🔀',
+        execution_mode: workflow.execution_mode,
         is_public: workflow.is_public,
         steps: steps.map((step, order) => ({
           application_id: step.application_id || step.application.id,
@@ -134,6 +135,25 @@ const WorkflowEditorPage = () => {
           <Input.TextArea value={workflow.description}
             placeholder="说明这个工作流要完成什么"
             onChange={(event) => setWorkflow({ ...workflow, description: event.target.value })} />
+          <div className="workflow-mode-field">
+            <span>执行方式</span>
+            <Segmented
+              value={workflow.execution_mode}
+              options={[
+                { label: '手动执行', value: 'manual' },
+                { label: '自动执行', value: 'automatic' },
+              ]}
+              onChange={(value) => setWorkflow({
+                ...workflow,
+                execution_mode: value as Workflow['execution_mode'],
+              })}
+            />
+            <small>
+              {workflow.execution_mode === 'manual'
+                ? '运行时从左侧列表选择应用并手动操作。'
+                : '运行时按照步骤依赖自动执行。'}
+            </small>
+          </div>
         </div>
         <Button type="primary" loading={saving} onClick={save}>保存工作流</Button>
       </div>
@@ -153,22 +173,26 @@ const WorkflowEditorPage = () => {
               <div className="workflow-step-copy">
                 <strong>{step.name || step.application.application_name}</strong>
                 <span>{step.application.application_description}</span>
-                <Select
-                  mode="multiple"
-                  value={step.depends_on || []}
-                  placeholder="无依赖（可并行）"
-                  options={steps.filter((candidate) => candidate.key !== step.key).map((candidate) => ({
-                    value: candidate.key,
-                    label: candidate.name || candidate.application.application_name,
-                  }))}
-                  onChange={(depends_on) => setSteps((current) => current.map((item) =>
-                    item.key === step.key ? { ...item, depends_on } : item))}
-                />
-                <span>
-                  节点重试：<InputNumber min={1} max={10} value={step.max_attempts || 1}
-                    onChange={(value) => setSteps((current) => current.map((item) =>
-                      item.key === step.key ? { ...item, max_attempts: value || 1 } : item))} />
-                </span>
+                {workflow.execution_mode === 'automatic' && (
+                  <>
+                    <Select
+                      mode="multiple"
+                      value={step.depends_on || []}
+                      placeholder="无依赖（可并行）"
+                      options={steps.filter((candidate) => candidate.key !== step.key).map((candidate) => ({
+                        value: candidate.key,
+                        label: candidate.name || candidate.application.application_name,
+                      }))}
+                      onChange={(depends_on) => setSteps((current) => current.map((item) =>
+                        item.key === step.key ? { ...item, depends_on } : item))}
+                    />
+                    <span>
+                      节点重试：<InputNumber min={1} max={10} value={step.max_attempts || 1}
+                        onChange={(value) => setSteps((current) => current.map((item) =>
+                          item.key === step.key ? { ...item, max_attempts: value || 1 } : item))} />
+                    </span>
+                  </>
+                )}
               </div>
               <Button icon={<ArrowUpOutlined />} disabled={index === 0}
                 onClick={() => move(index, -1)} />

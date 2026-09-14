@@ -41,6 +41,11 @@ export default function ChatApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('slug') || '';
+  const embedded = searchParams.get('embedded') === '1';
+  const restoredConversationId = searchParams.get('conversation');
+  const manualWorkflowId = searchParams.get('workflowId');
+  const manualRunId = searchParams.get('manualRunId');
+  const workflowStepKey = searchParams.get('workflowStepKey');
   const navigate = useNavigate();
   const loadApp = useAppStore((state) => state.loadApp);
   const [application, setApplication] = useState<AppItem | null>(null);
@@ -49,8 +54,8 @@ export default function ChatApplicationRuntimePage() {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [composing, setComposing] = useState(false);
-  const [chatStarted, setChatStarted] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [chatStarted, setChatStarted] = useState(Boolean(restoredConversationId));
+  const [conversationId, setConversationId] = useState<string | null>(restoredConversationId);
   const [draftRequestId, setDraftRequestId] = useState(0);
 
   useEffect(() => {
@@ -127,6 +132,19 @@ export default function ChatApplicationRuntimePage() {
     setDraftRequestId((current) => current + 1);
   };
 
+  const handleConversationCreated = (createdConversationId: string) => {
+    setConversationId(createdConversationId);
+    if (!manualWorkflowId || !manualRunId || !workflowStepKey) return;
+    void api.post(`/workflows/${manualWorkflowId}/manual-session/`, {
+      action: 'attach_conversation',
+      run_id: manualRunId,
+      step_key: workflowStepKey,
+      conversation_id: createdConversationId,
+    }).catch((error: any) => {
+      message.error(error?.response?.data?.detail || '工作流未能保存本次对话');
+    });
+  };
+
   if (loading) {
     return <div className="chat-app-loading"><Spin size="large" /></div>;
   }
@@ -139,8 +157,8 @@ export default function ChatApplicationRuntimePage() {
   }
 
   return (
-    <div className="chat-app-page">
-      <header className="chat-app-header">
+    <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
+      {!embedded && <header className="chat-app-header">
         <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(`/apps/${slug}`)}>
           返回应用
         </Button>
@@ -156,7 +174,7 @@ export default function ChatApplicationRuntimePage() {
             重新填写
           </Button>
         )}
-      </header>
+      </header>}
 
       {chatStarted ? (
         <main className="chat-app-chat">
@@ -177,7 +195,7 @@ export default function ChatApplicationRuntimePage() {
             emptyDescription={runtime.chat_profile.welcome_message}
             inputPlaceholder={runtime.chat_profile.input_placeholder}
             draftRequest={{ id: draftRequestId, text: generatedPrompt }}
-            onConversationCreated={setConversationId}
+            onConversationCreated={handleConversationCreated}
           />
         </main>
       ) : (

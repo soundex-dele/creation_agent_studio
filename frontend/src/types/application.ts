@@ -140,6 +140,7 @@ export interface Workflow {
   name: string;
   description?: string;
   icon?: string;
+  execution_mode: 'manual' | 'automatic';
   is_public: boolean;
   step_count?: number;
   steps?: WorkflowStep[];

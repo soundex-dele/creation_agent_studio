@@ -82,6 +82,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const creatingConversationRef = useRef(false);
   const skipNextFetchRef = useRef<string | null>(null);
+  const appliedDraftRequestIdRef = useRef<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
@@ -111,7 +112,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (draftRequest) setInputValue(draftRequest.text);
+    if (!draftRequest || appliedDraftRequestIdRef.current === draftRequest.id) return;
+    appliedDraftRequestIdRef.current = draftRequest.id;
+    setInputValue(draftRequest.text);
   }, [draftRequest]);
 
   const handleSendMessage = async (content: string, composer: ComposerContext) => {

@@ -7,6 +7,10 @@ from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class Workflow(models.Model):
+    class ExecutionMode(models.TextChoices):
+        MANUAL = 'manual', '手动执行'
+        AUTOMATIC = 'automatic', '自动执行'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(
         'enterprise.Organization', on_delete=models.CASCADE,
@@ -17,6 +21,11 @@ class Workflow(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     icon = models.CharField(max_length=50, blank=True, default='workflow')
+    execution_mode = models.CharField(
+        max_length=20,
+        choices=ExecutionMode.choices,
+        default=ExecutionMode.AUTOMATIC,
+    )
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

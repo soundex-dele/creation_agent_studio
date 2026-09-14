@@ -9,7 +9,11 @@
 .workflow-card h3 { margin: 0 0 8px; }
 .workflow-card p { min-height: 44px; color: var(--color-text-sec); }
 .workflow-card > span { color: var(--color-text-dim); font-size: 13px; }
+.workflow-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-dim); font-size: 13px; }
 .workflow-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.workflow-create-form { display: flex; flex-direction: column; gap: 18px; }
+.workflow-create-form > div { display: flex; flex-direction: column; gap: 8px; }
+.workflow-create-form small, .workflow-mode-field small { color: var(--color-text-dim); }
 .workflow-history { margin-top: 36px; }
 .workflow-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .workflow-history-heading > div { display: flex; align-items: center; gap: 9px; }
@@ -24,9 +28,12 @@
 .workflow-history-copy small { margin-top: 3px; color: var(--color-text-dim); }
 .workflow-history-progress { color: var(--color-text-sec); font-size: 13px; }
 .workflow-history-status { min-width: 58px; padding: 3px 8px; border-radius: 999px; color: #1677ff; background: rgba(22, 119, 255, 0.12); font-size: 12px; text-align: center; }
-.workflow-history-status--completed { color: #52c41a; background: rgba(82, 196, 26, 0.12); }
-.workflow-history-status--archived { color: var(--color-text-dim); background: var(--color-bg-elevated); }
+.workflow-history-status--succeeded { color: #52c41a; background: rgba(82, 196, 26, 0.12); }
+.workflow-history-status--failed { color: var(--color-error); background: color-mix(in srgb, var(--color-error) 12%, transparent); }
+.workflow-history-status--cancelled { color: var(--color-text-dim); background: var(--color-bg-elevated); }
 .workflow-name-input { max-width: 480px; margin-bottom: 10px; font-size: 22px; font-weight: 600; }
+.workflow-mode-field { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.workflow-mode-field > span { flex: 0 0 auto; color: var(--color-text-sec); font-weight: 500; }
 .workflow-add-card { margin-bottom: 18px; }
 .workflow-add-row { display: flex; gap: 10px; }
 .workflow-add-row .ant-select { flex: 1; }
@@ -36,7 +43,7 @@
 .workflow-step-icon { font-size: 26px; }
 .workflow-step-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .workflow-step-copy span { color: var(--color-text-sec); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workflow-runner { height: 100vh; display: flex; background: var(--color-bg-void); }
+.workflow-runner { height: 100%; min-height: 0; display: flex; background: var(--color-bg-void); }
 .workflow-run-sidebar { width: 270px; flex: 0 0 270px; display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-bg-surface); }
 .workflow-run-brand { min-height: 68px; display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--color-border); }
 .workflow-run-brand div { display: flex; min-width: 0; flex-direction: column; }
@@ -55,5 +62,8 @@
 .workflow-run-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workflow-run-header { height: 58px; flex: 0 0 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface); }
 .workflow-run-header > div { display: flex; align-items: center; gap: 10px; }
+.workflow-run-header-actions { justify-content: flex-end; }
 .workflow-run-application { flex: 1; min-height: 0; overflow: hidden; }
-@media (max-width: 760px) { .workflow-run-sidebar { width: 92px; flex-basis: 92px; } .workflow-run-brand div, .workflow-run-step-text { display: none; } }
+.workflow-run-application-frame { display: none; width: 100%; height: 100%; border: 0; background: var(--color-bg-void); }
+.workflow-run-application-frame.active { display: block; }
+@media (max-width: 760px) { .workflow-run-sidebar { width: 92px; flex-basis: 92px; } .workflow-run-brand div, .workflow-run-step-text { display: none; } .workflow-mode-field { align-items: flex-start; flex-direction: column; } .workflow-run-header > button span:last-child { display: none; } }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Empty, Input, Modal, Spin, message } from 'antd';
+import { Button, Card, Empty, Input, Modal, Segmented, Spin, Tag, message } from 'antd';
 import {
-  EditOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined,
+  AppstoreOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -22,6 +22,7 @@ const WorkflowsPage = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
+  const [executionMode, setExecutionMode] = useState<Workflow['execution_mode']>('manual');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,7 +47,8 @@ const WorkflowsPage = () => {
   const create = async () => {
     if (!name.trim()) return;
     const workflow = await api.post<Workflow>('/workflows/', {
-      name: name.trim(), description: '', icon: '🔀', is_public: false, steps: [],
+      name: name.trim(), description: '', icon: '🔀', execution_mode: executionMode,
+      is_public: false, steps: [],
     });
     setCreating(false);
     setName('');
@@ -54,6 +56,10 @@ const WorkflowsPage = () => {
   };
 
   const start = async (workflow: Workflow) => {
+    if (workflow.execution_mode === 'manual') {
+      navigate(`/workflows/${workflow.id}/manual`);
+      return;
+    }
     try {
       const run = await api.post<{ id: string }>(
         `/workflows/${workflow.id}/start/`,
@@ -69,7 +75,7 @@ const WorkflowsPage = () => {
   return (
     <div className="workflows-page">
       <div className="workflows-heading">
-        <div><h1>工作流</h1><p>把多个应用组合成一个人工执行的创作流程</p></div>
+        <div><h1>工作流</h1><p>把多个应用组合成手动操作或自动运行的创作流程</p></div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
           新建工作流
         </Button>
@@ -82,11 +88,23 @@ const WorkflowsPage = () => {
                 <div className="workflow-card-icon">{workflow.icon || '🔀'}</div>
                 <h3>{workflow.name}</h3>
                 <p>{workflow.description || '未填写说明'}</p>
-                <span>{workflow.step_count || 0} 个应用</span>
+                <div className="workflow-card-meta">
+                  <span>{workflow.step_count || 0} 个应用</span>
+                  <Tag color={workflow.execution_mode === 'manual' ? 'gold' : 'blue'}>
+                    {workflow.execution_mode === 'manual' ? '手动执行' : '自动执行'}
+                  </Tag>
+                </div>
                 <div className="workflow-card-actions">
                   <OutlinedButton onClick={() => navigate(`/workflows/${workflow.id}/edit`)} />
-                  <Button type="primary" icon={<PlayCircleOutlined />}
-                    disabled={!workflow.step_count} onClick={() => start(workflow)}>运行</Button>
+                  <Button
+                    type="primary"
+                    icon={workflow.execution_mode === 'manual'
+                      ? <AppstoreOutlined /> : <PlayCircleOutlined />}
+                    disabled={!workflow.step_count}
+                    onClick={() => start(workflow)}
+                  >
+                    {workflow.execution_mode === 'manual' ? '打开' : '运行'}
+                  </Button>
                 </div>
               </Card>
             ))}</div>}
@@ -104,12 +122,15 @@ const WorkflowsPage = () => {
                   const definition = run.definition_snapshot as {
                     workflow_name?: string;
                     workflow_steps?: unknown[];
+                    execution_mode?: 'manual' | 'automatic';
                   };
                   return (
                     <button
                       key={run.id}
                       className="workflow-history-item"
-                      onClick={() => navigate(`/runs/${run.id}`)}
+                      onClick={() => navigate(definition.execution_mode === 'manual'
+                        ? `/workflows/${run.source_id}/manual?runId=${run.id}`
+                        : `/runs/${run.id}`)}
                     >
                       <span className="workflow-history-icon"><HistoryOutlined /></span>
                       <span className="workflow-history-copy">
@@ -117,6 +138,7 @@ const WorkflowsPage = () => {
                         <small>{new Date(run.created_at || '').toLocaleString()}</small>
                       </span>
                       <span className="workflow-history-progress">
+                        {definition.execution_mode === 'manual' ? '手动执行 · ' : ''}
                         {definition.workflow_steps?.length || 0} 个应用
                       </span>
                       <span className={`workflow-history-status workflow-history-status--${run.status}`}>
@@ -134,8 +156,27 @@ const WorkflowsPage = () => {
       )}
       <Modal title="新建工作流" open={creating} okText="创建" cancelText="取消"
         onOk={create} onCancel={() => setCreating(false)}>
-        <Input autoFocus value={name} placeholder="例如：小红书内容生产"
-          onChange={(event) => setName(event.target.value)} onPressEnter={create} />
+        <div className="workflow-create-form">
+          <Input autoFocus value={name} placeholder="例如：小红书内容生产"
+            onChange={(event) => setName(event.target.value)} onPressEnter={create} />
+          <div>
+            <span>执行方式</span>
+            <Segmented
+              block
+              value={executionMode}
+              options={[
+                { label: '手动执行', value: 'manual' },
+                { label: '自动执行', value: 'automatic' },
+              ]}
+              onChange={(value) => setExecutionMode(value as Workflow['execution_mode'])}
+            />
+            <small>
+              {executionMode === 'manual'
+                ? '从左侧应用列表逐个打开并操作。'
+                : '按依赖关系自动运行所有应用。'}
+            </small>
+          </div>
+        </div>
       </Modal>
     </div>
   );

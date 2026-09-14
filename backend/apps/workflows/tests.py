@@ -9,6 +9,7 @@ from apps.applications.models import (
     ChatApplication,
     Skill,
 )
+from apps.conversations.models import Conversation
 from modules.catalog.models import (
     AgentDraft,
     ApplicationDeployment,
@@ -124,6 +125,102 @@ class WorkflowApiTest(TestCase):
         workflow.steps.all().delete()
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+
+    def test_manual_workflow_round_trips_and_cannot_start_automatically(self):
+        chat_application = Application.objects.create(
+            category=self.applications[0].category,
+            name="Manual chat",
+            slug="manual-workflow-chat",
+            description="Manual chat step",
+            created_by=self.user,
+            organization=self.organization,
+            kind=Application.Kind.CHAT,
+        )
+        chat_marker = ChatApplication.objects.create(application=chat_application)
+        response = self.client.post("/api/v1/workflows/", {
+            "name": "Manual content flow",
+            "execution_mode": "manual",
+            "steps": [{
+                "key": "first",
+                "application_id": chat_application.id,
+                "name": "First",
+                "order": 0,
+                "depends_on": [],
+            }],
+        }, format="json", **self.headers)
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["execution_mode"], "manual")
+
+        detail = self.client.get(
+            f"/api/v1/workflows/{response.data['id']}/",
+            **self.headers,
+        )
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertEqual(detail.data["execution_mode"], "manual")
+
+        started = self.client.post(
+            f"/api/v1/workflows/{response.data['id']}/start/",
+            {},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="manual-workflow-1",
+            **self.headers,
+        )
+        self.assertEqual(started.status_code, 409, started.data)
+        self.assertEqual(Run.objects.filter(source_type="workflow").count(), 0)
+
+        opened = self.client.post(
+            f"/api/v1/workflows/{response.data['id']}/manual-session/",
+            {"action": "open"},
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(opened.status_code, 201, opened.data)
+        self.assertEqual(opened.data["status"], Run.Status.RUNNING)
+        self.assertEqual(
+            opened.data["definition_snapshot"]["execution_mode"], "manual"
+        )
+
+        reopened = self.client.post(
+            f"/api/v1/workflows/{response.data['id']}/manual-session/",
+            {"action": "open"},
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(reopened.data["id"], opened.data["id"])
+        self.assertEqual(Run.objects.filter(source_type="workflow").count(), 1)
+
+        conversation = Conversation.objects.create(
+            user=self.user,
+            organization=self.organization,
+            chat_application=chat_marker,
+            title="Manual workflow conversation",
+        )
+        attached = self.client.post(
+            f"/api/v1/workflows/{response.data['id']}/manual-session/",
+            {
+                "action": "attach_conversation",
+                "run_id": opened.data["id"],
+                "step_key": "first",
+                "conversation_id": conversation.id,
+            },
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(attached.status_code, 200, attached.data)
+        self.assertEqual(
+            attached.data["output_summary"]["conversations"]["first"],
+            str(conversation.id),
+        )
+
+        completed = self.client.post(
+            f"/api/v1/workflows/{response.data['id']}/manual-session/",
+            {"action": "complete", "run_id": opened.data["id"]},
+            format="json",
+            **self.headers,
+        )
+        self.assertEqual(completed.status_code, 200, completed.data)
+        self.assertEqual(completed.data["status"], Run.Status.SUCCEEDED)
 
     def test_start_freezes_chat_application_draft_without_deployment(self):
         agent_category = AgentCategory.objects.create(
