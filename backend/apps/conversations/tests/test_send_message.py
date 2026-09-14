@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message
-from modules.catalog.models import AgentDeployment, AgentRevision
+from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash
 from modules.execution.application.projections import (
     project_input_accepted,
@@ -78,6 +78,37 @@ class DurableConversationRunTest(TestCase):
         self.assertTrue(Message.objects.filter(
             conversation=self.conversation, role="user", content="hello"
         ).exists())
+
+    @patch("apps.conversations.views.resolve_agent")
+    def test_explicit_null_agent_uses_fallback_without_saving_it(self, resolve_agent):
+        resolve_agent.return_value = self.agent
+
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "use the fallback", "agent_id": None},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-unbound-agent",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        self.assertEqual(
+            run.definition_snapshot["definition_overrides"],
+            {"system_prompt": ""},
+        )
+        self.assertEqual(
+            run.definition_snapshot["agent_definition"]["system_prompt"],
+            "",
+        )
+        self.conversation.refresh_from_db()
+        self.assertIsNone(self.conversation.agent_id)
+        message = Message.objects.get(
+            conversation=self.conversation,
+            role="user",
+            content="use the fallback",
+        )
+        self.assertIsNone(message.metadata["composer"]["agent_id"])
 
     @patch("apps.conversations.views.start_agent_run")
     def test_failed_run_creation_does_not_persist_user_message(self, start_run):
@@ -184,7 +215,7 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(detail.data["active_run"]["id"], sent.data["id"])
         self.assertEqual(detail.data["active_run"]["source_type"], "conversation")
 
-    def test_send_message_applies_agent_and_skill_composer_selection(self):
+    def test_switching_agent_resumes_thread_and_keeps_composer_skills(self):
         selected_agent = Agent.objects.create(
             category=self.agent.category,
             name="Selected agent",
@@ -195,19 +226,10 @@ class DurableConversationRunTest(TestCase):
             organization=self.organization,
         )
         definition = {"system_prompt": "Use the selected agent instructions."}
-        revision = AgentRevision.objects.create(
+        draft = AgentDraft.objects.create(
             organization=self.organization,
             agent=selected_agent,
-            revision_no=1,
             content=definition,
-            content_hash=canonical_content_hash(definition),
-            created_by=self.user,
-        )
-        AgentDeployment.objects.create(
-            organization=self.organization,
-            agent=selected_agent,
-            environment="production",
-            revision=revision,
             updated_by=self.user,
         )
         self.conversation.agent_thread_provider = "codex"
@@ -245,6 +267,8 @@ class DurableConversationRunTest(TestCase):
             run.definition_snapshot["agent_definition"]["system_prompt"],
             "Use the selected agent instructions.",
         )
+        self.assertEqual(run.definition_snapshot["agent_draft_id"], str(draft.id))
+        self.assertIsNone(run.definition_snapshot["deployment_id"])
         self.assertEqual(run.input["agent_thread"], {
             "provider": "codex",
             "id": "thread-1",
@@ -258,6 +282,8 @@ class DurableConversationRunTest(TestCase):
         }])
         self.conversation.refresh_from_db()
         self.assertEqual(self.conversation.agent_id, selected_agent.id)
+        self.assertEqual(self.conversation.agent_thread_provider, "codex")
+        self.assertEqual(self.conversation.agent_thread_id, "thread-1")
         message = Message.objects.get(
             conversation=self.conversation,
             role="user",

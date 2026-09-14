@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Spin, Tag, message } from 'antd';
+import { Spin, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useConversationStore } from '@/stores/useConversationStore';
@@ -100,16 +100,6 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
                 <div className="modal-section-title">系统提示词</div>
                 <div className="modal-prompt-block">
                   <pre>{agent.system_prompt}</pre>
-                </div>
-              </div>
-              <div className="modal-section">
-                <div className="modal-section-title">使用的 Skill</div>
-                <div className="modal-skill-list">
-                  {agent.skill_bindings?.length
-                    ? agent.skill_bindings.map((skill: any) => (
-                        <Tag key={skill.skill_id} color="gold">{skill.name}</Tag>
-                      ))
-                    : <span className="text-text-dim">未配置 Skill</span>}
                 </div>
               </div>
               <div className="modal-actions">

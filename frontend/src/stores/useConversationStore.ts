@@ -461,7 +461,7 @@ export const useConversationStore = create<ConversationState>()(
 
         sendMessage: async (conversationId, content, options = {}) => {
           const payload: Record<string, unknown> = { content };
-          if (options.agentId !== undefined && options.agentId !== null) {
+          if (options.agentId !== undefined) {
             payload.agent_id = options.agentId;
           }
           if (options.skillNames?.length) payload.skill_names = options.skillNames;

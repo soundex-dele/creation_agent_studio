@@ -1,7 +1,4 @@
-"""Tests for conversation creation and agent binding.
-
-每个对话必然绑定一个 agent：未指定 agent_id 时回退到通用 agent (slug=general)。
-"""
+"""Tests for conversation creation and optional agent binding."""
 from django.contrib.auth import get_user_model
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -30,17 +27,15 @@ class CreateConversationTest(TestCase):
             created_by=self.user,
         )
 
-    def test_create_without_agent_id_binds_general(self):
-        """未指定 agent_id 时自动绑定通用 agent。"""
-        general = Agent.objects.get(slug='general')
-
+    def test_create_without_agent_id_leaves_agent_unbound(self):
         with TemporaryDirectory() as directory, override_settings(
                 AGENT_WORKSPACE_ROOT=directory):
             response = self.client.post('/api/v1/conversations/', {})
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['agent']['id'], general.id)
+        self.assertIsNone(response.data['agent'])
         conversation = self.user.conversations.get(id=response.data['id'])
+        self.assertIsNone(conversation.agent_id)
         expected = (
             Path(directory) / 'organizations' / str(conversation.organization_id)
             / 'conversations' / str(conversation.id)
@@ -110,14 +105,11 @@ class CreateConversationTest(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['messages'][0]['content'], '保留的历史消息')
 
-    def test_create_with_invalid_agent_id_falls_back_to_general(self):
-        """无效 agent_id 回退到通用 agent，而不是报错。"""
-        general = Agent.objects.get(slug='general')
-
+    def test_create_with_invalid_agent_id_is_rejected(self):
         response = self.client.post('/api/v1/conversations/', {'agent_id': 999999})
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['agent']['id'], general.id)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('agent_id', response.data)
 
     def test_create_can_use_an_allowed_system_directory(self):
         with TemporaryDirectory() as directory:

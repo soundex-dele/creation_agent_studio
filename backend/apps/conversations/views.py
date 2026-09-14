@@ -50,6 +50,7 @@ from .serializers import (
 
 
 GENERAL_AGENT_SLUG = "general"
+AGENT_SELECTION_UNSET = object()
 logger = logging.getLogger(__name__)
 
 
@@ -57,23 +58,35 @@ class ConversationRunActive(Exception):
     pass
 
 
-def resolve_agent(agent_id, organization):
+def resolve_agent(agent_id, organization, *, use_default=False):
     visible = Agent.objects.filter(
         Q(organization=organization) | Q(is_public=True),
         is_active=True,
     )
-    if agent_id is not None:
-        selected = visible.filter(pk=agent_id).first()
-        if selected is not None:
-            return selected
-    return get_object_or_404(visible, slug=GENERAL_AGENT_SLUG)
+    if agent_id is None:
+        if use_default:
+            return get_object_or_404(visible, slug=GENERAL_AGENT_SLUG)
+        return None
+    selected = visible.filter(pk=agent_id).first()
+    if selected is None:
+        raise ValidationError({"agent_id": "该智能体不存在或当前用户无权使用。"})
+    return selected
 
 
 def resolve_conversation_agent(conversation, requested_agent_id):
-    """Resolve an explicit composer Agent without silently changing the choice."""
+    """Resolve the runtime Agent and the optional persisted composer selection."""
 
+    if requested_agent_id is AGENT_SELECTION_UNSET:
+        return (
+            conversation.agent or resolve_agent(
+                None, conversation.organization, use_default=True),
+            conversation.agent,
+        )
     if requested_agent_id is None:
-        return conversation.agent or resolve_agent(None, conversation.organization)
+        return (
+            resolve_agent(None, conversation.organization, use_default=True),
+            None,
+        )
     selected = Agent.objects.filter(
         Q(organization=conversation.organization) | Q(is_public=True),
         is_active=True,
@@ -90,7 +103,7 @@ def resolve_conversation_agent(conversation, requested_agent_id):
         }
         if selected.id not in allowed:
             raise ValidationError({"agent_id": "该智能体不属于当前聊天应用。"})
-    return selected
+    return selected, selected
 
 
 def validate_requested_skill_names(conversation, requested_skill_names):
@@ -116,40 +129,6 @@ def validate_requested_skill_names(conversation, requested_skill_names):
             ).values_list("slug", flat=True))
             if not requested.issubset(allowed):
                 raise ValidationError({"skill_names": "包含应用未授权的 Skill。"})
-
-
-def sync_agent_skill_bindings(conversation, agent):
-    """Replace only Agent-owned defaults when the composer switches Agent."""
-
-    agent_sources = (
-        ConversationSkillBinding.Source.AGENT_REQUIRED,
-        ConversationSkillBinding.Source.AGENT_DEFAULT,
-    )
-    conversation.skill_bindings.filter(source__in=agent_sources).delete()
-    existing = {
-        str(value)
-        for value in conversation.skill_bindings.values_list("skill_id", flat=True)
-    }
-    additions = []
-    for binding in get_agent_definition(agent).get("skill_bindings", []):
-        mode = binding.get("mode")
-        if mode not in ("required", "default"):
-            continue
-        skill_id = str(binding.get("skill_id") or "")
-        if not skill_id or skill_id in existing:
-            continue
-        existing.add(skill_id)
-        additions.append(ConversationSkillBinding(
-            conversation=conversation,
-            skill_id=skill_id,
-            source=(
-                ConversationSkillBinding.Source.AGENT_REQUIRED
-                if mode == "required"
-                else ConversationSkillBinding.Source.AGENT_DEFAULT
-            ),
-            config=binding.get("config") or {},
-        ))
-    ConversationSkillBinding.objects.bulk_create(additions)
 
 
 class ConversationViewSet(viewsets.ViewSet):
@@ -254,16 +233,6 @@ class ConversationViewSet(viewsets.ViewSet):
             )
 
         skill_sources = {}
-        for binding in get_agent_definition(agent).get("skill_bindings", []):
-            if binding.get("mode") not in ("required", "default"):
-                continue
-            source = (
-                ConversationSkillBinding.Source.AGENT_REQUIRED
-                if binding.get("mode") == "required"
-                else ConversationSkillBinding.Source.AGENT_DEFAULT
-            )
-            skill_sources[str(binding["skill_id"])] = (
-                source, binding.get("config", {}))
         if application:
             for binding in chat_definition.get("skill_bindings", []):
                 if binding.get("mode") not in ("required", "default"):
@@ -359,7 +328,7 @@ class ConversationViewSet(viewsets.ViewSet):
         conversation,
         message,
         idempotency_key,
-        requested_agent_id=None,
+        requested_agent_id=AGENT_SELECTION_UNSET,
         requested_skill_names=(),
     ):
         conversation = Conversation.objects.select_for_update().get(
@@ -368,7 +337,10 @@ class ConversationViewSet(viewsets.ViewSet):
             user_id=conversation.user_id,
         )
         organization = conversation.organization
-        agent = resolve_conversation_agent(conversation, requested_agent_id)
+        agent, selected_agent = resolve_conversation_agent(
+            conversation, requested_agent_id)
+        selection_changed = conversation.agent_id != getattr(
+            selected_agent, "id", None)
         is_idempotent_replay = IdempotencyRecord.objects.for_organization(
             organization.id
         ).filter(
@@ -395,8 +367,6 @@ class ConversationViewSet(viewsets.ViewSet):
         )[-99:]
         history.append({"role": "user", "content": message})
         working_directory = conversation_working_directory(conversation)
-        if conversation.agent_id != agent.id:
-            sync_agent_skill_bindings(conversation, agent)
         validate_requested_skill_names(conversation, requested_skill_names)
         definition = get_agent_definition(agent)
         adapter = resolve_skill_adapter(
@@ -408,7 +378,10 @@ class ConversationViewSet(viewsets.ViewSet):
             for binding in conversation.skill_bindings.select_related("skill").filter(
                 enabled=True,
                 skill__is_active=True,
-            )
+            ).exclude(source__in=(
+                ConversationSkillBinding.Source.AGENT_REQUIRED,
+                ConversationSkillBinding.Source.AGENT_DEFAULT,
+            ))
         ]
         effective_skill_names.extend(requested_skill_names)
         try:
@@ -425,6 +398,9 @@ class ConversationViewSet(viewsets.ViewSet):
                 "messages": history,
                 "working_directory": working_directory,
                 "skills": skill_inputs,
+                # Agent selection changes the instructions, not the conversation
+                # identity. Supplying the persisted thread makes Codex use
+                # thread/resume with the newly selected Agent's system prompt.
                 "agent_thread": {
                     "provider": conversation.agent_thread_provider,
                     "id": conversation.agent_thread_id,
@@ -438,13 +414,19 @@ class ConversationViewSet(viewsets.ViewSet):
             },
             source_type="conversation",
             source_id=conversation.id,
+            allow_draft=True,
+            definition_overrides=(
+                {"system_prompt": ""} if selected_agent is None else None
+            ),
         )
         if not replayed:
-            if conversation.agent_id != agent.id:
-                conversation.agent = agent
+            update_fields = ["title", "updated_at"]
+            if selection_changed:
+                conversation.agent = selected_agent
+                update_fields.append("agent")
             if not conversation.title:
                 conversation.title = message[:50]
-            conversation.save(update_fields=["agent", "title", "updated_at"])
+            conversation.save(update_fields=update_fields)
             Message.objects.create(
                 conversation=conversation,
                 role="user",
@@ -452,7 +434,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 metadata={
                     "run_request_id": getattr(request, "request_id", ""),
                     "composer": {
-                        "agent_id": agent.id,
+                        "agent_id": getattr(selected_agent, "id", None),
                         "skill_names": sorted(
                             str(value) for value in requested_skill_names),
                         "skills": [item["name"] for item in skill_inputs],
@@ -485,7 +467,8 @@ class ConversationViewSet(viewsets.ViewSet):
                 conversation,
                 serializer.validated_data["content"],
                 idempotency_key,
-                requested_agent_id=serializer.validated_data.get("agent_id"),
+                requested_agent_id=serializer.validated_data.get(
+                    "agent_id", AGENT_SELECTION_UNSET),
                 requested_skill_names=serializer.validated_data.get(
                     "skill_names", ()),
             )

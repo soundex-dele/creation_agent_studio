@@ -829,8 +829,10 @@ class CodexAdapter(AgentAdapter):
                     "auto_review" if options.get("require_tool_approval") else None,
                 ),
                 "base_instructions": (
-                    resume_system_prompt if requested_thread_id else system_prompt
-                ) or None,
+                    resume_system_prompt
+                    if requested_thread_id
+                    else system_prompt or None
+                ),
                 "cwd": cwd,
                 "model": self.model or None,
                 "sandbox": _sandbox(sdk),

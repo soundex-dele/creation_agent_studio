@@ -238,6 +238,29 @@ describe('useConversationStore durable Run integration', () => {
     );
   });
 
+  it('submits an explicit null Agent selection', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({
+      id: 'run-unbound',
+      organization_id: 'org-1',
+      status: 'queued',
+    });
+
+    await useConversationStore.getState().sendMessage(
+      'conversation-1',
+      'Use the fallback without binding it',
+      { agentId: null },
+    );
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/conversations/conversation-1/send_message/',
+      {
+        content: 'Use the fallback without binding it',
+        agent_id: null,
+      },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
+  });
+
   it('preserves multiple Codex questions and submits structured answers', async () => {
     let emit: ((event: RunEventEnvelope) => void) | undefined;
     vi.spyOn(api, 'post').mockResolvedValue({

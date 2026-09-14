@@ -75,7 +75,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     setCurrentConversation,
   } = useConversationStore();
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const creatingConversationRef = useRef(false);
   const skipNextFetchRef = useRef<string | null>(null);
@@ -83,6 +84,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   useEffect(() => {
+    shouldAutoScrollRef.current = true;
     if (conversationId) {
       if (skipNextFetchRef.current === conversationId) {
         skipNextFetchRef.current = null;
@@ -95,7 +97,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }, [conversationId, autoFetch, fetchConversationDetail, setCurrentConversation]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container || !shouldAutoScrollRef.current) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
   }, [currentConversation?.messages, isLoading, streamingMessageId]);
 
   useEffect(() => {
@@ -110,6 +114,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   const handleSendMessage = async (content: string, composer: ComposerContext) => {
     if (creatingConversationRef.current) return;
+    shouldAutoScrollRef.current = true;
 
     let targetConversationId = conversationId;
     if (!targetConversationId) {
@@ -174,6 +179,15 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     else if (suggestion.text) setInputValue(suggestion.text);
   };
 
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = (
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    );
+    shouldAutoScrollRef.current = distanceFromBottom <= 96;
+  };
+
   const isStreaming = streamingMessageId !== null;
   const messages = currentConversation?.messages || [];
   // The first optimistic messages are added just before the URL receives its
@@ -222,7 +236,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       ) : (
         <>
-          <div className="chat-messages">
+          <div
+            ref={messagesContainerRef}
+            className="chat-messages"
+            onScroll={handleMessagesScroll}
+          >
             <div className="chat-messages-inner">
               <MessageList messages={messages} isLoading={isLoading} isStreaming={isStreaming} />
               {agentActivity && isStreaming && (
@@ -235,7 +253,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                   onCancel={() => cancelTurn(conversationId)}
                 />
               )}
-              <div ref={messagesEndRef} />
             </div>
           </div>
         </>

@@ -12,6 +12,7 @@ from jsonschema.validators import validator_for
 
 from modules.catalog.models import (
     AgentDeployment,
+    AgentDraft,
     ApplicationDeployment,
     DeploymentEnvironment,
     SkillDeployment,
@@ -395,6 +396,8 @@ def start_agent_run(
     source_id="",
     priority=0,
     idempotency_input_data=None,
+    allow_draft=False,
+    definition_overrides=None,
 ):
     """Create the sole durable execution representation for an Agent call."""
     if not idempotency_key or len(idempotency_key) > 160:
@@ -413,6 +416,7 @@ def start_agent_run(
         ),
         "source_type": source_type,
         "source_id": str(source_id),
+        "definition_overrides": definition_overrides or {},
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     replay = _load_replay(
         organization_id=organization_id,
@@ -434,9 +438,14 @@ def start_agent_run(
             agent=agent,
             environment=environment,
         ).first()
-        if deployment is None:
+        draft = None
+        if deployment is None and allow_draft:
+            draft = AgentDraft.objects.for_organization(
+                organization_id
+            ).filter(agent=agent).first()
+        if deployment is None and draft is None:
             raise DeploymentUnavailable(f"Agent has no {environment} deployment")
-        if (
+        if deployment is not None and (
             agent.organization_id != organization_id
             or deployment.organization_id != organization_id
             or deployment.revision.organization_id != organization_id
@@ -451,10 +460,19 @@ def start_agent_run(
             raise InvalidExecutionDefinition("Agent executor is not registered")
         run_organization = port.organization(organization_id)
         port.enforce_quota(run_organization)
-        agent_definition = deployment.revision.content
+        source_agent_definition = (
+            deployment.revision.content if deployment is not None else draft.content
+        )
+        agent_definition = {
+            **source_agent_definition,
+            **dict(definition_overrides or {}),
+        }
         effective_config = {
             **dict(agent_definition.get("model_config") or {}),
-            **dict(deployment.config_override or {}),
+            **(
+                dict(deployment.config_override or {})
+                if deployment is not None else {}
+            ),
         }
         governance = _enforce_definition_governance(
             run_organization, agent_definition, effective_config
@@ -486,12 +504,25 @@ def start_agent_run(
             source_id=source_id or agent.id,
             definition_snapshot={
                 "agent_id": str(agent.id),
-                "agent_revision_id": str(deployment.revision_id),
-                "agent_revision_no": deployment.revision.revision_no,
-                "agent_content_hash": deployment.revision.content_hash,
-                "deployment_id": str(deployment.id),
-                "deployment_environment": deployment.environment,
-                "deployment_version": deployment.version,
+                "agent_revision_id": (
+                    str(deployment.revision_id) if deployment is not None else None
+                ),
+                "agent_revision_no": (
+                    deployment.revision.revision_no if deployment is not None else None
+                ),
+                "agent_content_hash": (
+                    deployment.revision.content_hash if deployment is not None else None
+                ),
+                "agent_draft_id": str(draft.id) if draft is not None else None,
+                "agent_draft_version": draft.version if draft is not None else None,
+                "deployment_id": str(deployment.id) if deployment is not None else None,
+                "deployment_environment": (
+                    deployment.environment if deployment is not None else None
+                ),
+                "deployment_version": (
+                    deployment.version if deployment is not None else None
+                ),
+                "definition_overrides": dict(definition_overrides or {}),
                 "agent_definition": agent_definition,
                 "effective_config": effective_config,
                 "governance": governance,

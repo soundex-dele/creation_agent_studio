@@ -14,14 +14,6 @@ interface AgentCategoryOption {
   name: string;
 }
 
-interface SkillOption {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  is_active: boolean;
-}
-
 interface AgentDetail {
   name: string;
   slug: string;
@@ -29,7 +21,6 @@ interface AgentDetail {
   icon: string;
   category: { id: number };
   system_prompt: string;
-  skill_bindings: Array<{ skill_id: string }>;
   is_public: boolean;
 }
 
@@ -40,7 +31,6 @@ interface AgentFormValues {
   description: string;
   icon?: string;
   system_prompt: string;
-  skill_ids?: string[];
   is_public: boolean;
 }
 
@@ -58,7 +48,6 @@ const fieldError = (error: any): string => {
 const AgentEditorModal = ({ agentId, open, onClose, onSaved }: AgentEditorModalProps) => {
   const [form] = Form.useForm<AgentFormValues>();
   const [categories, setCategories] = useState<AgentCategoryOption[]>([]);
-  const [skills, setSkills] = useState<SkillOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -68,13 +57,11 @@ const AgentEditorModal = ({ agentId, open, onClose, onSaved }: AgentEditorModalP
     setLoading(true);
     Promise.all([
       api.get<AgentCategoryOption[] | { results?: AgentCategoryOption[] }>('/agents/categories/'),
-      api.get<SkillOption[] | { results?: SkillOption[] }>('/apps/skills/'),
       agentId ? api.get<AgentDetail>(`/agents/${agentId}/`) : Promise.resolve(null),
     ])
-      .then(([categoryResponse, skillResponse, agent]) => {
+      .then(([categoryResponse, agent]) => {
         if (cancelled) return;
         setCategories(unwrap(categoryResponse));
-        setSkills(unwrap(skillResponse).filter((skill) => skill.is_active));
         form.resetFields();
         if (agent) {
           form.setFieldsValue({
@@ -84,11 +71,10 @@ const AgentEditorModal = ({ agentId, open, onClose, onSaved }: AgentEditorModalP
             description: agent.description,
             icon: agent.icon,
             system_prompt: agent.system_prompt,
-            skill_ids: agent.skill_bindings.map((binding) => binding.skill_id),
             is_public: agent.is_public,
           });
         } else {
-          form.setFieldsValue({ icon: '🤖', skill_ids: [], is_public: false });
+          form.setFieldsValue({ icon: '🤖', is_public: false });
         }
       })
       .catch(() => message.error('加载智能体配置失败'))
@@ -186,24 +172,6 @@ const AgentEditorModal = ({ agentId, open, onClose, onSaved }: AgentEditorModalP
             rows={10}
             placeholder="你是一位专业的……"
             className="agent-system-prompt-input"
-          />
-        </Form.Item>
-        <Form.Item
-          name="skill_ids"
-          label="使用的 Skill"
-          extra="选中的 Skill 会在智能体会话启动时按顺序加载。"
-        >
-          <Select
-            mode="multiple"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="选择要加载的 Skill"
-            options={skills.map((skill) => ({
-              value: skill.id,
-              label: `${skill.name} (${skill.slug})`,
-              title: skill.description,
-            }))}
           />
         </Form.Item>
         <Form.Item name="is_public" label="公开到智能体市场" valuePropName="checked">

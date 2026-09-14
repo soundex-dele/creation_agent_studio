@@ -368,6 +368,50 @@ class CodexIntegrationTest(TestCase):
         CODEX_WORKING_DIRECTORY="D:/workspace",
         CODEX_MODEL="",
     )
+    def test_resuming_without_agent_explicitly_clears_base_instructions(self):
+        turn = MagicMock()
+        turn.stream.return_value = iter([
+            SimpleNamespace(
+                method="turn/completed",
+                payload=SimpleNamespace(turn=SimpleNamespace(
+                    status="completed", error=None,
+                )),
+            ),
+        ])
+        thread = MagicMock(id="thread-1")
+        thread.turn.return_value = turn
+        client = MagicMock(input_request=None)
+        client.thread_resume.return_value = thread
+        sdk = SimpleNamespace(
+            Sandbox=SimpleNamespace(
+                read_only="read-only",
+                workspace_write="workspace-write",
+                full_access="danger-full-access",
+            ),
+            ApprovalMode=SimpleNamespace(
+                auto_review="auto_review",
+                deny_all="deny_all",
+            ),
+        )
+
+        adapter = CodexAdapter()
+        with patch.object(adapter, "_client", return_value=(sdk, client)):
+            adapter.complete(
+                [{"role": "system", "content": ""},
+                 {"role": "user", "content": "continue"}],
+                thread_id="thread-1",
+            )
+
+        self.assertEqual(
+            client.thread_resume.call_args.kwargs["base_instructions"], ""
+        )
+
+    @override_settings(
+        CODEX_SANDBOX="workspace-write",
+        CODEX_APPROVAL_MODE="deny_all",
+        CODEX_WORKING_DIRECTORY="D:/workspace",
+        CODEX_MODEL="",
+    )
     def test_replaces_a_missing_persisted_thread_with_full_history(self):
         turn = MagicMock()
         turn.stream.return_value = iter([
