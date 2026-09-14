@@ -6,6 +6,7 @@ from .views import (
     SkillViewSet,
 )
 from .runtime_files import list_runtime_directories, scan_runtime_folder
+from .runtime_skill_views import list_runtime_skills
 
 router = DefaultRouter()
 router.register(r'categories', ApplicationCategoryViewSet, basename='application_category')
@@ -18,5 +19,7 @@ urlpatterns = [
          name='runtime-file-directory-list'),
     path('runtime-files/scan/', scan_runtime_folder,
          name='runtime-file-scan'),
+    path('runtime-skills/', list_runtime_skills,
+         name='runtime-skill-list'),
     path('', include(router.urls)),
 ]
