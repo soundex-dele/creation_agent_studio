@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dropdown, Empty } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -85,6 +85,19 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Grow the textarea to fit its content, capped at max-height (160px) so long
+  // drafts scroll internally instead of expanding the composer without bound.
+  // Recompute on every keystroke and whenever the value changes externally
+  // (e.g. suggestion click, draft prefill, post-send clear).
+  const autosizeTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(autosizeTextarea, [content]);
+
   const handleSend = () => {
     if (content.trim() && !disabled) {
       onSendMessage(content.trim(), {
@@ -161,6 +174,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     <div className={`chat-input-box ${isFocused ? 'chat-input-box--focused' : ''}`}>
       <div className="chat-input-main">
         <textarea
+          ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}

@@ -152,6 +152,24 @@ a:hover {
   padding: 32px;
 }
 
+/* Home page chat shell: full-height flex row pairing the chat pane with the
+   optional workspace-files sidebar. Both children must derive their height
+   from the grid cell (app-main) rather than from their content, otherwise
+   .chat-container's `height: 100%` resolves against a content-sized parent
+   and the messages area never constrains — so it cannot scroll and the page
+   overflows past the viewport. */
+.chat-application-layout {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-application-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 /* ============================================
    Ant Design Dark Theme Overrides
    ============================================ */

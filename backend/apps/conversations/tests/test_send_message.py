@@ -8,7 +8,8 @@ from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message
 from modules.catalog.models import AgentDeployment, AgentRevision
 from modules.catalog.services import canonical_content_hash
-from modules.execution.models import Run
+from modules.execution.application.projections import project_terminal_run
+from modules.execution.models import Run, RunEvent
 
 
 class DurableConversationRunTest(TestCase):
@@ -134,3 +135,51 @@ class DurableConversationRunTest(TestCase):
             conversation=self.conversation,
             role="user",
         ).count(), 0)
+
+    def test_terminal_projection_preserves_tool_history(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "inspect a file"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-tool-history",
+            **self.headers,
+        )
+        run = Run.objects.get(pk=response.data["id"])
+        RunEvent.objects.create(
+            organization=self.organization,
+            run=run,
+            sequence=2,
+            type="tool.started",
+            payload={
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "input": {"path": "notes.txt"},
+            },
+        )
+        RunEvent.objects.create(
+            organization=self.organization,
+            run=run,
+            sequence=3,
+            type="tool.completed",
+            payload={
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "result": {"lines": 3},
+            },
+        )
+
+        project_terminal_run(run.id, {
+            "result": "done",
+            "model": "test-model",
+            "usage": {"total_tokens": 4},
+        })
+
+        message = Message.objects.get(run=run)
+        self.assertEqual(message.content, "done")
+        self.assertEqual(message.metadata["agent"]["tool_calls"], [{
+            "id": "call-1",
+            "name": "read_file",
+            "status": "completed",
+            "input": '{"path": "notes.txt"}',
+            "result": '{"lines": 3}',
+        }])

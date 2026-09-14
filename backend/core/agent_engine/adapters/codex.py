@@ -50,6 +50,141 @@ def _protocol_value(value):
     return value
 
 
+def _plain_value(value):
+    """Convert SDK/protocol objects into JSON-safe RunEvent payload values."""
+
+    if hasattr(value, "model_dump"):
+        value = value.model_dump()
+    if isinstance(value, dict):
+        return {str(key): _plain_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_value(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    enum_value = getattr(value, "value", None)
+    if enum_value is not None:
+        return _plain_value(enum_value)
+    if hasattr(value, "__dict__"):
+        return {
+            str(key): _plain_value(item)
+            for key, item in vars(value).items()
+            if not str(key).startswith("_")
+        }
+    return str(value)
+
+
+def _object_value(value, name, default=None):
+    if isinstance(value, dict):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
+_CODEX_TOOL_NAMES = {
+    "commandExecution": "shell",
+    "fileChange": "file_change",
+    "mcpToolCall": "mcp_tool",
+    "dynamicToolCall": "dynamic_tool",
+    "collabAgentToolCall": "collaboration",
+    "webSearch": "web_search",
+    "imageView": "view_image",
+    "imageGeneration": "image_generation",
+    "sleep": "wait",
+}
+
+
+def _codex_tool_payload(item):
+    raw = _plain_value(item)
+    item_type = str(raw.get("type") or "")
+    if item_type not in _CODEX_TOOL_NAMES:
+        return None
+    name = _CODEX_TOOL_NAMES[item_type]
+    if item_type == "mcpToolCall":
+        server = str(raw.get("server") or "")
+        tool = str(raw.get("tool") or "")
+        name = ".".join(value for value in (server, tool) if value) or name
+    elif item_type in {"dynamicToolCall", "collabAgentToolCall"}:
+        name = str(raw.get("tool") or name)
+
+    input_value = None
+    for key in ("arguments", "command", "changes", "query", "path", "prompt"):
+        if raw.get(key) not in (None, "", [], {}):
+            input_value = raw[key]
+            break
+    result_value = None
+    for key in ("result", "aggregatedOutput", "contentItems", "agentsStates"):
+        if raw.get(key) not in (None, "", [], {}):
+            result_value = raw[key]
+            break
+
+    payload = {
+        "tool_call_id": str(raw.get("id") or f"{item_type}-unknown"),
+        "name": name,
+        "tool_type": item_type,
+    }
+    if input_value is not None:
+        payload["input"] = input_value
+    if result_value is not None:
+        payload["result"] = result_value
+    error = raw.get("error")
+    if isinstance(error, dict) and error.get("message"):
+        payload["error_message"] = str(error["message"])
+    elif raw.get("errorMessage"):
+        payload["error_message"] = str(raw["errorMessage"])
+    return payload
+
+
+def _consume_codex_turn(thread, text, *, model="", on_event=None):
+    """Consume one Codex turn while preserving text and tool notifications."""
+
+    turn = thread.turn(text, model=model or None)
+    chunks = []
+    completed_items = {}
+    usage = None
+    terminal_turn = None
+    for notification in turn.stream():
+        method = str(_object_value(notification, "method", ""))
+        payload = _object_value(notification, "payload", {}) or {}
+        if method == "item/agentMessage/delta":
+            delta = str(_object_value(payload, "delta", "") or "")
+            if delta:
+                chunks.append(delta)
+                if on_event is not None:
+                    on_event("output.delta", {"text": delta})
+        elif method in {"item/started", "item/completed"}:
+            item = _object_value(payload, "item", {}) or {}
+            item_type = str(_object_value(item, "type", ""))
+            if item_type == "agentMessage" and method == "item/completed":
+                item_id = str(_object_value(item, "id", ""))
+                completed_items[item_id] = str(_object_value(item, "text", "") or "")
+            tool_payload = _codex_tool_payload(item)
+            if tool_payload is not None and on_event is not None:
+                if method == "item/started":
+                    on_event("tool.started", tool_payload)
+                else:
+                    status = str(_object_value(item, "status", ""))
+                    failed = status in {"failed", "declined"} or bool(
+                        tool_payload.get("error_message")
+                    )
+                    on_event("tool.failed" if failed else "tool.completed", tool_payload)
+        elif method == "thread/tokenUsage/updated":
+            usage = _object_value(payload, "token_usage")
+        elif method == "turn/completed":
+            terminal_turn = _object_value(payload, "turn")
+
+    final_response = "".join(chunks)
+    if not final_response and completed_items:
+        final_response = list(completed_items.values())[-1]
+    terminal_turn = terminal_turn or _ProtocolObject(
+        {"status": "failed", "error": {"message": "Missing turn completion"}}
+    )
+    return _ProtocolObject({
+        "status": _object_value(terminal_turn, "status", "failed"),
+        "final_response": final_response,
+        "usage": _plain_value(usage),
+        "error": _plain_value(_object_value(terminal_turn, "error")),
+    })
+
+
 class _AppServerTransport:
     """Minimal JSONL client for a dedicated Codex app-server process."""
 
@@ -321,40 +456,7 @@ class _AppServerThread:
         )
 
     def run(self, text: str, *, model: Optional[str] = None):
-        turn = self.turn(text, model=model)
-        chunks: list[str] = []
-        completed_items: dict[str, str] = {}
-        usage = None
-        terminal_turn = None
-        for notification in turn.stream():
-            if notification.method == "item/agentMessage/delta":
-                chunks.append(notification.payload.delta or "")
-            elif notification.method == "item/completed":
-                item = notification.payload.item
-                if getattr(item, "type", "") == "agentMessage":
-                    completed_items[item.id] = item.text or ""
-            elif notification.method == "thread/tokenUsage/updated":
-                usage = notification.payload.token_usage
-            elif notification.method == "turn/completed":
-                terminal_turn = notification.payload.turn
-        final_response = "".join(chunks)
-        if not final_response and completed_items:
-            final_response = list(completed_items.values())[-1]
-        terminal_turn = terminal_turn or _ProtocolObject(
-            {"status": "failed", "error": {"message": "Missing turn completion"}}
-        )
-        return _ProtocolObject(
-            {
-                "status": terminal_turn.status,
-                "final_response": final_response,
-                "usage": usage.model_dump() if usage is not None else None,
-                "error": (
-                    terminal_turn.error.model_dump()
-                    if getattr(terminal_turn, "error", None) is not None
-                    else None
-                ),
-            }
-        )
+        return _consume_codex_turn(self, text, model=model or "")
 
 
 class _AppServerCodex:
@@ -563,7 +665,12 @@ class CodexAdapter(AgentAdapter):
                 model=self.model or None,
                 sandbox=_sandbox(sdk),
             )
-            result = thread.run(query, model=self.model or None)
+            result = _consume_codex_turn(
+                thread,
+                query,
+                model=self.model or "",
+                on_event=options.get("on_event"),
+            )
             input_request = getattr(client, "input_request", None)
         finally:
             client.close()

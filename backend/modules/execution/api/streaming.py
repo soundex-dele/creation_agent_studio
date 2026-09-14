@@ -3,7 +3,7 @@ import json
 import time
 
 from asgiref.sync import sync_to_async
-from channels.layers import get_channel_layer
+from channels.layers import InMemoryChannelLayer, get_channel_layer
 from django.db import close_old_connections
 
 from modules.execution.api.serializers import RunEventSerializer
@@ -17,6 +17,17 @@ class StreamAccessLost(Exception):
 
 
 TERMINAL_EVENT_TYPES = {"run.succeeded", "run.failed", "run.cancelled"}
+
+
+def _cross_process_channel_layer(layer):
+    """Return a notification layer only when workers can reach web subscribers."""
+
+    # InMemoryChannelLayer is process-local. Treating it as shared makes a web
+    # stream sleep until the heartbeat whenever the execution worker runs in a
+    # separate process, which batches all deltas into an apparent final answer.
+    if layer is None or isinstance(layer, InMemoryChannelLayer):
+        return None
+    return layer
 
 
 def encode_event(event):
@@ -63,7 +74,7 @@ async def stream_run_events(
 ):
     """Subscribe first, then replay and continuously fill from the database."""
 
-    channel_layer = get_channel_layer()
+    channel_layer = _cross_process_channel_layer(get_channel_layer())
     channel_name = None
     group_name = f"run-{run_id}"
     if channel_layer is not None:

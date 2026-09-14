@@ -79,7 +79,10 @@ describe('useConversationStore durable Run integration', () => {
     emit?.(event(2, 'output.delta', { text: 'Hello ' }));
     emit?.(event(3, 'output.delta', { text: 'world' }));
     emit?.(event(4, 'tool.started', { tool_call_id: 'tool-1', name: 'read' }));
-    emit?.(event(5, 'input.required', {
+    emit?.(event(5, 'tool.completed', {
+      tool_call_id: 'tool-1', name: 'read', output: { lines: 3 },
+    }));
+    emit?.(event(6, 'input.required', {
       input_request_id: 'question-1',
       input_kind: 'permission',
       question: 'Allow access?',
@@ -89,7 +92,7 @@ describe('useConversationStore durable Run integration', () => {
     const assistant = useConversationStore.getState().currentConversation?.messages[1];
     expect(assistant?.content).toBe('Hello world');
     expect(assistant?.metadata?.agent?.tool_calls[0]).toMatchObject({
-      id: 'tool-1', name: 'read', status: 'running',
+      id: 'tool-1', name: 'read', status: 'completed', result: '{"lines":3}',
     });
     expect(useConversationStore.getState().pendingQuestion).toMatchObject({
       kind: 'permission', question: 'Allow access?',

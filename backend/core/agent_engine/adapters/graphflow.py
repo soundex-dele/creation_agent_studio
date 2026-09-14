@@ -17,6 +17,67 @@ multi_select (boolean). Do not wrap the object in a questions array.
 """.strip()
 
 
+def _message_value(message, name, default=""):
+    if isinstance(message, dict):
+        return message.get(name, default)
+    return getattr(message, name, default)
+
+
+def _graphflow_event_bridge(callback, *, content_mode="delta"):
+    """Map GraphFlow SDK messages to the durable Run event vocabulary."""
+
+    pending_tools = []
+
+    def emit(event_type, payload):
+        if callback is not None:
+            callback(event_type, payload)
+
+    def on_message(message):
+        message_type = str(_message_value(message, "type"))
+        content = str(_message_value(message, "content") or "")
+        if message_type == "progress":
+            subtype = str(_message_value(message, "subtype") or "content")
+            if subtype == "content" and content:
+                event_type = (
+                    "output.snapshot" if content_mode == "snapshot" else "output.delta"
+                )
+                emit(event_type, {"text": content})
+            elif content:
+                emit("progress.updated", {"category": subtype, "message": content})
+            return
+        if message_type == "tool_use":
+            tool_call_id = str(
+                _message_value(message, "tool_use_id") or f"tool-{len(pending_tools) + 1}"
+            )
+            tool_name = str(_message_value(message, "tool_name") or "tool")
+            pending_tools.append((tool_call_id, tool_name))
+            emit("tool.started", {
+                "tool_call_id": tool_call_id,
+                "name": tool_name,
+                "input": content,
+            })
+            return
+        if message_type == "tool_result":
+            tool_call_id = str(_message_value(message, "tool_use_id") or "")
+            tool_name = str(_message_value(message, "tool_name") or "")
+            if pending_tools:
+                pending_id, pending_name = pending_tools.pop(0)
+                tool_call_id = tool_call_id or pending_id
+                tool_name = tool_name or pending_name
+            failed = bool(_message_value(message, "is_error", False))
+            payload = {
+                "tool_call_id": tool_call_id or "tool-result",
+                "name": tool_name or "tool",
+                "result": content,
+            }
+            error_message = str(_message_value(message, "error_message") or "")
+            if error_message:
+                payload["error_message"] = error_message
+            emit("tool.failed" if failed else "tool.completed", payload)
+
+    return on_message
+
+
 def build_config(
     *,
     system_prompt: str = "",
@@ -75,6 +136,12 @@ class GraphFlowAdapter(AgentAdapter):
             base_url=self.base_url,
             model=self.model,
         ) as engine:
+            on_event = options.get("on_event")
+            if on_event is not None:
+                engine.on_message(_graphflow_event_bridge(
+                    on_event,
+                    content_mode=self.content_mode,
+                ))
             result = engine.query(query)
         input_request = getattr(result, "input_request", None)
         if input_request is None:

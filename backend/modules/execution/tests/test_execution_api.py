@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 import uuid
 
 import pytest
+from channels.layers import InMemoryChannelLayer
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
@@ -27,7 +28,10 @@ from modules.execution.application.runs import (
     record_artifact,
     suspend_attempt_for_input,
 )
-from modules.execution.api.streaming import stream_run_events
+from modules.execution.api.streaming import (
+    _cross_process_channel_layer,
+    stream_run_events,
+)
 from modules.execution.infrastructure.claim import claim_next_run
 from modules.execution.application.event_retention import (
     apply_projection_event,
@@ -52,6 +56,18 @@ def test_run_event_contract_fixture_matches_backend_projection():
             payload=item["payload"],
         ))
     assert projection == contract["projection"]
+
+
+def test_in_memory_channel_layer_uses_database_polling_fallback():
+    layer = InMemoryChannelLayer()
+
+    assert _cross_process_channel_layer(layer) is None
+
+
+def test_shared_channel_layer_keeps_notification_transport():
+    layer = object()
+
+    assert _cross_process_channel_layer(layer) is layer
 
 
 @pytest.fixture

@@ -45,6 +45,46 @@ class DurableAgentAdapterTest(TestCase):
         sink.emit.assert_any_call("output.delta", {"text": "hello"})
 
     @patch("apps.agents.execution.build_agent_engine")
+    def test_forwards_streaming_and_tool_events_without_duplicate_final_delta(
+        self, mock_factory
+    ):
+        engine = MagicMock()
+
+        def complete(_messages, **options):
+            options["on_event"]("output.delta", {"text": "hel"})
+            options["on_event"]("tool.started", {
+                "tool_call_id": "call-1", "name": "read_file", "input": {"path": "a"},
+            })
+            options["on_event"]("tool.completed", {
+                "tool_call_id": "call-1", "name": "read_file", "result": "ok",
+            })
+            options["on_event"]("output.delta", {"text": "lo"})
+            return LLMResponse(
+                content="hello", usage=TokenUsage(), model="deepseek-chat"
+            )
+
+        engine.complete.side_effect = complete
+        mock_factory.return_value = engine
+        sink = MagicMock(cancelled=False)
+
+        execute_agent_completion(self._payload(self.organization.id), sink)
+
+        self.assertEqual([item.args for item in sink.emit.call_args_list[:4]], [
+            ("output.delta", {"text": "hel"}),
+            ("tool.started", {
+                "tool_call_id": "call-1", "name": "read_file", "input": {"path": "a"},
+            }),
+            ("tool.completed", {
+                "tool_call_id": "call-1", "name": "read_file", "result": "ok",
+            }),
+            ("output.delta", {"text": "lo"}),
+        ])
+        delta_calls = [
+            call for call in sink.emit.call_args_list if call.args[0] == "output.delta"
+        ]
+        self.assertEqual(len(delta_calls), 2)
+
+    @patch("apps.agents.execution.build_agent_engine")
     def test_failure_raises_for_coordinator(self, mock_factory):
         mock_factory.return_value.complete.return_value = LLMResponse(
             content="", usage=TokenUsage(), model="deepseek-chat",

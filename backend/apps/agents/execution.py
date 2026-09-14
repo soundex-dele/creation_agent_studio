@@ -52,10 +52,19 @@ def execute_agent_completion(run_payload, sink):
                 {"role": "user", "content": "The requested permission was denied."},
             ]
 
+    emitted_output = False
+
+    def emit_runtime_event(event_type, payload):
+        nonlocal emitted_output
+        if event_type in {"output.delta", "output.snapshot"}:
+            emitted_output = True
+        sink.emit(event_type, payload)
+
     response = engine.complete(
         messages,
         approval_decision=approval_decision,
         require_tool_approval=bool(governance.get("require_tool_approval", False)),
+        on_event=emit_runtime_event,
     )
     if response.input_request:
         request = dict(response.input_request)
@@ -69,7 +78,10 @@ def execute_agent_completion(run_payload, sink):
         )
     if not response.success:
         raise RuntimeError(response.error or "Agent execution failed")
-    sink.emit("output.delta", {"text": response.content})
+    # Adapters that do not expose incremental events still get the canonical
+    # output event. Streaming adapters have already emitted their deltas.
+    if response.content and not emitted_output:
+        sink.emit("output.delta", {"text": response.content})
     output = {
         "result": response.content,
         "model": response.model,

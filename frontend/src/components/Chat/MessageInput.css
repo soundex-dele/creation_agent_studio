@@ -27,9 +27,13 @@
 .chat-input-textarea {
   flex: 1;
   resize: none;
-  min-height: 80px;
+  /* Start at one line; height grows with content via the auto-grow handler.
+     Keep max-height so very long drafts scroll inside the box instead of
+     pushing the composer off-screen. */
+  min-height: calc(1.5em + 2px);
   max-height: 160px;
   line-height: 1.5;
+  overflow-y: auto;
   background: transparent;
   color: var(--color-text);
   border: none;

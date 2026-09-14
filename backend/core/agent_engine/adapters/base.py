@@ -13,4 +13,8 @@ class AgentAdapter(ABC):
 
     @abstractmethod
     def complete(self, messages: list[dict], **options) -> LLMResponse:
-        """Run one completion and return the normalized result."""
+        """Run one completion and return the normalized result.
+
+        Adapters should call the optional ``on_event(type, payload)`` callback
+        for incremental output, tool lifecycle, and progress events.
+        """

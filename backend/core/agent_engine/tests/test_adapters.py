@@ -3,18 +3,24 @@ import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase, skipUnless
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import override_settings
 
 from core.agent_engine.adapters.base import AgentAdapter
 from core.agent_engine.adapters.codex import (
     CodexAdapter,
+    _consume_codex_turn,
     load_codex_sdk,
     resolve_codex_binary,
 )
-from core.agent_engine.adapters.graphflow import build_config
+from core.agent_engine.adapters.graphflow import (
+    GraphFlowAdapter,
+    _graphflow_event_bridge,
+    build_config,
+)
 from core.agent_engine.adapters.registry import AdapterRegistry
 from core.agent_engine.models import LLMResponse, TokenUsage
 
@@ -62,8 +68,125 @@ class GraphFlowIntegrationTest(TestCase):
         self.assertEqual(kwargs["llm_base_url"], "https://api.deepseek.com/v1")
         self.assertTrue(kwargs["enable_streaming"])
 
+    def test_maps_content_and_tool_callbacks_to_run_events(self):
+        events = []
+        bridge = _graphflow_event_bridge(
+            lambda event_type, payload: events.append((event_type, payload))
+        )
+
+        bridge(SimpleNamespace(type="progress", subtype="content", content="Hi"))
+        bridge(SimpleNamespace(
+            type="tool_use", tool_use_id="call-1", tool_name="read_file",
+            content='{"path":"a.txt"}',
+        ))
+        bridge(SimpleNamespace(
+            type="tool_result", tool_use_id="", tool_name="", content="contents",
+            is_error=False, error_message="",
+        ))
+
+        self.assertEqual(events, [
+            ("output.delta", {"text": "Hi"}),
+            ("tool.started", {
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "input": '{"path":"a.txt"}',
+            }),
+            ("tool.completed", {
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "result": "contents",
+            }),
+        ])
+
+    @override_settings(
+        GRAPHFLOW_PROVIDER="openai",
+        GRAPHFLOW_MODEL="deepseek-chat",
+        GRAPHFLOW_BASE_URL="https://example.com/v1",
+    )
+    @patch("core.agent_engine.adapters.graphflow.load_sdk")
+    def test_registers_streaming_callback_before_query(self, load_sdk):
+        sdk = load_sdk.return_value
+        engine = sdk.Engine.return_value.__enter__.return_value
+        result = SimpleNamespace(
+            final_answer="hello",
+            token_usage=SimpleNamespace(
+                prompt_tokens=1, completion_tokens=2, total_tokens=3,
+            ),
+            success=True,
+            error_message="",
+            input_request=None,
+            pending_question=None,
+        )
+        engine.query.return_value = result
+        callback = MagicMock()
+
+        GraphFlowAdapter().complete(
+            [{"role": "user", "content": "hi"}], on_event=callback
+        )
+
+        engine.on_message.assert_called_once()
+        self.assertEqual(
+            [method_call[0] for method_call in engine.method_calls[:2]],
+            ["on_message", "query"],
+        )
+
 
 class CodexIntegrationTest(TestCase):
+    def test_streams_agent_deltas_and_tool_lifecycle(self):
+        notifications = [
+            SimpleNamespace(
+                method="item/started",
+                payload=SimpleNamespace(item=SimpleNamespace(
+                    id="call-1", type="commandExecution", command="pwd",
+                    status="inProgress",
+                )),
+            ),
+            SimpleNamespace(
+                method="item/agentMessage/delta",
+                payload=SimpleNamespace(delta="Hello "),
+            ),
+            SimpleNamespace(
+                method="item/agentMessage/delta",
+                payload=SimpleNamespace(delta="world"),
+            ),
+            SimpleNamespace(
+                method="item/completed",
+                payload=SimpleNamespace(item=SimpleNamespace(
+                    id="call-1", type="commandExecution", command="pwd",
+                    aggregatedOutput="E:/workspace", status="completed",
+                )),
+            ),
+            SimpleNamespace(
+                method="turn/completed",
+                payload=SimpleNamespace(turn=SimpleNamespace(
+                    status="completed", error=None,
+                )),
+            ),
+        ]
+        turn = MagicMock()
+        turn.stream.return_value = iter(notifications)
+        thread = MagicMock()
+        thread.turn.return_value = turn
+        events = []
+
+        result = _consume_codex_turn(
+            thread,
+            "hi",
+            on_event=lambda event_type, payload: events.append((event_type, payload)),
+        )
+
+        self.assertEqual(result.final_response, "Hello world")
+        self.assertEqual([event[0] for event in events], [
+            "tool.started", "output.delta", "output.delta", "tool.completed",
+        ])
+        self.assertEqual(events[0][1], {
+            "tool_call_id": "call-1",
+            "name": "shell",
+            "tool_type": "commandExecution",
+            "input": "pwd",
+        })
+        self.assertEqual(events[-1][1]["result"], "E:/workspace")
+
     @override_settings(CODEX_SDK_PATH="D:/missing-codex-sdk")
     def test_python_sdk_transport_reports_missing_opt_in_dependency(self):
         load_codex_sdk.cache_clear()
