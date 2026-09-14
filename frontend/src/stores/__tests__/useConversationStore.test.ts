@@ -8,6 +8,7 @@ import { useConversationStore } from '../useConversationStore';
 describe('useConversationStore durable Run integration', () => {
   beforeEach(() => {
     useConversationStore.setState({
+      conversations: [],
       currentConversation: null,
       activeRun: null,
       error: null,
@@ -16,6 +17,35 @@ describe('useConversationStore durable Run integration', () => {
       agentActivity: null,
     });
     vi.restoreAllMocks();
+  });
+
+  it('normalizes conversation ids so URL selections match history items', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({
+      results: [{
+        id: 15,
+        title: 'Numeric id conversation',
+        created_at: '',
+        updated_at: '',
+      }],
+    });
+
+    await useConversationStore.getState().fetchConversations();
+
+    expect(useConversationStore.getState().conversations[0]?.id).toBe('15');
+  });
+
+  it('normalizes a newly created conversation id', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({
+      id: 16,
+      title: 'New conversation',
+      created_at: '',
+      updated_at: '',
+    });
+
+    const conversation = await useConversationStore.getState().createConversation('New conversation');
+
+    expect(conversation.id).toBe('16');
+    expect(useConversationStore.getState().conversations[0]?.id).toBe('16');
   });
 
   it('keeps the latest conversation when detail requests finish out of order', async () => {

@@ -47,10 +47,17 @@ export interface ChatRunOptions {
   agentId?: number | null;
 }
 
+const normalizeConversation = (item: any): Conversation => ({
+  ...item,
+  id: String(item.id),
+});
+
 const normalizeConversations = (raw: any): Conversation[] => {
   if (!raw) return [];
   const list = Array.isArray(raw) ? raw : Array.isArray(raw.results) ? raw.results : [];
-  return list.filter((item: any) => item?.id != null) as Conversation[];
+  return list
+    .filter((item: any) => item?.id != null)
+    .map(normalizeConversation);
 };
 
 const asQuestion = (payload: Record<string, unknown>): AgentQuestion => {
@@ -442,9 +449,10 @@ export const useConversationStore = create<ConversationState>()(
             if (context.skillIds?.length) payload.skill_ids = context.skillIds;
             if (context.workingDirectory) payload.working_directory = context.workingDirectory;
             const response = await api.post<Conversation>('/conversations/', payload);
-            if (!projectId) set({ conversations: [response, ...get().conversations] });
+            const conversation = normalizeConversation(response);
+            if (!projectId) set({ conversations: [conversation, ...get().conversations] });
             set({ isLoading: false });
-            return response;
+            return conversation;
           } catch (error: any) {
             set({ error: error.response?.data?.detail || '创建对话失败', isLoading: false });
             throw error;
