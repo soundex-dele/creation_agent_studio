@@ -5,7 +5,7 @@ import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import type { ComposerContext } from './MessageInput';
+import type { ComposerAgent, ComposerContext } from './MessageInput';
 import AgentQuestionCard from './AgentQuestionCard';
 import './ChatContainer.css';
 
@@ -37,6 +37,7 @@ interface ChatContainerProps {
   inputPlaceholder?: string;
   draftRequest?: { id: number; text: string } | null;
   projectId?: number;
+  defaultAgent?: ComposerAgent | null;
 }
 
 const defaultSuggestions: ChatSuggestion[] = [
@@ -57,6 +58,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   inputPlaceholder,
   draftRequest,
   projectId,
+  defaultAgent = null,
 }) => {
   const { user } = useAuthStore();
   const {
@@ -264,7 +266,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             value={inputValue}
             onValueChange={setInputValue}
             onSendMessage={handleSendMessage}
-            currentAgent={currentConversation?.agent || null}
+            currentAgent={currentConversation?.agent || defaultAgent}
             workspaceLocked={Boolean(
               conversationId || projectId || creationContext?.applicationId
               || creationContext?.workflowStepRunId

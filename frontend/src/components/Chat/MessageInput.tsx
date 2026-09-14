@@ -31,7 +31,7 @@ interface SkillOption {
   description?: string;
 }
 
-type ComposerAgent = Pick<Agent, 'id' | 'name' | 'description'>;
+export type ComposerAgent = Pick<Agent, 'id' | 'name' | 'description'>;
 
 interface MessageInputProps {
   value?: string;

@@ -159,6 +159,11 @@ def _durable_step_snapshot(step, governance):
         "workflow_step_id": str(step["id"]),
         "workflow_step_key": step["key"],
     }
+    if step.get("application_draft_id"):
+        snapshot.update({
+            "application_draft_id": str(step["application_draft_id"]),
+            "application_draft_version": step.get("application_draft_version"),
+        })
     dependencies = content.get("dependencies") or {}
     default_agents = [
         value for value in dependencies.get("agents", []) if value.get("is_default")
@@ -201,6 +206,7 @@ def _create_or_load_step_run(root, step, workflow_input, dependency_results, gov
             definition_snapshot=_durable_step_snapshot(step, governance),
             input_data={
                 **workflow_input,
+                **dict(step.get("runtime_input") or {}),
                 "dependency_outputs": {
                     key: value.get("output", {})
                     for key, value in dependency_results.items()

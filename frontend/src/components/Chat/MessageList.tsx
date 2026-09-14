@@ -154,7 +154,7 @@ const MessageList: React.FC<MessageListProps> = ({
             </span>
           </div>
 
-          <div className={`text-sm leading-relaxed ${isUser ? '' : 'prose prose-sm dark:prose-invert max-w-none'}`}>
+          <div className={`text-sm leading-relaxed ${isUser ? '' : 'message-markdown'}`}>
             {isUser && selectedSkills.length > 0 && (
               <div className="message-selected-skills" aria-label="本轮使用的技能">
                 {selectedSkills.map((skill) => (

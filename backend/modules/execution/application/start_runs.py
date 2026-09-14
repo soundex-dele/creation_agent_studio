@@ -573,6 +573,15 @@ def start_workflow_run(
             _enforce_definition_governance(
                 organization, content, step.get("effective_config") or {}
             )
+            runtime_skills = (step.get("runtime_input") or {}).get("skills") or []
+            port.enforce_skill_policy(
+                organization,
+                [
+                    str(item.get("name") or "")
+                    for item in runtime_skills
+                    if isinstance(item, dict) and item.get("name")
+                ],
+            )
             frozen_step = dict(step)
             frozen_step["skill_revisions"] = freeze_skill_revisions(
                 organization_id=organization.id,

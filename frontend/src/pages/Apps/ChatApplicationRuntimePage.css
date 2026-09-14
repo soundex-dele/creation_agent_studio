@@ -1,0 +1,174 @@
+.chat-app-page {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  background: var(--color-bg-void);
+}
+
+.chat-app-header {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 800px) minmax(120px, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+}
+
+.chat-app-header > :last-child {
+  justify-self: end;
+}
+
+.chat-app-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-app-heading h1,
+.chat-app-form-title h2,
+.chat-app-preview-card h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+}
+
+.chat-app-heading h1 { font-size: 18px; }
+.chat-app-heading p,
+.chat-app-form-title p,
+.chat-app-preview-card p {
+  margin: 3px 0 0;
+  color: var(--color-text-sec);
+  font-size: 13px;
+}
+
+.chat-app-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-elevated));
+  font-size: 22px;
+}
+
+.chat-app-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 680px) minmax(320px, 480px);
+  align-items: start;
+  justify-content: center;
+  gap: 24px;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.chat-app-form-card,
+.chat-app-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-xl);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-app-prompt-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-app-prompt-tabs button {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-sec);
+  cursor: pointer;
+}
+
+.chat-app-prompt-tabs button.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.chat-app-form-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chat-app-form-title > span { font-size: 30px; }
+.chat-app-form-title h2,
+.chat-app-preview-card h2 { font-size: 20px; }
+
+.chat-app-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chat-app-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chat-app-field:has(textarea) { grid-column: 1 / -1; }
+.chat-app-field b { margin-left: 3px; color: var(--color-error); }
+.chat-app-field small { color: var(--color-text-dim); font-weight: 400; }
+.chat-app-field .ant-input-number { width: 100%; }
+
+.chat-app-preview-card {
+  position: sticky;
+  top: 0;
+}
+
+.chat-app-chat {
+  min-height: 0;
+  flex: 1;
+}
+
+/* The launched chat is already framed by its own header. Keep the remaining
+   viewport focused on the conversation instead of surrounding it with the
+   roomier spacing used by the studio home page. */
+.chat-app-chat .chat-messages {
+  padding-block: 18px;
+}
+
+.chat-app-chat .chat-input-area {
+  padding: 8px 24px 10px;
+}
+
+.chat-app-chat .chat-input-hint {
+  margin-top: 4px;
+  line-height: 16px;
+}
+.chat-app-loading,
+.chat-app-error { display: grid; min-height: 360px; place-items: center; padding: 32px; }
+
+@media (max-width: 980px) {
+  .chat-app-header { grid-template-columns: auto 1fr auto; }
+  .chat-app-builder { grid-template-columns: minmax(0, 720px); }
+  .chat-app-preview-card { position: static; }
+}
+
+@media (max-width: 640px) {
+  .chat-app-header { padding: 12px; }
+  .chat-app-heading p { display: none; }
+  .chat-app-builder { padding: 16px; }
+  .chat-app-chat .chat-messages { padding: 12px 16px; }
+  .chat-app-chat .chat-input-area { padding: 6px 12px 8px; }
+  .chat-app-form-card,
+  .chat-app-preview-card { padding: 20px; }
+  .chat-app-fields { grid-template-columns: 1fr; }
+}

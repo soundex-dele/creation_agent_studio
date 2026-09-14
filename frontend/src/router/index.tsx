@@ -14,6 +14,7 @@ const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPa
 const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
 const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
 const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
+const ChatApplicationRuntimePage = lazy(() => import('@/pages/Apps/ChatApplicationRuntimePage'));
 const WorkspacePage = lazy(() => import('@/pages/Workspace/WorkspacePage'));
 const WorkflowsPage = lazy(() => import('@/pages/Workflows/WorkflowsPage'));
 const WorkflowEditorPage = lazy(() => import('@/pages/Workflows/WorkflowEditorPage'));
@@ -94,6 +95,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <MainLayout>
           {page(<AppDetailPage />)}
+        </MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/chat',
+    element: (
+      <ProtectedRoute>
+        <MainLayout hideSidebar hideHeader>
+          {page(<ChatApplicationRuntimePage />)}
         </MainLayout>
       </ProtectedRoute>
     ),

@@ -2,8 +2,15 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.applications.models import Application, ApplicationCategory
+from apps.agents.models import Agent, AgentCategory
+from apps.applications.models import (
+    Application,
+    ApplicationCategory,
+    ChatApplication,
+    Skill,
+)
 from modules.catalog.models import (
+    AgentDraft,
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
@@ -117,6 +124,125 @@ class WorkflowApiTest(TestCase):
         workflow.steps.all().delete()
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+
+    def test_start_freezes_chat_application_draft_without_deployment(self):
+        agent_category = AgentCategory.objects.create(
+            name="Workflow agents", slug="workflow-agents"
+        )
+        agent = Agent.objects.create(
+            category=agent_category,
+            name="Draft writer",
+            slug="workflow-draft-writer",
+            description="Writes from a draft",
+            created_by=self.user,
+            organization=self.organization,
+        )
+        agent_definition = {
+            "system_prompt": "Write a useful article.",
+            "model_config": {},
+            "tool_config": [],
+            "knowledge_config": [],
+            "guardrail_config": {},
+            "workflow_config": {},
+            "skill_bindings": [],
+        }
+        AgentDraft.objects.create(
+            organization=self.organization,
+            agent=agent,
+            updated_by=self.user,
+            content=agent_definition,
+        )
+        application = Application.objects.create(
+            category=self.applications[0].category,
+            name="Draft chat app",
+            slug="workflow-draft-chat",
+            description="Chat app without a production deployment",
+            created_by=self.user,
+            organization=self.organization,
+            kind=Application.Kind.CHAT,
+        )
+        ChatApplication.objects.create(application=application)
+        skill = Skill.objects.create(
+            organization=self.organization,
+            owner=self.user,
+            slug="workflow-draft-skill",
+            name="Workflow draft skill",
+            visibility=Skill.Visibility.ORGANIZATION,
+        )
+        draft = ApplicationDraft.objects.create(
+            organization=self.organization,
+            application=application,
+            updated_by=self.user,
+            content={
+                "kind": "chat",
+                "executor_kind": "agent",
+                "executor_key": "agent-chat",
+                "renderer_key": "chat",
+                "retry_policy": {"max_attempts": 3, "retry_safe": True},
+                "default_config": {},
+                "agent_bindings": [{
+                    "agent_id": agent.id,
+                    "label": agent.name,
+                    "is_default": True,
+                    "config_overrides": {},
+                    "order": 0,
+                }],
+                "skill_bindings": [{
+                    "skill_id": str(skill.id),
+                    "mode": "required",
+                    "config": {},
+                    "order": 0,
+                }],
+                "guided_prompts": [],
+            },
+        )
+        workflow_response = self.client.post("/api/v1/workflows/", {
+            "name": "Draft chat flow",
+            "steps": [{
+                "key": "write",
+                "application_id": application.id,
+                "name": "Write",
+                "order": 0,
+                "depends_on": [],
+            }],
+        }, format="json", **self.headers)
+        self.assertEqual(workflow_response.status_code, 201, workflow_response.data)
+
+        from unittest.mock import patch
+        runtime_skills = [{
+            "name": skill.slug,
+            "display_name": skill.name,
+            "path": "/skills/workflow-draft-skill/SKILL.md",
+            "adapter": "codex",
+        }]
+        with patch(
+            "apps.workflows.views.resolve_runtime_skills",
+            return_value=runtime_skills,
+        ):
+            response = self.client.post(
+                f"/api/v1/workflows/{workflow_response.data['id']}/start/",
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="workflow-draft-chat-1",
+                **self.headers,
+            )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        step = run.definition_snapshot["workflow_steps"][0]
+        self.assertEqual(step["executor_kind"], "agent")
+        self.assertEqual(step["executor_key"], "agent-completion")
+        self.assertEqual(step["application_draft_id"], str(draft.id))
+        self.assertEqual(step["application_draft_version"], draft.version)
+        self.assertEqual(step["content"]["skill_bindings"], [])
+        self.assertEqual(step["skill_revisions"], [])
+        self.assertEqual(step["runtime_input"]["skills"], runtime_skills)
+        self.assertEqual(
+            step["content"]["dependencies"]["agents"][0]["definition"],
+            agent_definition,
+        )
+        self.assertFalse(
+            ApplicationDeployment.objects.filter(application=application).exists()
+        )
 
     def test_rejects_cyclic_workflow(self):
         response = self.client.post("/api/v1/workflows/", {

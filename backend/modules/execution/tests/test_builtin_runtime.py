@@ -129,6 +129,7 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
             "application_content_hash": "b" * 64,
             "executor_kind": "agent", "executor_key": "agent-completion",
             "content": {}, "effective_config": {},
+            "runtime_input": {"skills": [{"name": "article-writer"}]},
         },
     ]
 
@@ -166,6 +167,7 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     assert first.max_attempts == 2
     assert second.executor_kind == Run.ExecutorKind.AGENT
     assert second.input["dependency_outputs"]["first"] == {"node": "first"}
+    assert second.input["skills"] == [{"name": "article-writer"}]
     assert second.definition_snapshot["governance"]["require_tool_approval"] is True
 
 

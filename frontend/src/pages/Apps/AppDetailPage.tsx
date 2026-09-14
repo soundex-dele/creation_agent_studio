@@ -64,6 +64,10 @@ const AppDetailPage: React.FC = () => {
       navigate(`/applications/${app.applicationId}/contacts`);
       return;
     }
+    if (app.kind === 'chat') {
+      navigate(`/applications/${app.applicationId}/chat?slug=${encodeURIComponent(app.id)}`);
+      return;
+    }
     navigate(`/applications/${app.applicationId}/run`);
   };
 
