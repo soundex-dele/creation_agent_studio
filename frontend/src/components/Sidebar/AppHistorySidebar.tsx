@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
+import SidebarCategoryLabel from './SidebarCategoryLabel';
 
 interface AppHistoryItem {
   key: string;
@@ -94,7 +95,14 @@ const AppHistorySidebar: React.FC = () => {
     { key: 'all', label: '全部应用' },
     ...categories.map((cat) => ({
       key: cat.slug,
-      label: `${cat.icon ? cat.icon + ' ' : ''}${cat.name} (${cat.app_count ?? 0})`,
+      label: (
+        <SidebarCategoryLabel
+          label={cat.name}
+          count={cat.app_count ?? 0}
+          countUnit="应用"
+          icon={cat.icon}
+        />
+      ),
     })),
   ];
 
