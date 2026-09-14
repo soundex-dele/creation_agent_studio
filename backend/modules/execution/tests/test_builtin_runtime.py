@@ -229,6 +229,11 @@ def test_agent_completion_projects_provider_question_to_durable_suspend(monkeypa
                 {"role": "system", "content": ""},
                 {"role": "user", "content": "hello"},
             ],
+            "input_request": {
+                "input_kind": "answer",
+                "question": "Which format?",
+                "expires_in_seconds": 120,
+            },
         },
         "expires_in_seconds": 120,
     }

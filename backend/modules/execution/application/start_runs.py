@@ -456,13 +456,17 @@ def start_agent_run(
             **dict(agent_definition.get("model_config") or {}),
             **dict(deployment.config_override or {}),
         }
-        skill_revisions = freeze_skill_revisions(
-            organization_id=organization_id,
-            environment=environment,
-            content=agent_definition,
-        )
         governance = _enforce_definition_governance(
             run_organization, agent_definition, effective_config
+        )
+        runtime_skills = input_data.get("skills") or []
+        port.enforce_skill_policy(
+            run_organization,
+            [
+                str(item.get("name") or "")
+                for item in runtime_skills
+                if isinstance(item, dict) and item.get("name")
+            ],
         )
         guarded_input = port.apply_input_guardrails(run_organization, input_data)
         record = IdempotencyRecord.objects.create(
@@ -491,7 +495,9 @@ def start_agent_run(
                 "agent_definition": agent_definition,
                 "effective_config": effective_config,
                 "governance": governance,
-                "skill_revisions": skill_revisions,
+                # Agent Skills are loaded from the active adapter directory at
+                # execution time and intentionally use the latest files.
+                "skill_revisions": [],
             },
             input_data=guarded_input,
             priority=priority,

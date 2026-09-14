@@ -28,9 +28,17 @@ def _create_managed(target: Path) -> Path:
     return resolved
 
 
-def system_working_directory(user, organization=None) -> str:
+def system_working_directory(
+    user, organization=None, conversation_id=None,
+) -> str:
     """Return the managed directory used by an ordinary system conversation."""
-    return str(_create_managed(_scope_root(user, organization) / 'system'))
+    scope = _scope_root(user, organization)
+    target = (
+        scope / 'conversations' / str(conversation_id)
+        if conversation_id is not None
+        else scope / 'system'
+    )
+    return str(_create_managed(target))
 
 
 def application_working_directory(project) -> str:
@@ -72,7 +80,13 @@ def conversation_working_directory(conversation) -> str:
     if (conversation.working_directory
             and not conversation.project_id
             and not conversation.application_id):
-        return conversation.working_directory
+        current = Path(conversation.working_directory).expanduser().resolve(
+            strict=False)
+        legacy_default = (
+            _scope_root(conversation.user, conversation.organization) / 'system'
+        ).resolve(strict=False)
+        if current != legacy_default:
+            return conversation.working_directory
     if conversation.project_id:
         project = conversation.project
         if (
@@ -91,7 +105,10 @@ def conversation_working_directory(conversation) -> str:
             / 'conversations' / str(conversation.id)))
     else:
         path = system_working_directory(
-            conversation.user, conversation.organization)
+            conversation.user,
+            conversation.organization,
+            conversation.id,
+        )
     if conversation.working_directory != path:
         conversation.working_directory = path
         conversation.save(update_fields=['working_directory'])

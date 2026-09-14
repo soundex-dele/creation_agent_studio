@@ -101,14 +101,19 @@ describe('RunEvent reducer', () => {
     ).state;
     state = ingestRunEvent(
       state,
-      event(2, 'input.required', { input_request_id: 'request-1' }),
+      event(2, 'output.delta', { text: 'partial answer' }),
+    ).state;
+    state = ingestRunEvent(
+      state,
+      event(3, 'input.required', { input_request_id: 'request-1' }),
     ).state;
     expect(state.status).toBe('waiting_input');
     expect(state.pendingInput?.input_request_id).toBe('request-1');
 
-    state = ingestRunEvent(state, event(3, 'input.accepted')).state;
+    state = ingestRunEvent(state, event(4, 'input.accepted')).state;
     expect(state.status).toBe('queued');
     expect(state.pendingInput).toBeNull();
+    expect(state.output).toBe('');
   });
 
   it('rejects another run and unknown schema versions', () => {

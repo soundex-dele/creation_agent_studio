@@ -43,9 +43,52 @@ class CreateConversationTest(TestCase):
         conversation = self.user.conversations.get(id=response.data['id'])
         expected = (
             Path(directory) / 'organizations' / str(conversation.organization_id)
-            / 'system'
+            / 'conversations' / str(conversation.id)
         ).resolve()
         self.assertEqual(Path(response.data['working_directory']), expected)
+
+    def test_system_conversations_have_isolated_working_directories(self):
+        with TemporaryDirectory() as directory, override_settings(
+                AGENT_WORKSPACE_ROOT=directory):
+            first = self.client.post('/api/v1/conversations/', {}, format='json')
+            second = self.client.post('/api/v1/conversations/', {}, format='json')
+            first_workspace = Path(first.data['working_directory'])
+            second_workspace = Path(second.data['working_directory'])
+            (first_workspace / 'first-only.txt').write_text(
+                'first conversation', encoding='utf-8')
+
+            listing = self.client.get(
+                f"/api/v1/conversations/{second.data['id']}/workspace-files/")
+
+        self.assertNotEqual(first_workspace, second_workspace)
+        self.assertEqual(listing.status_code, 200, listing.data)
+        self.assertEqual(listing.data['file_count'], 0)
+
+    def test_legacy_shared_system_directory_is_replaced_without_copying_files(self):
+        with TemporaryDirectory() as directory, override_settings(
+                AGENT_WORKSPACE_ROOT=directory):
+            created = self.client.post('/api/v1/conversations/', {}, format='json')
+            conversation = self.user.conversations.get(id=created.data['id'])
+            legacy = (
+                Path(directory) / 'organizations' / str(conversation.organization_id)
+                / 'system'
+            ).resolve()
+            legacy.mkdir(parents=True)
+            (legacy / 'unowned.txt').write_text('legacy', encoding='utf-8')
+            conversation.working_directory = str(legacy)
+            conversation.save(update_fields=['working_directory'])
+
+            listing = self.client.get(
+                f"/api/v1/conversations/{conversation.id}/workspace-files/")
+            conversation.refresh_from_db()
+
+        expected = (
+            Path(directory) / 'organizations' / str(conversation.organization_id)
+            / 'conversations' / str(conversation.id)
+        ).resolve()
+        self.assertEqual(listing.status_code, 200, listing.data)
+        self.assertEqual(Path(conversation.working_directory), expected)
+        self.assertEqual(listing.data['file_count'], 0)
 
     def test_create_with_agent_id_binds_specified(self):
         """指定 agent_id 时绑定到该 agent。"""

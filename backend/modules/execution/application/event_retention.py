@@ -65,6 +65,7 @@ def apply_projection_event(projection, event):
     elif event.type == "input.accepted":
         next_projection["status"] = Run.Status.QUEUED
         next_projection["pendingInput"] = None
+        next_projection["output"] = ""
     elif event.type == "input.expired":
         next_projection["status"] = Run.Status.CANCELLED
         next_projection["pendingInput"] = None

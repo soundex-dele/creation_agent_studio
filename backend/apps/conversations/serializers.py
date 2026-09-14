@@ -4,6 +4,8 @@ Serializers for conversations app.
 from rest_framework import serializers
 from apps.agents.models import Agent
 from apps.projects.services.workspace_paths import validate_system_working_directory
+from modules.execution.api.serializers import RunSerializer
+from modules.execution.models import Run
 from .models import Conversation, Message
 
 
@@ -33,7 +35,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'title', 'agent', 'project', 'process_id',
+        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
                   'application_id',
                   'working_directory',
                   'created_at', 'updated_at',
@@ -56,14 +58,16 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
     project = serializers.IntegerField(source='project_id', read_only=True)
     application_id = serializers.IntegerField(read_only=True)
     skills = serializers.SerializerMethodField()
+    active_run = serializers.SerializerMethodField()
+    organization_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = Conversation
-        fields = ['id', 'title', 'agent', 'project', 'process_id',
+        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
                   'application_id',
                   'working_directory',
                   'skills', 'created_at', 'updated_at',
-                  'messages']
+                  'messages', 'active_run']
 
     def get_skills(self, obj):
         return [{
@@ -73,6 +77,20 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
             'source': binding.source,
             'enabled': binding.enabled,
         } for binding in obj.skill_bindings.select_related('skill').all()]
+
+    def get_active_run(self, obj):
+        run = Run.objects.for_organization(obj.organization_id).filter(
+            source_type='conversation',
+            source_id=str(obj.id),
+            status__in=(
+                Run.Status.QUEUED,
+                Run.Status.RUNNING,
+                Run.Status.WAITING_INPUT,
+                Run.Status.WAITING_CHILDREN,
+                Run.Status.CANCELLING,
+            ),
+        ).select_related('current_attempt').order_by('-created_at').first()
+        return RunSerializer(run).data if run else None
 
 
 class CreateConversationSerializer(serializers.Serializer):
@@ -100,3 +118,6 @@ class SendMessageSerializer(serializers.Serializer):
     """发送消息序列化器"""
     content = serializers.CharField(required=True)
     conversation_id = serializers.IntegerField(required=False)
+    agent_id = serializers.IntegerField(required=False, allow_null=True)
+    skill_names = serializers.ListField(
+        child=serializers.CharField(max_length=160), required=False, default=list)

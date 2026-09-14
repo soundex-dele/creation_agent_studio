@@ -58,11 +58,18 @@ export interface AgentQuestionOption {
   description?: string;
 }
 
-export interface AgentQuestion {
+export interface AgentQuestionItem {
+  id: string;
   header: string;
   question: string;
-  kind: 'question' | 'permission';
   options: AgentQuestionOption[];
+  isOther?: boolean;
+  isSecret?: boolean;
+}
+
+export interface AgentQuestion extends AgentQuestionItem {
+  kind: 'question' | 'permission';
+  questions?: AgentQuestionItem[];
 }
 
 export interface AgentToolCall {

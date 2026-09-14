@@ -396,7 +396,7 @@ class ExecutionCoordinator:
                         size=len(encoded),
                         metadata={"checkpoint": checkpoint_data},
                     )
-                    suspend_attempt_for_input(
+                    input_event = suspend_attempt_for_input(
                         run_id=active.claimed.run.id,
                         organization_id=active.claimed.run.organization_id,
                         attempt_id=active.claimed.attempt.id,
@@ -407,6 +407,10 @@ class ExecutionCoordinator:
                         expires_at=timezone.now() + timedelta(seconds=expires_in),
                         request_payload=message.get("request_payload") or {},
                     )
+                    from modules.execution.application.projections import (
+                        project_input_required,
+                    )
+                    project_input_required(active.claimed.run.id, input_event)
                 annotate_execution_span(
                     getattr(active, "span", None),
                     "execution.suspension.reason",

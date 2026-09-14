@@ -12,7 +12,9 @@ from django.test import override_settings
 from core.agent_engine.adapters.base import AgentAdapter
 from core.agent_engine.adapters.codex import (
     CodexAdapter,
+    _AppServerTransport,
     _consume_codex_turn,
+    _text_input,
     load_codex_sdk,
     resolve_codex_binary,
 )
@@ -121,10 +123,13 @@ class GraphFlowIntegrationTest(TestCase):
         callback = MagicMock()
 
         GraphFlowAdapter().complete(
-            [{"role": "user", "content": "hi"}], on_event=callback
+            [{"role": "user", "content": "hi"}],
+            skills=[{"name": "repo-audit", "path": "D:/skills/repo-audit/SKILL.md"}],
+            on_event=callback,
         )
 
         engine.on_message.assert_called_once()
+        engine.query.assert_called_once_with("$repo-audit hi")
         self.assertEqual(
             [method_call[0] for method_call in engine.method_calls[:2]],
             ["on_message", "query"],
@@ -132,6 +137,115 @@ class GraphFlowIntegrationTest(TestCase):
 
 
 class CodexIntegrationTest(TestCase):
+    @patch("core.agent_engine.adapters.codex.threading.Thread")
+    @patch("core.agent_engine.adapters.codex.subprocess.Popen")
+    def test_app_server_opts_into_experimental_api(self, popen, _thread):
+        with (
+            patch.object(_AppServerTransport, "request", return_value={}) as request,
+            patch.object(_AppServerTransport, "notify") as notify,
+        ):
+            _AppServerTransport(codex_bin=Path("D:/installed/codex.exe"))
+
+        initialize = request.call_args_list[0]
+        self.assertEqual(initialize.args[0], "initialize")
+        self.assertEqual(
+            initialize.args[1]["capabilities"],
+            {"experimentalApi": True},
+        )
+        notify.assert_called_once_with("initialized")
+        popen.assert_called_once()
+
+    def test_projects_request_user_input_into_durable_question(self):
+        transport = object.__new__(_AppServerTransport)
+        transport.input_request = None
+        transport._send = MagicMock()
+
+        transport._handle_server_request({
+            "id": 17,
+            "method": "item/tool/requestUserInput",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "itemId": "item-1",
+                "questions": [
+                    {
+                        "id": "framework",
+                        "header": "Framework",
+                        "question": "Which framework should be used?",
+                        "options": [{
+                            "label": "React",
+                            "description": "Use React for the UI",
+                        }],
+                        "isOther": True,
+                        "isSecret": False,
+                    },
+                    {
+                        "id": "token",
+                        "header": "Token",
+                        "question": "Provide the token",
+                        "options": None,
+                        "isSecret": True,
+                    },
+                ],
+            },
+        })
+
+        self.assertEqual(transport.input_request["input_kind"], "answer")
+        self.assertEqual(transport.input_request["question"], "Which framework should be used?")
+        self.assertEqual(transport.input_request["questions"][0], {
+            "id": "framework",
+            "header": "Framework",
+            "question": "Which framework should be used?",
+            "options": [{
+                "label": "React",
+                "value": "React",
+                "description": "Use React for the UI",
+            }],
+            "is_other": True,
+            "is_secret": False,
+        })
+        self.assertTrue(transport.input_request["questions"][1]["is_secret"])
+        self.assertEqual(transport.input_request["codex"]["thread_id"], "thread-1")
+        transport._send.assert_called_once_with({
+            "id": 17,
+            "result": {
+                "answers": {
+                    "framework": {"answers": []},
+                    "token": {"answers": []},
+                },
+            },
+        })
+
+    def test_builds_structured_skill_input_with_text_marker(self):
+        result = _text_input("Inspect the repository", [{
+            "name": "repo-audit",
+            "path": "D:/skills/repo-audit/SKILL.md",
+            "display_name": "Repository Audit",
+        }])
+
+        self.assertEqual(result, [
+            {
+                "type": "text",
+                "text": "$repo-audit Inspect the repository",
+                "text_elements": [],
+            },
+            {
+                "type": "skill",
+                "name": "repo-audit",
+                "path": "D:/skills/repo-audit/SKILL.md",
+            },
+        ])
+
+    def test_falls_back_to_skill_marker_when_local_path_is_unavailable(self):
+        self.assertEqual(
+            _text_input("Inspect the repository", [{"name": "repo-audit"}]),
+            [{
+                "type": "text",
+                "text": "$repo-audit Inspect the repository",
+                "text_elements": [],
+            }],
+        )
+
     def test_streams_agent_deltas_and_tool_lifecycle(self):
         notifications = [
             SimpleNamespace(

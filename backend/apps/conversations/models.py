@@ -98,9 +98,10 @@ class Message(models.Model):
     ]
 
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
-    run = models.OneToOneField(
+    run = models.ForeignKey(
         'execution.Run', on_delete=models.PROTECT, null=True, blank=True,
-        related_name='projected_message')
+        related_name='projected_messages')
+    run_event_sequence = models.PositiveBigIntegerField(null=True, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     content = models.TextField()
     metadata = models.JSONField(blank=True, null=True)
@@ -109,6 +110,10 @@ class Message(models.Model):
     class Meta:
         ordering = ['created_at']
         db_table = 'messages'
+        constraints = [models.UniqueConstraint(
+            fields=['run', 'run_event_sequence'],
+            condition=models.Q(run__isnull=False, run_event_sequence__isnull=False),
+            name='unique_run_event_message')]
 
     def __str__(self):
         return f'{self.role}: {self.content[:50]}'

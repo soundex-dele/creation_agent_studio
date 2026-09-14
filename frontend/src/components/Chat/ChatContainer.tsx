@@ -148,15 +148,15 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     abortControllerRef.current?.abort();
     try {
       const activeConversation = useConversationStore.getState().currentConversation;
-      if (activeConversation) {
+      if (activeConversation && composer.agent) {
         setCurrentConversation({
           ...activeConversation,
-          agent: composer.agent || undefined,
+          agent: composer.agent,
         });
       }
       const controller = sendMessageStream(targetConversationId, content, {
         permissionMode: composer.permissionMode,
-        skills: composer.skills,
+        skillNames: composer.skillNames,
         agentId: composer.agentId,
       });
       abortControllerRef.current = controller;

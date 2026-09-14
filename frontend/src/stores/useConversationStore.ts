@@ -37,11 +37,13 @@ export interface Conversation {
 
 export interface ConversationDetail extends Conversation {
   messages: Message[];
+  organization_id?: string;
+  active_run?: RunResource | null;
 }
 
 export interface ChatRunOptions {
   permissionMode?: 'default' | 'allow_all';
-  skills?: string[];
+  skillNames?: string[];
   agentId?: number | null;
 }
 
@@ -55,19 +57,74 @@ const asQuestion = (payload: Record<string, unknown>): AgentQuestion => {
   const source = payload.question && typeof payload.question === 'object'
     ? payload.question as Record<string, unknown>
     : payload;
-  const options = Array.isArray(source.options) ? source.options : [];
+  const normalizeItem = (item: Record<string, unknown>, index: number) => {
+    const options = Array.isArray(item.options) ? item.options : [];
+    return {
+      id: String(item.id ?? `question-${index + 1}`),
+      header: String(item.header ?? 'Agent 提问'),
+      question: String(item.question ?? item.prompt ?? '请提供继续执行所需的信息'),
+      options: options.map((option: any) => ({
+        label: String(option?.label ?? option?.value ?? ''),
+        value: String(option?.value ?? option?.label ?? ''),
+        description: option?.description ? String(option.description) : undefined,
+      })),
+      isOther: item.is_other === undefined && item.isOther === undefined
+        ? undefined
+        : Boolean(item.is_other ?? item.isOther),
+      isSecret: Boolean(item.is_secret ?? item.isSecret),
+    };
+  };
+  const rawQuestions = Array.isArray(payload.questions)
+    ? payload.questions
+    : Array.isArray(source.questions) ? source.questions : [];
+  const questions = rawQuestions
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map(normalizeItem);
+  const primary = questions[0] ?? normalizeItem(source, 0);
   return {
-    header: String(source.header ?? 'Agent 提问'),
-    question: String(source.question ?? source.prompt ?? '请提供继续执行所需的信息'),
+    ...primary,
     kind: String(payload.input_kind ?? payload.kind ?? source.kind) === 'permission'
       ? 'permission'
       : 'question',
-    options: options.map((option: any) => ({
-      label: String(option?.label ?? option?.value ?? ''),
-      value: String(option?.value ?? option?.label ?? ''),
-      description: option?.description ? String(option.description) : undefined,
-    })),
+    questions: questions.length > 0 ? questions : undefined,
   };
+};
+
+const questionMessageContent = (question: AgentQuestion): string => {
+  const questions = question.questions?.length ? question.questions : [question];
+  return questions.map((item, index) => {
+    const lines: string[] = [];
+    if (item.header && (questions.length > 1 || item.header !== 'Agent 提问')) {
+      lines.push(`**${item.header}**`);
+    }
+    lines.push(item.question);
+    if (item.options.length) {
+      lines.push(`可选：${item.options.map((option) => option.label).join(' / ')}`);
+    }
+    return `${questions.length > 1 ? `${index + 1}. ` : ''}${lines.join('\n')}`;
+  }).join('\n\n');
+};
+
+const answerMessageContent = (
+  question: AgentQuestion,
+  answer: {
+    text?: string;
+    selections?: string[];
+    answers?: Record<string, { answers: string[] }>;
+  },
+): string => {
+  if (question.kind === 'permission') {
+    return answer.selections?.[0] === 'deny' ? '拒绝' : '允许';
+  }
+  const questions = question.questions?.length ? question.questions : [question];
+  if (answer.answers) {
+    return questions.map((item) => {
+      const values = answer.answers?.[item.id]?.answers ?? [];
+      const value = item.isSecret ? '••••••' : values.join(' / ');
+      return questions.length > 1 ? `${item.question}：${value}` : value;
+    }).join('\n');
+  }
+  return answer.text || answer.selections?.join(' / ') || '';
 };
 
 const toolValue = (value: unknown): string | undefined => {
@@ -89,6 +146,7 @@ const asToolCall = (event: RunEventEnvelope): AgentToolCall => ({
 });
 
 let latestConversationDetailRequest = 0;
+let restoredConversationRunStream: RunStreamHandle | null = null;
 
 interface ConversationState {
   conversations: Conversation[];
@@ -114,7 +172,11 @@ interface ConversationState {
       workingDirectory?: string;
     },
   ) => Promise<Conversation>;
-  sendMessage: (conversationId: string, content: string) => Promise<RunResource>;
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    options?: ChatRunOptions,
+  ) => Promise<RunResource>;
   sendMessageStream: (
     conversationId: string,
     content: string,
@@ -125,7 +187,11 @@ interface ConversationState {
   recordStreamToolCall: (toolCall: AgentToolCall) => void;
   answerQuestion: (
     conversationId: string,
-    answer: { text?: string; selections?: string[] },
+    answer: {
+      text?: string;
+      selections?: string[];
+      answers?: Record<string, { answers: string[] }>;
+    },
   ) => Promise<void>;
   cancelTurn: (conversationId: string) => Promise<void>;
   clearConversation: (conversationId: string) => Promise<void>;
@@ -201,7 +267,34 @@ export const useConversationStore = create<ConversationState>()(
             break;
           }
           case 'input.required':
-            set({ agentActivity: '等待你的回答' });
+            if (pendingQuestion) {
+              const questionContent = questionMessageContent(pendingQuestion);
+              set((state) => ({
+                currentConversation: state.currentConversation && state.streamingMessageId
+                  ? {
+                    ...state.currentConversation,
+                    messages: state.currentConversation.messages.map((message) => {
+                      if (message.id !== state.streamingMessageId) return message;
+                      const existing = message.content.trim();
+                      return {
+                        ...message,
+                        content: existing
+                          ? `${existing}\n\n${questionContent}`
+                          : questionContent,
+                        metadata: {
+                          ...message.metadata,
+                          interaction: { type: 'input.required' },
+                        },
+                      };
+                    }),
+                  }
+                  : state.currentConversation,
+                streamingMessageId: null,
+                agentActivity: '等待你的回答',
+              }));
+            } else {
+              set({ agentActivity: '等待你的回答' });
+            }
             break;
           case 'input.accepted':
             set({ agentActivity: 'Run 已继续执行…' });
@@ -221,6 +314,67 @@ export const useConversationStore = create<ConversationState>()(
             finishRun(conversationId);
             break;
         }
+      };
+
+      const restoreConversationRun = (
+        conversationId: string,
+        run: RunResource | null | undefined,
+      ) => {
+        restoredConversationRunStream?.abort();
+        restoredConversationRunStream = null;
+        if (!run) {
+          set({
+            activeRun: null,
+            streamingMessageId: null,
+            pendingQuestion: null,
+            agentActivity: null,
+          });
+          return;
+        }
+
+        const waitingForInput = run.status === 'waiting_input';
+        const assistantMessageId = `run-restored-${run.id}-${Date.now()}`;
+        set((state) => ({
+          activeRun: run,
+          pendingQuestion: null,
+          streamingMessageId: waitingForInput ? null : assistantMessageId,
+          agentActivity: waitingForInput ? '正在恢复待回答问题…' : '正在恢复 Run…',
+          currentConversation: !waitingForInput && state.currentConversation
+            ? {
+              ...state.currentConversation,
+              messages: [
+                ...state.currentConversation.messages,
+                {
+                  id: assistantMessageId,
+                  role: 'assistant',
+                  content: '',
+                  created_at: new Date().toISOString(),
+                },
+              ],
+            }
+            : state.currentConversation,
+        }));
+
+        let projection = createRunEventState(run.id);
+        restoredConversationRunStream = streamRunEvents({
+          organizationId: run.organization_id,
+          runId: run.id,
+          onEvent: (event) => {
+            if (get().currentConversation?.id !== conversationId) return;
+            projection = ingestRunEvent(projection, event).state;
+            applyRunProjection(conversationId, projection, event);
+          },
+          onSnapshot: (snapshot) => {
+            if (get().currentConversation?.id !== conversationId) return;
+            projection = restoreRunEventSnapshot(snapshot);
+            applyRunProjection(conversationId, projection);
+          },
+          onError: (error) => {
+            if (get().currentConversation?.id === conversationId) {
+              set({ error: `Run 恢复失败: ${error.message}` });
+            }
+          },
+        });
       };
 
       return {
@@ -254,6 +408,7 @@ export const useConversationStore = create<ConversationState>()(
                 currentConversation: { ...response, id: String(response.id) },
                 isLoading: false,
               });
+              restoreConversationRun(String(response.id), response.active_run);
             }
           } catch (error: any) {
             if (requestId === latestConversationDetailRequest) {
@@ -296,13 +451,22 @@ export const useConversationStore = create<ConversationState>()(
           }
         },
 
-        sendMessage: async (conversationId, content) => api.post<RunResource>(
-          `/conversations/${conversationId}/send_message/`,
-          { content },
-          { headers: { 'Idempotency-Key': crypto.randomUUID() } },
-        ),
+        sendMessage: async (conversationId, content, options = {}) => {
+          const payload: Record<string, unknown> = { content };
+          if (options.agentId !== undefined && options.agentId !== null) {
+            payload.agent_id = options.agentId;
+          }
+          if (options.skillNames?.length) payload.skill_names = options.skillNames;
+          return api.post<RunResource>(
+            `/conversations/${conversationId}/send_message/`,
+            payload,
+            { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+          );
+        },
 
         sendMessageStream: (conversationId, content, options = {}) => {
+          restoredConversationRunStream?.abort();
+          restoredConversationRunStream = null;
           const started = performance.now();
           const seenEventTypes = new Set<string>();
           const logTiming = (stage: string, details: Record<string, unknown> = {}) => {
@@ -324,7 +488,7 @@ export const useConversationStore = create<ConversationState>()(
             created_at: new Date().toISOString(),
             metadata: {
               composer: {
-                skills: options.skills ?? [],
+                skill_names: options.skillNames ?? [],
                 agent_id: options.agentId ?? null,
                 permission_mode: options.permissionMode ?? 'default',
               },
@@ -347,7 +511,7 @@ export const useConversationStore = create<ConversationState>()(
               : null,
           });
 
-          void get().sendMessage(conversationId, content).then((run) => {
+          void get().sendMessage(conversationId, content, options).then((run) => {
             logTiming('run_response', { runId: run.id });
             if (controller.signal.aborted) return;
             set({ activeRun: run, isLoading: false });
@@ -359,7 +523,10 @@ export const useConversationStore = create<ConversationState>()(
                 if (!seenEventTypes.has(event.type)) {
                   seenEventTypes.add(event.type);
                   logTiming('first_event', { runId: run.id, type: event.type, sequence: event.sequence });
-                  if (event.type === 'output.delta' || event.type === 'output.snapshot') {
+                  if (
+                    (event.type === 'output.delta' || event.type === 'output.snapshot')
+                    && typeof globalThis.requestAnimationFrame === 'function'
+                  ) {
                     requestAnimationFrame(() => requestAnimationFrame(() => {
                       logTiming('output_paint_opportunity', { runId: run.id });
                     }));
@@ -444,13 +611,40 @@ export const useConversationStore = create<ConversationState>()(
         },
 
         answerQuestion: async (_conversationId, answer) => {
-          const { activeRun, pendingQuestion } = get();
+          const {
+            activeRun, pendingQuestion, currentConversation, streamingMessageId,
+          } = get();
           if (!activeRun) throw new Error('没有可恢复的 Run');
+          if (!pendingQuestion) throw new Error('没有待回答的问题');
           const selected = answer.selections?.[0];
-          const type = pendingQuestion?.kind === 'permission'
+          const type = pendingQuestion.kind === 'permission'
             ? selected === 'deny' ? 'deny_permission' : 'grant_permission'
             : 'answer';
-          set({ pendingQuestion: null, agentActivity: '正在提交回答…', error: null });
+          const stamp = Date.now();
+          const nextAssistantId = `run-resume-${activeRun.id}-${stamp}`;
+          const answerMessage: Message = {
+            id: `answer-pending-${activeRun.id}-${stamp}`,
+            role: 'user',
+            content: answerMessageContent(pendingQuestion, answer),
+            created_at: new Date().toISOString(),
+            metadata: { interaction: { type: 'input.accepted' } },
+          };
+          const nextAssistant: Message = {
+            id: nextAssistantId,
+            role: 'assistant',
+            content: '',
+            created_at: new Date().toISOString(),
+          };
+          set({
+            pendingQuestion: null,
+            streamingMessageId: nextAssistantId,
+            currentConversation: currentConversation ? {
+              ...currentConversation,
+              messages: [...currentConversation.messages, answerMessage, nextAssistant],
+            } : null,
+            agentActivity: '正在提交回答…',
+            error: null,
+          });
           try {
             await api.post(
               `${tenantApiRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`,
@@ -462,7 +656,12 @@ export const useConversationStore = create<ConversationState>()(
               },
             );
           } catch (error: any) {
-            set({ pendingQuestion, error: error.response?.data?.detail || '提交回答失败' });
+            set({
+              pendingQuestion,
+              currentConversation,
+              streamingMessageId,
+              error: error.response?.data?.detail || '提交回答失败',
+            });
             throw error;
           }
         },

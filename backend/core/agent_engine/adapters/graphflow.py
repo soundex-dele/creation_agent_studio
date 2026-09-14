@@ -142,7 +142,13 @@ class GraphFlowAdapter(AgentAdapter):
                     on_event,
                     content_mode=self.content_mode,
                 ))
-            result = engine.query(query)
+            selected_skills = [
+                str(item.get("name") or "").strip()
+                for item in options.get("skills") or []
+                if isinstance(item, dict) and item.get("name")
+            ]
+            skill_markers = " ".join(f"${name}" for name in selected_skills)
+            result = engine.query(f"{skill_markers} {query}".strip())
         input_request = getattr(result, "input_request", None)
         if input_request is None:
             input_request = getattr(result, "pending_question", None)

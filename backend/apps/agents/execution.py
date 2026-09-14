@@ -7,6 +7,41 @@ from core.llm.factory import build_agent_engine
 logger = logging.getLogger(__name__)
 
 
+def _resume_answer_message(command_payload, input_request):
+    answers = command_payload.get("answers")
+    if isinstance(answers, dict) and answers:
+        question_by_id = {
+            str(item.get("id") or ""): str(item.get("question") or "")
+            for item in input_request.get("questions") or []
+            if isinstance(item, dict)
+        }
+        lines = []
+        for question_id, answer_payload in answers.items():
+            if isinstance(answer_payload, dict):
+                values = answer_payload.get("answers") or []
+            else:
+                values = answer_payload
+            if not isinstance(values, list):
+                values = [values]
+            answer_text = ", ".join(
+                str(value) for value in values if value not in (None, "")
+            )
+            if not answer_text:
+                continue
+            question = question_by_id.get(str(question_id)) or str(question_id)
+            lines.append(f"- {question}: {answer_text}")
+        if lines:
+            return (
+                "Answers to the questions you asked:\n"
+                + "\n".join(lines)
+                + "\nContinue the previous task using these answers."
+            )
+    answer = command_payload.get("text")
+    if not answer:
+        answer = ", ".join(command_payload.get("selections") or [])
+    return str(answer or "")
+
+
 def execute_agent_completion(run_payload, sink):
     started = time.perf_counter()
     run_id = run_payload.get("run_id", "unknown")
@@ -25,6 +60,9 @@ def execute_agent_completion(run_payload, sink):
         getattr(engine, "adapter_name", "") or model_config.get("adapter") or ""
     )
     input_data = dict(run_payload.get("input") or {})
+    skills = input_data.get("skills")
+    if not isinstance(skills, list):
+        skills = []
     checkpoint = ((run_payload.get("checkpoint") or {}).get("metadata") or {}).get(
         "checkpoint"
     ) or {}
@@ -54,10 +92,11 @@ def execute_agent_completion(run_payload, sink):
         command_type = resume_command.get("type")
         command_payload = resume_command.get("payload") or {}
         if command_type == "answer":
-            answer = command_payload.get("text")
-            if not answer:
-                answer = ", ".join(command_payload.get("selections") or [])
-            messages = [*messages, {"role": "user", "content": str(answer or "")}]
+            answer = _resume_answer_message(
+                command_payload,
+                checkpoint.get("input_request") or {},
+            )
+            messages = [*messages, {"role": "user", "content": answer}]
         elif command_type == "grant_permission":
             approval_decision = "grant"
             if thread_id:
@@ -102,6 +141,7 @@ def execute_agent_completion(run_payload, sink):
         approval_decision=approval_decision,
         require_tool_approval=bool(governance.get("require_tool_approval", False)),
         thread_id=thread_id,
+        skills=skills,
         on_event=emit_runtime_event,
     )
     logger.info(
@@ -109,10 +149,14 @@ def execute_agent_completion(run_payload, sink):
         run_id, (time.perf_counter() - started) * 1000, response.success, emitted_output,
     )
     if response.input_request:
-        request = dict(response.input_request)
+        checkpoint_request = dict(response.input_request)
+        request = dict(checkpoint_request)
         input_kind = request.pop("input_kind", "answer")
         expires_in_seconds = int(request.pop("expires_in_seconds", 86400))
-        checkpoint_data = {"messages": messages}
+        checkpoint_data = {
+            "messages": messages,
+            "input_request": checkpoint_request,
+        }
         if response.thread_id and provider_name:
             checkpoint_data["agent_thread"] = {
                 "provider": provider_name,
@@ -134,6 +178,15 @@ def execute_agent_completion(run_payload, sink):
         "result": response.content,
         "model": response.model,
         "usage": response.usage.model_dump(),
+        "loaded_skills": [
+            str(item.get("display_name") or item.get("name") or "")
+            for item in skills
+            if (
+                isinstance(item, dict)
+                and item.get("path")
+                and (item.get("display_name") or item.get("name"))
+            )
+        ],
     }
     sink.emit("output.snapshot", output)
     if response.thread_id and provider_name:

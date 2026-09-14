@@ -22,11 +22,12 @@ export interface ComposerContext {
   agentId: number | null;
   agent: ComposerAgent | null;
   permissionMode: 'default' | 'allow_all';
-  skills: string[];
+  skillNames: string[];
 }
 
 interface SkillOption {
   name: string;
+  display_name: string;
   description?: string;
 }
 
@@ -106,7 +107,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         agentId: selectedAgent?.id ?? null,
         agent: selectedAgent,
         permissionMode,
-        skills: selectedSkills,
+        skillNames: selectedSkills,
       });
       setContent('');
       setSelectedSkills([]);
@@ -134,7 +135,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       children: skills.length
         ? skills.map((skill) => ({
             key: `skill:${skill.name}`,
-            label: skill.name,
+            label: skill.display_name || skill.name,
             title: skill.description,
           }))
         : [{ key: 'skills-empty', disabled: true, label: '暂无可用 Skill' }],
@@ -202,15 +203,18 @@ const MessageInput: React.FC<MessageInputProps> = ({
               <button onClick={() => setSelectedAgent(null)} aria-label="移除 Agent"><CloseOutlined /></button>
             </span>
           )}
-          {selectedSkills.map((skill) => (
-            <span className="chat-composer-chip" key={skill}>
-              <ThunderboltOutlined /> {skill}
-              <button
-                onClick={() => setSelectedSkills((current) => current.filter((item) => item !== skill))}
-                aria-label={`移除 ${skill}`}
-              ><CloseOutlined /></button>
-            </span>
-          ))}
+          {selectedSkills.map((skillName) => {
+            const skill = skills.find((item) => item.name === skillName);
+            return (
+              <span className="chat-composer-chip" key={skillName}>
+                <ThunderboltOutlined /> {skill?.display_name || skillName}
+                <button
+                  onClick={() => setSelectedSkills((current) => current.filter((item) => item !== skillName))}
+                  aria-label={`移除 ${skill?.display_name || skillName}`}
+                ><CloseOutlined /></button>
+              </span>
+            );
+          })}
         </div>
       )}
 

@@ -133,3 +133,72 @@ class DurableAgentAdapterTest(TestCase):
             "provider": "codex",
             "id": "thread-1",
         })
+
+    @patch("apps.agents.execution.build_agent_engine")
+    def test_resumes_codex_thread_with_structured_question_answers(self, mock_factory):
+        engine = MagicMock()
+        engine.adapter_name = "codex"
+        engine.complete.return_value = LLMResponse(
+            content="continued",
+            usage=TokenUsage(),
+            model="codex-default",
+            thread_id="thread-1",
+        )
+        mock_factory.return_value = engine
+        payload = self._payload(self.organization.id)
+        payload["checkpoint"] = {"metadata": {"checkpoint": {
+            "messages": [{"role": "user", "content": "Build the app"}],
+            "agent_thread": {"provider": "codex", "id": "thread-1"},
+            "input_request": {"questions": [
+                {"id": "framework", "question": "Which framework?"},
+                {"id": "theme", "question": "Which theme?"},
+            ]},
+        }}}
+        payload["resume_command"] = {
+            "type": "answer",
+            "payload": {"answers": {
+                "framework": {"answers": ["React"]},
+                "theme": {"answers": ["Dark"]},
+            }},
+        }
+
+        execute_agent_completion(payload, MagicMock(cancelled=False))
+
+        self.assertEqual(engine.complete.call_args.kwargs["thread_id"], "thread-1")
+        self.assertEqual(engine.complete.call_args.args[0][-1], {
+            "role": "user",
+            "content": (
+                "Answers to the questions you asked:\n"
+                "- Which framework?: React\n"
+                "- Which theme?: Dark\n"
+                "Continue the previous task using these answers."
+            ),
+        })
+
+    @patch("apps.agents.execution.build_agent_engine")
+    def test_checkpoints_request_user_input_metadata(self, mock_factory):
+        engine = MagicMock()
+        engine.adapter_name = "codex"
+        request = {
+            "input_kind": "answer",
+            "kind": "question",
+            "questions": [{"id": "framework", "question": "Which framework?"}],
+        }
+        engine.complete.return_value = LLMResponse(
+            content="",
+            usage=TokenUsage(),
+            model="codex-default",
+            input_request=request,
+            thread_id="thread-1",
+        )
+        mock_factory.return_value = engine
+        sink = MagicMock(cancelled=False)
+
+        execute_agent_completion(self._payload(self.organization.id), sink)
+
+        checkpoint = sink.request_input.call_args.kwargs["checkpoint"]
+        self.assertEqual(checkpoint["input_request"], request)
+        self.assertEqual(checkpoint["agent_thread"], {
+            "provider": "codex",
+            "id": "thread-1",
+        })

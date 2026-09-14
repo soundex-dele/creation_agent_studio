@@ -1,9 +1,55 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.applications.models import Skill
+from apps.applications.runtime_skills import (
+    resolve_runtime_skills,
+    skill_directory_for_adapter,
+)
 from modules.catalog.models import SkillDraft
+
+
+class RuntimeSkillDiscoveryTest(SimpleTestCase):
+    def test_uses_the_directory_for_the_configured_adapter(self):
+        with (
+            TemporaryDirectory() as codex_directory,
+            TemporaryDirectory() as graphflow_directory,
+        ):
+            with override_settings(
+                AGENT_ENGINE_ADAPTER="graphflow",
+                CODEX_SKILLS_DIRECTORY=codex_directory,
+                GRAPHFLOW_SKILLS_DIRECTORY=graphflow_directory,
+            ):
+                self.assertEqual(
+                    skill_directory_for_adapter(),
+                    Path(graphflow_directory).resolve(),
+                )
+
+    def test_rescans_skill_file_and_returns_its_latest_metadata(self):
+        with TemporaryDirectory() as directory, override_settings(
+            AGENT_ENGINE_ADAPTER="codex",
+            CODEX_SKILLS_DIRECTORY=directory,
+        ):
+            skill_path = Path(directory) / "repo-audit" / "SKILL.md"
+            skill_path.parent.mkdir()
+            skill_path.write_text(
+                "---\nname: repo-audit\ndescription: First description\n---\n",
+                encoding="utf-8",
+            )
+
+            first = resolve_runtime_skills(["repo-audit"])
+            skill_path.write_text(
+                "---\nname: repo-audit\ndescription: Latest description\n---\n",
+                encoding="utf-8",
+            )
+            latest = resolve_runtime_skills(["repo-audit"])
+
+        self.assertEqual(first[0]["description"], "First description")
+        self.assertEqual(latest[0]["description"], "Latest description")
 
 
 class CanonicalSkillApiTest(TestCase):

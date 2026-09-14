@@ -241,6 +241,11 @@ def _submit_run_command_once(
                     "requested_by": actor.id,
                 },
             )
+            if event_type == "input.accepted":
+                from modules.execution.application.projections import (
+                    project_input_accepted,
+                )
+                project_input_accepted(run.id, event, command)
             run.status = new_status
             run.version = previous_version + 1
             run.next_event_sequence = next_sequence

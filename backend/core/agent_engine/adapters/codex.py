@@ -133,10 +133,13 @@ def _codex_tool_payload(item):
     return payload
 
 
-def _consume_codex_turn(thread, text, *, model="", on_event=None):
+def _consume_codex_turn(thread, text, *, model="", skills=None, on_event=None):
     """Consume one Codex turn while preserving text and tool notifications."""
 
-    turn = thread.turn(text, model=model or None)
+    if isinstance(thread, _AppServerThread):
+        turn = thread.turn(text, model=model or None, skills=skills)
+    else:
+        turn = thread.turn(_skill_marked_text(text, skills), model=model or None)
     chunks = []
     completed_items = {}
     usage = None
@@ -223,7 +226,7 @@ class _AppServerTransport:
                         "title": "Creation Agent Studio",
                         "version": "1.0.0",
                     },
-                    "capabilities": None,
+                    "capabilities": {"experimentalApi": True},
                 },
             )
             self.notify("initialized")
@@ -317,8 +320,40 @@ class _AppServerTransport:
         self._send(message)
 
     def _handle_server_request(self, message: dict) -> None:
-        """Resolve or project an approval into the durable Run input protocol."""
+        """Resolve or project interactive requests into the durable Run protocol."""
         method = message.get("method", "")
+        if method in {"item/tool/requestUserInput", "tool/requestUserInput"}:
+            params = message.get("params") or {}
+            questions = _normalize_user_input_questions(params.get("questions"))
+            primary = questions[0]
+            self.input_request = {
+                "input_kind": "answer",
+                "kind": "question",
+                "header": primary["header"],
+                "question": primary["question"],
+                "options": primary["options"],
+                "questions": questions,
+                "codex": {
+                    "method": method,
+                    "thread_id": str(params.get("threadId") or ""),
+                    "turn_id": str(params.get("turnId") or ""),
+                    "item_id": str(params.get("itemId") or ""),
+                    "auto_resolution_ms": params.get("autoResolutionMs"),
+                },
+            }
+            # A durable Run cannot retain this process while waiting for a user.
+            # Resolve the in-process request with empty answers, then resume the
+            # same Codex thread in a new turn after the answer command arrives.
+            self._send({
+                "id": message["id"],
+                "result": {
+                    "answers": {
+                        question["id"]: {"answers": []}
+                        for question in questions
+                    }
+                },
+            })
+            return
         if method in {
             "item/commandExecution/requestApproval",
             "item/fileChange/requestApproval",
@@ -380,8 +415,39 @@ class _AppServerTransport:
             self._process.wait(timeout=2)
 
 
-def _text_input(text: str) -> list[dict]:
-    return [{"type": "text", "text": text, "text_elements": []}]
+def _normalized_skills(skills) -> list[dict]:
+    normalized = []
+    for skill in skills or []:
+        if not isinstance(skill, dict):
+            continue
+        name = str(skill.get("name") or "").strip()
+        path = str(skill.get("path") or "").strip()
+        if name:
+            item = {"name": name}
+            if path:
+                item["path"] = path
+            normalized.append(item)
+    return normalized
+
+
+def _skill_marked_text(text: str, skills=None) -> str:
+    markers = " ".join(f"${skill['name']}" for skill in _normalized_skills(skills))
+    return f"{markers} {text}".strip()
+
+
+def _text_input(text: str, skills=None) -> list[dict]:
+    normalized = _normalized_skills(skills)
+    inputs = [{
+        "type": "text",
+        "text": _skill_marked_text(text, normalized),
+        "text_elements": [],
+    }]
+    inputs.extend(
+        {"type": "skill", **skill}
+        for skill in normalized
+        if skill.get("path")
+    )
+    return inputs
 
 
 def _approval_settings(approval_mode: str) -> tuple[str, str]:
@@ -391,17 +457,24 @@ def _approval_settings(approval_mode: str) -> tuple[str, str]:
 
 
 class _AppServerTurn:
-    def __init__(self, *, transport: _AppServerTransport, thread_id: str, text: str, model: str):
+    def __init__(
+        self, *, transport: _AppServerTransport, thread_id: str, text: str,
+        model: str, skills=None,
+    ):
         self._transport = transport
         self._thread_id = thread_id
         self._text = text
         self._model = model
+        self._skills = skills or []
         self.id = ""
 
     def _start(self) -> None:
         if self.id:
             return
-        params = {"threadId": self._thread_id, "input": _text_input(self._text)}
+        params = {
+            "threadId": self._thread_id,
+            "input": _text_input(self._text, self._skills),
+        }
         if self._model:
             params["model"] = self._model
         result = self._transport.request("turn/start", params)
@@ -447,16 +520,65 @@ class _AppServerThread:
         self._transport = transport
         self.id = thread_id
 
-    def turn(self, text: str, *, model: Optional[str] = None) -> _AppServerTurn:
+    def turn(
+        self, text: str, *, model: Optional[str] = None, skills=None,
+    ) -> _AppServerTurn:
         return _AppServerTurn(
             transport=self._transport,
             thread_id=self.id,
             text=text,
             model=model or "",
+            skills=skills,
         )
 
     def run(self, text: str, *, model: Optional[str] = None):
         return _consume_codex_turn(self, text, model=model or "")
+
+
+def _normalize_user_input_questions(raw_questions) -> list[dict]:
+    """Map Codex requestUserInput questions to the stable Run/UI contract."""
+
+    questions = []
+    if isinstance(raw_questions, list):
+        for index, raw_question in enumerate(raw_questions[:3]):
+            if not isinstance(raw_question, dict):
+                continue
+            question_id = str(raw_question.get("id") or f"question-{index + 1}")
+            options = []
+            raw_options = raw_question.get("options")
+            if isinstance(raw_options, list):
+                for raw_option in raw_options:
+                    if not isinstance(raw_option, dict):
+                        continue
+                    label = str(raw_option.get("label") or "").strip()
+                    if not label:
+                        continue
+                    options.append({
+                        "label": label,
+                        "value": label,
+                        "description": str(raw_option.get("description") or ""),
+                    })
+            questions.append({
+                "id": question_id,
+                "header": str(raw_question.get("header") or "Agent 提问"),
+                "question": str(
+                    raw_question.get("question")
+                    or "请提供继续执行所需的信息"
+                ),
+                "options": options,
+                "is_other": bool(raw_question.get("isOther", False)),
+                "is_secret": bool(raw_question.get("isSecret", False)),
+            })
+    if questions:
+        return questions
+    return [{
+        "id": "question-1",
+        "header": "Agent 提问",
+        "question": "请提供继续执行所需的信息",
+        "options": [],
+        "is_other": True,
+        "is_secret": False,
+    }]
 
 
 class _AppServerCodex:
@@ -734,6 +856,7 @@ class CodexAdapter(AgentAdapter):
                 thread,
                 query,
                 model=self.model or "",
+                skills=options.get("skills") or [],
                 on_event=options.get("on_event"),
             )
             input_request = getattr(client, "input_request", None)

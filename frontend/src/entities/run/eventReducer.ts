@@ -101,6 +101,7 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
     case 'input.accepted':
       next.status = 'queued';
       next.pendingInput = null;
+      next.output = '';
       break;
     case 'input.expired':
       next.status = 'cancelled';

@@ -1,17 +1,24 @@
 """Conversation resources backed exclusively by the durable Run plane."""
 import logging
 import time
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.agents.models import Agent
 from apps.agents.runtime import get_agent_definition
 from apps.applications.models import Application, Skill
+from apps.applications.runtime_skills import (
+    discover_runtime_skills,
+    resolve_runtime_skills,
+    resolve_skill_adapter,
+)
 from apps.applications.serializers import application_definition
 from apps.enterprise.permissions import resolve_organization
 from apps.projects.models import Project
@@ -62,6 +69,89 @@ def resolve_agent(agent_id, organization):
     return get_object_or_404(visible, slug=GENERAL_AGENT_SLUG)
 
 
+def resolve_conversation_agent(conversation, requested_agent_id):
+    """Resolve an explicit composer Agent without silently changing the choice."""
+
+    if requested_agent_id is None:
+        return conversation.agent or resolve_agent(None, conversation.organization)
+    selected = Agent.objects.filter(
+        Q(organization=conversation.organization) | Q(is_public=True),
+        is_active=True,
+        pk=requested_agent_id,
+    ).first()
+    if selected is None:
+        raise ValidationError({"agent_id": "该智能体不存在或当前用户无权使用。"})
+    if conversation.application_id:
+        allowed = {
+            item.get("agent_id")
+            for item in application_definition(conversation.application).get(
+                "agent_bindings", []
+            )
+        }
+        if selected.id not in allowed:
+            raise ValidationError({"agent_id": "该智能体不属于当前聊天应用。"})
+    return selected
+
+
+def validate_requested_skill_names(conversation, requested_skill_names):
+    """Validate one-turn Skill names against an application's selection policy."""
+
+    requested = {str(value) for value in requested_skill_names}
+    if not requested:
+        return
+    if conversation.application_id:
+        definition = application_definition(conversation.application)
+        profile = definition.get("chat_profile") or {}
+        if not profile.get("allow_skill_selection", True):
+            raise ValidationError({"skill_names": "当前聊天应用不允许选择 Skill。"})
+        if not profile.get("allow_extra_skills", False):
+            allowed_ids = {
+                item.get("skill_id")
+                for item in definition.get("skill_bindings", [])
+                if item.get("skill_id")
+            }
+            allowed = set(Skill.objects.filter(
+                id__in=allowed_ids,
+                is_active=True,
+            ).values_list("slug", flat=True))
+            if not requested.issubset(allowed):
+                raise ValidationError({"skill_names": "包含应用未授权的 Skill。"})
+
+
+def sync_agent_skill_bindings(conversation, agent):
+    """Replace only Agent-owned defaults when the composer switches Agent."""
+
+    agent_sources = (
+        ConversationSkillBinding.Source.AGENT_REQUIRED,
+        ConversationSkillBinding.Source.AGENT_DEFAULT,
+    )
+    conversation.skill_bindings.filter(source__in=agent_sources).delete()
+    existing = {
+        str(value)
+        for value in conversation.skill_bindings.values_list("skill_id", flat=True)
+    }
+    additions = []
+    for binding in get_agent_definition(agent).get("skill_bindings", []):
+        mode = binding.get("mode")
+        if mode not in ("required", "default"):
+            continue
+        skill_id = str(binding.get("skill_id") or "")
+        if not skill_id or skill_id in existing:
+            continue
+        existing.add(skill_id)
+        additions.append(ConversationSkillBinding(
+            conversation=conversation,
+            skill_id=skill_id,
+            source=(
+                ConversationSkillBinding.Source.AGENT_REQUIRED
+                if mode == "required"
+                else ConversationSkillBinding.Source.AGENT_DEFAULT
+            ),
+            config=binding.get("config") or {},
+        ))
+    ConversationSkillBinding.objects.bulk_create(additions)
+
+
 class ConversationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -75,17 +165,10 @@ class ConversationViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="composer-options")
     def composer_options(self, request):
-        organization = resolve_organization(request)
-        skills = Skill.objects.filter(
-            Q(organization=organization)
-            | Q(visibility=Skill.Visibility.PUBLIC),
-            is_active=True,
-        ).order_by("name")
+        adapter = resolve_skill_adapter()
         return Response({
-            "skills": [
-                {"name": skill.slug, "description": skill.description}
-                for skill in skills
-            ]
+            "adapter": adapter,
+            "skills": discover_runtime_skills(adapter),
         })
 
     def list(self, request):
@@ -249,9 +332,12 @@ class ConversationViewSet(viewsets.ViewSet):
         )
 
     def retrieve(self, request, pk=None):
-        return Response(
-            ConversationDetailSerializer(self.get_conversation(request, pk)).data
+        conversation = self.get_conversation(request, pk)
+        from modules.execution.application.projections import (
+            repair_conversation_messages,
         )
+        repair_conversation_messages(conversation)
+        return Response(ConversationDetailSerializer(conversation).data)
 
     @action(detail=True, methods=["get"], url_path="workspace-files")
     def workspace_files(self, request, pk=None):
@@ -274,6 +360,7 @@ class ConversationViewSet(viewsets.ViewSet):
         message,
         idempotency_key,
         requested_agent_id=None,
+        requested_skill_names=(),
     ):
         conversation = Conversation.objects.select_for_update().get(
             pk=conversation.pk,
@@ -281,7 +368,7 @@ class ConversationViewSet(viewsets.ViewSet):
             user_id=conversation.user_id,
         )
         organization = conversation.organization
-        agent = resolve_agent(requested_agent_id or conversation.agent_id, organization)
+        agent = resolve_conversation_agent(conversation, requested_agent_id)
         is_idempotent_replay = IdempotencyRecord.objects.for_organization(
             organization.id
         ).filter(
@@ -307,6 +394,27 @@ class ConversationViewSet(viewsets.ViewSet):
             conversation.messages.order_by("created_at", "id").values("role", "content")
         )[-99:]
         history.append({"role": "user", "content": message})
+        working_directory = conversation_working_directory(conversation)
+        if conversation.agent_id != agent.id:
+            sync_agent_skill_bindings(conversation, agent)
+        validate_requested_skill_names(conversation, requested_skill_names)
+        definition = get_agent_definition(agent)
+        adapter = resolve_skill_adapter(
+            (definition.get("model_config") or {}).get("adapter")
+            or settings.AGENT_ENGINE_ADAPTER
+        )
+        effective_skill_names = [
+            binding.skill.slug
+            for binding in conversation.skill_bindings.select_related("skill").filter(
+                enabled=True,
+                skill__is_active=True,
+            )
+        ]
+        effective_skill_names.extend(requested_skill_names)
+        try:
+            skill_inputs = resolve_runtime_skills(effective_skill_names, adapter)
+        except ValueError as exc:
+            raise ValidationError({"skill_names": str(exc)}) from exc
         run, replayed = start_agent_run(
             organization_id=organization.id,
             agent_id=agent.id,
@@ -315,14 +423,19 @@ class ConversationViewSet(viewsets.ViewSet):
             input_data={
                 "message": message,
                 "messages": history,
-                "working_directory": conversation.working_directory,
+                "working_directory": working_directory,
+                "skills": skill_inputs,
                 "agent_thread": {
                     "provider": conversation.agent_thread_provider,
                     "id": conversation.agent_thread_id,
                 } if conversation.agent_thread_id else {},
             },
             idempotency_key=idempotency_key,
-            idempotency_input_data={"message": message},
+            idempotency_input_data={
+                "message": message,
+                "skill_names": sorted(
+                    str(value) for value in requested_skill_names),
+            },
             source_type="conversation",
             source_id=conversation.id,
         )
@@ -336,7 +449,15 @@ class ConversationViewSet(viewsets.ViewSet):
                 conversation=conversation,
                 role="user",
                 content=message,
-                metadata={"run_request_id": getattr(request, "request_id", "")},
+                metadata={
+                    "run_request_id": getattr(request, "request_id", ""),
+                    "composer": {
+                        "agent_id": agent.id,
+                        "skill_names": sorted(
+                            str(value) for value in requested_skill_names),
+                        "skills": [item["name"] for item in skill_inputs],
+                    },
+                },
             )
         return run, replayed
 
@@ -346,7 +467,12 @@ class ConversationViewSet(viewsets.ViewSet):
         logger.info("chat_latency stage=request_received conversation_id=%s", pk)
         conversation = self.get_conversation(request, pk)
         serializer = SendMessageSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            logger.warning(
+                "chat_validation stage=send_message_invalid conversation_id=%s errors=%s",
+                pk, serializer.errors,
+            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
         if not idempotency_key or len(idempotency_key) > 160:
             return Response(
@@ -359,7 +485,16 @@ class ConversationViewSet(viewsets.ViewSet):
                 conversation,
                 serializer.validated_data["content"],
                 idempotency_key,
+                requested_agent_id=serializer.validated_data.get("agent_id"),
+                requested_skill_names=serializer.validated_data.get(
+                    "skill_names", ()),
             )
+        except ValidationError as exc:
+            logger.warning(
+                "chat_validation stage=composer_selection_invalid conversation_id=%s errors=%s",
+                pk, exc.detail,
+            )
+            return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
         except (DeploymentUnavailable, InvalidExecutionDefinition) as exc:
             return Response({"detail": str(exc)}, status=409)
         except IdempotencyKeyReused as exc:

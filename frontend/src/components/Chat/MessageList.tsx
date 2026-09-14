@@ -13,6 +13,10 @@ interface Message {
   content: string;
   created_at: string;
   metadata?: {
+    composer?: {
+      skill_names?: string[];
+      skills?: string[];
+    };
     graphflow?: {
       tool_calls?: AgentToolCall[];
       loaded_skills?: string[];
@@ -101,6 +105,9 @@ const MessageList: React.FC<MessageListProps> = ({
     const loadedSkills = message.metadata?.agent?.loaded_skills
       || message.metadata?.graphflow?.loaded_skills
       || [];
+    const selectedSkills = message.metadata?.composer?.skill_names
+      ?? message.metadata?.composer?.skills
+      ?? [];
 
     return (
       <div
@@ -148,6 +155,16 @@ const MessageList: React.FC<MessageListProps> = ({
           </div>
 
           <div className={`text-sm leading-relaxed ${isUser ? '' : 'prose prose-sm dark:prose-invert max-w-none'}`}>
+            {isUser && selectedSkills.length > 0 && (
+              <div className="message-selected-skills" aria-label="本轮使用的技能">
+                {selectedSkills.map((skill) => (
+                  <span className="message-skill-chip" key={skill}>
+                    <ThunderboltOutlined />
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            )}
             {!isUser && toolCalls.length > 0 && (
               <div className="tool-call-list">
                 {toolCalls.map(renderToolCall)}
