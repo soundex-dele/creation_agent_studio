@@ -35,6 +35,7 @@ import {
   listContacts,
   updateContact,
 } from '@/services/contacts';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import type { AddressBook, Contact, ContactInput, ContactMethod } from '@/types/contact';
 import './ContactsPage.css';
@@ -71,7 +72,7 @@ export default function ContactsPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const enteredFromHome = searchParams.get('entry') === 'home';
+  const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const organizations = useOrganizationStore((state) => state.organizations);
   const currentRole = organizations.find((item) => item.id === organizationId)?.role;
@@ -211,8 +212,8 @@ export default function ContactsPage() {
 
   return (
     <div className="contacts-page">
-      <header className={`contacts-header ${enteredFromHome ? 'contacts-header--compact' : ''}`}>
-        {!enteredFromHome && <Space align="center" size={14}>
+      <header className={`contacts-header ${showApplicationHeader ? '' : 'contacts-header--compact'}`}>
+        {showApplicationHeader && <Space align="center" size={14}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
             应用中心
           </Button>

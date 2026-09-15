@@ -12,6 +12,7 @@ import { ArrowLeftOutlined, EditOutlined, RocketOutlined } from '@ant-design/ico
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import ChatContainer from '@/components/Chat/ChatContainer';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { api } from '@/services/api';
 import { useAppStore } from '@/stores/useAppStore';
 import type {
@@ -41,8 +42,7 @@ export default function ChatApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('slug') || '';
-  const embedded = searchParams.get('embedded') === '1';
-  const enteredFromHome = searchParams.get('entry') === 'home';
+  const { embedded, entry, showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const restoredConversationId = searchParams.get('conversation');
   const manualWorkflowId = searchParams.get('workflowId');
   const manualRunId = searchParams.get('manualRunId');
@@ -159,7 +159,7 @@ export default function ChatApplicationRuntimePage() {
 
   return (
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
-      {!embedded && !enteredFromHome && (
+      {showApplicationHeader && (
         <header className="chat-app-header">
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
             返回应用
@@ -178,7 +178,7 @@ export default function ChatApplicationRuntimePage() {
           )}
         </header>
       )}
-      {!embedded && enteredFromHome && chatStarted && (
+      {!embedded && entry === 'home' && chatStarted && (
         <div className="chat-app-tools">
           <Button icon={<EditOutlined />} onClick={() => setChatStarted(false)}>
             重新填写

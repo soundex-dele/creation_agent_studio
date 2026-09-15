@@ -21,6 +21,7 @@ import {
   useApplicationRuntime,
 } from '@/components/Applications/ApplicationRuntimeContext';
 import { useRunStream } from '@/features/run-stream';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import {
   loadApplicationRuntime,
   type ApplicationRuntimeDescriptor,
@@ -147,6 +148,7 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
 export default function DurableApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const [searchParams] = useSearchParams();
+  const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [descriptor, setDescriptor] = useState<ApplicationRuntimeDescriptor | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +174,7 @@ export default function DurableApplicationRuntimePage() {
     >
       <RuntimeConsole
         descriptor={descriptor}
-        showApplicationHeader={searchParams.get('entry') !== 'home'}
+        showApplicationHeader={showApplicationHeader}
       />
     </ApplicationRuntimeProvider>
   );

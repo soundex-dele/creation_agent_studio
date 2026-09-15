@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { CreationMasterApp } from '@creation-master/main';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { api } from '@/services/api';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
@@ -10,7 +11,7 @@ export default function CreationMasterPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const embedded = searchParams.get('embedded') === '1';
+  const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
 
   const requester = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
@@ -29,7 +30,8 @@ export default function CreationMasterPage() {
       organizationId={organizationId ?? ''}
       applicationId={applicationId ?? ''}
       requester={requester}
-      onBack={embedded ? undefined : () => navigate('/apps')}
+      showHeader={showApplicationHeader}
+      onBack={showApplicationHeader ? () => navigate('/apps') : undefined}
     />
   );
 }

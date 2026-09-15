@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { ProtectedRoute, PublicRoute } from './guards';
 
 const HomePage = lazy(() => import('@/pages/Home/HomePage'));
@@ -42,11 +43,13 @@ const ApplicationShell = ({ children, fullBleed = false }: {
   fullBleed?: boolean;
 }) => {
   const location = useLocation();
-  const enteredFromHome = new URLSearchParams(location.search).get('entry') === 'home';
+  const { showPlatformChrome } = resolveApplicationPresentation(
+    new URLSearchParams(location.search),
+  );
   return (
     <MainLayout
-      hideHeader={!enteredFromHome}
-      hideSidebar={!enteredFromHome}
+      hideHeader={!showPlatformChrome}
+      hideSidebar={!showPlatformChrome}
       fullBleed={fullBleed}
     >
       {children}

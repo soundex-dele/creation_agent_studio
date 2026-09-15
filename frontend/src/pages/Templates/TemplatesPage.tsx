@@ -8,6 +8,7 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplatesPage.css';
 
@@ -29,7 +30,7 @@ const formatSource = (platform?: string, author?: string) =>
 const TemplatesPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const entry = searchParams.get('entry') === 'home' ? 'home' : 'apps';
+  const { entry, showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const {
     templates,
     isLoading,
@@ -55,7 +56,7 @@ const TemplatesPage: React.FC = () => {
 
   return (
     <div className="templates-page animate-fade-in">
-      {entry !== 'home' && <Button
+      {showApplicationHeader && <Button
         type="text"
         icon={<ArrowLeftOutlined />}
         onClick={() => navigate('/apps')}
@@ -63,7 +64,7 @@ const TemplatesPage: React.FC = () => {
       >
         返回应用
       </Button>}
-      {entry !== 'home' && <div className="page-header case-library-header">
+      {showApplicationHeader && <div className="page-header case-library-header">
         <div>
           <h1 className="page-title">案例库</h1>
           <p className="page-subtitle">阅读真实案例，理解内容结构、表达方法与可复用规律</p>
