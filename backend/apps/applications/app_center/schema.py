@@ -48,8 +48,12 @@ class BackendManifest(BaseModel):
     install_hook: str | None = None
     urlconf: str | None = None
     executor_entrypoint: str | None = None
+    definition_factory: str | None = None
 
-    @field_validator("django_app", "install_hook", "urlconf", "executor_entrypoint")
+    @field_validator(
+        "django_app", "install_hook", "urlconf", "executor_entrypoint",
+        "definition_factory",
+    )
     @classmethod
     def valid_dotted_path(cls, value: str | None) -> str | None:
         if value is not None and not _DOTTED_PATH.fullmatch(value):

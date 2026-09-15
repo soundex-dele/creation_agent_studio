@@ -72,7 +72,10 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
                 raise AppCenterError(directory, "directory name must be a Python-safe snake_case name")
             manifest, digest = _load_manifest(manifest_path)
             module_prefix = f"app_center.{directory.name}."
-            for field_name in ("django_app", "install_hook", "urlconf", "executor_entrypoint"):
+            for field_name in (
+                "django_app", "install_hook", "urlconf", "executor_entrypoint",
+                "definition_factory",
+            ):
                 dotted_path = getattr(manifest.spec.backend, field_name)
                 if dotted_path and not dotted_path.startswith(module_prefix):
                     raise AppCenterError(

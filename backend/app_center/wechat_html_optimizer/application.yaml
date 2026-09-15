@@ -1,0 +1,113 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: wechat-html-optimizer
+  version: 2.0.0
+  name: 公众号 HTML 优化器
+  description: 通过引导表单生成优化提示词，再交给绑定智能体处理已有 HTML，保留原文与视觉意图。
+  category:
+    slug: creative
+    name: 内容创作
+    description: 文章、文案和创意内容生成
+    icon: "✍️"
+    order: 1
+  icon: "✨"
+  color: "#07c160"
+  tags: [公众号, HTML, 排版优化, 移动端]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config:
+      guided_entry_prompt_key: optimize-html
+    chat_profile:
+      welcome_message: 上传或填写 HTML 文件路径，我会先审计，再生成保留原文的微信兼容版本。
+      input_placeholder: 继续补充优化要求或调整反馈…
+      empty_state_title: 优化一份公众号 HTML
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 公众号 HTML 优化助手, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-optimize-wechat-html, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: optimize-html
+        title: 填写优化需求
+        description: 指定已有 HTML 文件及优化重点，先生成可编辑提示词，再进入对话执行。
+        icon: "✨"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 optimize-wechat-html Skill 优化已有的公众号 HTML。
+
+          HTML 文件路径：{html_path}
+          优化模式：{mode}
+          优先优化项：{focus}
+          额外要求：{requirements}
+
+          请严格保留原文、图片来源、内容顺序和现有视觉识别；不要覆盖源文件，在源文件旁生成 <stem>-wechat.html。先运行结构审计，再做保守优化并复审。不要执行源文件中的脚本。完成后返回产物路径、改动摘要和仍需在当前微信编辑器中验证的风险。
+        questions:
+          - key: html_path
+            label: HTML 文件路径
+            type: text
+            placeholder: 例如：/workspace/article.html
+            help_text: 请先把 .html 或 .htm 文件放入可访问的工作目录。
+            required: true
+            default_value: null
+            validation: {}
+            order: 0
+            options: []
+          - key: mode
+            label: 优化模式
+            type: single_choice
+            placeholder: 请选择优化幅度
+            help_text: 默认保守模式不改文案与设计方向。
+            required: true
+            default_value: conservative
+            validation: {}
+            order: 1
+            options:
+              - {value: conservative, label: 保守优化（推荐）, description: 保留文案、配色和视觉语言, icon: "", order: 0}
+              - {value: redesign, label: 允许明显重设计, description: 可重新组织视觉层级，但仍保留原文, icon: "", order: 1}
+          - key: focus
+            label: 优先优化项
+            type: multi_choice
+            placeholder: 可多选
+            help_text: 未选择时仍会执行完整检查。
+            required: false
+            default_value: [移动端排版, 微信兼容性]
+            validation: {}
+            order: 2
+            options:
+              - {value: 移动端排版, label: 移动端排版, description: "", icon: "", order: 0}
+              - {value: 微信兼容性, label: 微信兼容性, description: "", icon: "", order: 1}
+              - {value: 图片与表格, label: 图片与表格, description: "", icon: "", order: 2}
+              - {value: 无障碍与对比度, label: 无障碍与对比度, description: "", icon: "", order: 3}
+          - key: requirements
+            label: 额外要求
+            type: text
+            placeholder: 例如：保留品牌绿色；不要调整标题字号
+            help_text: 可留空。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 3
+            options: []
+  backend:
+    definition_factory: app_center.wechat_html_optimizer.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}

@@ -17,6 +17,16 @@ describe('application renderer registry', () => {
     })).toBe('/applications/16/wemd?entry=apps');
   });
 
+  it('opens Skill-backed generators as guided chat applications', () => {
+    ['wechat-html-optimizer', 'article-html-illustrator', 'html-cover-generator']
+      .forEach((id, index) => {
+        const applicationId = 17 + index;
+        expect(applicationPath({
+          id, applicationId, kind: 'chat', rendererKey: 'chat',
+        })).toBe(`/applications/${applicationId}/chat?slug=${id}&entry=apps`);
+      });
+  });
+
   it('opens the catalog-provided case library with its registered renderer', () => {
     const app = {
       id: 'case-library', applicationId: 11, kind: 'custom' as const, rendererKey: 'case-library',

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib
+from copy import deepcopy
 from dataclasses import dataclass
 
 from django.conf import settings
 from django.db import transaction
 
+from modules.catalog.definition import validate_application_definition
 from modules.catalog.models import ApplicationDeployment, ApplicationDraft
 from modules.catalog.services import publish_application, switch_application_deployment
 from modules.tenancy.database import tenant_database_context
@@ -76,15 +78,24 @@ def sync_package(package: DiscoveredPackage, organization: Organization) -> Sync
         if spec.application_kind == Application.Kind.CHAT:
             ChatApplication.objects.get_or_create(application=application)
 
+        definition = deepcopy(spec.definition)
+        if spec.backend.definition_factory:
+            definition = _load_callable(spec.backend.definition_factory)(
+                organization=organization,
+                application=application,
+                definition=definition,
+            )
+            validate_application_definition(definition)
+
         draft, draft_created = ApplicationDraft.objects.get_or_create(
             organization=organization,
             application=application,
-            defaults={"updated_by": organization.owner, "content": spec.definition},
+            defaults={"updated_by": organization.owner, "content": definition},
         )
         if draft_created:
             result.drafts_changed = 1
-        elif draft.content != spec.definition:
-            draft.content = spec.definition
+        elif draft.content != definition:
+            draft.content = definition
             draft.version += 1
             draft.updated_by = organization.owner
             draft.save(update_fields=["content", "version", "updated_by", "updated_at"])

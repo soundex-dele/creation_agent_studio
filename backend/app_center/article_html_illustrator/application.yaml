@@ -1,0 +1,130 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: article-html-illustrator
+  version: 2.0.0
+  name: 文章 HTML 配图
+  description: 通过引导表单生成配图提示词，再交给智能体分析文章并生成整套可编辑 HTML/CSS 配图。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "🧩"
+  color: "#e8655a"
+  tags: [文章配图, HTML, SVG, 信息图]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: illustrate-article}
+    chat_profile:
+      welcome_message: 填写文章与视觉偏好，我会生成提示词并在确认后制作整套 HTML 配图。
+      input_placeholder: 继续修改配图、文字、布局或配色…
+      empty_state_title: 为文章生成 HTML 配图
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 文章 HTML 配图助手, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-baoyu-article-html-illustrator, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: illustrate-article
+        title: 填写配图需求
+        description: 应用先组合成可编辑提示词；发送后由智能体使用 Skill 分析并生成。
+        icon: "🧩"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 baoyu-article-html-illustrator Skill 为下面的文章生成一套 HTML/CSS 配图。
+
+          文章内容或文件路径：
+          {article}
+
+          配图预设/类型：{preset}
+          配图密度：{density}
+          画面比例：{aspect}
+          补充视觉要求：{requirements}
+
+          用户已通过应用表单确认以上设置，请直接生成，不要再次询问确认。先分析文章和视觉机会，避免按字面描绘比喻；生成 outline.md 与全部自包含 HTML 配图，保持整套作品的配色、字体、圆角、阴影和间距一致。不要使用内置浏览器，不需要导出 PNG。
+        questions:
+          - key: article
+            label: 文章内容或文件路径
+            type: text
+            placeholder: 粘贴完整文章，或填写工作目录内的文章文件路径
+            help_text: 内容越完整，配图位置和信息结构越准确。
+            required: true
+            default_value: null
+            validation: {}
+            order: 0
+            options: []
+          - key: preset
+            label: 配图预设/类型
+            type: single_choice
+            placeholder: 请选择
+            help_text: 默认手绘知识卡适合大多数知识与教程文章。
+            required: true
+            default_value: hand-drawn-edu
+            validation: {}
+            order: 1
+            options:
+              - {value: hand-drawn-edu, label: 手绘知识卡（推荐）, description: infographic + sketch-notes + macaron, icon: "", order: 0}
+              - {value: process-flow, label: 流程图, description: 适合步骤和操作流程, icon: "", order: 1}
+              - {value: tech-explainer, label: 技术信息图, description: 适合 API、数据和技术概念, icon: "", order: 2}
+              - {value: system-design, label: 系统框架图, description: 适合架构与模型, icon: "", order: 3}
+              - {value: versus, label: 对比图, description: 适合正反与前后对比, icon: "", order: 4}
+              - {value: storytelling, label: 叙事场景, description: 适合故事和情绪表达, icon: "", order: 5}
+              - {value: history, label: 时间线, description: 适合历史与演进, icon: "", order: 6}
+              - {value: opinion-piece, label: 观点海报, description: 适合评论和观点文章, icon: "", order: 7}
+          - key: density
+            label: 配图密度
+            type: single_choice
+            placeholder: 请选择
+            help_text: 按章节会根据文章结构决定数量。
+            required: true
+            default_value: per-section
+            validation: {}
+            order: 2
+            options:
+              - {value: per-section, label: 按章节（推荐）, description: 每个主要章节判断一次, icon: "", order: 0}
+              - {value: minimal, label: 精简 1–2 张, description: 只保留关键视觉, icon: "", order: 1}
+              - {value: balanced, label: 均衡 3–5 张, description: 控制篇幅与覆盖面, icon: "", order: 2}
+              - {value: rich, label: 丰富 6 张以上, description: 高密度视觉解释, icon: "", order: 3}
+          - key: aspect
+            label: 画面比例
+            type: single_choice
+            placeholder: 请选择
+            help_text: 所有配图使用同一比例。
+            required: true
+            default_value: "16:9"
+            validation: {}
+            order: 3
+            options:
+              - {value: "16:9", label: "16:9 横版", description: "1920×1080", icon: "", order: 0}
+              - {value: "4:3", label: "4:3 横版", description: "1600×1200", icon: "", order: 1}
+              - {value: "1:1", label: "1:1 方形", description: "1080×1080", icon: "", order: 2}
+              - {value: "3:2", label: "3:2 横版", description: "1500×1000", icon: "", order: 3}
+          - key: requirements
+            label: 补充视觉要求
+            type: text
+            placeholder: 例如：品牌色 #E8655A；避免英文；不使用 Rough.js
+            help_text: 可留空。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 4
+            options: []
+  backend:
+    definition_factory: app_center.article_html_illustrator.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}

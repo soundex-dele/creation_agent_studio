@@ -4,7 +4,7 @@ import type { WorkflowStep } from '@/types';
 import { workflowApplicationPath } from '../workflowApplicationPath';
 
 
-function step(rendererKey: string): WorkflowStep {
+function step(rendererKey: string, kind: 'chat' | 'custom' = 'custom'): WorkflowStep {
   return {
     id: 'step-1',
     key: 'draft',
@@ -16,7 +16,7 @@ function step(rendererKey: string): WorkflowStep {
     application_id: 6,
     application: {
       id: 6,
-      kind: 'custom',
+      kind,
       renderer_key: rendererKey,
       application_slug: rendererKey,
       application_name: '测试应用',
@@ -34,6 +34,18 @@ describe('workflow application path', () => {
   it('does not mark Creation Master as embedded when opened in a new window', () => {
     expect(workflowApplicationPath(step('creation-master'), false)).toBe(
       '/applications/6/creation-master',
+    );
+  });
+
+  it('opens Skill-backed generators as chat applications', () => {
+    expect(workflowApplicationPath(step('wechat-html-optimizer', 'chat'))).toBe(
+      '/applications/6/chat?slug=wechat-html-optimizer&embedded=1',
+    );
+    expect(workflowApplicationPath(step('article-html-illustrator', 'chat'), false)).toBe(
+      '/applications/6/chat?slug=article-html-illustrator',
+    );
+    expect(workflowApplicationPath(step('html-cover-generator', 'chat'))).toBe(
+      '/applications/6/chat?slug=html-cover-generator&embedded=1',
     );
   });
 });

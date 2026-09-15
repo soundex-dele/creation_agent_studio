@@ -19,10 +19,26 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     packages, _ = discover_packages(settings.APP_CENTER_ROOT, strict=True)
     package_ids = {package.manifest.metadata.id for package in packages}
 
-    assert {"batch-transcribe", "case-library", "contacts"} <= package_ids
+    assert {
+        "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
+        "html-cover-generator", "wechat-html-optimizer",
+    } <= package_ids
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"
     )
+    chat_packages = {
+        package.manifest.metadata.id: package
+        for package in packages
+        if package.manifest.metadata.id in {
+            "article-html-illustrator", "html-cover-generator", "wechat-html-optimizer",
+        }
+    }
+    for package in chat_packages.values():
+        assert package.manifest.spec.application_kind == "chat"
+        assert package.manifest.spec.launch_mode == "chat"
+        assert package.manifest.spec.definition["renderer_key"] == "chat"
+        assert package.manifest.spec.backend.definition_factory
+        assert package.manifest.spec.backend.executor_entrypoint is None
 
     creation_master_manifest = settings.APP_CENTER_ROOT / "creation_master" / "application.yaml"
     if creation_master_manifest.is_file():

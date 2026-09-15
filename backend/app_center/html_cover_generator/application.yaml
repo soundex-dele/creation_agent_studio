@@ -1,0 +1,212 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: html-cover-generator
+  version: 2.0.0
+  name: HTML 封面生成器
+  description: 通过引导表单生成封面提示词，再交给智能体制作像素级、可编辑的 HTML/CSS/SVG 封面。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "🖼️"
+  color: "#6d5dfc"
+  tags: [文章封面, HTML, CSS, SVG]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: generate-cover}
+    chat_profile:
+      welcome_message: 填写标题、内容与画面偏好，我会生成提示词并在确认后制作 HTML 封面。
+      input_placeholder: 继续修改标题、构图、字体、配色或装饰…
+      empty_state_title: 生成一张 HTML 文章封面
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: HTML 封面设计助手, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-baoyu-html-cover, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: generate-cover
+        title: 填写封面需求
+        description: 明确标题和画面比例，其余维度可让智能体自动选择。
+        icon: "🖼️"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 baoyu-html-cover Skill 生成一张纯 HTML/CSS/SVG 文章封面。
+
+          文章主题或内容：
+          {source}
+
+          标题（必须原样使用）：{title}
+          副标题（为空则不添加）：{subtitle}
+          封面类型：{cover_type}
+          配色：{palette}
+          视觉风格：{style}
+          文字层级：{text_level}
+          字体方向：{font}
+          画面比例：{aspect}
+          其他要求：{requirements}
+
+          用户已通过应用表单确认全部设置。请按 --quick 语义直接生成，不要再次询问；画面比例必须使用上面指定的值。标题不得改写或意译。输出完整、自包含、固定尺寸的 cover.html。不要使用内置浏览器，不需要导出 PNG。
+        questions:
+          - key: source
+            label: 文章主题或内容
+            type: text
+            placeholder: 粘贴文章摘要、完整正文或主题说明
+            help_text: 用于判断语气、关键词和视觉隐喻。
+            required: true
+            default_value: null
+            validation: {}
+            order: 0
+            options: []
+          - key: title
+            label: 封面标题
+            type: text
+            placeholder: 标题会原样出现在封面中
+            help_text: 智能体不得改写该标题。
+            required: true
+            default_value: null
+            validation: {}
+            order: 1
+            options: []
+          - key: subtitle
+            label: 副标题
+            type: text
+            placeholder: 可选
+            help_text: 留空则不添加。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 2
+            options: []
+          - key: cover_type
+            label: 封面类型
+            type: single_choice
+            placeholder: 请选择
+            help_text: 自动会根据内容判断。
+            required: true
+            default_value: auto
+            validation: {}
+            order: 3
+            options:
+              - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
+              - {value: hero, label: Hero 主视觉, description: "", icon: "", order: 1}
+              - {value: conceptual, label: 概念表达, description: "", icon: "", order: 2}
+              - {value: typography, label: 字体主导, description: "", icon: "", order: 3}
+              - {value: metaphor, label: 视觉隐喻, description: "", icon: "", order: 4}
+              - {value: scene, label: 场景构图, description: "", icon: "", order: 5}
+              - {value: minimal, label: 极简留白, description: "", icon: "", order: 6}
+          - key: palette
+            label: 配色
+            type: single_choice
+            placeholder: 请选择
+            help_text: 自动会匹配内容气质。
+            required: true
+            default_value: auto
+            validation: {}
+            order: 4
+            options:
+              - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
+              - {value: warm, label: Warm, description: "", icon: "", order: 1}
+              - {value: cool, label: Cool, description: "", icon: "", order: 2}
+              - {value: dark, label: Dark, description: "", icon: "", order: 3}
+              - {value: elegant, label: Elegant, description: "", icon: "", order: 4}
+              - {value: earth, label: Earth, description: "", icon: "", order: 5}
+              - {value: vivid, label: Vivid, description: "", icon: "", order: 6}
+              - {value: pastel, label: Pastel, description: "", icon: "", order: 7}
+              - {value: mono, label: Mono, description: "", icon: "", order: 8}
+              - {value: retro, label: Retro, description: "", icon: "", order: 9}
+              - {value: duotone, label: Duotone, description: "", icon: "", order: 10}
+              - {value: macaron, label: Macaron, description: "", icon: "", order: 11}
+              - {value: neon, label: Neon, description: "", icon: "", order: 12}
+          - key: style
+            label: 视觉风格
+            type: single_choice
+            placeholder: 请选择
+            help_text: 自动会匹配封面类型。
+            required: true
+            default_value: auto
+            validation: {}
+            order: 5
+            options:
+              - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
+              - {value: flat, label: Flat, description: "", icon: "", order: 1}
+              - {value: glassmorphism, label: Glassmorphism, description: "", icon: "", order: 2}
+              - {value: gradient, label: Gradient, description: "", icon: "", order: 3}
+              - {value: hand-drawn, label: Hand-drawn, description: "", icon: "", order: 4}
+              - {value: geometric, label: Geometric, description: "", icon: "", order: 5}
+              - {value: brutalist, label: Brutalist, description: "", icon: "", order: 6}
+              - {value: cyber, label: Cyber, description: "", icon: "", order: 7}
+          - key: text_level
+            label: 文字层级
+            type: single_choice
+            placeholder: 请选择
+            help_text: 默认只显示标题。
+            required: true
+            default_value: title-only
+            validation: {}
+            order: 6
+            options:
+              - {value: title-only, label: 仅标题（推荐）, description: "", icon: "", order: 0}
+              - {value: none, label: 无文字, description: "", icon: "", order: 1}
+              - {value: title-subtitle, label: 标题 + 副标题, description: "", icon: "", order: 2}
+              - {value: text-rich, label: 丰富文字, description: "", icon: "", order: 3}
+          - key: font
+            label: 字体方向
+            type: single_choice
+            placeholder: 请选择
+            help_text: 使用系统字体回退保证可用性。
+            required: true
+            default_value: clean
+            validation: {}
+            order: 7
+            options:
+              - {value: clean, label: Clean（推荐）, description: "", icon: "", order: 0}
+              - {value: handwritten, label: Handwritten, description: "", icon: "", order: 1}
+              - {value: serif, label: Serif, description: "", icon: "", order: 2}
+              - {value: display, label: Display, description: "", icon: "", order: 3}
+              - {value: mono, label: Mono, description: "", icon: "", order: 4}
+          - key: aspect
+            label: 画面比例
+            type: single_choice
+            placeholder: 请选择
+            help_text: 必须明确选择。
+            required: true
+            default_value: "16:9"
+            validation: {}
+            order: 8
+            options:
+              - {value: "16:9", label: "16:9 横版", description: "1920×1080", icon: "", order: 0}
+              - {value: "9:16", label: "9:16 竖版", description: "1080×1920", icon: "", order: 1}
+              - {value: "1:1", label: "1:1 方形", description: "1080×1080", icon: "", order: 2}
+              - {value: "2.35:1", label: "2.35:1 电影横幅", description: "2350×1000", icon: "", order: 3}
+              - {value: "3:2", label: "3:2 横版", description: "1500×1000", icon: "", order: 4}
+              - {value: "4:3", label: "4:3 横版", description: "1600×1200", icon: "", order: 5}
+          - key: requirements
+            label: 其他要求
+            type: text
+            placeholder: 例如：品牌紫色；不使用外部字体；右侧留出人物位置
+            help_text: 可留空。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 9
+            options: []
+  backend:
+    definition_factory: app_center.html_cover_generator.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}
