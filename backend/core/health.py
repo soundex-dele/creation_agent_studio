@@ -23,8 +23,13 @@ def readiness(request):
     except Exception:
         pass
     for worker_pool in settings.REQUIRED_EXECUTION_WORKER_POOLS:
-        checks[f'worker:{worker_pool}'] = bool(
-            cache.get(f'execution-worker:{worker_pool}'))
+        heartbeat = cache.get(f'execution-worker:{worker_pool}')
+        checks[f'worker:{worker_pool}'] = bool(heartbeat)
+        checks[f'app_center_registry:{worker_pool}'] = (
+            isinstance(heartbeat, dict)
+            and heartbeat.get('app_center_registry_hash')
+            == settings.APP_CENTER_REGISTRY_HASH
+        )
     if settings.REQUIRE_AUTOMATION_SCHEDULER:
         checks['scheduler'] = bool(cache.get('automation-scheduler'))
     status_code = 200 if all(checks.values()) else 503

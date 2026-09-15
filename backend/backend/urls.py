@@ -58,7 +58,7 @@ urlpatterns += [
     ),
     path(
         'api/v1/organizations/<uuid:organization_id>/',
-        include('apps.contacts.urls'),
+        include('apps.applications.app_center.urls'),
     ),
 
 ]

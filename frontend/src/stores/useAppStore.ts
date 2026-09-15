@@ -1,11 +1,6 @@
 import { create } from 'zustand';
 import type { AppItem, AppCategory } from '@/types';
 import { api } from '@/services/api';
-import {
-  CASE_LIBRARY_APP,
-  mergeBuiltInApplications,
-  mergeBuiltInCategories,
-} from '@/lib/applicationCatalog';
 
 interface AppState {
   apps: AppItem[];
@@ -64,10 +59,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await api.get<any>('/apps/categories/');
       const categories = unwrap<AppCategory>(response);
-      set({ categories: mergeBuiltInCategories(categories) });
+      set({ categories });
     } catch (error) {
       console.error('Failed to load app categories:', error);
-      set({ categories: mergeBuiltInCategories([]) });
+      set({ categories: [] });
     }
   },
 
@@ -79,7 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (category) params.category = category;
       if (searchQuery) params.search = searchQuery;
       const response = await api.get<any>('/apps/', { params });
-      let apps = mergeBuiltInApplications(unwrap<any>(response).map(toAppItem));
+      let apps = unwrap<any>(response).map(toAppItem);
       if (category) apps = apps.filter((app) => app.category === category);
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLocaleLowerCase();
@@ -89,14 +84,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ apps });
     } catch (error) {
       console.error('Failed to load apps:', error);
-      set({ apps: mergeBuiltInApplications([]) });
+      set({ apps: [] });
     } finally {
       set({ isLoading: false });
     }
   },
 
   loadApp: (slug: string) => {
-    if (slug === CASE_LIBRARY_APP.id) return Promise.resolve(CASE_LIBRARY_APP);
     const existing = inFlightAppRequests.get(slug);
     if (existing) return existing;
 

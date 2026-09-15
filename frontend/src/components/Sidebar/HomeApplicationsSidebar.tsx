@@ -7,7 +7,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { applicationPath, CASE_LIBRARY_APP_ID } from '@/lib/applicationCatalog';
+import { applicationPath } from '@/lib/applicationCatalog';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -57,13 +57,8 @@ const HomeApplicationsSidebar: React.FC = () => {
   const visibleApps = orderedApps.filter((app) => !preferences.hidden.includes(app.id));
 
   const isActiveApplication = (app: (typeof apps)[number]) => {
-    if (app.id === CASE_LIBRARY_APP_ID) {
-      return location.pathname.startsWith('/apps/case-library');
-    }
-    if (app.applicationId) {
-      return location.pathname.startsWith(`/applications/${app.applicationId}/`);
-    }
-    return location.pathname === `/apps/${app.id}`;
+    const runtimePath = applicationPath(app, 'home').split('?')[0];
+    return location.pathname === runtimePath || location.pathname.startsWith(`${runtimePath}/`);
   };
 
   const save = (next: HomeApplicationPreferences) => {

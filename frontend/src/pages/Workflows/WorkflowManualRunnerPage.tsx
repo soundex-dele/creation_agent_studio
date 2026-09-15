@@ -40,7 +40,7 @@ function applicationPath(
     });
     return `/applications/${applicationId}/chat?${query.toString()}`;
   }
-  if (application.renderer_key === 'contact-manager') {
+  if (application.renderer_key === 'contacts') {
     return `/applications/${applicationId}/contacts${embeddedQuery ? `?${embeddedQuery}` : ''}`;
   }
   return `/applications/${applicationId}/run${embeddedQuery ? `?${embeddedQuery}` : ''}`;

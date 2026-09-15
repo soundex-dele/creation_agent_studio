@@ -611,7 +611,14 @@ class ExecutionCoordinator:
                     with tenant_database_context(organization_id):
                         reap_expired_leases(limit=100)
                         expire_waiting_inputs(limit=100)
-            cache.set(f"execution-worker:{self.worker_pool}", self.worker_id, 15)
+            cache.set(
+                f"execution-worker:{self.worker_pool}",
+                {
+                    "worker_id": self.worker_id,
+                    "app_center_registry_hash": settings.APP_CENTER_REGISTRY_HASH,
+                },
+                15,
+            )
             self._next_maintenance_at = now + 5
         for attempt_id, active in list(self._active.items()):
             with tenant_database_context(active.claimed.run.organization_id):

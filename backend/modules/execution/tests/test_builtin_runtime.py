@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 
 from core.agent_engine.models import LLMResponse, TokenUsage
 from modules.execution.runtime import builtin
+from app_center.batch_transcribe import runtime as batch_transcribe
 from apps.agents.execution import execute_agent_completion
 from modules.execution.application.runs import create_run
 from modules.execution.models import Run
@@ -52,7 +53,7 @@ def test_batch_transcribe_uses_durable_event_protocol(monkeypatch, tmp_path):
     )
     sink = _Sink()
 
-    result = builtin.execute_batch_transcribe(
+    result = batch_transcribe.execute_batch_transcribe(
         {
             "allowed_roots": [str(tmp_path)],
             "input": {
@@ -86,7 +87,7 @@ def test_batch_transcribe_rejects_output_outside_runtime_roots(tmp_path):
     outside.mkdir()
 
     with pytest.raises(PermissionError, match="output is outside runtime roots"):
-        builtin.execute_batch_transcribe(
+        batch_transcribe.execute_batch_transcribe(
             {
                 "allowed_roots": [str(allowed)],
                 "input": {

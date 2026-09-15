@@ -1,0 +1,1 @@
+"""Application center infrastructure tests."""

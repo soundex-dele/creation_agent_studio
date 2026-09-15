@@ -12,6 +12,19 @@ services:
       postgres:
         condition: service_healthy
 
+  app-center-sync:
+    build: .
+    restart: "no"
+    command: python manage.py sync_app_center
+    env_file: ${BACKEND_ENV_FILE:-.env}
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   web:
     build: .
     restart: unless-stopped
@@ -37,6 +50,8 @@ services:
       redis:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      app-center-sync:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz/"]
@@ -67,6 +82,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      app-center-sync:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "agent"]
       interval: 15s
@@ -95,6 +112,8 @@ services:
       redis:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      app-center-sync:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "media"]
@@ -125,6 +144,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      app-center-sync:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "workflow"]
       interval: 15s
@@ -154,6 +175,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      app-center-sync:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--worker-pool", "evaluation"]
       interval: 15s
@@ -175,6 +198,8 @@ services:
       redis:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      app-center-sync:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--scheduler"]
@@ -202,6 +227,8 @@ services:
       redis:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      app-center-sync:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "manage.py", "check_execution_heartbeat", "--maintenance"]

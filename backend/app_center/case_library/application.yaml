@@ -1,0 +1,44 @@
+api_version: creation-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: case-library
+  version: 1.0.0
+  name: 案例库
+  description: 阅读真实案例，理解内容结构、表达方法与可复用规律。
+  category:
+    slug: knowledge
+    name: 知识与案例
+    description: 案例、知识与参考资料
+    icon: "📚"
+    order: 10
+  icon: "📚"
+  color: "#b45309"
+  tags: [案例, 内容拆解, 灵感]
+  developer: Creation Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: case-library
+    executor_protocol_version: 1
+    renderer_key: case-library
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+    dependencies:
+      agents: []
+      skills: []
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    initial_deployment: development

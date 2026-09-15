@@ -10,7 +10,7 @@ from apps.enterprise.tenancy import (
 )
 from modules.catalog.api.urls import urlpatterns as catalog_patterns
 from modules.execution.api.urls import urlpatterns as execution_patterns
-from apps.contacts.urls import urlpatterns as contact_patterns
+from apps.applications.app_center.urls import urlpatterns as application_patterns
 
 
 def _single_tenant_view(callback):
@@ -39,6 +39,6 @@ urlpatterns = [
         name=f'single-tenant-{index}-{pattern.name}',
     )
     for index, pattern in enumerate([
-        *catalog_patterns, *execution_patterns, *contact_patterns,
+        *catalog_patterns, *execution_patterns, *application_patterns,
     ])
 ]

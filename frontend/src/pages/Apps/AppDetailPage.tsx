@@ -3,6 +3,7 @@ import { Button, Result, Spin, Tag } from 'antd';
 import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
+import { applicationPath } from '@/lib/applicationCatalog';
 import type { AppItem } from '@/types';
 import './AppDetailPage.css';
 
@@ -60,15 +61,7 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
-    if (app.rendererKey === 'contacts') {
-      navigate(`/applications/${app.applicationId}/contacts`);
-      return;
-    }
-    if (app.kind === 'chat') {
-      navigate(`/applications/${app.applicationId}/chat?slug=${encodeURIComponent(app.id)}`);
-      return;
-    }
-    navigate(`/applications/${app.applicationId}/run`);
+    navigate(applicationPath(app));
   };
 
   return (

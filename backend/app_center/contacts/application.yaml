@@ -1,0 +1,51 @@
+api_version: creation-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: contacts
+  version: 1.0.0
+  name: 通讯录
+  description: 集中管理组织联系人、公司信息和多种联系方式。
+  category:
+    slug: office
+    name: 办公效率
+    description: 组织协作和办公工具
+    icon: "💼"
+    order: 20
+  icon: "👥"
+  color: "#2563eb"
+  tags: [联系人, 办公, 协作]
+  developer: Creation Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: contacts
+    executor_protocol_version: 1
+    renderer_key: contacts
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+      allow_export: false
+    dependencies:
+      agents: []
+      skills: []
+  backend:
+    django_app: app_center.contacts.backend.apps.ContactsConfig
+    install_hook: app_center.contacts.backend.install.install
+    urlconf: app_center.contacts.backend.urls
+  database:
+    mode: django-migrations
+    schema_version: 1
+    tenant_scoped: true
+  install:
+    scope: per-organization
+    initial_deployment: development

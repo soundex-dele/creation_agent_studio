@@ -1,0 +1,51 @@
+api_version: creation-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: batch-transcribe
+  version: 1.0.0
+  name: 批量转录
+  description: 基于 Whisper 的批量视频转文字和字幕。
+  category:
+    slug: audio
+    name: 音频工具
+    order: 30
+  icon: "🎙️"
+  color: "#2e7d32"
+  tags: [转录, Whisper, 字幕]
+  developer: Creation Studio
+spec:
+  application_kind: task
+  launch_mode: run
+  definition:
+    kind: task
+    executor_kind: media
+    executor_key: batch-transcribe
+    executor_protocol_version: 1
+    renderer_key: generic-task
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 3
+      retry_safe: true
+    input_schema:
+      type: object
+      required: [folder]
+      properties:
+        folder:
+          type: string
+        model:
+          type: string
+        language:
+          type: string
+    output_schema:
+      type: object
+    default_config: {}
+    dependencies:
+      agents: []
+      skills: []
+  backend:
+    executor_entrypoint: app_center.batch_transcribe.runtime.execute_batch_transcribe
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    initial_deployment: development

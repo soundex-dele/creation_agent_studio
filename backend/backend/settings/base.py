@@ -5,8 +5,18 @@ import json
 from pathlib import Path
 from decouple import config
 
+from apps.applications.app_center.discovery import (
+    app_center_registry_hash,
+    discover_django_apps,
+    discover_executor_adapters,
+)
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+APP_CENTER_ROOT = Path(config(
+    'APP_CENTER_ROOT', default=str(BASE_DIR / 'app_center')
+)).resolve()
+APP_CENTER_REGISTRY_HASH = app_center_registry_hash(APP_CENTER_ROOT)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
@@ -75,7 +85,7 @@ INSTALLED_APPS = [
     'apps.marketplace',
     'apps.enterprise',
     'apps.workflows',
-    'apps.contacts',
+    *discover_django_apps(APP_CENTER_ROOT),
 
     # Versioning, tenancy helpers and durable execution extend the product apps.
     'modules.tenancy.apps.TenancyConfig',
@@ -176,8 +186,7 @@ EXECUTION_CHILD_ADAPTERS = config(
     default=(
         '{"agent":{"agent-completion":'
         '"apps.agents.execution:execute_agent_completion"},'
-        '"media":{"batch-transcribe":'
-        '"modules.execution.runtime.builtin:execute_batch_transcribe"},'
+        '"media":{},'
         '"workflow":{"workflow-dag":'
         '"modules.execution.runtime.builtin:execute_workflow"},'
         '"evaluation":{"evaluation-suite":'
@@ -185,6 +194,14 @@ EXECUTION_CHILD_ADAPTERS = config(
     ),
     cast=json.loads,
 )
+for _executor_kind, _entries in discover_executor_adapters(APP_CENTER_ROOT).items():
+    _target_entries = EXECUTION_CHILD_ADAPTERS.setdefault(_executor_kind, {})
+    for _executor_key, _entrypoint in _entries.items():
+        if _executor_key in _target_entries and _target_entries[_executor_key] != _entrypoint:
+            raise ValueError(
+                f'Conflicting execution adapter {_executor_kind}/{_executor_key}'
+            )
+        _target_entries[_executor_key] = _entrypoint
 EXECUTION_DOMAIN_PORT = config(
     'EXECUTION_DOMAIN_PORT',
     default='apps.enterprise.execution_port.DjangoExecutionDomainPort',
