@@ -1,5 +1,5 @@
 """
-Custom exceptions for Creation Agent Studio.
+Custom exceptions for Agent Studio.
 """
 from rest_framework.exceptions import APIException
 

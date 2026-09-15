@@ -1,5 +1,5 @@
 """
-Conversations app for Creation Agent Studio.
+Conversations app for Agent Studio.
 
 This app handles conversation and message management for AI agent interactions.
 """

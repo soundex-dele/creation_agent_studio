@@ -1,5 +1,5 @@
 """
-Development settings for Creation Agent Studio backend.
+Development settings for Agent Studio backend.
 """
 from .base import *
 
@@ -50,7 +50,7 @@ if not REDIS_ENABLED:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'creation-agent-studio-development',
+            'LOCATION': 'agent-studio-development',
         }
     }
     CHANNEL_LAYERS = {

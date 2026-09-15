@@ -1,6 +1,6 @@
 # Enterprise deployment and operations
 
-Creation Agent Studio now uses a control-plane/data-plane architecture:
+Agent Studio uses a control-plane/data-plane architecture:
 
 - Django is the durable control plane for organizations, RBAC, agents, versions,
   deployments, policy, audit, quota, knowledge, evaluations and integrations.

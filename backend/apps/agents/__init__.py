@@ -1,5 +1,5 @@
 """
-Agents app for Creation Agent Studio.
+Agents app for Agent Studio.
 
 This app handles AI agent management and operations.
 """

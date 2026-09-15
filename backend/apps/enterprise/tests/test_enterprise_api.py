@@ -66,7 +66,7 @@ def test_user_cannot_register_as_admin():
         'role': 'admin',
     }, format='json')
     assert response.status_code == 201
-    assert response.data['user']['role'] == 'creator'
+    assert response.data['user']['role'] == 'member'
 
 
 def test_provider_is_isolated_by_membership():
@@ -254,7 +254,7 @@ def test_oidc_exchange_is_single_use():
                            format='json')
     assert response.status_code == 200
     assert 'refresh' not in response.data['tokens']
-    assert response.cookies['creation_refresh']['httponly']
+    assert response.cookies['agent_studio_refresh']['httponly']
     assert client.post('/api/v1/enterprise/sso/exchange', {'exchange': 'one-time'},
                        format='json').status_code == 400
 

@@ -25,15 +25,15 @@ def seed_default_chat(apps, schema_editor):
             'order': 0,
         })
     application, _ = Application.objects.get_or_create(
-        slug='creative-chat',
+        slug='general-chat',
         defaults={
             'category': category,
-            'name': '创作助手',
-            'description': '使用智能体和引导问题完成日常内容创作',
+            'name': '通用助手',
+            'description': '使用智能体和引导问题处理日常任务',
             'icon': '✨',
             'color': '#6d5dfc',
-            'tags': ['聊天', '智能体', '创作'],
-            'developer': 'Creation Studio',
+            'tags': ['聊天', '智能体', '效率'],
+            'developer': 'Agent Studio',
             'is_public': True,
             'created_by_id': general.created_by_id,
             'organization_id': general.organization_id,
@@ -44,9 +44,9 @@ def seed_default_chat(apps, schema_editor):
     ChatApplicationProfile.objects.get_or_create(
         application=application,
         defaults={
-            'welcome_message': '告诉我你的创作目标，我会陪你把想法变成作品。',
-            'input_placeholder': '描述你的创作需求…',
-            'empty_state_title': '今天想创作什么？',
+            'welcome_message': '告诉我你的目标，我会和你一起分析并完成任务。',
+            'input_placeholder': '描述你的需求…',
+            'empty_state_title': '今天想完成什么？',
             'allow_agent_selection': False,
             'allow_skill_selection': True,
         })
@@ -54,20 +54,18 @@ def seed_default_chat(apps, schema_editor):
         application=application, agent=general,
         defaults={'label': general.name, 'is_default': True, 'order': 0})
     prompts = [
-        ('video-script', '写一个短视频脚本', '🎬',
-         '请帮我写一个短视频脚本，主题是：{topic}\n风格：{style}', [
-             ('topic', '视频主题', 'text', True, []),
-             ('style', '内容风格', 'single_choice', False,
-              [('relaxed', '轻松有趣'), ('professional', '专业讲解'),
-               ('story', '故事叙述')]),
+        ('action-plan', '制定行动计划', '🧭',
+         '请将下面的目标拆解为清晰、可执行的行动计划：\n{goal}\n约束条件：{constraints}', [
+             ('goal', '目标', 'text', True, []),
+             ('constraints', '约束条件', 'text', False, []),
          ]),
-        ('polish-copy', '优化产品文案', '✍️',
-         '请优化下面的产品文案，使表达更有吸引力：\n{content}', [
-             ('content', '原始文案', 'text', True, []),
+        ('summarize', '整理信息要点', '📝',
+         '请整理下面的信息，提炼重点、结论和待办事项：\n{content}', [
+             ('content', '待整理内容', 'text', True, []),
          ]),
-        ('brainstorm', '创意头脑风暴', '💡',
-         '请围绕“{topic}”提供 10 个不同方向的创意。', [
-             ('topic', '创意主题', 'text', True, []),
+        ('analyze-options', '分析解决方案', '💡',
+         '请分析下面的问题，给出可行方案、主要取舍和建议：\n{problem}', [
+             ('problem', '需要解决的问题', 'text', True, []),
          ]),
     ]
     for order, (key, title, icon, template, questions) in enumerate(prompts):

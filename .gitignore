@@ -4,6 +4,7 @@
 !.env.example
 *.pem
 *.key
+*.license
 *.p12
 *.pfx
 *.jks

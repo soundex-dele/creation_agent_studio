@@ -28,7 +28,7 @@ def configure_telemetry():
             resource=Resource.create(
                 {
                     "service.name": getattr(
-                        settings, "OTEL_SERVICE_NAME", "creation-agent-studio"
+                        settings, "OTEL_SERVICE_NAME", "agent-studio"
                     ),
                     "deployment.environment.name": getattr(
                         settings, "OTEL_DEPLOYMENT_ENVIRONMENT", "development"
@@ -75,7 +75,7 @@ def start_execution_span(name, *, run, attempt=None):
                 "execution.attempt.number": attempt.number,
             }
         )
-    return trace.get_tracer("creation_agent_studio.execution").start_span(
+    return trace.get_tracer("agent_studio.execution").start_span(
         name, attributes=attributes
     )
 

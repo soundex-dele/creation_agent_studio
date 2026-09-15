@@ -1,8 +1,8 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "Creation Agent Studio API",
-        "description": "API for Creation Agent Studio - AI-powered video creation platform",
+        "title": "Agent Studio API",
+        "description": "API for Agent Studio - a platform for agents, applications, and workflows",
         "termsOfService": "https://www.example.com/terms/",
         "contact": {
             "email": "contact@example.com"
@@ -8694,7 +8694,7 @@
                         "enum": [
                             "admin",
                             "professional",
-                            "creator",
+                            "member",
                             "viewer"
                         ],
                         "readOnly": true

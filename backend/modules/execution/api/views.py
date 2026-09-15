@@ -56,7 +56,7 @@ from .streaming import stream_run_events
 def _problem(request, *, status_code, code, title, detail):
     return Response(
         {
-            "type": f"urn:creation-agent-studio:problem:{code}",
+            "type": f"urn:agent-studio:problem:{code}",
             "code": code,
             "title": title,
             "status": status_code,

@@ -1,15 +1,30 @@
-import React, { useState } from 'react';
-import { Form, Input, Button, message, Typography } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Form, Input, Button, message, Spin, Typography } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { api } from '@/services/api';
 
 const { Text } = Typography;
 
 const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [checkingMode, setCheckingMode] = useState(true);
   const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
+
+  useEffect(() => {
+    let active = true;
+    api.get<{ mode: 'account' | 'license' }>('/auth/mode/')
+      .then((result) => {
+        if (active && result.mode === 'license') {
+          navigate('/auth/login', { replace: true });
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => { if (active) setCheckingMode(false); });
+    return () => { active = false; };
+  }, [navigate]);
 
   const onFinish = async (values: {
     username: string;
@@ -42,11 +57,15 @@ const RegisterPage: React.FC = () => {
     }
   };
 
+  if (checkingMode) {
+    return <div className="p-12 text-center"><Spin /></div>;
+  }
+
   return (
     <div className="animate-fade-in-scale rounded-xl border border-border bg-card/80 p-8 shadow-lg backdrop-blur-xl">
       <div className="mb-8 text-center">
         <h1 className="animate-logo-reveal font-display text-2xl font-bold text-primary">
-          Creation Studio
+          Agent Studio
         </h1>
         <Text className="mt-2 block text-text-sec">创建新账户</Text>
       </div>

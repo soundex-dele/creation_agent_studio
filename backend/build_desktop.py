@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build Creation Agent Studio for Windows, excluding Creation Master."""
+"""Build Agent Studio for Windows, excluding Creation Master."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_ROOT.parent
 FRONTEND_ROOT = PROJECT_ROOT / "frontend"
-SPEC_FILE = BACKEND_ROOT / "creation_agent_studio.spec"
-BUILD_DIR = BACKEND_ROOT / "build" / "creation_agent_studio"
+SPEC_FILE = BACKEND_ROOT / "agent_studio.spec"
+BUILD_DIR = BACKEND_ROOT / "build" / "agent_studio"
 DIST_DIR = BACKEND_ROOT / "dist"
 
 
@@ -24,6 +24,14 @@ def run(command: list[str], *, cwd: Path, env=None) -> None:
 
 
 def build() -> None:
+    license_enabled = os.environ.get(
+        "LICENSE_AUTH_ENABLED", "False"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if license_enabled and not os.environ.get("LICENSE_PUBLIC_KEY", "").strip():
+        raise SystemExit(
+            "LICENSE_AUTH_ENABLED is true, but LICENSE_PUBLIC_KEY is empty."
+        )
+
     print("[1/4] Building React frontend without Creation Master")
     frontend_env = os.environ.copy()
     frontend_env["VITE_EXCLUDE_CREATION_MASTER"] = "true"
@@ -76,12 +84,12 @@ def build() -> None:
         str(DIST_DIR),
         str(SPEC_FILE),
     ], cwd=BACKEND_ROOT, env=build_env)
-    output = DIST_DIR / "CreationAgentStudio" / "CreationAgentStudio.exe"
+    output = DIST_DIR / "AgentStudio" / "AgentStudio.exe"
     print(f"Build complete: {output}")
 
 
 def clean() -> None:
-    targets = [BUILD_DIR, DIST_DIR / "CreationAgentStudio"]
+    targets = [BUILD_DIR, DIST_DIR / "AgentStudio"]
     for target in targets:
         if target.exists():
             shutil.rmtree(target)

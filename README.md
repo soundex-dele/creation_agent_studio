@@ -1,4 +1,4 @@
-# Creation Agent Studio
+# Agent Studio
 
 ## Bundled submodules
 
@@ -14,7 +14,7 @@ For an existing checkout, run `git submodule update --init --recursive`.
 Its Qt client remains a standalone desktop process. Its React source stays in
 the submodule and is compiled directly into the main frontend bundle.
 
-面向组织的智能体、应用与工作流创作平台。项目只有一套执行实现：所有 Agent、Conversation、Application、Workflow 和 Media 任务都创建 `modules.execution.Run`，由统一 Coordinator、事件流和命令 API 驱动。
+面向组织的通用智能体、应用与工作流平台。平台层提供统一的编排、执行与治理能力；具体场景能力由应用和智能体承载。项目只有一套执行实现：所有 Agent、Conversation、Application、Workflow 和 Media 任务都创建 `modules.execution.Run`，由统一 Coordinator、事件流和命令 API 驱动。
 
 当前架构及取舍见 [ARCHITECTURE_ANALYSIS.md](ARCHITECTURE_ANALYSIS.md)。仓库不再维护 V1/V2 两套设计文档或兼容协议。
 
@@ -132,8 +132,8 @@ sequence 游标恢复，不维护第二套运行状态。
 ```dotenv
 DATABASE_ENGINE=postgresql
 DB_ADMIN_PASSWORD=change-admin-password
-DB_NAME=creation_studio
-DB_USER=creation_app
+DB_NAME=agent_studio
+DB_USER=agent_studio
 DB_PASSWORD=change-app-password
 REDIS_ENABLED=True
 ```
@@ -159,13 +159,68 @@ python -m pip install -r requirements/desktop.txt
 python build_desktop.py
 ```
 
-产物为 `backend/dist/CreationAgentStudio/CreationAgentStudio.exe`。如果 FFmpeg
+产物为 `backend/dist/AgentStudio/AgentStudio.exe`。如果 FFmpeg
 不在 `PATH`，构建前可将 `FFMPEG_DIR` 指向同时包含 `ffmpeg.exe` 和
 `ffprobe.exe` 的目录。用户数据库、媒体和工作区保存在
-`%LOCALAPPDATA%/CreationAgentStudio`，不会写入安装目录。
-应用启动后驻留在 Windows 系统托盘。双击托盘图标或选择“打开 Creation
-Agent Studio”可重新打开页面；选择“退出应用”会同时关闭 Web 服务、执行
+`%LOCALAPPDATA%/AgentStudio`，不会写入安装目录。
+应用启动后驻留在 Windows 系统托盘。双击托盘图标或选择“打开 Agent
+Studio”可重新打开页面；选择“退出应用”会同时关闭 Web 服务、执行
 协调器和自动化调度器。
+
+### 桌面离线许可证
+
+桌面版可在构建时切换为离线许可证登录。启用后，账号密码登录、注册和企业
+SSO 入口会被许可证页面替代，注册 API 也会拒绝请求。生成签名密钥：
+
+```powershell
+cd backend
+python tools/license_generator.py generate-keys `
+  --private-key license-private.key `
+  --public-key license-public.key
+```
+
+使用许可证专用构建脚本读取公钥并打包。这些发行设置会嵌入程序，最终用户
+不能通过修改旁路配置重新开放注册。私钥不得放入仓库或桌面安装包：
+
+```powershell
+python build_licensed_desktop.py
+```
+
+公钥不在默认的 `backend/license-public.key` 时，可显式指定：
+
+```powershell
+python build_licensed_desktop.py `
+  --public-key D:\keys\agent-studio-public.key `
+  --product-id agent-studio
+```
+
+脚本只读取公钥，不读取私钥。用户将登录页显示的机器码发给授权方后，可签发
+永久许可证：
+
+```powershell
+python tools/license_generator.py issue `
+  --private-key license-private.key `
+  --machine-code "AS-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" `
+  --customer "客户名称" `
+  --license-type perpetual `
+  --output customer.license
+```
+
+试用许可证必须提供截止日期：
+
+```powershell
+python tools/license_generator.py issue `
+  --private-key license-private.key `
+  --machine-code "AS-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" `
+  --customer "客户名称" `
+  --license-type trial `
+  --expires-at 2026-09-30 `
+  --output customer-trial.license
+```
+
+用户导入的许可证保存在 `%LOCALAPPDATA%/AgentStudio/license.lic`。换电脑后
+机器码会改变，必须重新签发。纯离线模式以本机时间判断到期，无法彻底防止
+高级用户通过系统快照或程序破解绕过试用限制。
 
 Artifact 默认写入共享 `runtime_data:/data`，也可用 `ARTIFACT_STORAGE_BACKEND=s3` 切换到 AWS S3 或 MinIO；下载接口会返回对应后端的短期签名访问。Maintenance 默认每小时执行 Retention、对象删除和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。配置 OTLP Collector 后可启用 HTTP、Run 创建和 Attempt 生命周期追踪。
 

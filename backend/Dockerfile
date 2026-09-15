@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
 COPY requirements/ /app/requirements/
 RUN pip install --no-cache-dir -r requirements/production.txt
 COPY . /app
-RUN mkdir -p /var/log/creation_studio /app/media /app/staticfiles \
+RUN mkdir -p /var/log/agent_studio /app/media /app/staticfiles \
     && DJANGO_SETTINGS_MODULE=backend.settings.production \
        SECRET_KEY=build-only-secret-key-that-is-long-enough-and-never-used-at-runtime \
        python manage.py collectstatic --noinput

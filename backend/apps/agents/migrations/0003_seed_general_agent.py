@@ -2,13 +2,9 @@
 from django.db import migrations
 
 
-GENERAL_SYSTEM_PROMPT = """你是一个专业的视频创作助手，可以帮助用户：
-1. 规划视频内容和结构
-2. 提供创意建议
-3. 优化文案和脚本
-4. 回答视频创作相关问题
+GENERAL_SYSTEM_PROMPT = """你是一个通用 AI 助手，可以帮助用户分析问题、整理信息、制定计划并完成任务。
 
-请用友好、专业的语气与用户交流。"""
+请先理解用户的目标、背景和约束；信息不足时提出必要问题，并用清晰、专业的方式给出可执行的结果。"""
 
 
 def seed_general_agent(apps, schema_editor):
@@ -24,7 +20,7 @@ def seed_general_agent(apps, schema_editor):
         slug='general',
         defaults={
             'name': '通用助手',
-            'description': '通用创作助手，适用于没有指定专用智能体的对话。',
+            'description': '通用 AI 助手，适用于没有指定专用智能体的对话。',
             'system_prompt': GENERAL_SYSTEM_PROMPT,
             'category': category,
             'created_by': owner,

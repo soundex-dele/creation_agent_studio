@@ -1,5 +1,5 @@
 """
-Users app for Creation Agent Studio.
+Users app for Agent Studio.
 
 This app handles user management, authentication, and user-related operations.
 """

@@ -222,8 +222,8 @@ class _AppServerTransport:
                 "initialize",
                 {
                     "clientInfo": {
-                        "name": "creation_agent_studio",
-                        "title": "Creation Agent Studio",
+                        "name": "agent_studio",
+                        "title": "Agent Studio",
                         "version": "1.0.0",
                     },
                     "capabilities": {"experimentalApi": True},
@@ -802,8 +802,8 @@ class CodexAdapter(AgentAdapter):
         config = sdk.CodexConfig(
             codex_bin=str(resolve_codex_binary()),
             cwd=cwd or settings.CODEX_WORKING_DIRECTORY,
-            client_name="creation_agent_studio",
-            client_title="Creation Agent Studio",
+            client_name="agent_studio",
+            client_title="Agent Studio",
         )
         return sdk, sdk.Codex(config=config)
 

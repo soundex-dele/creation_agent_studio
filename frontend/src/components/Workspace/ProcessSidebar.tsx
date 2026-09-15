@@ -36,7 +36,7 @@ const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         <div className="ws-workspace-title">{project.title}</div>
       </div>
 
-      <div className="ws-sidebar-section-title">创作流程</div>
+      <div className="ws-sidebar-section-title">任务流程</div>
       <nav className="ws-process-nav">
         {processes.map((p, i) => {
           const active = p.id === activeProcessId;

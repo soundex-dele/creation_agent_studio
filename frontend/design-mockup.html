@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Creation Studio — 创作智能体工作室</title>
+<title>Agent Studio — 智能体工作室</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -1125,7 +1125,7 @@ button { cursor: pointer; }
   <div class="login-card">
     <div class="login-brand">
       <h1>Creation <span>Studio</span></h1>
-      <p>你的 AI 创作智能体工作室</p>
+      <p>你的 AI 智能体与应用工作室</p>
     </div>
 
     <div class="login-field">
@@ -1303,7 +1303,7 @@ button { cursor: pointer; }
         <div class="chat-input-glow"></div>
         <div class="chat-input-wrapper">
           <div class="chat-input-box">
-            <textarea id="chat-input" rows="1" placeholder="描述你的创作需求... (Enter 发送，Shift+Enter 换行)" oninput="autoResize(this)"></textarea>
+            <textarea id="chat-input" rows="1" placeholder="描述你的需求... (Enter 发送，Shift+Enter 换行)" oninput="autoResize(this)"></textarea>
             <button class="chat-send-btn" id="send-btn" onclick="sendMessage()" disabled>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -1319,7 +1319,7 @@ button { cursor: pointer; }
     <!-- ── Agents Page ── -->
     <div class="page-agents" id="page-agents">
       <h1 class="page-title">智能体市场</h1>
-      <p class="page-subtitle">选择一个创作智能体，让 AI 协助你完成专业创作任务</p>
+      <p class="page-subtitle">选择一个智能体，让 AI 协助你处理不同场景的任务</p>
 
       <div class="agent-grid" id="agent-grid">
         <!-- Rendered by JS -->
@@ -1595,8 +1595,8 @@ function initChat() {
   const emptyHTML = `
     <div class="chat-empty" id="chat-empty">
       <div class="chat-empty-icon">✦</div>
-      <h3>开始你的创作之旅</h3>
-      <p>向创作智能体描述你的需求，AI 会协助你完成脚本编写、文案优化、视频策划等专业创作任务</p>
+      <h3>开始处理你的任务</h3>
+      <p>描述你的目标、背景和约束，或选择一个更适合当前场景的智能体</p>
       <div class="chat-empty-suggestions">
         <div class="chat-suggestion" onclick="useSuggestion('帮我写一个咖啡店探店的短视频脚本')">🎬 写一个短视频脚本</div>
         <div class="chat-suggestion" onclick="useSuggestion('优化这段产品文案')">✍️ 优化产品文案</div>

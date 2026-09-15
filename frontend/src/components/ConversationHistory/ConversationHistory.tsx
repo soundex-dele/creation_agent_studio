@@ -14,7 +14,7 @@ const { Text } = Typography;
 
 /**
  * Conversation history — designed as a "creative archive": conversations are the
- * work products of an AI creation studio, so the list is grouped by recency
+ * work sessions in an AI agent studio, so the list is grouped by recency
  * (today / yesterday / this week / earlier) and each row shows the last message
  * preview so recognition relies on content, not just titles.
  */
@@ -197,7 +197,7 @@ const ConversationHistory: React.FC<ConversationHistoryProps> = ({
       <div className="conversation-history-empty">
         <div className="ch-empty-mark">✶</div>
         <Text className="ch-empty-title">开启你的第一次对话</Text>
-        <Text className="ch-empty-sub">和 AI 一起，从一句话开始创作。</Text>
+        <Text className="ch-empty-sub">和 AI 一起，从一句话开始处理任务。</Text>
         <Button
           type="primary"
           icon={<PlusOutlined />}

@@ -13,7 +13,7 @@ const navItems = [
   { key: '/skills', label: '⚡ 技能' },
   { key: '/apps', label: '🧩 应用' },
   { key: '/workflows', label: '🔀 工作流' },
-  { key: '/enterprise', label: '🏢 企业控制台' },
+  { key: '/enterprise', label: '🏢 控制台' },
 ];
 
 const Header: React.FC = () => {
@@ -56,7 +56,7 @@ const Header: React.FC = () => {
     <header className="app-header">
       {/* Left: Logo */}
       <div className="header-logo" onClick={() => navigate('/')}>
-        Creation <span>Studio</span>
+        Agent <span>Studio</span>
       </div>
 
       {/* Center: Nav */}

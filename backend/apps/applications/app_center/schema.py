@@ -31,7 +31,7 @@ class MetadataManifest(BaseModel):
     icon: str = ""
     color: str = ""
     tags: list[str] = Field(default_factory=list)
-    developer: str = "Creation Studio"
+    developer: str = "Agent Studio"
 
     @field_validator("id")
     @classmethod
@@ -121,7 +121,9 @@ class SpecManifest(BaseModel):
 class ApplicationPackageManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    api_version: Literal["creation-studio/v1"]
+    # Keep loading independently versioned application packages that still use
+    # the former platform namespace while new packages adopt agent-studio/v1.
+    api_version: Literal["agent-studio/v1", "creation-studio/v1"]
     kind: Literal["ApplicationPackage"]
     metadata: MetadataManifest
     spec: SpecManifest

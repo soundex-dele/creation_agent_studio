@@ -1,5 +1,5 @@
 """
-WSGI config for Creation Agent Studio backend.
+WSGI config for Agent Studio backend.
 """
 import os
 from django.core.wsgi import get_wsgi_application

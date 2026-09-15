@@ -7,9 +7,9 @@ import type { WorkflowField, WorkflowProcess, WorkflowStructure } from '@/types/
 /** A default single "free" process used when a template has no processes defined. */
 const FALLBACK_PROCESS: WorkflowProcess = {
   id: 'free',
-  name: '自由创作',
+  name: '自由对话',
   icon: '✨',
-  description: '与助手自由交流，完成你的创作',
+  description: '与助手自由交流，完成你的任务',
   mode: 'free',
 };
 

@@ -1,4 +1,4 @@
-api_version: creation-studio/v1
+api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: case-library
@@ -14,7 +14,7 @@ metadata:
   icon: "📚"
   color: "#b45309"
   tags: [案例, 内容拆解, 灵感]
-  developer: Creation Studio
+  developer: Agent Studio
 spec:
   application_kind: custom
   launch_mode: dedicated

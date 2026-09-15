@@ -12,9 +12,9 @@ const HomePage: React.FC = () => {
   return (
     <div className="home-page animate-fade-in">
       <section className="home-hero">
-        <span className="home-eyebrow">CREATION STUDIO</span>
+        <span className="home-eyebrow">AGENT STUDIO</span>
         <h1>{username ? `${username}，欢迎回来` : '欢迎回来'}</h1>
-        <p>从左侧选择一个应用开始创作，或进入应用中心发现更多工具。</p>
+        <p>从左侧选择一个应用开始处理任务，或进入应用中心发现更多工具。</p>
         <div className="home-actions">
           <Button type="primary" size="large" icon={<MessageOutlined />} onClick={() => navigate('/chat')}>
             开始对话
@@ -26,7 +26,7 @@ const HomePage: React.FC = () => {
       </section>
       <section className="home-guide" aria-label="首页使用提示">
         <div><span>1</span><strong>选择应用</strong><p>从侧边栏打开常用工具</p></div>
-        <div><span>2</span><strong>完成创作</strong><p>按应用指引提交你的需求</p></div>
+        <div><span>2</span><strong>完成任务</strong><p>按应用指引提交你的需求</p></div>
         <div><span>3</span><strong>随时配置</strong><p>调整首页展示和应用顺序</p></div>
       </section>
     </div>

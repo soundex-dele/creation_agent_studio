@@ -43,7 +43,7 @@ const AppsPage: React.FC = () => {
     <div className="apps-page animate-fade-in">
       <div className="page-header">
         <h1 className="page-title">应用中心</h1>
-        <p className="page-subtitle">各类创作、视频与 AI 工具，点开即可开始使用</p>
+        <p className="page-subtitle">汇集不同业务场景的应用与 AI 工具，点开即可使用</p>
       </div>
 
       <div className="page-toolbar">

@@ -1,5 +1,5 @@
 """
-Templates app for Creation Agent Studio.
+Templates app for Agent Studio.
 
 This app handles content template management and operations.
 """

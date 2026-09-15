@@ -75,7 +75,7 @@ const WorkflowsPage = () => {
   return (
     <div className="workflows-page">
       <div className="workflows-heading">
-        <div><h1>工作流</h1><p>把多个应用组合成手动操作或自动运行的创作流程</p></div>
+        <div><h1>工作流</h1><p>把多个应用组合成可手动操作或自动运行的业务流程</p></div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
           新建工作流
         </Button>

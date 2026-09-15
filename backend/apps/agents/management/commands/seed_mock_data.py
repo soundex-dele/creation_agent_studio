@@ -1,5 +1,5 @@
 """
-Seed mock data for Creation Agent Studio.
+Seed mock data for Agent Studio.
 
 Usage:
     python manage.py seed_mock_data
@@ -88,7 +88,7 @@ class Command(BaseCommand):
             ))
         data = [
             {'username': 'creator', 'email': 'creator@example.com', 'password': password,
-             'role': 'creator', 'bio': '全职创作者，擅长短视频和直播'},
+             'role': 'member', 'bio': '全职内容创作者，擅长短视频和直播'},
             {'username': 'designer', 'email': 'designer@example.com', 'password': password,
              'role': 'professional', 'bio': '视觉设计师，精通品牌设计'},
             {'username': 'admin', 'email': 'admin@example.com', 'password': password,
@@ -252,35 +252,35 @@ class Command(BaseCommand):
                 'slug': 'screen-recorder', 'name': '录屏工作台',
                 'category_slug': 'video', 'icon': '🎥', 'color': '#2e1a1a',
                 'tags': ['录屏', '标注', '直播'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '一键录制屏幕、摄像头与系统声音，支持实时标注与高光片段标记。',
             },
             {
                 'slug': 'subtitle-studio', 'name': '智能字幕',
                 'category_slug': 'ai', 'icon': '💬', 'color': '#1a2e3e',
                 'tags': ['ASR', '双语', '字幕'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '语音转字幕、双语对齐、样式模板与时间轴微调，自动断句更自然。',
             },
             {
                 'slug': 'video-composer', 'name': '视频合成器',
                 'category_slug': 'video', 'icon': '🎞️', 'color': '#1a1a2e',
                 'tags': ['合成', '画中画', '转场'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '多源视频画中画合成、布局模板与转场，实时预览最终成片效果。',
             },
             {
                 'slug': 'image-genie', 'name': 'AI 绘画',
                 'category_slug': 'ai', 'icon': '🖼️', 'color': '#2e1a2e',
                 'tags': ['文生图', '风格迁移', '提示词'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '文生图、图生图与风格迁移，内置提示词库与一致角色生成能力。',
             },
             {
                 'slug': 'xiaohongshu-cover', 'name': '小红书封面生成',
                 'category_slug': 'creative', 'icon': '📕', 'color': '#ff2442',
                 'tags': ['小红书', '封面', 'AI 绘画'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '根据笔记主题生成醒目、清晰、适合小红书发布的封面图片。',
                 'renderer_key': 'image-genie',
                 'executor_key': 'image-generation',
@@ -305,7 +305,7 @@ class Command(BaseCommand):
                 'slug': 'xiaohongshu-copy', 'name': '小红书文案生成',
                 'category_slug': 'creative', 'icon': '📝', 'color': '#ff5a76',
                 'tags': ['小红书', '种草文案', '标题'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '根据内容主题生成小红书标题、正文和话题标签。',
                 'kind': Application.Kind.CHAT,
                 'renderer_key': 'chat',
@@ -315,42 +315,42 @@ class Command(BaseCommand):
                 'slug': 'script-writer', 'name': '剧本创作',
                 'category_slug': 'creative', 'icon': '✍️', 'color': '#1a2e1a',
                 'tags': ['剧本', '分镜', '对白'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '从大纲到分镜，结构化剧本写作与角色对白润色，输出可直接配音的稿件。',
             },
             {
                 'slug': 'voiceover-mixer', 'name': '配音混音',
                 'category_slug': 'media', 'icon': '🎙️', 'color': '#1a2e2e',
                 'tags': ['TTS', '混音', '配音'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': 'TTS 语音合成、多角色音色切换与背景音乐混音，一键导出配音轨。',
             },
             {
                 'slug': 'template-hub', 'name': '模板套用',
                 'category_slug': 'creative', 'icon': '📐', 'color': '#2e2e1a',
                 'tags': ['模板', '批量', '快速'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '从模板库一键套用，替换素材即可成片，适合批量、快速的内容生产。',
             },
             {
                 'slug': 'project-manager', 'name': '项目管理',
                 'category_slug': 'productivity', 'icon': '📋', 'color': '#213e3e',
                 'tags': ['看板', '协作'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '创作项目看板、版本管理与团队协作，跟踪每个作品从草稿到发布。',
             },
             {
                 'slug': 'asset-library', 'name': '素材库',
                 'category_slug': 'media', 'icon': '🗂️', 'color': '#3e2e1a',
                 'tags': ['素材', '检索', '打标'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '图片、视频、音频与字体素材集中管理，智能打标与快速检索。',
             },
             {
                 'slug': 'auto-clipper', 'name': '智能剪辑',
                 'category_slug': 'ai', 'icon': '⚡', 'color': '#16213e',
                 'tags': ['自动剪辑', '高光', '短视频'],
-                'developer': 'Creation Studio',
+                'developer': 'Agent Studio',
                 'description': '基于脚本与高光识别自动剪辑长视频，输出短视频矩阵分发素材。',
             },
         ]

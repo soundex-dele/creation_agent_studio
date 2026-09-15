@@ -1,5 +1,5 @@
 """
-Base settings for Creation Agent Studio backend.
+Base settings for Agent Studio backend.
 """
 import json
 from pathlib import Path
@@ -39,6 +39,13 @@ SINGLE_TENANT_ORGANIZATION_NAME = config(
     'SINGLE_TENANT_ORGANIZATION_NAME', default='Enterprise Workspace').strip()
 SINGLE_TENANT_DEFAULT_ROLE = config(
     'SINGLE_TENANT_DEFAULT_ROLE', default='viewer').strip().lower()
+
+# Optional offline desktop licensing. The public key is safe to distribute;
+# the matching private key must only exist in the vendor's license tool.
+LICENSE_AUTH_ENABLED = config('LICENSE_AUTH_ENABLED', default=False, cast=bool)
+LICENSE_PRODUCT_ID = config('LICENSE_PRODUCT_ID', default='agent-studio').strip()
+LICENSE_PUBLIC_KEY = config('LICENSE_PUBLIC_KEY', default='').strip()
+LICENSE_FILE_PATH = config('LICENSE_FILE_PATH', default='').strip()
 
 DATABASE_ENGINE = config('DATABASE_ENGINE', default='postgresql').strip().lower()
 REDIS_ENABLED = config(
@@ -164,7 +171,7 @@ elif DATABASE_ENGINE in {'postgres', 'postgresql'}:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='creation_studio'),
+            'NAME': config('DB_NAME', default='agent_studio'),
             'USER': config('DB_USER', default='postgres'),
             'PASSWORD': config('DB_PASSWORD', default='postgres'),
             'HOST': config('DB_HOST', default='localhost'),
@@ -215,7 +222,7 @@ CATALOG_DOMAIN_PORT = config(
 # OTLP exporter at a collector to retain HTTP and durable-execution spans.
 OTEL_ENABLED = config('OTEL_ENABLED', default=False, cast=bool)
 OTEL_SERVICE_NAME = config(
-    'OTEL_SERVICE_NAME', default='creation-agent-studio-backend')
+    'OTEL_SERVICE_NAME', default='agent-studio-backend')
 OTEL_DEPLOYMENT_ENVIRONMENT = config(
     'OTEL_DEPLOYMENT_ENVIRONMENT', default='development')
 OTEL_EXPORTER_OTLP_ENDPOINT = config(
@@ -275,7 +282,7 @@ else:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'creation-agent-studio-local',
+            'LOCATION': 'agent-studio-local',
         }
     }
 
@@ -325,7 +332,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.users.authentication.LicenseAwareJWTAuthentication',
         'apps.users.authentication.ScopedAPIKeyAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -402,7 +409,7 @@ SIMPLE_JWT = {
 # Browser refresh tokens never need to be readable by JavaScript. The access
 # token remains short lived and in memory; this cookie only reaches auth URLs.
 JWT_REFRESH_COOKIE_NAME = config(
-    'JWT_REFRESH_COOKIE_NAME', default='creation_refresh')
+    'JWT_REFRESH_COOKIE_NAME', default='agent_studio_refresh')
 JWT_REFRESH_COOKIE_PATH = config(
     'JWT_REFRESH_COOKIE_PATH', default='/api/v1/')
 JWT_REFRESH_COOKIE_SECURE = config(

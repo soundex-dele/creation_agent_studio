@@ -1,6 +1,6 @@
 """
-Projects app for Creation Agent Studio.
+Projects app for Agent Studio.
 
-This app handles content creation project management and operations.
+This app handles general project management and operations.
 """
 default_app_config = 'apps.projects.apps.ProjectsConfig'

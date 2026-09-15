@@ -15,7 +15,7 @@ from .models import Application, ApplicationCategory, ChatApplication, Skill
 
 class LegacyDefinitionMigrationTest(TestCase):
     def test_seeded_chat_and_agent_definitions_survive_schema_migration(self):
-        application = Application.objects.get(slug='creative-chat')
+        application = Application.objects.get(slug='general-chat')
         definition = application.draft.content
         self.assertIsNotNone(application.organization_id)
         self.assertEqual(definition['kind'], 'chat')
@@ -26,7 +26,7 @@ class LegacyDefinitionMigrationTest(TestCase):
 
         agent = Agent.objects.get(slug='general')
         self.assertIsNotNone(agent.organization_id)
-        self.assertIn('视频创作助手', agent.draft.content['system_prompt'])
+        self.assertIn('通用 AI 助手', agent.draft.content['system_prompt'])
 
 
 class ChatApplicationBoundaryTest(TestCase):

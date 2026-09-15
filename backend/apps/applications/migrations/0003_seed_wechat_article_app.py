@@ -94,7 +94,7 @@ def seed_wechat_article_app(apps, schema_editor):
             'icon': '📝',
             'color': '#07c160',
             'tags': ['公众号', '文章写作', '内容创作'],
-            'developer': 'Creation Studio',
+            'developer': 'Agent Studio',
             'is_public': True,
             'created_by': owner,
             'organization_id': skill.organization_id,

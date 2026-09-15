@@ -14,7 +14,7 @@ class ProblemDetailsAPIView(APIView):
             code = "invalid_request"
         title = str(code).replace("_", " ").capitalize()
         body = {
-            "type": f"urn:creation-agent-studio:problem:{code}",
+            "type": f"urn:agent-studio:problem:{code}",
             "code": str(code),
             "title": title,
             "status": response.status_code,

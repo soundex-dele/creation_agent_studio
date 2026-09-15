@@ -18,6 +18,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
+  licenseLogin: (license?: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   completeSso: (exchange: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -63,6 +64,14 @@ export const useAuthStore = create<AuthState>()(
           token: tokens.access,
           isAuthenticated: true,
         });
+      },
+
+      licenseLogin: async (license?: string) => {
+        const response = await api.post<AuthResponse>('/auth/license/login/', {
+          license: license?.trim() || undefined,
+        });
+        const { user, tokens } = response;
+        set({ user, token: tokens.access, isAuthenticated: true });
       },
 
       register: async (data: RegisterData) => {

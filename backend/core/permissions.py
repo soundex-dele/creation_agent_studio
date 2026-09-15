@@ -18,11 +18,15 @@ class IsProfessionalOrAdmin(permissions.BasePermission):
         return request.user and request.user.role in ['professional', 'admin']
 
 
-class IsCreatorOrAbove(permissions.BasePermission):
-    """创作者及以上权限"""
+class IsMemberOrAbove(permissions.BasePermission):
+    """成员及以上权限。"""
 
     def has_permission(self, request, view):
-        return request.user and request.user.role in ['creator', 'professional', 'admin']
+        return request.user and request.user.role in ['member', 'professional', 'admin']
+
+
+# Backward-compatible import alias for integrations that imported the old class name.
+IsCreatorOrAbove = IsMemberOrAbove
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):

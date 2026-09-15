@@ -1,5 +1,5 @@
 """
-Marketplace app for Creation Agent Studio.
+Marketplace app for Agent Studio.
 
 This app handles marketplace item management and operations.
 """

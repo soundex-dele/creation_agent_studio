@@ -1,5 +1,5 @@
 """
-Production settings for Creation Agent Studio backend.
+Production settings for Agent Studio backend.
 """
 from .base import *
 from django.core.exceptions import ImproperlyConfigured

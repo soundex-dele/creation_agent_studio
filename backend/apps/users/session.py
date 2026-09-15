@@ -4,7 +4,7 @@ from django.conf import settings
 
 
 def refresh_cookie_name():
-    return getattr(settings, "JWT_REFRESH_COOKIE_NAME", "creation_refresh")
+    return getattr(settings, "JWT_REFRESH_COOKIE_NAME", "agent_studio_refresh")
 
 
 def set_refresh_cookie(response, refresh_token):

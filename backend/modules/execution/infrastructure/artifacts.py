@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.module_loading import import_string
 
 
-ARTIFACT_TOKEN_SALT = "creation-agent-studio.artifact-access"
+ARTIFACT_TOKEN_SALT = "agent-studio.artifact-access"
 
 
 class ArtifactObjectUnavailable(Exception):

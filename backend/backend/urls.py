@@ -1,5 +1,5 @@
 """
-URL configuration for Creation Agent Studio backend.
+URL configuration for Agent Studio backend.
 """
 from django.contrib import admin
 from django.urls import path, include

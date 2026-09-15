@@ -41,9 +41,9 @@ interface ChatContainerProps {
 }
 
 const defaultSuggestions: ChatSuggestion[] = [
-  { icon: '🎬', label: '写一个短视频脚本', text: '帮我写一个咖啡店探店的短视频脚本' },
-  { icon: '✍️', label: '优化产品文案', text: '优化这段产品文案' },
-  { icon: '🎙️', label: '直播话术方案', text: '设计一个直播话术方案' },
+  { icon: '🧭', label: '制定行动计划', text: '帮我把这个目标拆解成清晰的行动计划' },
+  { icon: '📝', label: '整理信息要点', text: '帮我整理这段信息的重点和待办事项' },
+  { icon: '💡', label: '分析解决方案', text: '分析这个问题，并给出几种可行方案及其取舍' },
 ];
 
 const ChatContainer: React.FC<ChatContainerProps> = ({
@@ -221,11 +221,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       {isEmpty && !isLoading ? (
         <div className="chat-empty">
           <div className="chat-empty-icon">{agent?.icon || '✦'}</div>
-          <h3>{emptyTitle || (agent ? `我是${agent.name}，请问有什么可以帮您？` : '开始你的创作之旅')}</h3>
+          <h3>{emptyTitle || (agent ? `我是${agent.name}，请问有什么可以帮您？` : '开始处理你的任务')}</h3>
           <p>
             {emptyDescription || (agent
-              ? `向${agent.name}描述你的需求，AI 会协助你完成脚本编写、文案优化、视频策划等专业创作任务`
-              : '向创作智能体描述你的需求，AI 会协助你完成脚本编写、文案优化、视频策划等专业创作任务')}
+              ? `向${agent.name}描述你的目标、背景和约束，它会根据自身能力协助你完成任务`
+              : '描述你的目标、背景和约束，或选择一个更适合当前场景的智能体')}
           </p>
           <div className="chat-empty-suggestions">
             {suggestions.map((s) => (
@@ -278,7 +278,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               !user || isLoading || isCreatingConversation || isStreaming
               || (!conversationId && !createOnFirstSend)
             }
-            placeholder={user ? (inputPlaceholder || '描述你的创作需求... (Enter 发送，Shift+Enter 换行)') : '请先登录'}
+            placeholder={user ? (inputPlaceholder || '描述你的需求... (Enter 发送，Shift+Enter 换行)') : '请先登录'}
           />
           <div className="chat-input-hint">
             {isStreaming && conversationId ? (

@@ -1,4 +1,4 @@
-# Creation Agent Studio 当前架构分析
+# Agent Studio 当前架构分析
 
 > 分析日期：2026-09-14
 >

@@ -1,5 +1,5 @@
 """
-Custom middleware for Creation Agent Studio.
+Custom middleware for Agent Studio.
 """
 import time
 import logging

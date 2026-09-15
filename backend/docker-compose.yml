@@ -239,7 +239,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    container_name: creation_studio_postgres
+    container_name: agent_studio_postgres
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: ${DB_ADMIN_USER:-postgres}
@@ -259,7 +259,7 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
-    container_name: creation_studio_redis
+    container_name: agent_studio_redis
     volumes:
       - redis_data:/data
     healthcheck:

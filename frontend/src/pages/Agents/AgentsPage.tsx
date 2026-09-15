@@ -64,7 +64,7 @@ const AgentsPage: React.FC = () => {
     <div className="agents-page animate-fade-in">
       <div className="page-header">
         <h1 className="page-title">智能体市场</h1>
-        <p className="page-subtitle">选择一个创作智能体，让 AI 协助你完成专业创作任务</p>
+        <p className="page-subtitle">选择或创建智能体，让 AI 协助你处理不同场景的任务</p>
       </div>
 
       <div className="page-toolbar">

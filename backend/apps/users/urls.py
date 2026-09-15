@@ -5,6 +5,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('mode/', views.auth_mode_view, name='auth_mode'),
+    path('license/login/', views.license_login_view, name='license_login'),
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),

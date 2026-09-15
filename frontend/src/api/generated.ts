@@ -3222,7 +3222,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            readonly role?: "admin" | "professional" | "creator" | "viewer";
+            readonly role?: "admin" | "professional" | "member" | "viewer";
             /**
              * Avatar
              * Format: uri

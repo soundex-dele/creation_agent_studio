@@ -11,7 +11,7 @@ from django.contrib.auth.models import AbstractUser
 
 
 class User(AbstractUser):
-    """Custom user model for Creation Agent Studio.
+    """Custom user model for Agent Studio.
 
     Extends Django's AbstractUser to add custom fields and functionality.
     """
@@ -19,13 +19,13 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'admin', '管理员'
         PROFESSIONAL = 'professional', '专业用户'
-        CREATOR = 'creator', '创作者'
+        MEMBER = 'member', '成员'
         VIEWER = 'viewer', '查看者'
 
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
-        default=Role.CREATOR
+        default=Role.MEMBER
     )
     avatar = models.URLField(blank=True, help_text='用户头像 URL')
     bio = models.TextField(blank=True, help_text='用户简介')
@@ -49,7 +49,7 @@ class User(AbstractUser):
 
     def generate_api_key(self):
         """生成兼容旧接口的 API 密钥，数据库只保存不可逆哈希。"""
-        raw_key = f'cas_{secrets.token_urlsafe(32)}'
+        raw_key = f'ast_{secrets.token_urlsafe(32)}'
         self.api_key = make_password(raw_key)
         self.save(update_fields=['api_key', 'updated_at'])
         return raw_key
@@ -84,7 +84,7 @@ class UserAPIKey(models.Model):
 
     @classmethod
     def issue(cls, *, user, name='default', scopes=None, expires_at=None):
-        raw_key = f'cas_{secrets.token_urlsafe(32)}'
+        raw_key = f'ast_{secrets.token_urlsafe(32)}'
         obj = cls.objects.create(
             user=user,
             name=name,

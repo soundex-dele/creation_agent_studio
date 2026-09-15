@@ -1,4 +1,4 @@
-"""Windows launcher for the packaged Creation Agent Studio application."""
+"""Windows launcher for the packaged Agent Studio application."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import webbrowser
 from pathlib import Path
 
 
-APP_NAME = "CreationAgentStudio"
+APP_NAME = "AgentStudio"
 HOST = "127.0.0.1"
 PORT = 8765
 LOG_PATH: Path | None = None
@@ -43,7 +43,7 @@ def _secret_key(data_root: Path) -> str:
 def _configure_stdio(data_root: Path) -> None:
     """Give windowed PyInstaller processes a real stream for Django output."""
     global LOG_PATH, LOG_STREAM
-    LOG_PATH = data_root / "logs" / f"creation-agent-studio-{os.getpid()}.log"
+    LOG_PATH = data_root / "logs" / f"agent-studio-{os.getpid()}.log"
     if sys.stdout is None or sys.stderr is None:
         LOG_STREAM = LOG_PATH.open("a", encoding="utf-8", buffering=1)
         if sys.stdout is None:
@@ -63,7 +63,7 @@ def configure_environment() -> tuple[Path, Path]:
         "DJANGO_SETTINGS_MODULE": "backend.settings.desktop",
         "DATABASE_ENGINE": "sqlite",
         "REDIS_ENABLED": "False",
-        "SQLITE_PATH": str(data_root / "creation-agent-studio.sqlite3"),
+        "SQLITE_PATH": str(data_root / "agent-studio.sqlite3"),
         "MEDIA_ROOT": str(data_root / "media"),
         "ARTIFACT_ROOT": str(data_root / "artifacts"),
         "AGENT_WORKSPACE_ROOT": str(data_root / "agent-workspaces"),
@@ -72,6 +72,7 @@ def configure_environment() -> tuple[Path, Path]:
         "CREATION_STUDIO_FRONTEND_DIST": str(bundle_root / "frontend_dist"),
         "SECRET_KEY": _secret_key(data_root),
         "ALLOWED_HOSTS": "127.0.0.1,localhost",
+        "LICENSE_FILE_PATH": str(data_root / "license.lic"),
     }
     for key, value in values.items():
         os.environ[key] = value
@@ -171,9 +172,9 @@ def _run_tray(children: list[subprocess.Popen]) -> None:
     icon = pystray.Icon(
         APP_NAME,
         _tray_image(),
-        "Creation Agent Studio",
+        "Agent Studio",
         menu=pystray.Menu(
-            pystray.MenuItem("打开 Creation Agent Studio", open_application, default=True),
+            pystray.MenuItem("打开 Agent Studio", open_application, default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("退出应用", exit_application),
         ),
@@ -213,7 +214,7 @@ def main() -> int:
     children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler")]
     try:
         if not _wait_until_ready(children[0]):
-            raise RuntimeError("The local Creation Agent Studio server did not start")
+            raise RuntimeError("The local Agent Studio server did not start")
         _run_tray(children)
         return 0
     except KeyboardInterrupt:
@@ -231,8 +232,8 @@ def _show_startup_error(error: Exception) -> None:
     log_hint = f"\n\n日志：{LOG_PATH}" if LOG_PATH else ""
     ctypes.windll.user32.MessageBoxW(
         None,
-        f"Creation Agent Studio 启动失败：\n{error}{log_hint}",
-        "Creation Agent Studio",
+        f"Agent Studio 启动失败：\n{error}{log_hint}",
+        "Agent Studio",
         0x10,
     )
 

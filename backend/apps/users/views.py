@@ -1,6 +1,8 @@
 """
 Views for users app.
 """
+import hashlib
+
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.contrib.auth import authenticate
+from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from .serializers import (
@@ -20,6 +24,22 @@ from .serializers import (
 from .models import User
 from .models import UserAPIKey
 from .session import clear_refresh_cookie, refresh_cookie_name, set_refresh_cookie
+from .licensing import (
+    LicenseError,
+    load_installed_license,
+    machine_code,
+    save_installed_license,
+    validate_license,
+)
+
+
+def _session_response(user, *, response_status=status.HTTP_200_OK):
+    refresh = RefreshToken.for_user(user)
+    response = Response({
+        'user': UserSerializer(user).data,
+        'tokens': {'access': str(refresh.access_token)},
+    }, status=response_status)
+    return set_refresh_cookie(response, refresh)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -29,20 +49,16 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
     def create(self, request, *args, **kwargs):
+        if settings.LICENSE_AUTH_ENABLED:
+            return Response(
+                {'detail': '当前版本使用许可证登录，无需注册账户'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # 生成 JWT token
-        refresh = RefreshToken.for_user(user)
-
-        response = Response({
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'access': str(refresh.access_token),
-            }
-        }, status=status.HTTP_201_CREATED)
-        return set_refresh_cookie(response, refresh)
+        return _session_response(user, response_status=status.HTTP_201_CREATED)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -51,6 +67,11 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
+        if settings.LICENSE_AUTH_ENABLED:
+            return Response(
+                {'detail': '当前版本仅支持许可证登录'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -65,15 +86,87 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        refresh = RefreshToken.for_user(user)
+        return _session_response(user)
 
-        response = Response({
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'access': str(refresh.access_token),
-            }
-        })
-        return set_refresh_cookie(response, refresh)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def auth_mode_view(request):
+    """Expose only the public information needed to render the login page."""
+
+    enabled = bool(settings.LICENSE_AUTH_ENABLED)
+    installed = False
+    if enabled:
+        token = load_installed_license()
+        if token:
+            try:
+                validate_license(token)
+                installed = True
+            except LicenseError:
+                pass
+    return Response({
+        'mode': 'license' if enabled else 'account',
+        'registration_enabled': not enabled,
+        'machine_code': machine_code() if enabled else None,
+        'license_installed': installed,
+        'product': settings.LICENSE_PRODUCT_ID if enabled else None,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def license_login_view(request):
+    """Validate/import an offline license and create a normal local JWT session."""
+
+    if not settings.LICENSE_AUTH_ENABLED:
+        return Response({'detail': '许可证登录未启用'}, status=status.HTTP_404_NOT_FOUND)
+    supplied_token = str(request.data.get('license') or '').strip()
+    token = supplied_token or load_installed_license()
+    if not token:
+        return Response({'detail': '请输入许可证或先导入许可证文件'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        payload = validate_license(token)
+    except LicenseError as exc:
+        return Response({'detail': str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+    username_suffix = hashlib.sha256(machine_code().encode('ascii')).hexdigest()[:16]
+    with transaction.atomic():
+        user, _ = User.objects.get_or_create(
+            username=f'licensed-{username_suffix}',
+            defaults={
+                'email': f'licensed-{username_suffix}@local.invalid',
+                'first_name': str(payload.get('customer') or '')[:150],
+                'role': User.Role.PROFESSIONAL,
+                'is_active': True,
+            },
+        )
+        if not user.is_active:
+            return Response({'detail': '本机许可证用户已被禁用'},
+                            status=status.HTTP_403_FORBIDDEN)
+        user.set_unusable_password()
+        user.first_name = str(payload.get('customer') or '')[:150]
+        user.role = User.Role.PROFESSIONAL
+        user.save(update_fields=['password', 'first_name', 'role', 'updated_at'])
+
+        from apps.enterprise.models import Membership
+        from apps.enterprise.tenancy import provision_single_tenant_user
+
+        membership = provision_single_tenant_user(user)
+        if membership is None:
+            return Response({'detail': '无法初始化本机工作区'},
+                            status=status.HTTP_403_FORBIDDEN)
+        if membership.role != Membership.Role.OWNER:
+            membership.role = Membership.Role.ADMIN
+            membership.save(update_fields=['role', 'updated_at'])
+
+    if supplied_token:
+        try:
+            save_installed_license(token)
+        except OSError:
+            return Response({'detail': '许可证有效，但无法保存到本机'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return _session_response(user)
 
 
 class BrowserTokenRefreshView(TokenRefreshView):
@@ -82,6 +175,16 @@ class BrowserTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
+        if settings.LICENSE_AUTH_ENABLED:
+            token = load_installed_license()
+            if not token:
+                return Response({'detail': '本机未安装许可证'},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            try:
+                validate_license(token)
+            except LicenseError as exc:
+                return Response({'detail': str(exc)},
+                                status=status.HTTP_401_UNAUTHORIZED)
         refresh_token = request.data.get('refresh') or request.COOKIES.get(
             refresh_cookie_name())
         if not refresh_token:
