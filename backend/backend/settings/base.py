@@ -18,10 +18,6 @@ APP_CENTER_ROOT = Path(config(
 )).resolve()
 APP_CENTER_REGISTRY_HASH = app_center_registry_hash(APP_CENTER_ROOT)
 
-# URL of the independently deployed Creation Master React application.
-CREATION_MASTER_REACT_URL = config(
-    'CREATION_MASTER_REACT_URL', default='http://localhost:5174').strip()
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 

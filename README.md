@@ -11,9 +11,8 @@ git clone --recurse-submodules <repository-url>
 ```
 
 For an existing checkout, run `git submodule update --init --recursive`.
-Its Qt client remains a standalone desktop process; its React client is an
-independently deployed Vite application configured with
-`CREATION_MASTER_REACT_URL`.
+Its Qt client remains a standalone desktop process. Its React source stays in
+the submodule and is compiled directly into the main frontend bundle.
 
 面向组织的智能体、应用与工作流创作平台。项目只有一套执行实现：所有 Agent、Conversation、Application、Workflow 和 Media 任务都创建 `modules.execution.Run`，由统一 Coordinator、事件流和命令 API 驱动。
 

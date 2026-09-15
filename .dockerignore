@@ -1,0 +1,7 @@
+.git
+**/.git
+**/node_modules
+**/dist
+backend/venv
+backend/.pytest_cache
+backend/db.sqlite3*

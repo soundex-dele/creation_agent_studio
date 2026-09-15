@@ -6,8 +6,12 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@creation-master': path.resolve(
+        __dirname, '../backend/app_center/creation_master/react/src',
+      ),
     },
   },
   build: {
@@ -43,6 +47,9 @@ export default defineConfig({
   },
   server: {
     port: 3030,
+    fs: {
+      allow: [path.resolve(__dirname, '..')],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
