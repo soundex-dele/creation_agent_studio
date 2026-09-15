@@ -7,6 +7,25 @@ import { tenantApiRoot } from './tenantContext';
 
 export type DeploymentEnvironment = 'development' | 'staging' | 'production';
 
+const DEPLOYMENT_ENVIRONMENTS: readonly DeploymentEnvironment[] = [
+  'development',
+  'staging',
+  'production',
+];
+
+export function resolveDefaultDeploymentEnvironment(
+  configured: string | undefined = import.meta.env.VITE_DEPLOYMENT_ENVIRONMENT,
+  isDevelopment: boolean = import.meta.env.DEV,
+): DeploymentEnvironment {
+  const normalized = configured?.trim().toLowerCase();
+  if (DEPLOYMENT_ENVIRONMENTS.includes(normalized as DeploymentEnvironment)) {
+    return normalized as DeploymentEnvironment;
+  }
+  return isDevelopment ? 'development' : 'production';
+}
+
+export const DEFAULT_DEPLOYMENT_ENVIRONMENT = resolveDefaultDeploymentEnvironment();
+
 export interface RunResource {
   id: string;
   organization_id: string;
@@ -71,7 +90,7 @@ export interface RuntimeClientOptions {
 export function createApplicationRuntimeClient({
   organizationId,
   applicationId,
-  environment = 'production',
+  environment = DEFAULT_DEPLOYMENT_ENVIRONMENT,
 }: RuntimeClientOptions) {
   const root = tenantApiRoot(organizationId);
   return {
@@ -127,7 +146,7 @@ export function createApplicationRuntimeClient({
 export async function loadApplicationRuntime(
   organizationId: string,
   applicationId: string,
-  environment: DeploymentEnvironment = 'production',
+  environment: DeploymentEnvironment = DEFAULT_DEPLOYMENT_ENVIRONMENT,
 ): Promise<ApplicationRuntimeDescriptor> {
   return api.get<ApplicationRuntimeDescriptor>(
     `${tenantApiRoot(organizationId)}/applications/${applicationId}/runtime`,

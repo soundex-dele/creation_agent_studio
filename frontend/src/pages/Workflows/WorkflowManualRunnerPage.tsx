@@ -10,41 +10,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import type { Workflow, WorkflowStep } from '@/types';
+import { workflowApplicationPath } from '@/lib/workflowApplicationPath';
 import './Workflows.css';
-
-
-function applicationPath(
-  step: WorkflowStep,
-  embedded = true,
-  workflowId?: string,
-  manualRun?: RunResource | null,
-) {
-  const application = step.application;
-  const applicationId = step.application_id
-    ?? application.application_id
-    ?? application.id;
-  const embeddedQuery = embedded ? 'embedded=1' : '';
-
-  if (application.kind === 'chat') {
-    const conversationMap = manualRun?.output_summary?.conversations as
-      | Record<string, string>
-      | undefined;
-    const query = new URLSearchParams({
-      slug: application.application_slug,
-      ...(embedded ? { embedded: '1' } : {}),
-      ...(workflowId ? { workflowId } : {}),
-      ...(manualRun ? { manualRunId: manualRun.id, workflowStepKey: step.key } : {}),
-      ...(conversationMap?.[step.key]
-        ? { conversation: conversationMap[step.key] }
-        : {}),
-    });
-    return `/applications/${applicationId}/chat?${query.toString()}`;
-  }
-  if (application.renderer_key === 'contacts') {
-    return `/applications/${applicationId}/contacts${embeddedQuery ? `?${embeddedQuery}` : ''}`;
-  }
-  return `/applications/${applicationId}/run${embeddedQuery ? `?${embeddedQuery}` : ''}`;
-}
 
 
 export default function WorkflowManualRunnerPage() {
@@ -171,7 +138,7 @@ export default function WorkflowManualRunnerPage() {
                 <Button
                   icon={<ExportOutlined />}
                   onClick={() => window.open(
-                    applicationPath(selectedStep, false, id, manualRun),
+                    workflowApplicationPath(selectedStep, false, id, manualRun),
                     '_blank',
                     'noopener,noreferrer',
                   )}
@@ -196,7 +163,7 @@ export default function WorkflowManualRunnerPage() {
                   className={`workflow-run-application-frame ${
                     selectedStep.key === step.key ? 'active' : ''
                   }`}
-                  src={applicationPath(step, true, id, manualRun)}
+                  src={workflowApplicationPath(step, true, id, manualRun)}
                   title={step.name || step.application.application_name}
                   aria-hidden={selectedStep.key !== step.key}
                 />
