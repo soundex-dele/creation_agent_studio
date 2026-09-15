@@ -52,16 +52,17 @@ Windows 使用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。开发环境不
 项目已通过 Daphne 将 `runserver` 注册为 ASGI 服务，以支持 Run 的异步 SSE
 事件流；不要改用同步 WSGI 服务器承载 `/api/v1/runs/.../stream`。
 
-开发环境默认使用 SQLite。另开终端启动需要的执行 Worker：
+开发环境默认使用 SQLite。SQLite 只允许一个 coordinator 进程；使用 `all`
+在同一进程内轮询所有执行池：
 
 ```bash
 cd backend
 source .venv/bin/activate
-python manage.py run_execution_coordinator --worker-pool agent
-python manage.py run_execution_coordinator --worker-pool media
-python manage.py run_execution_coordinator --worker-pool workflow
-python manage.py run_execution_coordinator --worker-pool evaluation
+python manage.py run_execution_coordinator --worker-pool all
 ```
+
+也可以把 `all` 替换为 `agent`、`media`、`workflow` 或 `evaluation`，只启动
+一个执行池。PostgreSQL 环境仍可按执行池分别启动多个 coordinator 进程。
 
 前端：
 

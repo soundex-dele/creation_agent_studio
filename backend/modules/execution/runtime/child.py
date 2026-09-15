@@ -20,7 +20,8 @@ def _initialize_django():
 
 def _load_entrypoint(dotted_path):
     try:
-        module_name, attribute_name = dotted_path.split(":", 1)
+        separator = ":" if ":" in dotted_path else "."
+        module_name, attribute_name = dotted_path.rsplit(separator, 1)
         entrypoint = getattr(importlib.import_module(module_name), attribute_name)
     except (ImportError, AttributeError, ValueError) as exc:
         raise RuntimeError(f"Cannot load execution adapter {dotted_path!r}") from exc

@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from core.agent_engine.models import LLMResponse, TokenUsage
 from modules.execution.runtime import builtin
 from app_center.batch_transcribe import runtime as batch_transcribe
+from app_center.creation_master.backend import runtime as creation_master
 from apps.agents.execution import execute_agent_completion
 from modules.execution.application.runs import create_run
 from modules.execution.models import Run
@@ -32,6 +33,38 @@ class _SuspendSink(_Sink):
     def request_input(self, **request):
         self.request = request
         raise RuntimeError("suspended")
+
+
+def test_creation_master_trim_decodes_ffmpeg_output_as_utf8(monkeypatch, tmp_path):
+    source = tmp_path / "视频.mp4"
+    source.write_bytes(b"")
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        if command[0] == "ffprobe":
+            return SimpleNamespace(stdout="10\n", stderr="", returncode=0)
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+    monkeypatch.setattr(creation_master.subprocess, "run", fake_run)
+
+    result = creation_master.execute_creation_master(
+        {
+            "allowed_roots": [str(tmp_path)],
+            "input": {
+                "operation": "trim",
+                "folder": str(tmp_path),
+                "trim_start": 1,
+                "trim_end": 1,
+            },
+        },
+        _Sink(),
+    )
+
+    assert result["total"] == 1
+    assert len(calls) == 2
+    assert all(kwargs["encoding"] == "utf-8" for _command, kwargs in calls)
+    assert all(kwargs["errors"] == "replace" for _command, kwargs in calls)
 
 
 def test_batch_transcribe_uses_durable_event_protocol(monkeypatch, tmp_path):

@@ -6,7 +6,10 @@ from django.conf import settings
 from django.db import connection
 from django.core.management.base import BaseCommand, CommandError
 
-from modules.execution.infrastructure.coordinator import ExecutionCoordinator
+from modules.execution.infrastructure.coordinator import (
+    ExecutionCoordinator,
+    ExecutionCoordinatorSupervisor,
+)
 from modules.execution.infrastructure.coordinator_lock import (
     CoordinatorAlreadyRunning,
     CoordinatorFileLock,
@@ -21,7 +24,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--worker-pool",
-            choices=Run.ExecutorKind.values,
+            choices=(*Run.ExecutorKind.values, "all"),
             default=Run.ExecutorKind.MEDIA,
         )
         parser.add_argument(
@@ -42,18 +45,30 @@ class Command(BaseCommand):
             raise CommandError("Coordinator requires a file-backed SQLite database")
 
         worker_id = f"{socket.gethostname()}:{os.getpid()}"
-        coordinator = ExecutionCoordinator(
-            worker_id=worker_id,
-            worker_pool=options["worker_pool"],
-            max_children=options["max_children"],
-            lease_seconds=options["lease_seconds"],
+        worker_pools = (
+            tuple(Run.ExecutorKind.values)
+            if options["worker_pool"] == "all"
+            else (options["worker_pool"],)
+        )
+        coordinators = tuple(
+            ExecutionCoordinator(
+                worker_id=f"{worker_id}:{worker_pool}",
+                worker_pool=worker_pool,
+                max_children=options["max_children"],
+                lease_seconds=options["lease_seconds"],
+                poll_interval=options["poll_interval"],
+                adapter_entries=(
+                    getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
+                        worker_pool,
+                        {},
+                    )
+                ),
+            )
+            for worker_pool in worker_pools
+        )
+        coordinator = ExecutionCoordinatorSupervisor(
+            coordinators,
             poll_interval=options["poll_interval"],
-            adapter_entries=(
-                getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
-                    options["worker_pool"],
-                    {},
-                )
-            ),
         )
         try:
             lock = (
@@ -64,7 +79,8 @@ class Command(BaseCommand):
             with lock:
                 self.stdout.write(
                     f"Execution coordinator {worker_id} started "
-                    f"for database={connection.vendor} pool={options['worker_pool']}"
+                    f"for database={connection.vendor} "
+                    f"pools={','.join(worker_pools)}"
                 )
                 if options["once"]:
                     coordinator.run_once()

@@ -652,3 +652,38 @@ class ExecutionCoordinator:
             finish_execution_span(
                 getattr(active, "span", None), outcome="coordinator_stopped"
             )
+
+
+class ExecutionCoordinatorSupervisor:
+    """Drive multiple worker pools from one process and one database lock."""
+
+    def __init__(self, coordinators, *, poll_interval=0.25):
+        self.coordinators = tuple(coordinators)
+        if not self.coordinators:
+            raise ValueError("at least one coordinator is required")
+        self.poll_interval = poll_interval
+        self._stopping = False
+
+    @property
+    def active_count(self):
+        return sum(coordinator.active_count for coordinator in self.coordinators)
+
+    def tick(self, *, allow_claim=True):
+        for coordinator in self.coordinators:
+            coordinator.tick(allow_claim=allow_claim)
+
+    def run_once(self):
+        self.tick(allow_claim=True)
+        while self.active_count:
+            time.sleep(self.poll_interval)
+            self.tick(allow_claim=False)
+
+    def run_forever(self):
+        while not self._stopping:
+            self.tick(allow_claim=True)
+            time.sleep(self.poll_interval)
+
+    def stop(self):
+        self._stopping = True
+        for coordinator in self.coordinators:
+            coordinator.stop()

@@ -7,7 +7,10 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
-from modules.execution.infrastructure.coordinator import ExecutionCoordinator
+from modules.execution.infrastructure.coordinator import (
+    ExecutionCoordinator,
+    ExecutionCoordinatorSupervisor,
+)
 from modules.execution.application.runs import LeaseFence, create_run, finish_attempt
 from modules.execution.infrastructure.claim import claim_next_run
 from modules.execution.models import Run
@@ -36,6 +39,44 @@ def _django_model_adapter(_payload, _sink):
     return {"model": Organization._meta.label}
 
 
+class _FakeCoordinator:
+    def __init__(self, active_counts):
+        self.active_counts = list(active_counts)
+        self.calls = []
+        self.stopped = False
+
+    @property
+    def active_count(self):
+        return self.active_counts[0]
+
+    def tick(self, *, allow_claim=True):
+        self.calls.append(allow_claim)
+        if len(self.active_counts) > 1:
+            self.active_counts.pop(0)
+
+    def stop(self):
+        self.stopped = True
+
+
+def test_supervisor_ticks_all_pools_and_stops_them(monkeypatch):
+    first = _FakeCoordinator([1, 1, 0])
+    second = _FakeCoordinator([1, 1, 0])
+    monkeypatch.setattr(
+        "modules.execution.infrastructure.coordinator.time.sleep", lambda _seconds: None
+    )
+    supervisor = ExecutionCoordinatorSupervisor(
+        (first, second), poll_interval=0.01
+    )
+
+    supervisor.run_once()
+    supervisor.stop()
+
+    assert first.calls == [True, False]
+    assert second.calls == [True, False]
+    assert first.stopped is True
+    assert second.stopped is True
+
+
 def test_spawned_child_initializes_django_before_loading_adapter():
     context = multiprocessing.get_context("spawn")
     messages = context.Queue()
@@ -61,6 +102,20 @@ def test_spawned_child_initializes_django_before_loading_adapter():
     assert terminal["outcome"] == "succeeded"
     assert terminal["output"] == {"model": "enterprise.Organization"}
     messages.close()
+
+
+def test_child_loads_standard_dotted_adapter_path():
+    messages = queue.Queue()
+    execute_child(
+        {"input": {}},
+        messages,
+        threading.Event(),
+        "modules.execution.tests.test_coordinator._django_model_adapter",
+    )
+
+    terminal = messages.get_nowait()
+    assert terminal["outcome"] == "succeeded"
+    assert terminal["output"] == {"model": "enterprise.Organization"}
 
 
 def test_child_reports_invalid_adapter_without_database_access():
