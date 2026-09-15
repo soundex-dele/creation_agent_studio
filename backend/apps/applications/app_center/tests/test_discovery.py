@@ -31,6 +31,9 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"
     )
+    assert settings.EXECUTION_CHILD_ADAPTERS["media"]["creation-master"] == (
+        "app_center.creation_master.backend.runtime.execute_creation_master"
+    )
 
 
 def test_invalid_package_is_quarantined(tmp_path: Path):

@@ -8,6 +8,7 @@ import {
   type CreationMasterWebRuntime,
 } from '@/services/creationMaster';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { API_BASE_URL } from '@/services/apiBaseUrl';
 import './CreationMasterPage.css';
 
 
@@ -47,6 +48,11 @@ export default function CreationMasterPage() {
     );
   }
 
+  const embeddedUrl = new URL(runtime.url, window.location.origin);
+  embeddedUrl.searchParams.set('apiBase', new URL(API_BASE_URL, window.location.origin).toString());
+  embeddedUrl.searchParams.set('organizationId', organizationId ?? '');
+  embeddedUrl.searchParams.set('applicationId', applicationId ?? '');
+
   return (
     <div className="creation-master-page">
       <div className="creation-master-toolbar">
@@ -69,7 +75,7 @@ export default function CreationMasterPage() {
       <iframe
         className="creation-master-frame"
         title="创作大师 React"
-        src={runtime.url}
+        src={embeddedUrl.toString()}
         sandbox="allow-downloads allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
       />
     </div>
