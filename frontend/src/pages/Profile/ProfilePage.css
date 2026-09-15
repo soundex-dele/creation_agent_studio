@@ -1,0 +1,13 @@
+.profile-page { max-width: 1120px; margin: 0 auto; }
+.profile-heading { margin-bottom: 8px; }
+.profile-heading h1 { margin: 0; font-size: 28px; }
+.profile-heading p { margin: 8px 0 0; color: var(--color-text-sec); }
+.profile-grid { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 1.4fr); gap: 20px; }
+.profile-summary-card { align-self: start; }
+.profile-identity { display: flex; align-items: center; gap: 20px; }
+.profile-identity h3.ant-typography { margin: 0 0 10px; }
+.profile-narrow-form { max-width: 520px; }
+.profile-key-alert { margin-bottom: 12px; }
+.profile-key-icon { color: var(--color-primary); font-size: 22px; margin-top: 8px; }
+.profile-created-key { margin: 16px 0 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+@media (max-width: 760px) { .profile-grid { grid-template-columns: 1fr; } }

@@ -84,6 +84,67 @@ class BrowserSessionTest(TestCase):
         self.assertEqual(response.status_code, 401)
 
 
+class ProfileAndApiKeyTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='profile-user', email='before@example.com',
+            password='safe-test-password',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_profile_can_be_read_and_updated(self):
+        loaded = self.client.get('/api/v1/auth/me/')
+        updated = self.client.patch('/api/v1/auth/me/', {
+            'username': 'updated-user',
+            'email': 'after@example.com',
+            'avatar': 'https://example.com/avatar.png',
+            'bio': '团队成员',
+        }, format='json')
+
+        self.assertEqual(loaded.status_code, 200)
+        self.assertEqual(updated.status_code, 200, updated.data)
+        self.assertEqual(updated.data['username'], 'updated-user')
+        self.assertEqual(updated.data['email'], 'after@example.com')
+        self.assertEqual(updated.data['bio'], '团队成员')
+
+    def test_password_change_checks_current_password(self):
+        rejected = self.client.put('/api/v1/auth/me/change-password/', {
+            'old_password': 'incorrect-password',
+            'new_password': 'new-safe-password',
+            'new_password_confirm': 'new-safe-password',
+        }, format='json')
+        changed = self.client.put('/api/v1/auth/me/change-password/', {
+            'old_password': 'safe-test-password',
+            'new_password': 'new-safe-password',
+            'new_password_confirm': 'new-safe-password',
+        }, format='json')
+
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(changed.status_code, 200, changed.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('new-safe-password'))
+
+    def test_api_key_is_shown_once_and_can_be_revoked(self):
+        created = self.client.post('/api/v1/auth/me/generate-api-key/', {
+            'name': 'Local development',
+            'scopes': ['runs:read'],
+        }, format='json')
+
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertTrue(created.data['api_key'].startswith('ast_'))
+        listed = self.client.get('/api/v1/auth/me/api-keys/')
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(len(listed.data), 1)
+        self.assertNotIn('api_key', listed.data[0])
+        self.assertEqual(listed.data[0]['scopes'], ['runs:read'])
+
+        revoked = self.client.post(
+            f"/api/v1/auth/me/api-keys/{created.data['id']}/revoke/", {})
+        self.assertEqual(revoked.status_code, 204)
+        self.assertIsNotNone(self.user.api_keys.get().revoked_at)
+
+
 class OfflineLicenseLoginTest(TestCase):
     def setUp(self):
         self.private_key, public_key = generate_keypair()

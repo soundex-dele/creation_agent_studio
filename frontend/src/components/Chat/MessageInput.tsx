@@ -13,6 +13,7 @@ import {
 import { api } from '@/services/api';
 import { useAgentStore, type Agent } from '@/stores/useAgentStore';
 import { useProjectStore, type Project } from '@/stores/useProjectStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import FolderPickerModal from '@/pages/Apps/FolderPickerModal';
 import './MessageInput.css';
 
@@ -59,7 +60,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<ComposerAgent | null>(currentAgent);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>('default');
+  const defaultPermissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
+  const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
+  const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects, loadProjects } = useProjectStore();
   const { agents, loadAgents } = useAgentStore();
@@ -165,7 +168,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    const shouldSend = sendShortcut === 'enter'
+      ? e.key === 'Enter' && !e.shiftKey
+      : e.key === 'Enter' && (e.ctrlKey || e.metaKey);
+    if (shouldSend) {
       e.preventDefault();
       handleSend();
     }

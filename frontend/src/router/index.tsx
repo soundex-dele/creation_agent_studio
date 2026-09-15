@@ -25,6 +25,8 @@ const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
+const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
+const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 
 const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
@@ -239,6 +241,14 @@ const router = createBrowserRouter([
   {
     path: '/enterprise',
     element: <ProtectedRoute><MainLayout>{page(<EnterprisePage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/profile',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<ProfilePage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/settings',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<SettingsPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/auth/sso/callback',

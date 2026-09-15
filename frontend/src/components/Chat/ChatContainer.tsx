@@ -3,6 +3,7 @@ import { Alert } from 'antd';
 import { useConversationStore } from '@/stores/useConversationStore';
 import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import type { ComposerAgent, ComposerContext } from './MessageInput';
@@ -61,6 +62,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   defaultAgent = null,
 }) => {
   const { user } = useAuthStore();
+  const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
   const {
     currentConversation,
     isLoading,
@@ -285,7 +287,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               <button className="agent-cancel-link" onClick={() => void cancelTurn(conversationId)}>
                 停止当前任务
               </button>
-            ) : 'Enter 发送 · Shift+Enter 换行'}
+            ) : sendShortcut === 'enter'
+              ? 'Enter 发送 · Shift+Enter 换行'
+              : 'Ctrl/⌘+Enter 发送 · Enter 换行'}
           </div>
         </div>
       </div>

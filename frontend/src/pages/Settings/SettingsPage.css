@@ -1,0 +1,16 @@
+.settings-page { max-width: 1040px; margin: 0 auto; }
+.settings-heading { margin-bottom: 20px; }
+.settings-heading h1 { margin: 0; font-size: 28px; }
+.settings-heading p { margin: 8px 0 0; color: var(--color-text-sec); }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.settings-grid .ant-card-head-title { display: flex; align-items: center; gap: 8px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.settings-row--top { align-items: flex-start; }
+.settings-row strong { color: var(--color-text); }
+.settings-row p { margin: 4px 0 0; color: var(--color-text-sec); line-height: 1.5; }
+.settings-org-details { margin-top: 20px; }
+.settings-reset-card { margin-top: 20px; }
+@media (max-width: 820px) {
+  .settings-grid { grid-template-columns: 1fr; }
+  .settings-row { align-items: flex-start; flex-direction: column; }
+}
