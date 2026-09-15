@@ -501,6 +501,8 @@ APPLICATION_RUNTIME_ALLOWED_ROOTS = [
         'APPLICATION_RUNTIME_ALLOWED_ROOTS', default='').split(',')
     if item.strip()
 ]
+CREATION_MASTER_ALLOW_ALL_PATHS = config(
+    'CREATION_MASTER_ALLOW_ALL_PATHS', default=True, cast=bool)
 
 # Image Generation Configuration (OpenAI-compatible / DALL-E style)
 # Used by the AI 绘画 (image-genie) app. Leave IMAGE_API_KEY empty to disable.

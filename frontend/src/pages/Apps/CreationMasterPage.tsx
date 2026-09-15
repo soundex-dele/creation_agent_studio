@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { CreationMasterApp } from '@creation-master/main';
 import { api } from '@/services/api';
@@ -8,6 +8,7 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
 export default function CreationMasterPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
+  const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
 
   const requester = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
@@ -26,6 +27,7 @@ export default function CreationMasterPage() {
       organizationId={organizationId ?? ''}
       applicationId={applicationId ?? ''}
       requester={requester}
+      onBack={() => navigate('/apps')}
     />
   );
 }
