@@ -147,6 +147,26 @@ docker compose up --build
 
 Compose 先以一次性 `migrate` 服务完成迁移，再启动 Web、Agent Worker、Media Worker、Workflow Worker、Evaluation Worker、Scheduler、Maintenance、PostgreSQL 16 和 Redis 7.4。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`；PostgreSQL 和 Redis 不暴露宿主机端口。
 
+## Windows 桌面打包（不包含 Creation Master）
+
+主工程可以用 PyInstaller 构建为自包含的 Windows 目录发行版。该构建使用
+SQLite 和本地事件轮询，包含 React 前端、Django/Daphne、执行协调器及其他
+App Center 应用，但明确排除 `app_center/creation_master`：
+
+```powershell
+cd backend
+python -m pip install -r requirements/desktop.txt
+python build_desktop.py
+```
+
+产物为 `backend/dist/CreationAgentStudio/CreationAgentStudio.exe`。如果 FFmpeg
+不在 `PATH`，构建前可将 `FFMPEG_DIR` 指向同时包含 `ffmpeg.exe` 和
+`ffprobe.exe` 的目录。用户数据库、媒体和工作区保存在
+`%LOCALAPPDATA%/CreationAgentStudio`，不会写入安装目录。
+应用启动后驻留在 Windows 系统托盘。双击托盘图标或选择“打开 Creation
+Agent Studio”可重新打开页面；选择“退出应用”会同时关闭 Web 服务、执行
+协调器和自动化调度器。
+
 Artifact 默认写入共享 `runtime_data:/data`，也可用 `ARTIFACT_STORAGE_BACKEND=s3` 切换到 AWS S3 或 MinIO；下载接口会返回对应后端的短期签名访问。Maintenance 默认每小时执行 Retention、对象删除和 RunEvent 压缩；可用 `EXECUTION_WORKER_MAX_CHILDREN` 调整每个 Worker 的子进程并发数。配置 OTLP Collector 后可启用 HTTP、Run 创建和 Attempt 生命周期追踪。
 
 如果数据库 volume 是旧版本创建的，需要在尚未承载数据的前提下重建 volume，使新的账号与 RLS 初始化生效。

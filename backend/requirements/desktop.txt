@@ -1,0 +1,4 @@
+-r base.txt
+pyinstaller~=6.16
+pystray~=0.19.5
+Pillow~=11.3

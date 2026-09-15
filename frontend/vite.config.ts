@@ -9,9 +9,9 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@creation-master': path.resolve(
-        __dirname, '../backend/app_center/creation_master/react/src',
-      ),
+      '@creation-master': process.env.VITE_EXCLUDE_CREATION_MASTER === 'true'
+        ? path.resolve(__dirname, './src/stubs/creation-master')
+        : path.resolve(__dirname, '../backend/app_center/creation_master/react/src'),
     },
   },
   build: {
