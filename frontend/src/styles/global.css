@@ -88,6 +88,34 @@ a:hover {
   color: #F0C060;
 }
 
+/* Shared page heading and toolbar primitives. These must stay in the eagerly
+   loaded stylesheet because Apps, Agents and Templates are lazy routes. */
+.page-header {
+  margin-bottom: 4px;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--color-text-sec);
+  margin-bottom: 20px;
+}
+
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
 /* Smooth theme transition on all elements */
 *,
 *::before,
