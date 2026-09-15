@@ -80,6 +80,16 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
                         manifest_path,
                         f"spec.backend.{field_name} must resolve inside {module_prefix}",
                     )
+            for frontend in manifest.spec.frontends:
+                relative_path = frontend.entrypoint or frontend.directory
+                if not relative_path:
+                    continue
+                candidate = (directory / relative_path).resolve()
+                if directory not in candidate.parents or not candidate.exists():
+                    raise AppCenterError(
+                        manifest_path,
+                        f"frontend {frontend.id!r} path must exist inside the package",
+                    )
             package_id = manifest.metadata.id
             if package_id in seen_ids:
                 raise AppCenterError(

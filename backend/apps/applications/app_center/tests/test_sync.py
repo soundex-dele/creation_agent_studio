@@ -15,10 +15,10 @@ def test_sync_installs_all_packages_and_only_deploys_development():
 
     applications = Application.objects.filter(organization=organization)
     assert set(applications.values_list("slug", flat=True)) >= {
-        "batch-transcribe", "case-library", "contacts",
+        "batch-transcribe", "case-library", "contacts", "creation-master",
     }
     for application in applications.filter(
-        slug__in=("batch-transcribe", "case-library", "contacts")
+        slug__in=("batch-transcribe", "case-library", "contacts", "creation-master")
     ):
         assert application.revisions.count() == 1
         assert application.deployments.filter(environment="development").count() == 1

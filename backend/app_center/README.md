@@ -4,6 +4,10 @@ Each direct child directory is one trusted, bundled application. It must contain
 an `application.yaml` manifest. Directory names use `snake_case`; the public
 application ID in the manifest uses a lowercase slug.
 
+A child may be a complete Git submodule. `creation_master` demonstrates a
+package with isolated Qt and React variants: frontend metadata is declared in
+the manifest, while each variant keeps its own runtime and dependencies.
+
 Applications that own relational tables declare a Django `AppConfig` and keep
 their migrations below their package. App labels and migration names are stable
 database identifiers and must never be renamed after release.

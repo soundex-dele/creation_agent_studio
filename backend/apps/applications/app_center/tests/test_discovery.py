@@ -19,7 +19,14 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     packages, _ = discover_packages(settings.APP_CENTER_ROOT, strict=True)
 
     assert {package.manifest.metadata.id for package in packages} == {
-        "batch-transcribe", "case-library", "contacts",
+        "batch-transcribe", "case-library", "contacts", "creation-master",
+    }
+    creation_master = next(
+        package for package in packages
+        if package.manifest.metadata.id == "creation-master"
+    )
+    assert {frontend.type for frontend in creation_master.manifest.spec.frontends} == {
+        "react", "qt",
     }
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"

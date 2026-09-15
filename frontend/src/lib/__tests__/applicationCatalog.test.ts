@@ -5,6 +5,12 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens Creation Master with its registered React renderer', () => {
+    expect(applicationPath({
+      id: 'creation-master', applicationId: 15, kind: 'custom', rendererKey: 'creation-master',
+    })).toBe('/applications/15/creation-master?entry=apps');
+  });
+
   it('opens the catalog-provided case library with its registered renderer', () => {
     const app = {
       id: 'case-library', applicationId: 11, kind: 'custom' as const, rendererKey: 'case-library',

@@ -24,6 +24,7 @@ const WorkflowManualRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowMa
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
+const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 
 const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
@@ -175,6 +176,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ApplicationShell>
           {page(<ContactsPage />)}
+        </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/creation-master',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>
+          {page(<CreationMasterPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),

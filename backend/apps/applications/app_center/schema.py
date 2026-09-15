@@ -72,6 +72,27 @@ class InstallManifest(BaseModel):
     initial_deployment: Literal["none", "development"] = "development"
 
 
+class FrontendManifest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    id: str = Field(min_length=1, max_length=40)
+    type: Literal["react", "qt"]
+    renderer_key: str | None = Field(default=None, min_length=1, max_length=160)
+    entrypoint: str | None = Field(default=None, min_length=1, max_length=260)
+    directory: str | None = Field(default=None, min_length=1, max_length=260)
+    platforms: list[Literal["windows", "linux", "macos", "web"]] = Field(
+        default_factory=list
+    )
+
+    @model_validator(mode="after")
+    def validate_variant(self):
+        if self.type == "react" and not (self.renderer_key and self.directory):
+            raise ValueError("react frontends require renderer_key and directory")
+        if self.type == "qt" and not self.entrypoint:
+            raise ValueError("qt frontends require entrypoint")
+        return self
+
+
 class SpecManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -81,6 +102,7 @@ class SpecManifest(BaseModel):
     backend: BackendManifest = Field(default_factory=BackendManifest)
     database: DatabaseManifest = Field(default_factory=DatabaseManifest)
     install: InstallManifest = Field(default_factory=InstallManifest)
+    frontends: list[FrontendManifest] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def database_requires_django_app(self):
@@ -90,6 +112,9 @@ class SpecManifest(BaseModel):
             self.backend.executor_entrypoint or self.definition.get("executor_key")
         ):
             raise ValueError("run applications require an executor")
+        frontend_ids = [frontend.id for frontend in self.frontends]
+        if len(frontend_ids) != len(set(frontend_ids)):
+            raise ValueError("frontend ids must be unique")
         return self
 
 
