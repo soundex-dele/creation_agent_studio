@@ -1,12 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { Empty, Input, Spin } from 'antd';
+import { Button, Empty, Input, Spin } from 'antd';
 import {
   ArrowRightOutlined,
+  ArrowLeftOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplatesPage.css';
 
@@ -27,6 +28,8 @@ const formatSource = (platform?: string, author?: string) =>
 
 const TemplatesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const entry = searchParams.get('entry') === 'home' ? 'home' : 'apps';
   const {
     templates,
     isLoading,
@@ -52,13 +55,21 @@ const TemplatesPage: React.FC = () => {
 
   return (
     <div className="templates-page animate-fade-in">
-      <div className="page-header case-library-header">
+      {entry !== 'home' && <Button
+        type="text"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => navigate('/apps')}
+        className="template-library-back"
+      >
+        返回应用
+      </Button>}
+      {entry !== 'home' && <div className="page-header case-library-header">
         <div>
           <h1 className="page-title">案例库</h1>
           <p className="page-subtitle">阅读真实案例，理解内容结构、表达方法与可复用规律</p>
         </div>
         <div className="case-library-count">{templates.length} 个案例</div>
-      </div>
+      </div>}
 
       <div className="page-toolbar case-library-toolbar">
         <Search
@@ -84,11 +95,11 @@ const TemplatesPage: React.FC = () => {
               key={template.id}
               className="template-card"
               style={{ animationDelay: `${index * 50}ms` }}
-              onClick={() => navigate(`/templates/${template.id}`)}
+              onClick={() => navigate(`/apps/case-library/${template.id}?entry=${entry}`)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  navigate(`/templates/${template.id}`);
+                  navigate(`/apps/case-library/${template.id}?entry=${entry}`);
                 }
               }}
               role="link"

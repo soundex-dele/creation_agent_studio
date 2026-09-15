@@ -24,8 +24,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const shouldHideSidebar = Boolean(hideSidebar || embedded);
   const shouldHideHeader = Boolean(hideHeader || embedded);
   // Chat page needs full-height content without padding
-  const isChatPage = location.pathname === '/' || location.pathname === '';
-  const shouldUseFullBleed = Boolean(isChatPage || fullBleed || embedded);
+  const ownsPageSpacing = location.pathname === '/' || location.pathname === ''
+    || location.pathname === '/chat';
+  const shouldUseFullBleed = Boolean(ownsPageSpacing || fullBleed || embedded);
 
   const layoutClass = [
     'app-layout',

@@ -1,1 +1,23 @@
-/* HomePage styles — layout now handled by MainLayout + Sidebar */
+.home-page {
+  min-height: 100%;
+  padding: clamp(40px, 7vw, 96px);
+  background:
+    radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--color-primary) 13%, transparent), transparent 34%),
+    var(--color-bg-void);
+}
+
+.home-hero { max-width: 760px; }
+.home-eyebrow { color: var(--color-primary); font-size: 12px; font-weight: 700; letter-spacing: .16em; }
+.home-hero h1 { margin: 16px 0 12px; color: var(--color-text); font: 700 clamp(36px, 5vw, 64px)/1.08 var(--font-display); letter-spacing: -.04em; }
+.home-hero p { max-width: 620px; margin: 0; color: var(--color-text-sec); font-size: 18px; line-height: 1.75; }
+.home-actions { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
+.home-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; max-width: 920px; margin-top: clamp(64px, 10vw, 120px); }
+.home-guide > div { padding: 22px; border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: color-mix(in srgb, var(--color-bg-card) 88%, transparent); }
+.home-guide span { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-bottom: 18px; border-radius: 9px; background: color-mix(in srgb, var(--color-primary) 14%, transparent); color: var(--color-primary); font-weight: 700; }
+.home-guide strong { display: block; color: var(--color-text); font-size: 15px; }
+.home-guide p { margin: 6px 0 0; color: var(--color-text-dim); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .home-page { padding: 32px 24px; }
+  .home-guide { grid-template-columns: 1fr; margin-top: 52px; }
+}

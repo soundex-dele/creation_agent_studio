@@ -13,7 +13,8 @@ import {
   Typography,
   message,
 } from 'antd';
-import { useParams } from 'react-router-dom';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
   ApplicationRuntimeProvider,
@@ -29,8 +30,12 @@ import {
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
 
-function RuntimeConsole({ descriptor }: { descriptor: ApplicationRuntimeDescriptor }) {
+function RuntimeConsole({ descriptor, showApplicationHeader }: {
+  descriptor: ApplicationRuntimeDescriptor;
+  showApplicationHeader: boolean;
+}) {
   const runtime = useApplicationRuntime();
+  const navigate = useNavigate();
   const [inputText, setInputText] = useState('{}');
   const [run, setRun] = useState<RunResource | null>(null);
   const [starting, setStarting] = useState(false);
@@ -83,9 +88,19 @@ function RuntimeConsole({ descriptor }: { descriptor: ApplicationRuntimeDescript
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Card title={`${descriptor.name} · Revision ${descriptor.revision_no}`}>
+      {showApplicationHeader && (
+        <div>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
+            返回应用
+          </Button>
+          <Typography.Title level={2} style={{ margin: '12px 0 20px' }}>
+            {descriptor.name}
+          </Typography.Title>
+        </div>
+      )}
+      <Card>
         <Typography.Paragraph type="secondary">
-          {descriptor.description || descriptor.slug} · {descriptor.environment} ·{' '}
+          Revision {descriptor.revision_no} · {descriptor.environment} ·{' '}
           {String(descriptor.definition.executor_key ?? '')}
         </Typography.Paragraph>
         <Input.TextArea
@@ -131,6 +146,7 @@ function RuntimeConsole({ descriptor }: { descriptor: ApplicationRuntimeDescript
 
 export default function DurableApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
+  const [searchParams] = useSearchParams();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [descriptor, setDescriptor] = useState<ApplicationRuntimeDescriptor | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +170,10 @@ export default function DurableApplicationRuntimePage() {
       applicationId={descriptor.application_id}
       environment={descriptor.environment}
     >
-      <RuntimeConsole descriptor={descriptor} />
+      <RuntimeConsole
+        descriptor={descriptor}
+        showApplicationHeader={searchParams.get('entry') !== 'home'}
+      />
     </ApplicationRuntimeProvider>
   );
 }

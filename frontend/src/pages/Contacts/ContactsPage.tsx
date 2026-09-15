@@ -26,7 +26,7 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
   createContact,
@@ -70,6 +70,8 @@ function errorText(error: unknown, fallback: string) {
 export default function ContactsPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const enteredFromHome = searchParams.get('entry') === 'home';
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const organizations = useOrganizationStore((state) => state.organizations);
   const currentRole = organizations.find((item) => item.id === organizationId)?.role;
@@ -209,8 +211,8 @@ export default function ContactsPage() {
 
   return (
     <div className="contacts-page">
-      <header className="contacts-header">
-        <Space align="center" size={14}>
+      <header className={`contacts-header ${enteredFromHome ? 'contacts-header--compact' : ''}`}>
+        {!enteredFromHome && <Space align="center" size={14}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
             应用中心
           </Button>
@@ -219,7 +221,7 @@ export default function ContactsPage() {
             <Typography.Title level={2}>通讯录</Typography.Title>
             <Typography.Text type="secondary">{subtitle}</Typography.Text>
           </div>
-        </Space>
+        </Space>}
         {canWrite && (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             添加联系人

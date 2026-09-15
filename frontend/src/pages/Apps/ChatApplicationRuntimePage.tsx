@@ -42,6 +42,7 @@ export default function ChatApplicationRuntimePage() {
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('slug') || '';
   const embedded = searchParams.get('embedded') === '1';
+  const enteredFromHome = searchParams.get('entry') === 'home';
   const restoredConversationId = searchParams.get('conversation');
   const manualWorkflowId = searchParams.get('workflowId');
   const manualRunId = searchParams.get('manualRunId');
@@ -158,23 +159,32 @@ export default function ChatApplicationRuntimePage() {
 
   return (
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
-      {!embedded && <header className="chat-app-header">
-        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(`/apps/${slug}`)}>
-          返回应用
-        </Button>
-        <div className="chat-app-heading">
-          <span className="chat-app-icon">{application.icon || '✦'}</span>
-          <div>
-            <h1>{application.name}</h1>
-            <p>{application.description}</p>
+      {!embedded && !enteredFromHome && (
+        <header className="chat-app-header">
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
+            返回应用
+          </Button>
+          <div className="chat-app-heading">
+            <span className="chat-app-icon">{application.icon || '✦'}</span>
+            <div>
+              <h1>{application.name}</h1>
+              <p>{application.description}</p>
+            </div>
           </div>
-        </div>
-        {chatStarted && (
+          {chatStarted && (
+            <Button icon={<EditOutlined />} onClick={() => setChatStarted(false)}>
+              重新填写
+            </Button>
+          )}
+        </header>
+      )}
+      {!embedded && enteredFromHome && chatStarted && (
+        <div className="chat-app-tools">
           <Button icon={<EditOutlined />} onClick={() => setChatStarted(false)}>
             重新填写
           </Button>
-        )}
-      </header>}
+        </div>
+      )}
 
       {chatStarted ? (
         <main className="chat-app-chat">

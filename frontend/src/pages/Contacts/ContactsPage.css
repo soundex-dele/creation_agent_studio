@@ -13,6 +13,11 @@
   background: var(--color-bg-card);
 }
 
+.contacts-header--compact {
+  justify-content: flex-end;
+  padding-block: 12px;
+}
+
 .contacts-header h2 {
   margin: 0 !important;
   color: var(--color-text) !important;

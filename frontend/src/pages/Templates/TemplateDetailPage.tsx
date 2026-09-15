@@ -10,7 +10,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplateDetailPage.css';
 
@@ -20,6 +20,8 @@ const formatDate = (date?: string | null) =>
 const TemplateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const libraryPath = `/apps/case-library?entry=${searchParams.get('entry') === 'home' ? 'home' : 'apps'}`;
   const { currentTemplate, isLoadingTemplate, loadTemplate, clearCurrentTemplate } =
     useTemplateStore();
   const templateId = id ? Number(id) : Number.NaN;
@@ -40,7 +42,7 @@ const TemplateDetailPage: React.FC = () => {
           status="404"
           title="案例不存在"
           subTitle="该案例可能尚未发布、已归档或链接有误。"
-          extra={<Button type="primary" onClick={() => navigate('/templates')}>返回案例库</Button>}
+          extra={<Button type="primary" onClick={() => navigate(libraryPath)}>返回案例库</Button>}
         />
       </div>
     );
@@ -53,7 +55,7 @@ const TemplateDetailPage: React.FC = () => {
       <Button
         type="text"
         icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/templates')}
+        onClick={() => navigate(libraryPath)}
         className="template-detail-back"
       >
         返回案例库

@@ -3,6 +3,7 @@ import { Empty, Spin, Input } from 'antd';
 import { SearchOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
+import { applicationPath } from '@/lib/applicationCatalog';
 import './AppsPage.css';
 
 const { Search } = Input;
@@ -71,7 +72,15 @@ const AppsPage: React.FC = () => {
               key={app.id}
               className="app-card"
               style={{ animationDelay: `${index * 60}ms` }}
-              onClick={() => navigate(`/apps/${app.id}`)}
+              onClick={() => navigate(applicationPath(app))}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(applicationPath(app));
+                }
+              }}
+              role="link"
+              tabIndex={0}
             >
               <div
                 className="app-card-thumb"

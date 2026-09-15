@@ -4,6 +4,7 @@ import TemplateHistorySidebar from './TemplateHistorySidebar';
 import AppHistorySidebar from './AppHistorySidebar';
 import ProjectListSidebar from './ProjectListSidebar';
 import ConversationHistory from '../ConversationHistory/ConversationHistory';
+import HomeApplicationsSidebar from './HomeApplicationsSidebar';
 import './Sidebar.css';
 
 const Sidebar = () => {
@@ -13,17 +14,23 @@ const Sidebar = () => {
 
   const renderSidebar = () => {
     if (path === '/' || path === '') {
+      return <HomeApplicationsSidebar />;
+    }
+    if (path.startsWith('/chat')) {
       return (
         <ConversationHistory
           activeConversationId={new URLSearchParams(location.search).get('conversation')}
           onConversationSelect={(id: string) => {
-            navigate(id ? `/?conversation=${id}` : '/');
+            navigate(id ? `/chat?conversation=${id}` : '/chat');
           }}
         />
       );
     }
     if (path.startsWith('/agents')) {
       return <AgentCategoriesSidebar />;
+    }
+    if (path.startsWith('/applications') || path.startsWith('/apps/case-library')) {
+      return <HomeApplicationsSidebar />;
     }
     if (path.startsWith('/templates')) {
       return <TemplateHistorySidebar />;

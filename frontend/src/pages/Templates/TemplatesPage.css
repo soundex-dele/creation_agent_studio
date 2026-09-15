@@ -10,6 +10,8 @@
   gap: 20px;
 }
 
+.template-library-back { margin: -8px 0 12px -12px; }
+
 .case-library-count {
   color: var(--color-text-dim);
   font-size: 12px;

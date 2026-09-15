@@ -1,9 +1,10 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
 import { ProtectedRoute, PublicRoute } from './guards';
 
 const HomePage = lazy(() => import('@/pages/Home/HomePage'));
+const ChatPage = lazy(() => import('@/pages/Chat/ChatPage'));
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage'));
 const SsoCallbackPage = lazy(() => import('@/pages/Auth/SsoCallbackPage'));
@@ -28,6 +29,28 @@ const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
 );
 
+const LegacyTemplateRedirect = () => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/apps/case-library/${id}` : '/apps/case-library'} replace />;
+};
+
+const ApplicationShell = ({ children, fullBleed = false }: {
+  children: ReactNode;
+  fullBleed?: boolean;
+}) => {
+  const location = useLocation();
+  const enteredFromHome = new URLSearchParams(location.search).get('entry') === 'home';
+  return (
+    <MainLayout
+      hideHeader={!enteredFromHome}
+      hideSidebar={!enteredFromHome}
+      fullBleed={fullBleed}
+    >
+      {children}
+    </MainLayout>
+  );
+};
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -39,6 +62,16 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     index: true,
+  },
+  {
+    path: '/chat',
+    element: (
+      <ProtectedRoute>
+        <MainLayout>
+          {page(<ChatPage />)}
+        </MainLayout>
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/agents',
@@ -64,9 +97,7 @@ const router = createBrowserRouter([
     path: '/templates',
     element: (
       <ProtectedRoute>
-        <MainLayout>
-          {page(<TemplatesPage />)}
-        </MainLayout>
+        <LegacyTemplateRedirect />
       </ProtectedRoute>
     ),
   },
@@ -74,9 +105,7 @@ const router = createBrowserRouter([
     path: '/templates/:id',
     element: (
       <ProtectedRoute>
-        <MainLayout>
-          {page(<TemplateDetailPage />)}
-        </MainLayout>
+        <LegacyTemplateRedirect />
       </ProtectedRoute>
     ),
   },
@@ -87,6 +116,26 @@ const router = createBrowserRouter([
         <MainLayout>
           {page(<AppsPage />)}
         </MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/apps/case-library',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell>
+          {page(<TemplatesPage />)}
+        </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/apps/case-library/:id',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell>
+          {page(<TemplateDetailPage />)}
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },
@@ -104,9 +153,9 @@ const router = createBrowserRouter([
     path: '/applications/:applicationId/chat',
     element: (
       <ProtectedRoute>
-        <MainLayout hideSidebar hideHeader fullBleed>
+        <ApplicationShell fullBleed>
           {page(<ChatApplicationRuntimePage />)}
-        </MainLayout>
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },
@@ -114,9 +163,9 @@ const router = createBrowserRouter([
     path: '/applications/:applicationId/run',
     element: (
       <ProtectedRoute>
-        <MainLayout hideSidebar>
+        <ApplicationShell>
           {page(<DurableApplicationRuntimePage />)}
-        </MainLayout>
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },
@@ -124,9 +173,9 @@ const router = createBrowserRouter([
     path: '/applications/:applicationId/contacts',
     element: (
       <ProtectedRoute>
-        <MainLayout hideSidebar>
+        <ApplicationShell>
           {page(<ContactsPage />)}
-        </MainLayout>
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },

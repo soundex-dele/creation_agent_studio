@@ -122,8 +122,12 @@ a:hover {
 
 /* Variant: fullscreen launched-app view — no header, no sidebar, main fills the viewport */
 .app-layout--noheader {
-  grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  grid-template-areas: "sidebar main";
+}
+
+.app-layout--noheader.app-layout--nosidebar {
+  grid-template-columns: 1fr;
   grid-template-areas: "main";
 }
 

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Menu } from 'antd';
 import { useAgentStore } from '@/stores/useAgentStore';
 import SidebarCategoryLabel from './SidebarCategoryLabel';
+import { categoryIcon } from '@/lib/categoryIcons';
 
 const AgentCategoriesSidebar: React.FC = () => {
   const { categories, selectedCategory, loadCategories, selectCategory } = useAgentStore();
@@ -11,7 +12,17 @@ const AgentCategoriesSidebar: React.FC = () => {
   }, [loadCategories]);
 
   const menuItems = [
-    { key: 'all', label: '全部智能体' },
+    {
+      key: 'all',
+      label: (
+        <SidebarCategoryLabel
+          label="全部智能体"
+          count={categories.reduce((total, category) => total + category.agent_count, 0)}
+          countUnit="智能体"
+          icon="🤖"
+        />
+      ),
+    },
     ...categories.map((cat) => ({
       key: cat.slug,
       label: (
@@ -19,6 +30,7 @@ const AgentCategoriesSidebar: React.FC = () => {
           label={cat.name}
           count={cat.agent_count}
           countUnit="智能体"
+          icon={categoryIcon(cat.icon, cat.slug, 'agent')}
         />
       ),
     })),

@@ -7,10 +7,10 @@ import { ThemeToggle } from '@/components/Theme';
 import './Header.css';
 
 const navItems = [
-  { key: '/', label: '💬 对话' },
+  { key: '/', label: '🏠 首页' },
+  { key: '/chat', label: '💬 对话' },
   { key: '/agents', label: '🤖 智能体' },
   { key: '/skills', label: '⚡ 技能' },
-  { key: '/templates', label: '📚 案例库' },
   { key: '/apps', label: '🧩 应用' },
   { key: '/workflows', label: '🔀 工作流' },
   { key: '/enterprise', label: '🏢 企业控制台' },
@@ -49,6 +49,8 @@ const Header: React.FC = () => {
   ];
 
   const currentPath = location.pathname;
+  const enteredFromHome = new URLSearchParams(location.search).get('entry') === 'home';
+  const activePath = enteredFromHome ? '/' : currentPath;
 
   return (
     <header className="app-header">
@@ -63,7 +65,7 @@ const Header: React.FC = () => {
           <div
             key={item.key}
             className={`header-nav-item ${
-              currentPath === item.key || (item.key !== '/' && currentPath.startsWith(item.key))
+              activePath === item.key || (item.key !== '/' && activePath.startsWith(item.key))
                 ? 'active' : ''}`}
             onClick={() => navigate(item.key)}
           >
