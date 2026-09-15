@@ -131,6 +131,39 @@
   border-radius: var(--border-radius-md);
 }
 
+.message-bubble-column {
+  position: relative;
+  min-width: 0;
+}
+
+.message-actions {
+  position: absolute;
+  top: 100%;
+  left: 2px;
+  display: flex;
+  height: 18px;
+}
+
+.message-actions--user {
+  right: 2px;
+  left: auto;
+}
+
+.message-copy-button.ant-btn {
+  width: 20px;
+  min-width: 20px;
+  height: 18px;
+  padding: 0;
+  color: var(--color-text-dim);
+  font-size: 13px;
+}
+
+.message-copy-button.ant-btn:hover,
+.message-copy-button.ant-btn:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
 .tool-call-list {
   display: flex;
   flex-direction: column;

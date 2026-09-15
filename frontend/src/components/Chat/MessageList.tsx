@@ -1,6 +1,11 @@
 import React from 'react';
-import { Avatar, Typography } from 'antd';
-import { RobotOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
+import { Avatar, Button, message as toast, Tooltip, Typography } from 'antd';
+import {
+  CopyOutlined,
+  RobotOutlined,
+  ThunderboltOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import type { AgentToolCall } from '@/entities/run';
 import './MessageList.css';
@@ -39,6 +44,15 @@ const MessageList: React.FC<MessageListProps> = ({
   isLoading = false,
   isStreaming = false,
 }) => {
+  const copyMessageContent = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('消息已复制');
+    } catch {
+      toast.error('复制失败，请稍后重试');
+    }
+  };
+
   const formatToolValue = (value: string) => {
     if (!value) return '';
     try {
@@ -128,59 +142,76 @@ const MessageList: React.FC<MessageListProps> = ({
           }}
         />
 
-        <div
-          className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-            isUser
-              ? 'border border-primary/30 text-text'
-              : 'border border-border bg-card text-text'
-          }`}
-          style={isUser ? {
-            background: 'color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-card))',
-          } : undefined}
-        >
+        <div className="message-bubble-column max-w-[75%]">
           <div
-            className={`mb-1 flex items-center gap-2 text-xs ${
-              isUser ? 'justify-end text-text-sec' : 'text-text-dim'
+            className={`rounded-2xl px-4 py-3 ${
+              isUser
+                ? 'border border-primary/30 text-text'
+                : 'border border-border bg-card text-text'
             }`}
+            style={isUser ? {
+              background: 'color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-card))',
+            } : undefined}
           >
-            <span className="font-medium">
-              {isUser ? '你' : isSystem ? '系统' : '助手'}
-            </span>
-            <span>
-              {new Date(message.created_at).toLocaleString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
+            <div
+              className={`mb-1 flex items-center gap-2 text-xs ${
+                isUser ? 'justify-end text-text-sec' : 'text-text-dim'
+              }`}
+            >
+              <span className="font-medium">
+                {isUser ? '你' : isSystem ? '系统' : '助手'}
+              </span>
+              <span>
+                {new Date(message.created_at).toLocaleString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </div>
+
+            <div className={`text-sm leading-relaxed ${isUser ? '' : 'message-markdown'}`}>
+              {isUser && selectedSkills.length > 0 && (
+                <div className="message-selected-skills" aria-label="本轮使用的技能">
+                  {selectedSkills.map((skill) => (
+                    <span className="message-skill-chip" key={skill}>
+                      <ThunderboltOutlined />
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {!isUser && toolCalls.length > 0 && (
+                <div className="tool-call-list">
+                  {toolCalls.map(renderToolCall)}
+                </div>
+              )}
+              {!isUser && loadedSkills.length > 0 && (
+                <div className="message-loaded-skills">
+                  <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
+                </div>
+              )}
+              {isUser || isSystem ? (
+                <span>{message.content}</span>
+              ) : (
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+              )}
+            </div>
           </div>
 
-          <div className={`text-sm leading-relaxed ${isUser ? '' : 'message-markdown'}`}>
-            {isUser && selectedSkills.length > 0 && (
-              <div className="message-selected-skills" aria-label="本轮使用的技能">
-                {selectedSkills.map((skill) => (
-                  <span className="message-skill-chip" key={skill}>
-                    <ThunderboltOutlined />
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            )}
-            {!isUser && toolCalls.length > 0 && (
-              <div className="tool-call-list">
-                {toolCalls.map(renderToolCall)}
-              </div>
-            )}
-            {!isUser && loadedSkills.length > 0 && (
-              <div className="message-loaded-skills">
-                <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
-              </div>
-            )}
-            {isUser || isSystem ? (
-              <span>{message.content}</span>
-            ) : (
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            )}
-          </div>
+          {message.content.trim() && (
+            <div className={`message-actions ${isUser ? 'message-actions--user' : ''}`}>
+              <Tooltip title="复制正文">
+                <Button
+                  type="text"
+                  size="small"
+                  className="message-copy-button"
+                  icon={<CopyOutlined />}
+                  aria-label="复制消息正文"
+                  onClick={() => void copyMessageContent(message.content)}
+                />
+              </Tooltip>
+            </div>
+          )}
         </div>
       </div>
     );
