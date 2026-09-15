@@ -66,7 +66,6 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
             continue
         manifest_path = directory / "application.yaml"
         if not manifest_path.is_file():
-            errors.append(AppCenterError(directory, "application.yaml is required"))
             continue
         try:
             if not re.fullmatch(r"[a-z][a-z0-9_]*", directory.name):

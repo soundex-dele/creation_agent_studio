@@ -4,6 +4,8 @@ COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ /app/frontend/
 COPY backend/app_center/creation_master/react/src/ /app/backend/app_center/creation_master/react/src/
+COPY backend/app_center/WeMD/apps/web/ /app/backend/app_center/WeMD/apps/web/
+COPY backend/app_center/WeMD/packages/core/ /app/backend/app_center/WeMD/packages/core/
 WORKDIR /app/frontend
 RUN /app/node_modules/.bin/tsc && /app/node_modules/.bin/vite build
 

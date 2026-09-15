@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f9f9f9" />
+    <link rel="icon" type="image/svg+xml" href="/favicon-dark.svg" />
+    <title>WeMD - 微信公众号 Markdown 排版编辑器</title>
+    <style>
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]) {
+        cursor: pointer !important;
+      }
+
+      button:disabled,
+      [role="button"][aria-disabled="true"] {
+        cursor: not-allowed !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/wemd-main.js"></script>
+  </body>
+</html>

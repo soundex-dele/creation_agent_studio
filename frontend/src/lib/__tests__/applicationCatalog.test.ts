@@ -11,6 +11,12 @@ describe('application renderer registry', () => {
     })).toBe('/applications/15/creation-master?entry=apps');
   });
 
+  it('opens WeMD in its isolated editor runtime', () => {
+    expect(applicationPath({
+      id: 'wemd', applicationId: 16, kind: 'custom', rendererKey: 'wemd',
+    })).toBe('/applications/16/wemd?entry=apps');
+  });
+
   it('opens the catalog-provided case library with its registered renderer', () => {
     const app = {
       id: 'case-library', applicationId: 11, kind: 'custom' as const, rendererKey: 'case-library',

@@ -26,6 +26,7 @@ const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
+const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 
@@ -191,6 +192,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ApplicationShell fullBleed>
           {page(<CreationMasterPage />)}
+        </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/wemd',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>
+          {page(<WeMDPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),

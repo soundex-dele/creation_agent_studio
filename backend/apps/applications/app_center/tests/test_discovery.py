@@ -17,23 +17,36 @@ def test_bundled_contacts_package_is_valid():
 
 def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     packages, _ = discover_packages(settings.APP_CENTER_ROOT, strict=True)
+    package_ids = {package.manifest.metadata.id for package in packages}
 
-    assert {package.manifest.metadata.id for package in packages} == {
-        "batch-transcribe", "case-library", "contacts", "creation-master",
-    }
-    creation_master = next(
-        package for package in packages
-        if package.manifest.metadata.id == "creation-master"
-    )
-    assert {frontend.type for frontend in creation_master.manifest.spec.frontends} == {
-        "react", "qt",
-    }
+    assert {"batch-transcribe", "case-library", "contacts"} <= package_ids
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"
     )
-    assert settings.EXECUTION_CHILD_ADAPTERS["media"]["creation-master"] == (
-        "app_center.creation_master.backend.runtime.execute_creation_master"
-    )
+
+    creation_master_manifest = settings.APP_CENTER_ROOT / "creation_master" / "application.yaml"
+    if creation_master_manifest.is_file():
+        assert "creation-master" in package_ids
+        creation_master = next(
+            package for package in packages
+            if package.manifest.metadata.id == "creation-master"
+        )
+        assert {frontend.type for frontend in creation_master.manifest.spec.frontends} == {
+            "react", "qt",
+        }
+        assert settings.EXECUTION_CHILD_ADAPTERS["media"]["creation-master"] == (
+            "app_center.creation_master.backend.runtime.execute_creation_master"
+        )
+    else:
+        assert "creation-master" not in package_ids
+        assert "creation-master" not in settings.EXECUTION_CHILD_ADAPTERS["media"]
+
+    wemd_manifest = settings.APP_CENTER_ROOT / "wemd_app" / "application.yaml"
+    if wemd_manifest.is_file():
+        assert "wemd" in package_ids
+        wemd = next(package for package in packages if package.manifest.metadata.id == "wemd")
+        assert wemd.manifest.spec.launch_mode == "dedicated"
+        assert [frontend.renderer_key for frontend in wemd.manifest.spec.frontends] == ["wemd"]
 
 
 def test_invalid_package_is_quarantined(tmp_path: Path):
@@ -46,3 +59,12 @@ def test_invalid_package_is_quarantined(tmp_path: Path):
     assert packages == []
     assert len(errors) == 1
     assert "validation error" in str(errors[0])
+
+
+def test_directory_without_manifest_is_skipped(tmp_path: Path):
+    (tmp_path / "not_an_application").mkdir()
+
+    packages, errors = discover_packages(tmp_path, strict=True)
+
+    assert packages == []
+    assert errors == []

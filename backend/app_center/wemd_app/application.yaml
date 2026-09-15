@@ -1,0 +1,51 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: wemd
+  version: 1.5.3
+  name: WeMD
+  description: 专为微信公众号设计的 Markdown 排版编辑器，支持主题设计、实时预览与一键复制。
+  category:
+    slug: creative
+    name: 内容创作
+    description: 文章、文案和创意内容生成
+    icon: edit
+    order: 1
+  icon: "📝"
+  color: "#047857"
+  tags: [Markdown, 公众号, 排版]
+  developer: WeMD Team
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: wemd
+    executor_protocol_version: 1
+    renderer_key: wemd
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+      storage: local-first
+    dependencies:
+      agents: []
+      skills: []
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    initial_deployment: development
+  frontends:
+    - id: web
+      type: react
+      renderer_key: wemd
+      directory: react
+      platforms: [web]

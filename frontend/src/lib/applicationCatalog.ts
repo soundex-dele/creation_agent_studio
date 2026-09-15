@@ -17,6 +17,7 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'creation-master': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-master`, entry,
   ),
+  wemd: (app, entry) => withEntry(`/applications/${app.applicationId}/wemd`, entry),
   chat: (app, entry) => withEntry(
     `/applications/${app.applicationId}/chat`,
     entry,
