@@ -2,8 +2,8 @@
 from copy import deepcopy
 
 from django.conf import settings
-from django.db import transaction
-from django.db.models import Count, Q
+from django.db import connection, transaction
+from django.db.models import Count, F, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -162,6 +162,18 @@ def _backfill_manual_conversations(workflow, run, user):
     return run
 
 
+def _lock_manual_workflow(workflow):
+    """Serialize manual Run creation on every supported database backend."""
+
+    if connection.vendor == "sqlite":
+        # select_for_update() is a no-op on SQLite. Acquire its single writer
+        # lock before checking for an existing Run so concurrent page mounts
+        # wait here instead of both reading an empty result and racing to write.
+        Workflow.objects.filter(pk=workflow.pk).update(updated_at=F("updated_at"))
+        return
+    Workflow.objects.select_for_update().get(pk=workflow.pk)
+
+
 class WorkflowViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, OrganizationRolePermission]
 
@@ -313,7 +325,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Serialize page mounts so development double-effects and quick
                 # reopen actions reuse the same active manual execution.
-                Workflow.objects.select_for_update().get(pk=workflow.pk)
+                _lock_manual_workflow(workflow)
                 run = runs.filter(status=Run.Status.RUNNING).order_by("-created_at").first()
                 if run is None:
                     run = Run.objects.create(

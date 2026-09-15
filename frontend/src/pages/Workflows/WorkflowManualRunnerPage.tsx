@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Spin, message } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -58,9 +58,11 @@ export default function WorkflowManualRunnerPage() {
   const [openedKeys, setOpenedKeys] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [completing, setCompleting] = useState(false);
+  const openingManualSession = useRef(false);
 
   useEffect(() => {
-    if (!id || manualRun) return;
+    if (!id || manualRun || openingManualSession.current) return;
+    openingManualSession.current = true;
     setError('');
     Promise.all([
       api.get<Workflow>(`/workflows/${id}/`),
@@ -80,6 +82,7 @@ export default function WorkflowManualRunnerPage() {
         }
       })
       .catch((reason: any) => {
+        openingManualSession.current = false;
         setError(reason?.response?.data?.detail || '工作流加载失败');
       });
   }, [id, manualRun, navigate, resumeRunId]);

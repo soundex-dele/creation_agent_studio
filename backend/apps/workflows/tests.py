@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
@@ -169,13 +171,20 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(started.status_code, 409, started.data)
         self.assertEqual(Run.objects.filter(source_type="workflow").count(), 0)
 
-        opened = self.client.post(
-            f"/api/v1/workflows/{response.data['id']}/manual-session/",
-            {"action": "open"},
-            format="json",
-            **self.headers,
-        )
+        with CaptureQueriesContext(connection) as queries:
+            opened = self.client.post(
+                f"/api/v1/workflows/{response.data['id']}/manual-session/",
+                {"action": "open"},
+                format="json",
+                **self.headers,
+            )
         self.assertEqual(opened.status_code, 201, opened.data)
+        if connection.vendor == "sqlite":
+            self.assertTrue(any(
+                'UPDATE "workflows"' in query["sql"]
+                and '"updated_at" = "workflows"."updated_at"' in query["sql"]
+                for query in queries.captured_queries
+            ))
         self.assertEqual(opened.data["status"], Run.Status.RUNNING)
         self.assertEqual(
             opened.data["definition_snapshot"]["execution_mode"], "manual"
