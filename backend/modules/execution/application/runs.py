@@ -182,6 +182,40 @@ def create_run(
     return run
 
 
+def mirror_child_output_event(*, child_run_id, organization_id, event_type, payload):
+    """Append a child output event to its parent workflow's ordered stream."""
+    if event_type not in {"output.delta", "output.snapshot"}:
+        return None
+    with transaction.atomic():
+        child = Run.objects.select_related("parent").get(pk=child_run_id)
+        if str(child.organization_id) != str(organization_id):
+            raise OrganizationMismatch("Run belongs to another organization")
+        if child.parent_id is None or child.source_type != "workflow_step":
+            return None
+        parent = Run.objects.select_for_update().get(pk=child.parent_id)
+        snapshot = child.definition_snapshot or {}
+        parent.version += 1
+        parent.next_event_sequence += 1
+        parent.save(update_fields=("version", "next_event_sequence"))
+        event = RunEvent.objects.create(
+            organization_id=parent.organization_id,
+            run=parent,
+            sequence=parent.next_event_sequence,
+            type=f"workflow.step.{event_type}",
+            payload={
+                "workflow_step_id": snapshot.get("workflow_step_id") or child.source_id,
+                "workflow_step_key": snapshot.get("workflow_step_key") or child.node_key,
+                "workflow_step_name": snapshot.get("workflow_step_name") or child.node_key,
+                "child_run_id": str(child.id),
+                **dict(payload or {}),
+            },
+        )
+        transaction.on_commit(
+            lambda: _publish_event_notification(parent.id, event.sequence)
+        )
+    return event
+
+
 def record_artifact(
     *,
     run_id,

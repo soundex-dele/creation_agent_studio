@@ -25,6 +25,7 @@ from modules.execution.application.runs import (
     append_event_and_transition,
     fail_attempt,
     finish_attempt,
+    mirror_child_output_event,
     record_artifact,
     suspend_attempt_for_children,
     suspend_attempt_for_input,
@@ -491,6 +492,17 @@ class ExecutionCoordinator:
                 event_type=message["type"],
                 payload=message.get("payload") or {},
             )
+            if (
+                active.claimed.run.parent_id
+                and active.claimed.run.source_type == "workflow_step"
+                and message["type"] in {"output.delta", "output.snapshot"}
+            ):
+                mirror_child_output_event(
+                    child_run_id=active.claimed.run.id,
+                    organization_id=active.claimed.run.organization_id,
+                    event_type=message["type"],
+                    payload=message.get("payload") or {},
+                )
             return False
         if message.get("kind") == "terminal":
             self._finish(active, message)

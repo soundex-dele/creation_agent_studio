@@ -9,7 +9,10 @@ from modules.execution.runtime import builtin
 from app_center.batch_transcribe import runtime as batch_transcribe
 from app_center.creation_master.backend import runtime as creation_master
 from apps.agents.execution import execute_agent_completion
-from modules.execution.application.runs import create_run
+from apps.conversations.models import Conversation, Message
+from apps.conversations.serializers import ConversationDetailSerializer
+from modules.execution.application.projections import project_terminal_run
+from modules.execution.application.runs import create_run, mirror_child_output_event
 from modules.execution.models import Run
 
 
@@ -203,6 +206,150 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     assert second.input["dependency_outputs"]["first"] == {"node": "first"}
     assert second.input["skills"] == [{"name": "article-writer"}]
     assert second.definition_snapshot["governance"]["require_tool_approval"] is True
+
+
+@pytest.mark.django_db(transaction=True)
+def test_durable_workflow_renders_guided_prompt_from_workflow_and_step_outputs(monkeypatch):
+    actor = get_user_model().objects.create_user(username="guided-dag-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="guided-dag",
+        definition_snapshot={},
+        input_data={"topic": "AI productivity"},
+    )
+    prompt = {
+        "key": "write",
+        "prompt_template": "Topic: {source}\nMode: {mode}",
+        "questions": [
+            {"key": "source", "label": "Source", "type": "text", "required": True},
+            {
+                "key": "mode", "label": "Mode", "type": "single_choice",
+                "required": True, "default_value": "full",
+                "options": [{"value": "full", "label": "Full article"}],
+            },
+        ],
+    }
+    steps = [
+        {
+            "id": "step-1", "key": "writer", "name": "Writer",
+            "depends_on": [], "condition": {}, "max_attempts": 1,
+            "application_id": 1, "application_revision_id": "",
+            "application_content_hash": "a" * 64,
+            "executor_kind": "agent", "executor_key": "agent-completion",
+            "content": {"guided_prompts": [prompt]},
+            "effective_config": {
+                "automation": {
+                    "guided_prompt_key": "write",
+                    "answers": {"source": {"from": "workflow.input.topic"}},
+                }
+            },
+        },
+        {
+            "id": "step-2", "key": "layout", "name": "Layout",
+            "depends_on": ["writer"], "condition": {}, "max_attempts": 1,
+            "application_id": 2, "application_revision_id": "",
+            "application_content_hash": "b" * 64,
+            "executor_kind": "agent", "executor_key": "agent-completion",
+            "content": {"guided_prompts": [prompt]},
+            "effective_config": {
+                "automation": {
+                    "guided_prompt_key": "write",
+                    "answers": {"source": {"from": "steps.writer.output.result"}},
+                }
+            },
+        },
+    ]
+
+    def finish_children(_root, children, _sink, _organization_id, poll_interval=0.25):
+        return {
+            key: {
+                "status": "completed", "attempts": 1,
+                "output": {"result": "Rendered article" if key == "writer" else "Done"},
+                "child_run_id": str(child_id),
+            }
+            for key, child_id in children.items()
+        }
+
+    monkeypatch.setattr(builtin, "_wait_for_step_runs", finish_children)
+    builtin.execute_workflow({
+        "run_id": str(root.id),
+        "organization_id": str(organization.id),
+        "definition_snapshot": {"durable_children": True, "workflow_steps": steps},
+        "input": {"topic": "AI productivity"},
+    }, _Sink())
+
+    writer = root.child_runs.get(node_key="writer")
+    layout = root.child_runs.get(node_key="layout")
+    assert writer.input["message"] == "Topic: AI productivity\nMode: Full article"
+    assert layout.input["message"] == "Topic: Rendered article\nMode: Full article"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_child_output_is_mirrored_to_parent_stream():
+    actor = get_user_model().objects.create_user(username="workflow-stream-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization, owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW, executor_key="workflow-dag",
+        source_type="workflow", source_id="flow", definition_snapshot={},
+        input_data={},
+    )
+    child = create_run(
+        organization=organization, owner=actor, parent=root, node_key="writer",
+        executor_kind=Run.ExecutorKind.AGENT, executor_key="agent-completion",
+        source_type="workflow_step", source_id="step-1",
+        definition_snapshot={
+            "workflow_step_id": "step-1",
+            "workflow_step_key": "writer",
+            "workflow_step_name": "Writer",
+        },
+        input_data={},
+    )
+
+    event = mirror_child_output_event(
+        child_run_id=child.id,
+        organization_id=organization.id,
+        event_type="output.delta",
+        payload={"text": "live text"},
+    )
+
+    assert event.run_id == root.id
+    assert event.type == "workflow.step.output.delta"
+    assert event.payload["workflow_step_key"] == "writer"
+    assert event.payload["text"] == "live text"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_child_projects_prompt_and_result_to_conversation():
+    actor = get_user_model().objects.create_user(username="workflow-conversation-owner")
+    organization = actor.owned_organizations.get()
+    conversation = Conversation.objects.create(
+        user=actor,
+        organization=organization,
+        title="Flow · Writer",
+    )
+    child = create_run(
+        organization=organization, owner=actor,
+        executor_kind=Run.ExecutorKind.AGENT, executor_key="agent-completion",
+        source_type="workflow_step", source_id="step-1",
+        definition_snapshot={"conversation_id": str(conversation.id)},
+        input_data={"message": "Write about AI"},
+    )
+
+    assert ConversationDetailSerializer(conversation).data["active_run"]["id"] == str(child.id)
+
+    project_terminal_run(child.id, {"result": "Finished article"})
+
+    messages = list(Message.objects.filter(conversation=conversation).order_by("created_at"))
+    assert [(message.role, message.content) for message in messages] == [
+        ("user", "Write about AI"),
+        ("assistant", "Finished article"),
+    ]
 
 
 @pytest.mark.parametrize(

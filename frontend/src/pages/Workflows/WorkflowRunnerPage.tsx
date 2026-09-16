@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Descriptions, List, Progress, Space, Spin, Tag, Typography } from 'antd';
-import { useParams } from 'react-router-dom';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useRunStream } from '@/features/run-stream';
 import { api } from '@/services/api';
@@ -12,6 +13,7 @@ const terminal = ['succeeded', 'failed', 'cancelled'];
 
 const WorkflowRunnerPage = () => {
   const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [run, setRun] = useState<RunResource | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,11 @@ const WorkflowRunnerPage = () => {
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%', padding: 24 }}>
+      <div>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/workflows')}>
+          返回工作流
+        </Button>
+      </div>
       <Card
         title={definition.workflow_name || `Run ${run.id}`}
         extra={<Space>
@@ -67,9 +74,11 @@ const WorkflowRunnerPage = () => {
       </Card>
       {projection.error && <Alert type="warning" showIcon message="事件流正在重连"
         description={projection.error.message} />}
-      <Card title="输出">
+      <Card title="工作流汇总">
         <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
-          {projection.state.output || JSON.stringify(run.output_summary || {}, null, 2) || '等待输出…'}
+          {projection.state.output || (Object.keys(run.output_summary || {}).length
+            ? JSON.stringify(run.output_summary, null, 2)
+            : '每个智能体的实时输出显示在对应步骤中。')}
         </Typography.Paragraph>
       </Card>
       <Card title="步骤">
@@ -81,14 +90,36 @@ const WorkflowRunnerPage = () => {
               <List.Item.Meta
                 title={`${index + 1}. ${step.name}`}
                 description={(() => {
-                  const eventType = projection.state.tools[`workflow:${step.key}`]?.event_type;
+                  const stepState = projection.state.tools[`workflow:${step.key}`] || {};
+                  const eventType = stepState.event_type;
                   const stateLabel = eventType === 'workflow.step.completed' ? '已完成'
                     : eventType === 'workflow.step.started' ? '执行中'
                       : eventType === 'workflow.step.failed' ? '重试或失败'
                         : eventType === 'workflow.step.skipped' ? '条件未满足，已跳过' : '等待依赖';
                   const dependencies = step.depends_on?.length
                     ? ` · 依赖 ${step.depends_on.join(', ')}` : ' · 无依赖，可并行';
-                  return `${stateLabel}${dependencies}`;
+                  const completedOutput = stepState.output as Record<string, unknown> | undefined;
+                  const output = String(
+                    stepState.stream_output
+                    || completedOutput?.result
+                    || '',
+                  );
+                  return (
+                    <div>
+                      <div>{stateLabel}{dependencies}</div>
+                      {output && (
+                        <Typography.Paragraph
+                          style={{
+                            margin: '10px 0 0', padding: 12, maxHeight: 360,
+                            overflow: 'auto', whiteSpace: 'pre-wrap',
+                            borderRadius: 8, background: 'var(--color-bg-elevated)',
+                          }}
+                        >
+                          {output}
+                        </Typography.Paragraph>
+                      )}
+                    </div>
+                  );
                 })()}
               />
             </List.Item>

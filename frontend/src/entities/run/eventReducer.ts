@@ -139,6 +139,28 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
       };
       break;
     }
+    case 'workflow.step.output.delta':
+    case 'workflow.step.output.snapshot': {
+      const key = String(event.payload.workflow_step_key ?? event.payload.workflow_step_id ?? event.sequence);
+      const id = `workflow:${key}`;
+      const previous = next.tools[id] || {};
+      const streamOutput = event.type === 'workflow.step.output.delta'
+        ? String(previous.stream_output ?? '') + String(event.payload.text ?? '')
+        : outputText(event.payload);
+      next.tools = {
+        ...next.tools,
+        [id]: {
+          ...previous,
+          workflow_step_id: event.payload.workflow_step_id,
+          workflow_step_key: event.payload.workflow_step_key,
+          workflow_step_name: event.payload.workflow_step_name,
+          child_run_id: event.payload.child_run_id,
+          stream_output: streamOutput,
+          output_event_type: event.type,
+        },
+      };
+      break;
+    }
   }
   return next;
 }

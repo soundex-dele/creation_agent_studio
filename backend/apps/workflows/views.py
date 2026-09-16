@@ -444,16 +444,45 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 },
             })
         try:
-            run, replayed = start_workflow_run(
-                organization=workflow.organization,
-                workflow_id=workflow.id,
-                workflow_name=workflow.name,
-                steps=snapshots,
-                actor=request.user,
-                input_data=request.data.get("input") or {},
-                priority=int(request.data.get("priority") or 0),
-                idempotency_key=idempotency_key,
-            )
+            with transaction.atomic():
+                run, replayed = start_workflow_run(
+                    organization=workflow.organization,
+                    workflow_id=workflow.id,
+                    workflow_name=workflow.name,
+                    steps=snapshots,
+                    actor=request.user,
+                    input_data=request.data.get("input") or {},
+                    priority=int(request.data.get("priority") or 0),
+                    idempotency_key=idempotency_key,
+                )
+                if not replayed:
+                    from apps.conversations.models import Conversation
+
+                    frozen = dict(run.definition_snapshot or {})
+                    frozen_steps = list(frozen.get("workflow_steps") or [])
+                    for step, frozen_step in zip(steps, frozen_steps):
+                        if step.application.kind != Application.Kind.CHAT:
+                            continue
+                        default_agent = next((
+                            item for item in (
+                                (frozen_step.get("content") or {})
+                                .get("dependencies", {})
+                                .get("agents", [])
+                            )
+                            if item.get("is_default")
+                        ), None)
+                        conversation = Conversation.objects.create(
+                            user=request.user,
+                            organization=workflow.organization,
+                            title=f"{workflow.name} · {frozen_step['name']}",
+                            agent_id=(default_agent or {}).get("agent_id"),
+                            chat_application_id=step.application_id,
+                            process_id=f"workflow:{frozen_step['key']}"[:64],
+                        )
+                        frozen_step["conversation_id"] = str(conversation.id)
+                    frozen["workflow_steps"] = frozen_steps
+                    Run.objects.filter(pk=run.pk).update(definition_snapshot=frozen)
+                    run.definition_snapshot = frozen
         except IdempotencyKeyReused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         body = RunSerializer(run).data

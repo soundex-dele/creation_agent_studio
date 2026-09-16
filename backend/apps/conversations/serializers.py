@@ -1,6 +1,7 @@
 """
 Serializers for conversations app.
 """
+from django.db.models import Q
 from rest_framework import serializers
 from apps.agents.models import Agent
 from apps.projects.services.workspace_paths import validate_system_working_directory
@@ -80,8 +81,11 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
 
     def get_active_run(self, obj):
         run = Run.objects.for_organization(obj.organization_id).filter(
-            source_type='conversation',
-            source_id=str(obj.id),
+            Q(source_type='conversation', source_id=str(obj.id))
+            | Q(
+                source_type='workflow_step',
+                definition_snapshot__conversation_id=str(obj.id),
+            ),
             status__in=(
                 Run.Status.QUEUED,
                 Run.Status.RUNNING,

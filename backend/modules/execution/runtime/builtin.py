@@ -1,5 +1,7 @@
 """Platform adapters for the unified durable execution plane."""
 
+from modules.catalog.guided_prompts import compose_guided_prompt
+
 
 class _WorkflowSink:
     def __init__(self, sink, step):
@@ -80,7 +82,10 @@ def _durable_step_snapshot(step, governance):
         "governance": governance,
         "workflow_step_id": str(step["id"]),
         "workflow_step_key": step["key"],
+        "workflow_step_name": step["name"],
     }
+    if step.get("conversation_id"):
+        snapshot["conversation_id"] = str(step["conversation_id"])
     if step.get("application_draft_id"):
         snapshot.update({
             "application_draft_id": str(step["application_draft_id"]),
@@ -93,6 +98,76 @@ def _durable_step_snapshot(step, governance):
     if default_agents:
         snapshot["agent_definition"] = default_agents[0].get("definition") or {}
     return snapshot
+
+
+def _resolve_automation_value(binding, workflow_input, dependency_results):
+    """Resolve a declarative workflow input binding for a chat prompt answer."""
+    if not isinstance(binding, dict):
+        return binding
+    if "value" in binding:
+        return binding["value"]
+    source = str(binding.get("from") or "")
+    if source.startswith("workflow.input."):
+        value, exists = _value_at_path(
+            workflow_input, source.removeprefix("workflow.input.")
+        )
+        return value if exists else None
+    if source.startswith("steps."):
+        remainder = source.removeprefix("steps.")
+        step_key, separator, path = remainder.partition(".output")
+        if separator and step_key in dependency_results:
+            value, exists = _value_at_path(
+                dependency_results[step_key].get("output", {}), path.lstrip(".")
+            )
+            return value if exists else None
+    raise RuntimeError(f"Unsupported workflow input binding: {source or binding}")
+
+
+def _render_step_message(step, workflow_input, dependency_results):
+    """Render a chat application's guided prompt for unattended execution."""
+    content = step.get("content") or {}
+    prompts = content.get("guided_prompts") or []
+    if not prompts:
+        return ""
+    effective_config = step.get("effective_config") or {}
+    automation = effective_config.get("automation") or {}
+    prompt_key = (
+        automation.get("guided_prompt_key")
+        or effective_config.get("guided_entry_prompt_key")
+        or (content.get("default_config") or {}).get("guided_entry_prompt_key")
+    )
+    prompt = next(
+        (
+            item for item in prompts
+            if str(item.get("id") or item.get("key")) == str(prompt_key)
+        ),
+        prompts[0] if not prompt_key else None,
+    )
+    if prompt is None:
+        raise RuntimeError(
+            f"Workflow step {step['key']} references unknown guided prompt {prompt_key}"
+        )
+
+    configured_answers = automation.get("answers") or {}
+    if not isinstance(configured_answers, dict):
+        raise RuntimeError(
+            f"Workflow step {step['key']} automation.answers must be an object"
+        )
+    answers = {
+        question["key"]: workflow_input.get(question["key"])
+        for question in prompt.get("questions", [])
+        if question.get("key") in workflow_input
+    }
+    answers.update({
+        key: _resolve_automation_value(binding, workflow_input, dependency_results)
+        for key, binding in configured_answers.items()
+    })
+    rendered = compose_guided_prompt(
+        prompt,
+        answers,
+        application_id=int(step.get("application_id") or 0),
+    )
+    return rendered["prompt"]
 
 
 def _load_root_run(run_payload):
@@ -116,6 +191,17 @@ def _create_or_load_step_run(root, step, workflow_input, dependency_results, gov
         if child is not None:
             return child, False
         retry_policy = (step.get("content") or {}).get("retry_policy") or {}
+        child_input = {
+            **workflow_input,
+            **dict(step.get("runtime_input") or {}),
+            "dependency_outputs": {
+                key: value.get("output", {})
+                for key, value in dependency_results.items()
+            },
+        }
+        message = _render_step_message(step, workflow_input, dependency_results)
+        if message:
+            child_input["message"] = message
         child = create_run(
             organization=locked_root.organization,
             owner=locked_root.owner,
@@ -126,14 +212,7 @@ def _create_or_load_step_run(root, step, workflow_input, dependency_results, gov
             source_type="workflow_step",
             source_id=step["id"],
             definition_snapshot=_durable_step_snapshot(step, governance),
-            input_data={
-                **workflow_input,
-                **dict(step.get("runtime_input") or {}),
-                "dependency_outputs": {
-                    key: value.get("output", {})
-                    for key, value in dependency_results.items()
-                },
-            },
+            input_data=child_input,
             priority=locked_root.priority,
             max_attempts=int(step.get("max_attempts") or 1),
             retry_safe=bool(retry_policy.get("retry_safe", True)),

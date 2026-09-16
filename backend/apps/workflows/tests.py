@@ -382,6 +382,12 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(step["content"]["skill_bindings"], [])
         self.assertEqual(step["skill_revisions"], [])
         self.assertEqual(step["runtime_input"]["skills"], runtime_skills)
+        conversation = Conversation.objects.get(
+            pk=step["conversation_id"],
+            chat_application_id=application.id,
+        )
+        self.assertEqual(conversation.title, "Draft chat flow · Write")
+        self.assertEqual(conversation.process_id, "workflow:write")
         self.assertEqual(
             step["content"]["dependencies"]["agents"][0]["definition"],
             agent_definition,

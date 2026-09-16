@@ -104,6 +104,38 @@ def apply_projection_event(projection, event):
             **payload,
             "event_type": event.type,
         }
+    elif event.type in {
+        "workflow.step.output.delta",
+        "workflow.step.output.snapshot",
+    }:
+        key = str(
+            payload.get("workflow_step_key")
+            or payload.get("workflow_step_id")
+            or event.sequence
+        )
+        tool_id = f"workflow:{key}"
+        tools = next_projection.setdefault("tools", {})
+        previous = tools.get(tool_id, {})
+        if event.type == "workflow.step.output.delta":
+            stream_output = str(previous.get("stream_output", "")) + str(
+                payload.get("text", "")
+            )
+        else:
+            value = payload.get(
+                "text", payload.get("output", payload.get("result", ""))
+            )
+            stream_output = value if isinstance(value, str) else json.dumps(
+                value, ensure_ascii=False, indent=2
+            )
+        tools[tool_id] = {
+            **previous,
+            "workflow_step_id": payload.get("workflow_step_id"),
+            "workflow_step_key": payload.get("workflow_step_key"),
+            "workflow_step_name": payload.get("workflow_step_name"),
+            "child_run_id": payload.get("child_run_id"),
+            "stream_output": stream_output,
+            "output_event_type": event.type,
+        }
     return next_projection
 
 

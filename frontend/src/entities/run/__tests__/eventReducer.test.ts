@@ -94,6 +94,22 @@ describe('RunEvent reducer', () => {
     expect(state.output).toBe('canonical');
   });
 
+  it('keeps concurrent workflow step output in separate projections', () => {
+    let state = createRunEventState('run-1');
+    state = ingestRunEvent(state, event(1, 'workflow.step.output.delta', {
+      workflow_step_key: 'writer', text: 'Article ',
+    })).state;
+    state = ingestRunEvent(state, event(2, 'workflow.step.output.delta', {
+      workflow_step_key: 'cover', text: 'Cover',
+    })).state;
+    state = ingestRunEvent(state, event(3, 'workflow.step.output.snapshot', {
+      workflow_step_key: 'writer', result: 'Article complete',
+    })).state;
+
+    expect(state.tools['workflow:writer'].stream_output).toBe('Article complete');
+    expect(state.tools['workflow:cover'].stream_output).toBe('Cover');
+  });
+
   it('projects lifecycle and durable input state', () => {
     let state = ingestRunEvent(
       createRunEventState('run-1'),

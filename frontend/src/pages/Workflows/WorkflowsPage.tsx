@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Empty, Popconfirm, Spin, Tag, message } from 'antd';
+import { Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tag, message } from 'antd';
 import {
   AppstoreOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
-import type { Workflow } from '@/types';
+import type { GuidedPrompt, GuidedQuestion, Workflow } from '@/types';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -19,6 +19,16 @@ const wait = (milliseconds: number) => new Promise((resolve) => {
   window.setTimeout(resolve, milliseconds);
 });
 
+type WorkflowAnswer = string | string[] | number;
+
+const promptDefaults = (prompt: GuidedPrompt): Record<string, WorkflowAnswer> => (
+  Object.fromEntries(prompt.questions.flatMap((question) => (
+    question.default_value === undefined || question.default_value === null
+      ? []
+      : [[question.key, question.default_value as WorkflowAnswer]]
+  )))
+);
+
 const WorkflowsPage = () => {
   const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
@@ -27,6 +37,11 @@ const WorkflowsPage = () => {
   const [loading, setLoading] = useState(true);
   const [deletingWorkflowId, setDeletingWorkflowId] = useState<string | null>(null);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+  const [runWorkflow, setRunWorkflow] = useState<Workflow | null>(null);
+  const [runPrompt, setRunPrompt] = useState<GuidedPrompt | null>(null);
+  const [runAnswers, setRunAnswers] = useState<Record<string, WorkflowAnswer>>({});
+  const [preparingRunId, setPreparingRunId] = useState<string | null>(null);
+  const [startingRun, setStartingRun] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,21 +63,78 @@ const WorkflowsPage = () => {
 
   useEffect(() => { void load(); }, [load]);
 
+  const launch = async (workflow: Workflow, input: Record<string, WorkflowAnswer>) => {
+    setStartingRun(true);
+    try {
+      const run = await api.post<{ id: string }>(
+        `/workflows/${workflow.id}/start/`,
+        { input },
+        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      );
+      setRunWorkflow(null);
+      setRunPrompt(null);
+      navigate(`/runs/${run.id}`);
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '工作流启动失败');
+    } finally {
+      setStartingRun(false);
+    }
+  };
+
   const start = async (workflow: Workflow) => {
     if (workflow.execution_mode === 'manual') {
       navigate(`/workflows/${workflow.id}/manual`);
       return;
     }
+    setPreparingRunId(workflow.id);
     try {
-      const run = await api.post<{ id: string }>(
-        `/workflows/${workflow.id}/start/`,
-        undefined,
-        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      const detail = await api.get<Workflow>(`/workflows/${workflow.id}/`);
+      const entryStep = [...(detail.steps || [])]
+        .sort((left, right) => left.order - right.order)
+        .find((step) => step.depends_on.length === 0 && step.application.kind === 'chat');
+      if (!entryStep || entryStep.application.kind !== 'chat') {
+        await launch(detail, {});
+        return;
+      }
+      const preferredKey = String(
+        entryStep.application.default_config.guided_entry_prompt_key || '',
       );
-      navigate(`/runs/${run.id}`);
+      const prompt = entryStep.application.guided_prompts.find((item) => (
+        String(item.id || item.key) === preferredKey
+      )) || entryStep.application.guided_prompts[0];
+      if (!prompt) {
+        await launch(detail, {});
+        return;
+      }
+      setRunWorkflow(detail);
+      setRunPrompt(prompt);
+      setRunAnswers(promptDefaults(prompt));
     } catch (error: any) {
-      message.error(error?.response?.data?.detail || '工作流启动失败');
+      message.error(error?.response?.data?.detail || '读取工作流输入配置失败');
+    } finally {
+      setPreparingRunId(null);
     }
+  };
+
+  const setRunAnswer = (question: GuidedQuestion, value: WorkflowAnswer | null) => {
+    setRunAnswers((current) => ({
+      ...current,
+      [question.key]: value === null ? '' : value,
+    }));
+  };
+
+  const submitAutomaticRun = async () => {
+    if (!runWorkflow || !runPrompt) return;
+    const missing = runPrompt.questions.filter((question) => {
+      if (!question.required) return false;
+      const value = runAnswers[question.key];
+      return value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
+    });
+    if (missing.length) {
+      message.warning(`请填写：${missing.map((question) => question.label).join('、')}`);
+      return;
+    }
+    await launch(runWorkflow, runAnswers);
   };
 
   const remove = async (workflow: Workflow) => {
@@ -155,6 +227,7 @@ const WorkflowsPage = () => {
                     icon={workflow.execution_mode === 'manual'
                       ? <AppstoreOutlined /> : <PlayCircleOutlined />}
                     disabled={!workflow.step_count}
+                    loading={preparingRunId === workflow.id}
                     onClick={() => start(workflow)}
                   >
                     {workflow.execution_mode === 'manual' ? '打开' : '运行'}
@@ -230,6 +303,57 @@ const WorkflowsPage = () => {
           </section>
         </>
       )}
+      <Modal
+        title={runPrompt?.title || `运行 ${runWorkflow?.name || '工作流'}`}
+        open={Boolean(runWorkflow && runPrompt)}
+        okText="开始自动运行"
+        cancelText="取消"
+        width={680}
+        confirmLoading={startingRun}
+        onOk={submitAutomaticRun}
+        onCancel={() => {
+          if (startingRun) return;
+          setRunWorkflow(null);
+          setRunPrompt(null);
+        }}
+      >
+        {runPrompt?.description && <p className="workflow-run-form-description">{runPrompt.description}</p>}
+        <div className="workflow-run-form">
+          {runPrompt?.questions.map((question) => (
+            <label className="workflow-run-field" key={question.id || question.key}>
+              <span>{question.label}{question.required && <b>*</b>}</span>
+              {question.help_text && <small>{question.help_text}</small>}
+              {question.type === 'single_choice' || question.type === 'multi_choice' ? (
+                <Select
+                  mode={question.type === 'multi_choice' ? 'multiple' : undefined}
+                  value={runAnswers[question.key] || undefined}
+                  placeholder={question.placeholder}
+                  options={question.options.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                    title: option.description,
+                  }))}
+                  onChange={(value) => setRunAnswer(question, value)}
+                  allowClear
+                />
+              ) : question.type === 'number' ? (
+                <InputNumber
+                  value={runAnswers[question.key] as number | undefined}
+                  placeholder={question.placeholder}
+                  onChange={(value) => setRunAnswer(question, value)}
+                />
+              ) : (
+                <Input.TextArea
+                  value={(runAnswers[question.key] as string | undefined) || ''}
+                  placeholder={question.placeholder}
+                  autoSize={{ minRows: question.key === 'source' ? 3 : 2, maxRows: 8 }}
+                  onChange={(event) => setRunAnswer(question, event.target.value)}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -153,9 +153,20 @@ def _answer_content(command_payload, request_payload):
     return " / ".join(str(value) for value in selections)
 
 
+def _conversation_id_for_run(run):
+    if run.source_type == "conversation" and run.source_id:
+        return run.source_id
+    if run.source_type == "workflow_step":
+        return (run.definition_snapshot or {}).get("conversation_id")
+    return None
+
+
 def _conversation_for_run(run, Conversation):
+    conversation_id = _conversation_id_for_run(run)
+    if not conversation_id:
+        return None
     return Conversation.objects.select_for_update().filter(
-        pk=run.source_id,
+        pk=conversation_id,
         organization_id=run.organization_id,
         user_id=run.owner_id,
     ).first()
@@ -165,7 +176,7 @@ def project_input_required(run_id, event):
     """Persist an Agent question as its own assistant conversation turn."""
 
     run = Run.objects.get(pk=run_id)
-    if run.source_type != "conversation" or not run.source_id:
+    if not _conversation_id_for_run(run):
         return None
     from apps.conversations.models import Conversation, Message
 
@@ -213,7 +224,7 @@ def project_input_accepted(run_id, event, command):
     """Persist an interactive answer as its own user conversation turn."""
 
     run = Run.objects.get(pk=run_id)
-    if run.source_type != "conversation" or not run.source_id:
+    if not _conversation_id_for_run(run):
         return None
     from apps.conversations.models import Conversation, Message
 
@@ -257,7 +268,7 @@ def project_input_accepted(run_id, event, command):
 
 def project_terminal_run(run_id, output):
     run = Run.objects.get(pk=run_id)
-    if run.source_type != "conversation" or not run.source_id:
+    if not _conversation_id_for_run(run):
         return
     from apps.conversations.models import Conversation, Message
 
@@ -265,6 +276,22 @@ def project_terminal_run(run_id, output):
         conversation = _conversation_for_run(run, Conversation)
         if conversation is None:
             return
+        if run.source_type == "workflow_step":
+            user_message, _ = Message.objects.get_or_create(
+                conversation=conversation,
+                run=run,
+                role="user",
+                run_event_sequence=None,
+                defaults={
+                    "content": str((run.input or {}).get("message") or ""),
+                    "metadata": {
+                        "run_id": str(run.id),
+                        "workflow_step_key": run.node_key,
+                        "automated": True,
+                    },
+                },
+            )
+            Message.objects.filter(pk=user_message.pk).update(created_at=run.created_at)
         agent_thread = output.get("agent_thread") or {}
         provider = str(agent_thread.get("provider") or "")
         thread_id = str(agent_thread.get("id") or "")

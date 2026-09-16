@@ -11,6 +11,13 @@
 .workflow-card > span { color: var(--color-text-dim); font-size: 13px; }
 .workflow-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-dim); font-size: 13px; }
 .workflow-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.workflow-run-form-description { margin: 0 0 18px; color: var(--color-text-sec); }
+.workflow-run-form { display: flex; max-height: 62vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 2px 5px 2px 2px; }
+.workflow-run-field { display: flex; flex-direction: column; gap: 7px; }
+.workflow-run-field > span { color: var(--color-text); font-weight: 600; }
+.workflow-run-field > span b { margin-left: 3px; color: var(--color-error); }
+.workflow-run-field > small { color: var(--color-text-dim); }
+.workflow-run-field .ant-input-number { width: 100%; }
 .workflow-mode-field small { color: var(--color-text-dim); }
 .workflow-history { margin-top: 36px; }
 .workflow-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
