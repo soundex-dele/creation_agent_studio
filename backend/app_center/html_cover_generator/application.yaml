@@ -4,7 +4,7 @@ metadata:
   id: html-cover-generator
   version: 2.0.0
   name: HTML 封面生成器
-  description: 通过引导表单生成封面提示词，再由通用助手使用 Skill 制作像素级、可编辑的 HTML/CSS/SVG 封面。
+  description: 通过引导表单生成封面提示词，再由内容创作专家使用 Skill 制作像素级、可编辑的 HTML/CSS/SVG 封面。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
   icon: "🖼️"
   color: "#6d5dfc"
@@ -34,7 +34,7 @@ spec:
       conversation_policy: choose_history
       starter_layout: cards
     agent_bindings:
-      - {agent_id: 1, label: 通用助手, is_default: true, config_overrides: {}, order: 0}
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
     skill_bindings:
       - {skill_id: pending-baoyu-html-cover, mode: required, config: {}, order: 0}
     guided_prompts:

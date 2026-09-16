@@ -18,7 +18,13 @@ describe('application renderer registry', () => {
   });
 
   it('opens Skill-backed generators as guided chat applications', () => {
-    ['wechat-html-optimizer', 'article-html-illustrator', 'html-cover-generator']
+    [
+      'wechat-html-optimizer',
+      'article-html-illustrator',
+      'html-cover-generator',
+      'wechat-viral-article',
+      'gzh-design',
+    ]
       .forEach((id, index) => {
         const applicationId = 17 + index;
         expect(applicationPath({

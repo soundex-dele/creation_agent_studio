@@ -1,0 +1,152 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: wechat-viral-article
+  version: 1.0.0
+  name: 公众号爆款写作
+  description: 由内容创作专家使用 Skill 完成公众号选题、标题、正文、改写优化与发布前合规检查。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "✍️"
+  color: "#f04444"
+  tags: [公众号, 爆款文章, 写作, 标题, 合规]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: write-wechat-article}
+    chat_profile:
+      welcome_message: 填写写作任务、素材与账号定位，我会生成可编辑提示词并调用 Skill 完成创作。
+      input_placeholder: 继续调整标题、结构、语气、细节或合规表述…
+      empty_state_title: 创作一篇公众号文章
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-wechat-viral-article, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: write-wechat-article
+        title: 填写公众号写作需求
+        description: 可生成完整文章，也可只做选题、标题、大纲、改写、优化或合规检查。
+        icon: "✍️"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 wechat-viral-article Skill 完成下面的公众号内容任务。
+
+          任务类型：{task}
+          主题、素材、原稿或文件路径：
+          {source}
+
+          账号定位：{positioning}
+          目标读者：{audience}
+          转化目标：{goal}
+          内容类型：{content_type}
+          补充要求：{requirements}
+
+          用户已通过应用表单确认以上设置，请直接执行，不要重复询问。仅交付任务类型要求的内容；若生成完整文章，默认同时提供 Markdown 正文、10 个候选标题、首选标题理由、合规自检和发布策略。不得虚构事实或数据；素材不足时使用合理假设并在交付中明确标注。发布前必须按 Skill 完成广告法、平台规范、导流、垂类和 AI 痕迹自检，发现问题直接改写并说明。
+        questions:
+          - key: task
+            label: 任务类型
+            type: single_choice
+            placeholder: 请选择
+            help_text: 选择本次只需要的交付物，避免生成无关内容。
+            required: true
+            default_value: full-article
+            validation: {}
+            order: 0
+            options:
+              - {value: full-article, label: 完整文章（推荐）, description: 正文、标题、合规检查与发布策略, icon: "", order: 0}
+              - {value: topic-ideas, label: 爆款选题, description: 输出 5 个选题及理由, icon: "", order: 1}
+              - {value: titles, label: 爆款标题, description: 输出 10 个分型标题并推荐首选, icon: "", order: 2}
+              - {value: outline, label: 文章大纲, description: 按高完读结构搭建文章骨架, icon: "", order: 3}
+              - {value: rewrite, label: 改写成公众号风格, description: 保留事实并重构表达, icon: "", order: 4}
+              - {value: optimize, label: 优化现有文章, description: 提升完读、传播与真人感, icon: "", order: 5}
+              - {value: compliance, label: 合规检查, description: 检查并修正发布风险, icon: "", order: 6}
+          - key: source
+            label: 主题、素材、原稿或文件路径
+            type: text
+            placeholder: 填写主题与素材，粘贴原稿，或提供工作目录内的文件路径
+            help_text: 若涉及事实或数据，请尽量附上可靠来源。
+            required: true
+            default_value: null
+            validation: {}
+            order: 1
+            options: []
+          - key: positioning
+            label: 账号定位
+            type: text
+            placeholder: 例如：AI 工具测评、职场成长、母婴科普
+            help_text: 未指定时使用干货型个人成长号。
+            required: true
+            default_value: 干货型个人成长号
+            validation: {}
+            order: 2
+            options: []
+          - key: audience
+            label: 目标读者
+            type: text
+            placeholder: 例如：25–35 岁一线城市职场人
+            help_text: 描述越具体，场景和语言越准确。
+            required: true
+            default_value: 25–40 岁微信深度阅读用户
+            validation: {}
+            order: 3
+            options: []
+          - key: goal
+            label: 转化目标
+            type: single_choice
+            placeholder: 请选择
+            help_text: 决定文章结尾和传播钩子的侧重点。
+            required: true
+            default_value: reading
+            validation: {}
+            order: 4
+            options:
+              - {value: reading, label: 阅读量与在看（推荐）, description: 优先完读与自然互动, icon: "", order: 0}
+              - {value: followers, label: 涨粉, description: 强化账号价值与持续关注理由, icon: "", order: 1}
+              - {value: sales, label: 带货转化, description: 保持广告可识别与合规表达, icon: "", order: 2}
+              - {value: branding, label: 品牌曝光, description: 强化品牌认知与可信度, icon: "", order: 3}
+          - key: content_type
+            label: 内容类型
+            type: single_choice
+            placeholder: 请选择
+            help_text: Skill 会据此选择开头、正文和结尾结构。
+            required: true
+            default_value: tutorial
+            validation: {}
+            order: 5
+            options:
+              - {value: tutorial, label: 干货教程（推荐）, description: 分步骤、强执行性, icon: "", order: 0}
+              - {value: opinion, label: 观点评论, description: 反常识观点与论证链, icon: "", order: 1}
+              - {value: story, label: 情感故事, description: 场景、故事线与情绪共鸣, icon: "", order: 2}
+              - {value: insight, label: 行业洞察, description: 数据现象、分析与趋势判断, icon: "", order: 3}
+              - {value: recommendation, label: 产品种草, description: 真实体验、利益点与广告合规, icon: "", order: 4}
+          - key: requirements
+            label: 补充要求
+            type: text
+            placeholder: 例如：约 2000 字；语气克制；保留案例；不要使用网络热梗
+            help_text: 可填写篇幅、语气、必须保留或禁止出现的内容。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 6
+            options: []
+  backend:
+    definition_factory: app_center.wechat_viral_article.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}

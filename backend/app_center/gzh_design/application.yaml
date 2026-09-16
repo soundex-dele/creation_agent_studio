@@ -1,0 +1,123 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: gzh-design
+  version: 1.0.0
+  name: 公众号排版引擎
+  description: 由内容创作专家使用 Skill 将 Markdown、Word、PDF 或纯文本转换为公众号可直接粘贴的 HTML。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "🎨"
+  color: "#059669"
+  tags: [公众号, 排版, HTML, Markdown, 主题]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: format-wechat-article}
+    chat_profile:
+      welcome_message: 提供文章正文或文件路径并选择主题，我会生成提示词并制作公众号 HTML 与复制预览页。
+      input_placeholder: 继续调整主题、组件、强调层级、署名或排版细节…
+      empty_state_title: 排版一篇公众号文章
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-gzh-design, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: format-wechat-article
+        title: 填写公众号排版需求
+        description: 支持 Markdown、Word、PDF、纯文本和自定义主题，输出干净正文与一键复制预览页。
+        icon: "🎨"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 gzh-design Skill 排版下面的公众号文章。
+
+          文章正文或文件路径：
+          {source}
+
+          主题：{theme}
+          作者署名：{author}
+          作者简介：{bio}
+          补充要求或自定义主题描述：{requirements}
+
+          用户已通过应用表单确认以上设置。若主题为“自动推荐（一键排版）”，请进入全自动模式，自动推断结构并选择最契合的已注册主题，不要再次询问；若已指定主题，直接使用该主题；若选择“自定义主题”，按 Skill 的自定义主题流程执行，仅在缺少必需风格信息时询问。严格从主题组件库装配 HTML，不得凭记忆手写组件或跨主题混用。必须保留原文全部段落和图片，生成纯 section 正文、运行 validate_gzh_html.py 至 0 ERROR 且 0 个半角标点 WARNING，并生成一键复制预览页。交付时给出两个文件的路径、所选主题与校验结论。
+        questions:
+          - key: source
+            label: 文章正文或文件路径
+            type: text
+            placeholder: 粘贴 Markdown/纯文本，或填写工作目录内的 .md、.docx、.pdf、.txt 文件路径
+            help_text: 非 Markdown 文件会先按 Skill 规则归一化结构。
+            required: true
+            default_value: null
+            validation: {}
+            order: 0
+            options: []
+          - key: theme
+            label: 排版主题
+            type: single_choice
+            placeholder: 请选择
+            help_text: 自动推荐会根据文章类型选择主题；指定主题后不再询问。
+            required: true
+            default_value: auto
+            validation: {}
+            order: 1
+            options:
+              - {value: auto, label: 自动推荐（一键排版）, description: 自动分析题材并选择最契合主题, icon: "", order: 0}
+              - {value: zhici-qinglv, label: 只此青绿, description: 观点复盘、文化叙事、品牌故事、东方美学, icon: "", order: 1}
+              - {value: moyu-green, label: 摸鱼绿, description: 教程、测评、清单、工具盘点, icon: "", order: 2}
+              - {value: red-white, label: 红白色系, description: 深度分析、观点、力量感话题, icon: "", order: 3}
+              - {value: graphite-minimal, label: 石墨极简风, description: 设计、科技评论、专业观点、高端品牌, icon: "", order: 4}
+              - {value: zen-whitespace, label: 留白禅意风, description: 禅意冥想、极简生活、深度随笔, icon: "", order: 5}
+              - {value: moyu-ticket, label: 摸鱼票据风, description: 测评、工具对比、创意评测, icon: "", order: 6}
+              - {value: olive-journal, label: 橄榄手记, description: 内刊手记、深度评测、案例复盘, icon: "", order: 7}
+              - {value: custom, label: 自定义主题, description: 根据补充描述或参考图生成并登记新主题, icon: "", order: 8}
+          - key: author
+            label: 作者署名
+            type: text
+            placeholder: 例如：小林；留空则保留 {{作者名}} 占位
+            help_text: 原文已有署名时可留空，Skill 会沿用原文。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 2
+            options: []
+          - key: bio
+            label: 作者简介
+            type: text
+            placeholder: 例如：热衷分享 AI 工具与实战经验
+            help_text: 用于文末唯一的作者签名区。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 3
+            options: []
+          - key: requirements
+            label: 补充要求或自定义主题描述
+            type: text
+            placeholder: 例如：品牌色 #007C7E；减少卡片；参考图路径为 assets/style.png
+            help_text: 选择自定义主题时，请填写风格描述或参考图路径。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 4
+            options: []
+  backend:
+    definition_factory: app_center.gzh_design.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}

@@ -4,9 +4,13 @@ from django.core.management import call_command
 
 from apps.agents.models import Agent
 from apps.applications.models import Application, Skill
+from modules.catalog.models import AgentDraft
 
 
 CHAT_SKILL_APPS = {
+    "gzh-design": {
+        "skill_slug": "gzh-design",
+    },
     "wechat-html-optimizer": {
         "skill_slug": "optimize-wechat-html",
     },
@@ -15,6 +19,9 @@ CHAT_SKILL_APPS = {
     },
     "html-cover-generator": {
         "skill_slug": "baoyu-html-cover",
+    },
+    "wechat-viral-article": {
+        "skill_slug": "wechat-viral-article",
     },
 }
 
@@ -28,14 +35,20 @@ def test_sync_installs_all_packages_and_only_deploys_development():
     call_command("sync_app_center", organization_id=str(organization.id))
 
     applications = Application.objects.filter(organization=organization)
+    content_agent = Agent.objects.get(
+        organization=organization,
+        slug="content-creation-expert",
+    )
     assert set(applications.values_list("slug", flat=True)) >= {
         "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
-        "creation-master", "html-cover-generator", "wechat-html-optimizer",
+        "creation-master", "gzh-design", "html-cover-generator",
+        "wechat-html-optimizer", "wechat-viral-article",
     }
     for application in applications.filter(
         slug__in=(
             "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
-            "creation-master", "html-cover-generator", "wechat-html-optimizer",
+            "creation-master", "gzh-design", "html-cover-generator",
+            "wechat-html-optimizer", "wechat-viral-article",
         )
     ):
         assert application.revisions.count() == 1
@@ -51,8 +64,9 @@ def test_sync_installs_all_packages_and_only_deploys_development():
         definition = application.draft.content
         agent = Agent.objects.get(
             id=definition["agent_bindings"][0]["agent_id"],
-            slug="general",
+            slug="content-creation-expert",
         )
+        assert agent == content_agent
 
         assert application.kind == Application.Kind.CHAT
         assert application.chat_application.application_id == application.id
@@ -73,6 +87,13 @@ def test_sync_installs_all_packages_and_only_deploys_development():
             "order": 0,
         }]
         assert "pending-" not in str(definition)
+
+    agent_draft = AgentDraft.objects.get(agent=content_agent)
+    assert "必须使用应用绑定的必需 Skill" in agent_draft.content["system_prompt"]
+    assert Agent.objects.filter(
+        organization=organization,
+        slug="content-creation-expert",
+    ).count() == 1
 
     assert not Agent.objects.filter(
         organization=organization,

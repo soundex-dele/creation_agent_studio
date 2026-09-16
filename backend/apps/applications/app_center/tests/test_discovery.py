@@ -21,7 +21,8 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
 
     assert {
         "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
-        "html-cover-generator", "wechat-html-optimizer",
+        "gzh-design", "html-cover-generator", "wechat-html-optimizer",
+        "wechat-viral-article",
     } <= package_ids
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"
@@ -30,7 +31,8 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
         package.manifest.metadata.id: package
         for package in packages
         if package.manifest.metadata.id in {
-            "article-html-illustrator", "html-cover-generator", "wechat-html-optimizer",
+            "article-html-illustrator", "gzh-design", "html-cover-generator",
+            "wechat-html-optimizer", "wechat-viral-article",
         }
     }
     for package in chat_packages.values():

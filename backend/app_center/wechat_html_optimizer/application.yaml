@@ -4,7 +4,7 @@ metadata:
   id: wechat-html-optimizer
   version: 2.0.0
   name: 公众号 HTML 优化器
-  description: 通过引导表单生成优化提示词，再由通用助手使用 Skill 处理已有 HTML，保留原文与视觉意图。
+  description: 通过引导表单生成优化提示词，再由内容创作专家使用 Skill 处理已有 HTML，保留原文与视觉意图。
   category:
     slug: creative
     name: 内容创作
@@ -40,7 +40,7 @@ spec:
       conversation_policy: choose_history
       starter_layout: cards
     agent_bindings:
-      - {agent_id: 1, label: 通用助手, is_default: true, config_overrides: {}, order: 0}
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
     skill_bindings:
       - {skill_id: pending-optimize-wechat-html, mode: required, config: {}, order: 0}
     guided_prompts:

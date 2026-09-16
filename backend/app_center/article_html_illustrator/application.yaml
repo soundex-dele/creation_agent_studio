@@ -4,7 +4,7 @@ metadata:
   id: article-html-illustrator
   version: 2.0.0
   name: 文章 HTML 配图
-  description: 通过引导表单生成配图提示词，再由通用助手使用 Skill 分析文章并生成整套可编辑 HTML/CSS 配图。
+  description: 通过引导表单生成配图提示词，再由内容创作专家使用 Skill 分析文章并生成整套可编辑 HTML/CSS 配图。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
   icon: "🧩"
   color: "#e8655a"
@@ -34,7 +34,7 @@ spec:
       conversation_policy: choose_history
       starter_layout: cards
     agent_bindings:
-      - {agent_id: 1, label: 通用助手, is_default: true, config_overrides: {}, order: 0}
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
     skill_bindings:
       - {skill_id: pending-baoyu-article-html-illustrator, mode: required, config: {}, order: 0}
     guided_prompts:
