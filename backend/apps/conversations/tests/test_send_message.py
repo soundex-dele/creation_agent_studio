@@ -4,11 +4,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import OperationalError
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message
+from apps.conversations.views import ConversationViewSet
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash
 from modules.execution.application.projections import (
@@ -78,6 +80,28 @@ class DurableConversationRunTest(TestCase):
         self.assertTrue(Message.objects.filter(
             conversation=self.conversation, role="user", content="hello"
         ).exists())
+
+    @patch("apps.conversations.views.time.sleep")
+    @patch.object(ConversationViewSet, "_create_run_once")
+    def test_send_message_retries_the_full_transaction_when_sqlite_is_busy(
+        self, create_run_once, sleep,
+    ):
+        expected = (object(), False)
+        create_run_once.side_effect = [
+            OperationalError("database is locked"),
+            expected,
+        ]
+
+        result = ConversationViewSet()._create_run(
+            request=object(),
+            conversation=self.conversation,
+            message="retry me",
+            idempotency_key="conversation-lock-retry",
+        )
+
+        self.assertEqual(result, expected)
+        self.assertEqual(create_run_once.call_count, 2)
+        sleep.assert_called_once_with(0.02)
 
     @patch("apps.conversations.views.resolve_agent")
     def test_explicit_null_agent_uses_fallback_without_saving_it(self, resolve_agent):

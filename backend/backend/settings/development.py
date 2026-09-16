@@ -44,6 +44,12 @@ if DATABASE_ENGINE in {'sqlite', 'sqlite3'}:
         }
     }
 
+LOCAL_FILE_MANAGER_ENABLED = config(
+    'LOCAL_FILE_MANAGER_ENABLED',
+    default=DATABASE_ENGINE in {'sqlite', 'sqlite3'},
+    cast=bool,
+)
+
 if not REDIS_ENABLED:
     # SQLite Local and tests are self-contained; DB polling is the cross-process
     # event fallback when no shared Redis channel layer exists.

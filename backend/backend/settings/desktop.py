@@ -24,5 +24,6 @@ STORAGES["staticfiles"] = {
 # fallback.  It deliberately has no PostgreSQL or Redis runtime dependency.
 DATABASE_ENGINE = "sqlite"
 REDIS_ENABLED = False
+LOCAL_FILE_MANAGER_ENABLED = True
 REQUIRED_EXECUTION_WORKER_POOLS = ()
 REQUIRE_AUTOMATION_SCHEDULER = False

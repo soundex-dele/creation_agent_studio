@@ -1,4 +1,7 @@
 """Safe filesystem workspace allocation for conversations and application runs."""
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from django.conf import settings
@@ -113,3 +116,24 @@ def conversation_working_directory(conversation) -> str:
         conversation.working_directory = path
         conversation.save(update_fields=['working_directory'])
     return path
+
+
+def open_workspace_directory(raw_path: str) -> None:
+    """Open an existing workspace in the host operating system's file manager."""
+    directory = Path(raw_path).expanduser().resolve(strict=True)
+    if not directory.is_dir():
+        raise FileNotFoundError(str(directory))
+    if os.name == 'nt':
+        os.startfile(str(directory))
+        return
+
+    command = ['open', str(directory)] if sys.platform == 'darwin' else [
+        'xdg-open', str(directory),
+    ]
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )

@@ -1,11 +1,19 @@
 /* ChatContainer — matches design-mockup.html chat styles */
 
 .chat-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   background: var(--color-bg-void);
+}
+
+.chat-workspace-toolbar {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 20px;
 }
 
 /* Messages area */

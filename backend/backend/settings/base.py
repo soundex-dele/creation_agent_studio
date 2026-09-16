@@ -185,6 +185,8 @@ else:
 SQLITE_BUSY_TIMEOUT_MS = config(
     'SQLITE_BUSY_TIMEOUT_MS', default=5000, cast=int)
 SQLITE_SYNCHRONOUS = config('SQLITE_SYNCHRONOUS', default='FULL')
+LOCAL_FILE_MANAGER_ENABLED = config(
+    'LOCAL_FILE_MANAGER_ENABLED', default=False, cast=bool)
 
 # Server-controlled executor key -> child entrypoint registry. Revision content
 # selects only a key; it can never inject an arbitrary Python import path.

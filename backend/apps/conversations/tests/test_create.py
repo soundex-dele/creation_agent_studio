@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+from unittest.mock import patch
 
 from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Message
@@ -171,3 +172,26 @@ class CreateConversationTest(TestCase):
             )
 
         self.assertEqual(response.status_code, 400)
+
+    @override_settings(LOCAL_FILE_MANAGER_ENABLED=True)
+    @patch('apps.conversations.views.open_workspace_directory')
+    def test_open_workspace_opens_the_authorized_conversation_directory(self, open_directory):
+        with TemporaryDirectory() as directory, override_settings(
+                AGENT_WORKSPACE_ROOT=directory):
+            created = self.client.post('/api/v1/conversations/', {}, format='json')
+            response = self.client.post(
+                f"/api/v1/conversations/{created.data['id']}/open-workspace/",
+                {},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        open_directory.assert_called_once_with(created.data['working_directory'])
+
+    @override_settings(LOCAL_FILE_MANAGER_ENABLED=False)
+    def test_open_workspace_is_disabled_for_server_deployments(self):
+        response = self.client.post(
+            '/api/v1/conversations/999/open-workspace/', {}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 409, response.data)

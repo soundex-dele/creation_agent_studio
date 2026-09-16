@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert } from 'antd';
+import { Alert, Button, message } from 'antd';
+import { FolderOpenOutlined } from '@ant-design/icons';
+import { api } from '@/services/api';
 import { useConversationStore } from '@/stores/useConversationStore';
 import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -87,6 +89,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const appliedDraftRequestIdRef = useRef<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
 
   useEffect(() => {
     shouldAutoScrollRef.current = true;
@@ -195,6 +198,18 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     shouldAutoScrollRef.current = distanceFromBottom <= 96;
   };
 
+  const openWorkspace = async () => {
+    if (!conversationId || isOpeningWorkspace) return;
+    setIsOpeningWorkspace(true);
+    try {
+      await api.post(`/conversations/${conversationId}/open-workspace/`, {});
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '无法打开当前会话目录');
+    } finally {
+      setIsOpeningWorkspace(false);
+    }
+  };
+
   const isStreaming = streamingMessageId !== null;
   const messages = currentConversation?.messages || [];
   // The first optimistic messages are added just before the URL receives its
@@ -220,6 +235,18 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   return (
     <div className="chat-container">
+      {conversationId && (
+        <div className="chat-workspace-toolbar">
+          <Button
+            size="small"
+            icon={<FolderOpenOutlined />}
+            loading={isOpeningWorkspace}
+            onClick={() => void openWorkspace()}
+          >
+            打开目录
+          </Button>
+        </div>
+      )}
       {isEmpty && !isLoading ? (
         <div className="chat-empty">
           <div className="chat-empty-icon">{agent?.icon || '✦'}</div>

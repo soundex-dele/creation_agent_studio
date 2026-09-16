@@ -2,7 +2,7 @@
 import logging
 import time
 from django.conf import settings
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -27,7 +27,10 @@ from apps.projects.services.workspace_files import (
     list_conversation_workspace_files,
     read_conversation_workspace_file,
 )
-from apps.projects.services.workspace_paths import conversation_working_directory
+from apps.projects.services.workspace_paths import (
+    conversation_working_directory,
+    open_workspace_directory,
+)
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import (
     DeploymentUnavailable,
@@ -321,8 +324,57 @@ class ConversationViewSet(viewsets.ViewSet):
         except FileNotFoundError:
             return Response({"detail": "文件不存在或已被删除。"}, status=404)
 
-    @transaction.atomic
+    @action(detail=True, methods=["post"], url_path="open-workspace")
+    def open_workspace(self, request, pk=None):
+        if not settings.LOCAL_FILE_MANAGER_ENABLED:
+            return Response(
+                {"detail": "当前部署不支持打开本机目录。"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        conversation = self.get_conversation(request, pk)
+        try:
+            directory = conversation_working_directory(conversation)
+            open_workspace_directory(directory)
+        except (FileNotFoundError, OSError):
+            logger.exception(
+                "Unable to open conversation workspace conversation_id=%s", pk,
+            )
+            return Response(
+                {"detail": "无法打开当前会话目录。"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response({"working_directory": directory})
+
     def _create_run(
+        self,
+        request,
+        conversation,
+        message,
+        idempotency_key,
+        requested_agent_id=AGENT_SELECTION_UNSET,
+        requested_skill_names=(),
+        max_retries=6,
+    ):
+        for retry_no in range(max_retries):
+            try:
+                return self._create_run_once(
+                    request,
+                    conversation,
+                    message,
+                    idempotency_key,
+                    requested_agent_id=requested_agent_id,
+                    requested_skill_names=requested_skill_names,
+                )
+            except OperationalError as exc:
+                is_busy = "locked" in str(exc).lower() or "busy" in str(exc).lower()
+                if not is_busy or retry_no + 1 >= max_retries:
+                    raise
+                time.sleep(0.02 * (2**retry_no))
+
+        raise RuntimeError("Unable to create conversation run after retries")
+
+    @transaction.atomic
+    def _create_run_once(
         self,
         request,
         conversation,

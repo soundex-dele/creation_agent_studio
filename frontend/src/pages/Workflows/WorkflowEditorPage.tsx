@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Input, InputNumber, Segmented, Select, Spin, message } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Card, Empty, Input, InputNumber, Modal, Segmented, Select, Spin, message } from 'antd';
+import type { InputRef } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -15,17 +16,12 @@ const WorkflowEditorPage = () => {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [apps, setApps] = useState<AppItem[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
-  const [selectedApplication, setSelectedApplication] = useState<number>();
   const [saving, setSaving] = useState(false);
+  const [appPickerOpen, setAppPickerOpen] = useState(false);
+  const nameInputRef = useRef<InputRef>(null);
 
   useEffect(() => {
-    if (!id) return;
-    Promise.all([
-      api.get<Workflow>(`/workflows/${id}/`),
-      api.get<any[]>('/apps/'),
-    ]).then(([workflowData, appData]) => {
-      setWorkflow(workflowData);
-      setSteps(workflowData.steps || []);
+    const loadApps = () => api.get<any[]>('/apps/').then((appData) => {
       setApps(unwrap(appData).map((app: any) => ({
         id: app.slug, name: app.name, description: app.description,
         category: app.category_slug, icon: app.icon, color: app.color,
@@ -33,21 +29,38 @@ const WorkflowEditorPage = () => {
         rendererKey: app.renderer_key, kind: app.kind,
       })));
     });
+    if (!id) {
+      setWorkflow({
+        id: '',
+        name: '',
+        description: '',
+        icon: '🔀',
+        execution_mode: 'manual',
+        is_public: false,
+        steps: [],
+      });
+      setSteps([]);
+      void loadApps();
+      return;
+    }
+    Promise.all([
+      api.get<Workflow>(`/workflows/${id}/`),
+      loadApps(),
+    ]).then(([workflowData]) => {
+      setWorkflow(workflowData);
+      setSteps(workflowData.steps || []);
+    });
   }, [id]);
-
-  const choices = useMemo(() => apps.filter((app) => app.applicationId).map((app) => ({
-    value: app.applicationId!, label: `${app.icon || '◈'} ${app.name}`,
-  })), [apps]);
 
   if (!workflow) return <div className="workflows-loading"><Spin size="large" /></div>;
 
-  const addStep = () => {
-    const app = apps.find((item) => item.applicationId === selectedApplication);
-    if (!app || !selectedApplication) return;
+  const addStep = (applicationId: number) => {
+    const app = apps.find((item) => item.applicationId === applicationId);
+    if (!app) return;
     const key = `step-${Date.now()}`;
     const applicationBase = {
-      id: selectedApplication,
-      application_id: selectedApplication,
+      id: applicationId,
+      application_id: applicationId,
       application_slug: app.id,
       application_name: app.name,
       application_description: app.description,
@@ -85,10 +98,10 @@ const WorkflowEditorPage = () => {
       depends_on: current.length ? [current[current.length - 1].key] : [],
       condition: {},
       max_attempts: 1,
-      application_id: selectedApplication,
+      application_id: applicationId,
       application,
     }]);
-    setSelectedApplication(undefined);
+    setAppPickerOpen(false);
   };
 
   const move = (index: number, delta: number) => {
@@ -100,10 +113,15 @@ const WorkflowEditorPage = () => {
   };
 
   const save = async () => {
+    if (!workflow.name.trim()) {
+      message.warning('请填写工作流名称');
+      nameInputRef.current?.focus();
+      return;
+    }
     setSaving(true);
     try {
-      await api.put(`/workflows/${workflow.id}/`, {
-        name: workflow.name,
+      const payload = {
+        name: workflow.name.trim(),
         description: workflow.description || '',
         icon: workflow.icon || '🔀',
         execution_mode: workflow.execution_mode,
@@ -118,9 +136,16 @@ const WorkflowEditorPage = () => {
           condition: step.condition || {},
           max_attempts: step.max_attempts || 1,
         })),
-      });
-      message.success('工作流已保存');
+      };
+      if (id) {
+        await api.put(`/workflows/${workflow.id}/`, payload);
+      } else {
+        await api.post<Workflow>('/workflows/', payload);
+      }
+      message.success(id ? '工作流已保存' : '工作流已创建');
       navigate('/workflows');
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '工作流保存失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -130,7 +155,8 @@ const WorkflowEditorPage = () => {
     <div className="workflow-editor">
       <div className="workflows-heading">
         <div>
-          <Input className="workflow-name-input" value={workflow.name}
+          <Input ref={nameInputRef} autoFocus={!id} className="workflow-name-input"
+            value={workflow.name} placeholder="工作流名称"
             onChange={(event) => setWorkflow({ ...workflow, name: event.target.value })} />
           <Input.TextArea value={workflow.description}
             placeholder="说明这个工作流要完成什么"
@@ -155,15 +181,41 @@ const WorkflowEditorPage = () => {
             </small>
           </div>
         </div>
-        <Button type="primary" loading={saving} onClick={save}>保存工作流</Button>
+        <Button type="primary" loading={saving} onClick={save}>
+          {id ? '保存工作流' : '创建工作流'}
+        </Button>
       </div>
-      <Card title="添加应用" className="workflow-add-card">
-        <div className="workflow-add-row">
-          <Select showSearch value={selectedApplication} onChange={setSelectedApplication}
-            placeholder="选择应用" options={choices} />
-          <Button icon={<PlusOutlined />} disabled={!selectedApplication} onClick={addStep}>添加</Button>
-        </div>
-      </Card>
+      <div className="workflow-add-actions">
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAppPickerOpen(true)}>
+          添加应用
+        </Button>
+      </div>
+      <Modal
+        title="选择应用"
+        open={appPickerOpen}
+        footer={null}
+        width={760}
+        onCancel={() => setAppPickerOpen(false)}
+      >
+        {apps.some((app) => app.applicationId) ? (
+          <div className="workflow-app-picker-grid">
+            {apps.filter((app) => app.applicationId).map((app) => (
+              <button
+                key={app.applicationId}
+                type="button"
+                className="workflow-app-picker-item"
+                onClick={() => addStep(app.applicationId!)}
+              >
+                <span className="workflow-app-picker-icon">{app.icon || '◈'}</span>
+                <span className="workflow-app-picker-copy">
+                  <strong>{app.name}</strong>
+                  <small>{app.description || '暂无应用说明'}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : <Empty description="暂无可添加的应用" />}
+      </Modal>
       <div className="workflow-step-list">
         {steps.length === 0 ? <Empty description="请添加至少一个应用" />
           : steps.map((step, index) => (
