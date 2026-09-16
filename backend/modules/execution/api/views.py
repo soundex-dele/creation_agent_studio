@@ -37,6 +37,10 @@ from modules.execution.models import (
     RunEventSnapshot,
 )
 from apps.enterprise.models import Membership
+from apps.projects.services.workspace_paths import (
+    open_workspace_directory,
+    workflow_working_directory,
+)
 from modules.tenancy.permissions import HasPathOrganizationRole
 
 from .base import ProblemDetailsAPIView
@@ -108,6 +112,38 @@ def _compacted_problem(request, snapshot):
     return response
 
 
+def _workflow_conversation_ids(run_ids):
+    """Collect conversations owned by one workflow Run tree."""
+
+    conversation_ids = set()
+
+    def add(value):
+        try:
+            conversation_ids.add(int(value))
+        except (TypeError, ValueError):
+            return
+
+    runs = Run.objects.filter(id__in=run_ids).only(
+        "definition_snapshot", "output_summary"
+    )
+    for item in runs:
+        definition = dict(item.definition_snapshot or {})
+        add(definition.get("conversation_id"))
+        for step in definition.get("workflow_steps") or []:
+            if isinstance(step, dict):
+                add(step.get("conversation_id"))
+        summary = dict(item.output_summary or {})
+        conversations = summary.get("conversations") or {}
+        if isinstance(conversations, dict):
+            for conversation_id in conversations.values():
+                add(conversation_id)
+        for conversation_id in item.projected_messages.values_list(
+            "conversation_id", flat=True
+        ).distinct():
+            add(conversation_id)
+    return conversation_ids
+
+
 class OrganizationRunView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
@@ -126,7 +162,20 @@ class OrganizationRunView(ProblemDetailsAPIView):
                 title="Run not found",
                 detail="The requested run does not exist or is not accessible.",
             )
-        return Response(RunSerializer(run, context={"request": request}).data)
+        body = RunSerializer(run, context={"request": request}).data
+        if run.source_type == "workflow":
+            body["workflow_conversations"] = {
+                child.node_key: str(conversation_id)
+                for child in run.child_runs.only(
+                    "node_key", "definition_snapshot"
+                )
+                if child.node_key
+                for conversation_id in [
+                    (child.definition_snapshot or {}).get("conversation_id")
+                ]
+                if conversation_id
+            }
+        return Response(body)
 
     def delete(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
@@ -209,14 +258,32 @@ class OrganizationRunView(ProblemDetailsAPIView):
             .values_list("object_key", flat=True)
         )
         try:
-            run.delete()
+            with transaction.atomic():
+                # Suspended workflow attempts protect their checkpoint artifact.
+                # Both rows belong to the Run tree being deleted, so release
+                # the pointer before Django collects the cascading deletes.
+                RunAttempt.objects.filter(
+                    run_id__in=run_ids,
+                    checkpoint_artifact_id__isnull=False,
+                ).update(checkpoint_artifact=None)
+                if run.source_type == "workflow":
+                    from apps.conversations.models import Conversation
+
+                    conversation_ids = _workflow_conversation_ids(run_ids)
+                    if conversation_ids:
+                        Conversation.objects.filter(
+                            id__in=conversation_ids,
+                            organization_id=organization_id,
+                            user_id=run.owner_id,
+                        ).delete()
+                run.delete()
         except ProtectedError:
             return _problem(
                 request,
                 status_code=status.HTTP_409_CONFLICT,
                 code="run_is_referenced",
                 title="Run is referenced",
-                detail="该执行记录已关联到对话消息，无法删除。",
+                detail="该执行记录仍存在无法自动清理的关联数据，暂时无法删除。",
             )
         for object_key in filter(None, object_keys):
             try:
@@ -224,6 +291,58 @@ class OrganizationRunView(ProblemDetailsAPIView):
             except (OSError, UnsafeArtifactObjectKey):
                 continue
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OrganizationRunWorkspaceView(ProblemDetailsAPIView):
+    """Open the shared directory owned by a workflow Run."""
+
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    def post(self, request, organization_id, run_id):
+        if not settings.LOCAL_FILE_MANAGER_ENABLED:
+            return _problem(
+                request,
+                status_code=status.HTTP_409_CONFLICT,
+                code="local_file_manager_disabled",
+                title="Local file manager disabled",
+                detail="当前部署不支持打开本机目录。",
+            )
+        run = (
+            Run.objects.for_organization(organization_id)
+            .select_related("owner", "organization")
+            .filter(pk=run_id, owner=request.user)
+            .first()
+        )
+        if run is None:
+            return _problem(
+                request,
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="run_not_found",
+                title="Run not found",
+                detail="工作流执行记录不存在或无权访问。",
+            )
+        if run.source_type != "workflow":
+            return _problem(
+                request,
+                status_code=status.HTTP_409_CONFLICT,
+                code="run_has_no_workflow_workspace",
+                title="Run has no workflow workspace",
+                detail="该执行记录没有工作流共享目录。",
+            )
+        try:
+            directory = workflow_working_directory(
+                run.owner, run.organization, run.id
+            )
+            open_workspace_directory(directory)
+        except (FileNotFoundError, OSError, RuntimeError):
+            return _problem(
+                request,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                code="workflow_workspace_open_failed",
+                title="Workflow workspace open failed",
+                detail="无法打开当前工作流目录。",
+            )
+        return Response({"working_directory": directory})
 
 
 class OrganizationRunsView(ProblemDetailsAPIView):

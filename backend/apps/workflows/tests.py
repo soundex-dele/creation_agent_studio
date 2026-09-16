@@ -1,3 +1,7 @@
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
@@ -113,6 +117,13 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(
             run.definition_snapshot["workflow_steps"][1]["max_attempts"], 2
         )
+        expected_workspace = (
+            Path(settings.AGENT_WORKSPACE_ROOT)
+            / "organizations" / str(self.organization.id)
+            / "workflows" / str(run.id)
+        ).resolve()
+        self.assertEqual(Path(run.input["working_directory"]), expected_workspace)
+        self.assertTrue(expected_workspace.is_dir())
 
         replay = self.client.post(
             f"/api/v1/workflows/{workflow.id}/start/",
@@ -354,7 +365,6 @@ class WorkflowApiTest(TestCase):
         }, format="json", **self.headers)
         self.assertEqual(workflow_response.status_code, 201, workflow_response.data)
 
-        from unittest.mock import patch
         runtime_skills = [{
             "name": skill.slug,
             "display_name": skill.name,
@@ -382,12 +392,53 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(step["content"]["skill_bindings"], [])
         self.assertEqual(step["skill_revisions"], [])
         self.assertEqual(step["runtime_input"]["skills"], runtime_skills)
+        self.assertNotIn("conversation_id", step)
+        self.assertFalse(
+            Conversation.objects.filter(process_id="workflow:write").exists()
+        )
+
+        from modules.execution.runtime import builtin
+
+        def finish_child(_root, children, _sink, _organization_id, **_kwargs):
+            return {
+                "write": {
+                    "status": "completed",
+                    "attempts": 1,
+                    "output": {"result": "Draft article"},
+                    "child_run_id": str(children["write"]),
+                }
+            }
+
+        result_sink = MagicMock(cancelled=False)
+        with patch.object(builtin, "_wait_for_step_runs", side_effect=finish_child):
+            result = builtin.execute_workflow({
+                "run_id": str(run.id),
+                "organization_id": str(self.organization.id),
+                "definition_snapshot": run.definition_snapshot,
+                "input": run.input,
+            }, result_sink)
+
+        self.assertEqual(result["status"], "completed")
+        child = run.child_runs.get(node_key="write")
         conversation = Conversation.objects.get(
-            pk=step["conversation_id"],
+            pk=child.definition_snapshot["conversation_id"],
             chat_application_id=application.id,
         )
         self.assertEqual(conversation.title, "Draft chat flow · Write")
         self.assertEqual(conversation.process_id, "workflow:write")
+        self.assertEqual(
+            conversation.working_directory,
+            run.input["working_directory"],
+        )
+        started_payload = next(
+            call.args[1]
+            for call in result_sink.emit.call_args_list
+            if call.args[0] == "workflow.step.started"
+        )
+        self.assertEqual(
+            started_payload["conversation_id"],
+            str(conversation.id),
+        )
         self.assertEqual(
             step["content"]["dependencies"]["agents"][0]["definition"],
             agent_definition,

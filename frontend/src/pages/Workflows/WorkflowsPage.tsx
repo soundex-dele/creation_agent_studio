@@ -171,7 +171,7 @@ const WorkflowsPage = () => {
         throw new Error('取消工作流超时，请稍后重试');
       }
       setRuns((current) => current.filter((item) => item.id !== run.id));
-      message.success('执行历史已删除');
+      message.success('执行历史及关联对话已删除');
     } catch (error: any) {
       message.error(error?.response?.data?.detail || error?.message || '删除执行历史失败');
     } finally {
@@ -279,8 +279,8 @@ const WorkflowsPage = () => {
                         <Popconfirm
                           title="删除执行历史"
                           description={['succeeded', 'failed', 'cancelled'].includes(run.status)
-                            ? '确定删除这条执行历史吗？相关事件和产物也会删除，且无法恢复。'
-                            : '执行仍在进行。删除时会先自动取消或结束工作流，再清理相关事件和产物。'}
+                            ? '确定删除这条执行历史吗？关联对话、消息、事件和产物也会删除，且无法恢复。'
+                            : '执行仍在进行。删除时会先自动取消或结束工作流，再删除关联对话、消息、事件和产物。'}
                           okText="删除"
                           cancelText="取消"
                           okButtonProps={{ danger: true }}

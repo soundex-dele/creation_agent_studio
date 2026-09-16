@@ -11,6 +11,7 @@ from .views import (
     OrganizationRunEventsView,
     OrganizationRunStreamView,
     OrganizationRunView,
+    OrganizationRunWorkspaceView,
     OrganizationRunsView,
     RunArtifactContentView,
 )
@@ -31,6 +32,11 @@ urlpatterns = [
         name="application-runs",
     ),
     path("runs/<uuid:run_id>", OrganizationRunView.as_view(), name="run-detail"),
+    path(
+        "runs/<uuid:run_id>/open-workspace",
+        OrganizationRunWorkspaceView.as_view(),
+        name="run-open-workspace",
+    ),
     path(
         "runs/<uuid:run_id>/events",
         OrganizationRunEventsView.as_view(),

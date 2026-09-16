@@ -84,4 +84,5 @@ def test_parser_accepts_all_worker_pool():
     options = parser.parse_args(["--worker-pool", "all", "--once"])
 
     assert options.worker_pool == "all"
+    assert options.max_children == 3
     assert options.once is True

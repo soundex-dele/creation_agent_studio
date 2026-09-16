@@ -1,5 +1,7 @@
 """Platform adapters for the unified durable execution plane."""
 
+import json
+
 from modules.catalog.guided_prompts import compose_guided_prompt
 
 
@@ -162,6 +164,38 @@ def _render_step_message(step, workflow_input, dependency_results):
         key: _resolve_automation_value(binding, workflow_input, dependency_results)
         for key, binding in configured_answers.items()
     })
+    missing_required_text = [
+        question
+        for question in prompt.get("questions", [])
+        if question.get("required")
+        and question.get("type") == "text"
+        and answers.get(question["key"], question.get("default_value")) in (None, "")
+    ]
+    if missing_required_text and dependency_results:
+        dependency_outputs = {
+            key: value.get("output", {})
+            for key, value in dependency_results.items()
+        }
+        if len(dependency_outputs) == 1:
+            dependency_value = next(iter(dependency_outputs.values()))
+            if isinstance(dependency_value, dict) and dependency_value.get("result"):
+                dependency_value = dependency_value["result"]
+        else:
+            dependency_value = dependency_outputs
+        if not isinstance(dependency_value, str):
+            dependency_value = json.dumps(
+                dependency_value,
+                ensure_ascii=False,
+                indent=2,
+            )
+        preferred_keys = ("source", "article", "content", "input", "text", "material")
+        target = next((
+            question
+            for key in preferred_keys
+            for question in missing_required_text
+            if question["key"] == key
+        ), missing_required_text[0])
+        answers[target["key"]] = dependency_value
     rendered = compose_guided_prompt(
         prompt,
         answers,
@@ -176,6 +210,34 @@ def _load_root_run(run_payload):
     return Run.objects.select_related("owner", "organization").get(
         pk=run_payload["run_id"]
     )
+
+
+def _create_step_conversation(root, step, working_directory):
+    """Create a chat step's Conversation only when its child Run is runnable."""
+
+    content = step.get("content") or {}
+    if content.get("kind") != "chat":
+        return step
+    from apps.conversations.models import Conversation
+
+    default_agent = next((
+        item
+        for item in (content.get("dependencies") or {}).get("agents", [])
+        if item.get("is_default")
+    ), None)
+    workflow_name = str(
+        (root.definition_snapshot or {}).get("workflow_name") or "Workflow"
+    )
+    conversation = Conversation.objects.create(
+        user=root.owner,
+        organization=root.organization,
+        title=f"{workflow_name} · {step['name']}",
+        agent_id=(default_agent or {}).get("agent_id"),
+        chat_application_id=step.get("application_id"),
+        process_id=f"workflow:{step['key']}"[:64],
+        working_directory=str(working_directory or ""),
+    )
+    return {**step, "conversation_id": str(conversation.id)}
 
 
 def _create_or_load_step_run(root, step, workflow_input, dependency_results, governance):
@@ -199,19 +261,30 @@ def _create_or_load_step_run(root, step, workflow_input, dependency_results, gov
                 for key, value in dependency_results.items()
             },
         }
+        # The root Run owns the workspace. Every workflow Agent receives the
+        # same directory so files produced by dependent steps are immediately
+        # available to the steps that follow. Runtime step input must not be
+        # able to replace this server-controlled path.
+        if workflow_input.get("working_directory"):
+            child_input["working_directory"] = workflow_input["working_directory"]
         message = _render_step_message(step, workflow_input, dependency_results)
         if message:
             child_input["message"] = message
+        step_snapshot = _create_step_conversation(
+            locked_root,
+            step,
+            child_input.get("working_directory"),
+        )
         child = create_run(
             organization=locked_root.organization,
             owner=locked_root.owner,
             parent=locked_root,
-            node_key=step["key"],
-            executor_kind=step["executor_kind"],
-            executor_key=step["executor_key"],
+            node_key=step_snapshot["key"],
+            executor_kind=step_snapshot["executor_kind"],
+            executor_key=step_snapshot["executor_key"],
             source_type="workflow_step",
-            source_id=step["id"],
-            definition_snapshot=_durable_step_snapshot(step, governance),
+            source_id=step_snapshot["id"],
+            definition_snapshot=_durable_step_snapshot(step_snapshot, governance),
             input_data=child_input,
             priority=locked_root.priority,
             max_attempts=int(step.get("max_attempts") or 1),
@@ -266,6 +339,19 @@ def _cancel_children(root):
         )
 
 
+def _completed_step_result(child):
+    result = {
+        "status": "completed",
+        "attempts": child.attempt_count,
+        "output": child.output_summary,
+        "child_run_id": str(child.id),
+    }
+    conversation_id = (child.definition_snapshot or {}).get("conversation_id")
+    if conversation_id:
+        result["conversation_id"] = str(conversation_id)
+    return result
+
+
 def _wait_for_step_runs(root, children, sink, organization_id, poll_interval=None):
     """Collect completed children or durably release the workflow Worker.
 
@@ -304,12 +390,7 @@ def _wait_for_step_runs(root, children, sink, organization_id, poll_interval=Non
                     ),
                 )
             if child.status == Run.Status.SUCCEEDED:
-                results[key] = {
-                    "status": "completed",
-                    "attempts": child.attempt_count,
-                    "output": child.output_summary,
-                    "child_run_id": str(child.id),
-                }
+                results[key] = _completed_step_result(child)
             elif child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
                 raise RuntimeError(
                     f"Workflow step {key} {child.status}: "
@@ -353,6 +434,9 @@ def _execute_workflow_durable(run_payload, sink):
                 "workflow.step.skipped",
             )
         }
+        latest_progress = root.events.filter(
+            type="progress.updated"
+        ).order_by("-sequence").values_list("payload", flat=True).first() or {}
         for child in root.child_runs.all():
             if child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
                 raise RuntimeError(
@@ -360,12 +444,7 @@ def _execute_workflow_durable(run_payload, sink):
                     f"{child.error_message or child.error_code}"
                 )
             if child.status == Run.Status.SUCCEEDED:
-                result = {
-                    "status": "completed",
-                    "attempts": child.attempt_count,
-                    "output": child.output_summary,
-                    "child_run_id": str(child.id),
-                }
+                result = _completed_step_result(child)
                 results[child.node_key] = result
                 if child.node_key not in emitted["workflow.step.completed"]:
                     _WorkflowSink(sink, by_key[child.node_key]).emit(
@@ -374,8 +453,28 @@ def _execute_workflow_durable(run_payload, sink):
         for key in emitted["workflow.step.skipped"]:
             if key in by_key:
                 results[key] = {"status": "skipped", "attempts": 0, "output": {}}
+
+    last_progress = (
+        latest_progress.get("current"), latest_progress.get("total")
+    )
+
+    def emit_progress(current):
+        nonlocal last_progress
+        progress = (current, len(steps))
+        if progress == last_progress:
+            return
+        sink.emit("progress.updated", {
+            "current": current,
+            "total": len(steps),
+        })
+        last_progress = progress
+
     pending = set(by_key) - set(results)
     completed = len(results)
+    # Durable workflows suspend their Worker while child Runs execute. Emit
+    # progress immediately after rebuilding state on every resume; code after
+    # wait_for_children() is not reached when the attempt is suspended.
+    emit_progress(completed)
     while pending:
         ready = sorted(
             key for key in pending
@@ -396,6 +495,7 @@ def _execute_workflow_durable(run_payload, sink):
                     )
                 pending.remove(key)
                 completed += 1
+                emit_progress(completed)
         runnable = runnable[:max_parallelism]
         children = {}
         for key in runnable:
@@ -410,11 +510,17 @@ def _execute_workflow_durable(run_payload, sink):
                 )
             children[key] = child.id
             if created:
-                _WorkflowSink(sink, step).emit("workflow.step.started", {
+                started = {
                     "child_run_id": str(child.id),
                     "status": child.status,
                     "max_attempts": child.max_attempts,
-                })
+                }
+                conversation_id = (child.definition_snapshot or {}).get(
+                    "conversation_id"
+                )
+                if conversation_id:
+                    started["conversation_id"] = str(conversation_id)
+                _WorkflowSink(sink, step).emit("workflow.step.started", started)
         layer_results = _wait_for_step_runs(
             root,
             children,
@@ -430,7 +536,7 @@ def _execute_workflow_durable(run_payload, sink):
             _WorkflowSink(sink, by_key[key]).emit(
                 "workflow.step.completed", result
             )
-            sink.emit("progress.updated", {"current": completed, "total": len(steps)})
+            emit_progress(completed)
     return {
         "status": "completed",
         "steps": [

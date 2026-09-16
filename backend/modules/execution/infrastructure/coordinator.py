@@ -69,6 +69,7 @@ class ActiveChild:
     next_heartbeat_at: float
     span: object = None
     exited_at: float | None = None
+    cancel_requested_at: float | None = None
 
 
 class ExecutionCoordinator:
@@ -83,11 +84,12 @@ class ExecutionCoordinator:
         *,
         worker_id,
         worker_pool,
-        max_children=2,
+        max_children=3,
         lease_seconds=30,
         poll_interval=0.25,
         adapter_entries=None,
         process_context=None,
+        cancel_grace_seconds=None,
     ):
         if max_children < 1:
             raise ValueError("max_children must be at least one")
@@ -98,6 +100,14 @@ class ExecutionCoordinator:
         self.max_children = max_children
         self.lease_seconds = lease_seconds
         self.poll_interval = poll_interval
+        self.cancel_grace_seconds = max(
+            0.0,
+            float(
+                getattr(settings, "EXECUTION_CANCEL_GRACE_SECONDS", 2.0)
+                if cancel_grace_seconds is None
+                else cancel_grace_seconds
+            ),
+        )
         self.adapter_entries = dict(adapter_entries or {})
         self._context = process_context or multiprocessing.get_context("spawn")
         self._active = {}
@@ -526,6 +536,8 @@ class ExecutionCoordinator:
         ).first()
         if run_status == Run.Status.CANCELLING:
             active.cancel_event.set()
+            if active.cancel_requested_at is None:
+                active.cancel_requested_at = now_monotonic
             RunCommand.objects.filter(
                 run_id=active.claimed.run.id,
                 type=RunCommand.Type.CANCEL,
@@ -547,6 +559,30 @@ class ExecutionCoordinator:
                 break
 
         if terminal:
+            self._remove_child(attempt_id, active)
+            return
+
+        if (
+            active.cancel_requested_at is not None
+            and now_monotonic - active.cancel_requested_at
+            >= self.cancel_grace_seconds
+        ):
+            # Adapters receive the cancellation Event first. A provider call
+            # may nevertheless be blocked in native/network code, so enforce
+            # the user-requested cancellation after a short grace period.
+            if active.process.is_alive():
+                active.process.terminate()
+                active.process.join(timeout=1)
+            try:
+                self._finish(
+                    active,
+                    {
+                        "outcome": "cancelled",
+                        "output": {},
+                    },
+                )
+            except LeaseLost:
+                pass
             self._remove_child(attempt_id, active)
             return
 

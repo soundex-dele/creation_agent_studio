@@ -17,6 +17,7 @@ from apps.applications.models import Application, Skill
 from apps.applications.runtime_skills import resolve_runtime_skills, resolve_skill_adapter
 from apps.enterprise.models import Membership
 from apps.enterprise.permissions import OrganizationRolePermission, resolve_organization
+from apps.projects.services.workspace_paths import workflow_working_directory
 from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
 from modules.catalog.services import canonical_content_hash
 from modules.execution.api.serializers import RunSerializer
@@ -455,34 +456,14 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     priority=int(request.data.get("priority") or 0),
                     idempotency_key=idempotency_key,
                 )
-                if not replayed:
-                    from apps.conversations.models import Conversation
-
-                    frozen = dict(run.definition_snapshot or {})
-                    frozen_steps = list(frozen.get("workflow_steps") or [])
-                    for step, frozen_step in zip(steps, frozen_steps):
-                        if step.application.kind != Application.Kind.CHAT:
-                            continue
-                        default_agent = next((
-                            item for item in (
-                                (frozen_step.get("content") or {})
-                                .get("dependencies", {})
-                                .get("agents", [])
-                            )
-                            if item.get("is_default")
-                        ), None)
-                        conversation = Conversation.objects.create(
-                            user=request.user,
-                            organization=workflow.organization,
-                            title=f"{workflow.name} · {frozen_step['name']}",
-                            agent_id=(default_agent or {}).get("agent_id"),
-                            chat_application_id=step.application_id,
-                            process_id=f"workflow:{frozen_step['key']}"[:64],
-                        )
-                        frozen_step["conversation_id"] = str(conversation.id)
-                    frozen["workflow_steps"] = frozen_steps
-                    Run.objects.filter(pk=run.pk).update(definition_snapshot=frozen)
-                    run.definition_snapshot = frozen
+                working_directory = workflow_working_directory(
+                    request.user, workflow.organization, run.id
+                )
+                run_input = dict(run.input or {})
+                if run_input.get("working_directory") != working_directory:
+                    run_input["working_directory"] = working_directory
+                    Run.objects.filter(pk=run.pk).update(input=run_input)
+                    run.input = run_input
         except IdempotencyKeyReused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         body = RunSerializer(run).data

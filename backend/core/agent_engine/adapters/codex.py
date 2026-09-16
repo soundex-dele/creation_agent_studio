@@ -133,46 +133,87 @@ def _codex_tool_payload(item):
     return payload
 
 
-def _consume_codex_turn(thread, text, *, model="", skills=None, on_event=None):
+def _consume_codex_turn(
+    thread, text, *, model="", skills=None, on_event=None, cancelled=None,
+):
     """Consume one Codex turn while preserving text and tool notifications."""
 
     if isinstance(thread, _AppServerThread):
         turn = thread.turn(text, model=model or None, skills=skills)
     else:
         turn = thread.turn(_skill_marked_text(text, skills), model=model or None)
+    stop_watcher = threading.Event()
+
+    def interrupt_when_cancelled():
+        if cancelled is None:
+            return
+        while not stop_watcher.wait(0.05):
+            if cancelled():
+                # App-server assigns the turn id in stream(). An immediate
+                # cancellation can arrive before turn/start has returned, so
+                # keep watching until there is an actual turn to interrupt.
+                if isinstance(turn, _AppServerTurn) and not turn.id:
+                    continue
+                try:
+                    turn.interrupt()
+                except Exception:
+                    logger.warning(
+                        "Unable to interrupt cancelled Codex turn", exc_info=True
+                    )
+                return
+
+    watcher = None
+    if cancelled is not None:
+        watcher = threading.Thread(
+            target=interrupt_when_cancelled,
+            name="codex-cancellation-watcher",
+            daemon=True,
+        )
+        watcher.start()
+
     chunks = []
     completed_items = {}
     usage = None
     terminal_turn = None
-    for notification in turn.stream():
-        method = str(_object_value(notification, "method", ""))
-        payload = _object_value(notification, "payload", {}) or {}
-        if method == "item/agentMessage/delta":
-            delta = str(_object_value(payload, "delta", "") or "")
-            if delta:
-                chunks.append(delta)
-                if on_event is not None:
-                    on_event("output.delta", {"text": delta})
-        elif method in {"item/started", "item/completed"}:
-            item = _object_value(payload, "item", {}) or {}
-            item_type = str(_object_value(item, "type", ""))
-            if item_type == "agentMessage" and method == "item/completed":
-                item_id = str(_object_value(item, "id", ""))
-                completed_items[item_id] = str(_object_value(item, "text", "") or "")
-            tool_payload = _codex_tool_payload(item)
-            if tool_payload is not None and on_event is not None:
-                if method == "item/started":
-                    on_event("tool.started", tool_payload)
-                else:
-                    status = str(_object_value(item, "status", ""))
-                    failed = status in {"failed", "declined"} or bool(
-                        tool_payload.get("error_message")
+    try:
+        for notification in turn.stream():
+            method = str(_object_value(notification, "method", ""))
+            payload = _object_value(notification, "payload", {}) or {}
+            if method == "item/agentMessage/delta":
+                delta = str(_object_value(payload, "delta", "") or "")
+                if delta:
+                    chunks.append(delta)
+                    if on_event is not None:
+                        on_event("output.delta", {"text": delta})
+            elif method in {"item/started", "item/completed"}:
+                item = _object_value(payload, "item", {}) or {}
+                item_type = str(_object_value(item, "type", ""))
+                if item_type == "agentMessage" and method == "item/completed":
+                    item_id = str(_object_value(item, "id", ""))
+                    completed_items[item_id] = str(
+                        _object_value(item, "text", "") or ""
                     )
-                    on_event("tool.failed" if failed else "tool.completed", tool_payload)
-        elif method == "thread/tokenUsage/updated":
-            usage = _object_value(payload, "token_usage")
-        elif method == "turn/completed":
-            terminal_turn = _object_value(payload, "turn")
+                tool_payload = _codex_tool_payload(item)
+                if tool_payload is not None and on_event is not None:
+                    if method == "item/started":
+                        on_event("tool.started", tool_payload)
+                    else:
+                        status = str(_object_value(item, "status", ""))
+                        failed = status in {"failed", "declined"} or bool(
+                            tool_payload.get("error_message")
+                        )
+                        on_event(
+                            "tool.failed" if failed else "tool.completed",
+                            tool_payload,
+                        )
+            elif method == "thread/tokenUsage/updated":
+                usage = _object_value(payload, "token_usage")
+            elif method == "turn/completed":
+                terminal_turn = _object_value(payload, "turn")
+    finally:
+        stop_watcher.set()
+        if watcher is not None:
+            watcher.join(timeout=0.2)
 
     final_response = "".join(chunks)
     if not final_response and completed_items:
@@ -860,6 +901,7 @@ class CodexAdapter(AgentAdapter):
                 model=self.model or "",
                 skills=options.get("skills") or [],
                 on_event=options.get("on_event"),
+                cancelled=options.get("cancelled"),
             )
             input_request = getattr(client, "input_request", None)
         finally:

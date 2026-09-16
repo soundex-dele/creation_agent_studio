@@ -59,6 +59,12 @@ def application_working_directory(project) -> str:
     return project.working_directory
 
 
+def workflow_working_directory(user, organization, run_id) -> str:
+    """Create the one shared directory owned by a durable workflow Run."""
+    scope = _scope_root(user, organization)
+    return str(_create_managed(scope / 'workflows' / str(run_id)))
+
+
 def validate_system_working_directory(raw_path: str) -> str:
     """Validate that a user-selected server directory exists and is accessible."""
     target = Path(raw_path).expanduser().resolve(strict=False)
@@ -84,6 +90,9 @@ def conversation_working_directory(conversation) -> str:
     # Only an ordinary conversation may own an explicitly selected external
     # system directory. Managed application/workflow directories are resolved
     # again so a directory removed on disk is safely recreated before a run.
+    if (conversation.working_directory
+            and str(conversation.process_id or '').startswith('workflow:')):
+        return str(_create_managed(Path(conversation.working_directory)))
     if (conversation.working_directory
             and not conversation.project_id
             and not conversation.application_id):

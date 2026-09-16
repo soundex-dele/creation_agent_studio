@@ -1,5 +1,6 @@
 import asyncio
 import json
+from unittest.mock import patch
 from types import SimpleNamespace
 from datetime import timedelta
 from pathlib import Path
@@ -19,6 +20,7 @@ from modules.catalog.models import (
     SkillRevision,
 )
 from apps.applications.models import Application, Skill
+from apps.conversations.models import Conversation, Message
 from modules.catalog.services import canonical_content_hash
 from django.utils import timezone
 
@@ -39,7 +41,7 @@ from modules.execution.application.event_retention import (
     empty_projection,
 )
 from modules.execution.application.runs import append_event_and_transition
-from modules.execution.models import IdempotencyRecord, Run, RunArtifact
+from modules.execution.models import IdempotencyRecord, Run, RunArtifact, RunAttempt
 from apps.enterprise.models import Membership, Organization
 from apps.applications.models import ApplicationCategory
 
@@ -154,6 +156,44 @@ def _run_url(organization, run, suffix=""):
     return f"/api/v1/organizations/{organization.id}/runs/{run.id}{suffix}"
 
 
+@pytest.mark.django_db
+@patch("modules.execution.api.views.open_workspace_directory")
+def test_workflow_run_opens_its_shared_workspace(
+    open_directory,
+    authenticated_client,
+    api_actor,
+    api_organization,
+    settings,
+    tmp_path,
+):
+    settings.LOCAL_FILE_MANAGER_ENABLED = True
+    settings.AGENT_WORKSPACE_ROOT = tmp_path
+    run = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="workflow-1",
+        definition_snapshot={"durable_children": True},
+        input_data={},
+    )
+
+    response = authenticated_client.post(
+        _run_url(api_organization, run, "/open-workspace"),
+        {},
+        format="json",
+    )
+
+    expected = (
+        tmp_path / "organizations" / str(api_organization.id)
+        / "workflows" / str(run.id)
+    ).resolve()
+    assert response.status_code == 200
+    assert Path(response.data["working_directory"]) == expected
+    open_directory.assert_called_once_with(str(expected))
+
+
 def test_run_list_uses_canonical_history_and_source_filter(
     authenticated_client, api_organization, api_run,
 ):
@@ -169,6 +209,40 @@ def test_run_list_uses_canonical_history_and_source_filter(
         {"source_type": "legacy-job"},
     )
     assert invalid.status_code == 400
+
+
+@pytest.mark.django_db
+def test_workflow_run_detail_exposes_child_conversations(
+    authenticated_client, api_actor, api_organization,
+):
+    root = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="workflow-1",
+        definition_snapshot={"durable_children": True},
+        input_data={},
+    )
+    child = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        parent=root,
+        node_key="write",
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="workflow_step",
+        source_id="step-1",
+        definition_snapshot={"conversation_id": "42"},
+        input_data={},
+    )
+
+    response = authenticated_client.get(_run_url(api_organization, root))
+
+    assert response.status_code == 200
+    assert response.data["workflow_conversations"] == {"write": "42"}
+    assert child.parent_id == root.id
 
 
 @pytest.mark.django_db
@@ -234,6 +308,92 @@ def test_running_run_starts_cancellation_before_deletion(
     deleted = authenticated_client.delete(_run_url(api_organization, api_run))
     assert deleted.status_code == 204
     assert not Run.objects.filter(pk=api_run.pk).exists()
+
+
+@pytest.mark.django_db
+def test_deleting_workflow_history_deletes_its_conversations_and_messages(
+    authenticated_client, api_actor, api_organization, api_run,
+):
+    projected_conversation = Conversation.objects.create(
+        user=api_actor,
+        organization=api_organization,
+        title="Workflow writer",
+        process_id="workflow:writer",
+    )
+    empty_conversation = Conversation.objects.create(
+        user=api_actor,
+        organization=api_organization,
+        title="Workflow reviewer",
+        process_id="workflow:reviewer",
+    )
+    Run.objects.filter(pk=api_run.pk).update(
+        status=Run.Status.SUCCEEDED,
+        finished_at=timezone.now(),
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        definition_snapshot={
+            "workflow_steps": [
+                {"key": "writer", "conversation_id": str(projected_conversation.id)},
+                {"key": "reviewer", "conversation_id": str(empty_conversation.id)},
+            ],
+        },
+    )
+    child = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        parent=api_run,
+        node_key="writer",
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="workflow_step",
+        source_id="writer",
+        definition_snapshot={
+            "conversation_id": str(projected_conversation.id),
+        },
+        input_data={"message": "Write the article"},
+    )
+    Run.objects.filter(pk=child.pk).update(
+        status=Run.Status.SUCCEEDED,
+        finished_at=timezone.now(),
+    )
+    message = Message.objects.create(
+        conversation=projected_conversation,
+        run=child,
+        run_event_sequence=1,
+        role="assistant",
+        content="Finished article",
+    )
+    attempt = RunAttempt.objects.create(
+        run=api_run,
+        attempt_no=1,
+        status=RunAttempt.Status.SUSPENDED,
+        worker_pool=Run.ExecutorKind.WORKFLOW,
+        finished_at=timezone.now(),
+    )
+    checkpoint = RunArtifact.objects.create(
+        organization=api_organization,
+        run=api_run,
+        attempt=attempt,
+        kind="checkpoint",
+        object_key=f"runs/{api_run.id}/attempts/{attempt.id}/checkpoint.json",
+        content_hash="f" * 64,
+        mime_type="application/json",
+        size=2,
+    )
+    attempt.checkpoint_artifact = checkpoint
+    attempt.save(update_fields=("checkpoint_artifact",))
+
+    deleted = authenticated_client.delete(_run_url(api_organization, api_run))
+
+    assert deleted.status_code == 204
+    assert not Run.objects.filter(pk__in=(api_run.pk, child.pk)).exists()
+    assert not Conversation.objects.filter(
+        pk__in=(projected_conversation.pk, empty_conversation.pk)
+    ).exists()
+    assert not Message.objects.filter(pk=message.pk).exists()
+    assert not RunAttempt.objects.filter(pk=attempt.pk).exists()
+    assert not RunArtifact.objects.filter(pk=checkpoint.pk).exists()
 
 
 @pytest.mark.django_db

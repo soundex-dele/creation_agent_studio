@@ -11,9 +11,10 @@ from modules.execution.infrastructure.coordinator import (
     ExecutionCoordinator,
     ExecutionCoordinatorSupervisor,
 )
+from modules.execution.application.commands import submit_run_command
 from modules.execution.application.runs import LeaseFence, create_run, finish_attempt
 from modules.execution.infrastructure.claim import claim_next_run
-from modules.execution.models import Run
+from modules.execution.models import Run, RunCommand
 from modules.execution.runtime.child import execute_child
 
 
@@ -383,3 +384,123 @@ def test_coordinator_with_no_registered_adapters_does_not_claim(monkeypatch):
     )
 
     coordinator._claim_available()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_cancel_cascades_to_running_agent():
+    actor = get_user_model().objects.create_user(username="workflow-cancel-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="1",
+        definition_snapshot={},
+        input_data={},
+    )
+    child = create_run(
+        organization=organization,
+        owner=actor,
+        parent=root,
+        node_key="writer",
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="workflow_step",
+        source_id="writer",
+        definition_snapshot={},
+        input_data={},
+    )
+    claim_next_run(
+        worker_id="agent-coordinator",
+        worker_pool=Run.ExecutorKind.AGENT,
+        executor_keys=("agent-completion",),
+    )
+
+    submit_run_command(
+        run_id=root.id,
+        organization_id=organization.id,
+        actor=actor,
+        command_type=RunCommand.Type.CANCEL,
+        idempotency_key="cancel-workflow-with-agent",
+        payload={"reason": "user_requested"},
+    )
+
+    root.refresh_from_db()
+    child.refresh_from_db()
+    assert root.status == Run.Status.CANCELLED
+    assert child.status == Run.Status.CANCELLING
+    assert child.commands.get(type=RunCommand.Type.CANCEL).payload == {
+        "reason": "parent_cancelled"
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_coordinator_force_stops_agent_after_cancellation_grace():
+    actor = get_user_model().objects.create_user(username="cancelled-agent-owner")
+    organization = actor.owned_organizations.get()
+    run = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="agent",
+        source_id="1",
+        definition_snapshot={},
+        input_data={"message": "keep working"},
+    )
+    claimed = claim_next_run(
+        worker_id="agent-coordinator",
+        worker_pool=Run.ExecutorKind.AGENT,
+        executor_keys=("agent-completion",),
+    )
+    Run.objects.filter(pk=run.pk).update(status=Run.Status.CANCELLING)
+
+    class Process:
+        terminated = False
+
+        def is_alive(self):
+            return not self.terminated
+
+        def terminate(self):
+            self.terminated = True
+
+        def join(self, timeout=None):
+            return None
+
+    class Messages:
+        def get_nowait(self):
+            raise queue.Empty
+
+        def close(self):
+            return None
+
+    cancel_event = threading.Event()
+    process = Process()
+    active = SimpleNamespace(
+        claimed=claimed,
+        process=process,
+        messages=Messages(),
+        cancel_event=cancel_event,
+        next_heartbeat_at=float("inf"),
+        span=None,
+        exited_at=None,
+        cancel_requested_at=None,
+    )
+    coordinator = ExecutionCoordinator(
+        worker_id="agent-coordinator",
+        worker_pool=Run.ExecutorKind.AGENT,
+        adapter_entries={"agent-completion": "unused:adapter"},
+        cancel_grace_seconds=0,
+    )
+    coordinator._active[claimed.attempt.id] = active
+
+    coordinator._service_child(claimed.attempt.id, active)
+
+    run.refresh_from_db()
+    assert cancel_event.is_set()
+    assert process.terminated is True
+    assert run.status == Run.Status.CANCELLED
+    assert run.current_attempt_id is None
+    assert run.events.filter(type="run.cancelled").exists()

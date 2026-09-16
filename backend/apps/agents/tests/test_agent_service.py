@@ -122,6 +122,18 @@ class DurableAgentAdapterTest(TestCase):
             )
 
     @patch("apps.agents.execution.build_agent_engine")
+    def test_cancelled_provider_error_returns_for_cancelled_outcome(self, mock_factory):
+        mock_factory.return_value.complete.side_effect = RuntimeError("interrupted")
+        sink = MagicMock(cancelled=True)
+
+        output = execute_agent_completion(self._payload(self.organization.id), sink)
+
+        self.assertEqual(output, {})
+        self.assertTrue(callable(
+            mock_factory.return_value.complete.call_args.kwargs["cancelled"]
+        ))
+
+    @patch("apps.agents.execution.build_agent_engine")
     def test_success_serializes_usage(self, mock_factory):
         mock_factory.return_value.complete.return_value = LLMResponse(
             content="hello",

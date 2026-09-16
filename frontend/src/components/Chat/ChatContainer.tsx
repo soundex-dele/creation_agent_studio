@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, message } from 'antd';
+import { Alert, Button, Tooltip, message } from 'antd';
 import { FolderOpenOutlined } from '@ant-design/icons';
 import { api } from '@/services/api';
 import { useConversationStore } from '@/stores/useConversationStore';
@@ -237,14 +237,17 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     <div className="chat-container">
       {conversationId && (
         <div className="chat-workspace-toolbar">
-          <Button
-            size="small"
-            icon={<FolderOpenOutlined />}
-            loading={isOpeningWorkspace}
-            onClick={() => void openWorkspace()}
-          >
-            打开目录
-          </Button>
+          <Tooltip title="打开目录">
+            <Button
+              type="text"
+              shape="circle"
+              size="small"
+              icon={<FolderOpenOutlined />}
+              loading={isOpeningWorkspace}
+              aria-label="打开目录"
+              onClick={() => void openWorkspace()}
+            />
+          </Tooltip>
         </div>
       )}
       {isEmpty && !isLoading ? (

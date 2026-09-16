@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.db import transaction
 from django.db.models import OuterRef, Q, Subquery
 from django.db.models.deletion import ProtectedError
 from rest_framework.filters import SearchFilter
@@ -97,17 +98,45 @@ class AgentViewSet(viewsets.ModelViewSet):
         from apps.enterprise.models import Membership
         self.require_agent_role(self.request, instance, (
             Membership.Role.OWNER, Membership.Role.ADMIN))
-        from modules.catalog.models import ApplicationDraft, ApplicationRevision
-        definitions = list(ApplicationDraft.objects.filter(
-            organization=instance.organization).values_list('content', flat=True))
-        definitions += list(ApplicationRevision.objects.filter(
-            organization=instance.organization).values_list('content', flat=True))
-        if any(str(instance.id) in {
-            str(binding.get('agent_id'))
-            for binding in definition.get('agent_bindings', [])
-        } for definition in definitions):
-            raise ProtectedError('Agent is referenced by an application definition.', [instance])
-        instance.delete()
+        from modules.catalog.models import (
+            ApplicationDeployment,
+            ApplicationDraft,
+        )
+
+        def references_agent(definition):
+            return str(instance.id) in {
+                str(binding.get('agent_id'))
+                for binding in (definition or {}).get('agent_bindings', [])
+            }
+
+        with transaction.atomic():
+            locked = Agent.objects.select_for_update().get(pk=instance.pk)
+            definitions = list(ApplicationDraft.objects.filter(
+                organization=locked.organization,
+            ).values_list('content', flat=True))
+            deployments = list(ApplicationDeployment.objects.filter(
+                organization=locked.organization,
+            ).select_related('revision', 'previous_revision'))
+            definitions += [deployment.revision.content for deployment in deployments]
+            if any(references_agent(definition) for definition in definitions):
+                raise ProtectedError(
+                    'Agent is referenced by an active application definition.',
+                    [locked],
+                )
+
+            # An old revision remains an immutable audit snapshot, but it must
+            # no longer be offered as a rollback target after its Agent is gone.
+            stale_rollback_ids = [
+                deployment.id
+                for deployment in deployments
+                if deployment.previous_revision is not None
+                and references_agent(deployment.previous_revision.content)
+            ]
+            if stale_rollback_ids:
+                ApplicationDeployment.objects.filter(
+                    id__in=stale_rollback_ids,
+                ).update(previous_revision=None)
+            locked.delete()
 
     def destroy(self, request, *args, **kwargs):
         try:

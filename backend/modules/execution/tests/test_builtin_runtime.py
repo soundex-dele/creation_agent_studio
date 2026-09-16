@@ -189,7 +189,10 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
             "workflow_steps": steps,
             "governance": {"require_tool_approval": True},
         },
-        "input": {"topic": "durable"},
+        "input": {
+            "topic": "durable",
+            "working_directory": "/managed/workflows/dag-1",
+        },
     }
 
     first_result = builtin.execute_workflow(payload, sink)
@@ -202,10 +205,105 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     second = root.child_runs.get(node_key="second")
     assert first.executor_kind == Run.ExecutorKind.MEDIA
     assert first.max_attempts == 2
+    assert first.input["working_directory"] == "/managed/workflows/dag-1"
     assert second.executor_kind == Run.ExecutorKind.AGENT
+    assert second.input["working_directory"] == "/managed/workflows/dag-1"
     assert second.input["dependency_outputs"]["first"] == {"node": "first"}
     assert second.input["skills"] == [{"name": "article-writer"}]
     assert second.definition_snapshot["governance"]["require_tool_approval"] is True
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_does_not_create_dependent_agent_until_dependency_finishes(
+    monkeypatch,
+):
+    actor = get_user_model().objects.create_user(username="dependency-gated-dag-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="dependency-gated-dag",
+        definition_snapshot={},
+        input_data={"working_directory": "/managed/workflows/dependency-gated-dag"},
+    )
+    steps = [
+        {
+            "id": "step-1", "key": "research", "name": "Research",
+            "depends_on": [], "condition": {}, "max_attempts": 1,
+            "application_id": 1, "application_revision_id": "revision-1",
+            "application_content_hash": "a" * 64,
+            "executor_kind": "agent", "executor_key": "agent-completion",
+            "content": {}, "effective_config": {},
+        },
+        {
+            "id": "step-2", "key": "writer", "name": "Writer",
+            "depends_on": ["research"], "condition": {}, "max_attempts": 1,
+            "application_id": 2, "application_revision_id": "revision-2",
+            "application_content_hash": "b" * 64,
+            "executor_kind": "agent", "executor_key": "agent-completion",
+            "content": {}, "effective_config": {},
+        },
+    ]
+    payload = {
+        "run_id": str(root.id),
+        "organization_id": str(organization.id),
+        "definition_snapshot": {
+            "durable_children": True,
+            "workflow_steps": steps,
+        },
+        "input": root.input,
+    }
+
+    class WaitingForDependency(RuntimeError):
+        pass
+
+    def suspend_on_first_layer(_root, children, _sink, _organization_id, **_kwargs):
+        assert set(children) == {"research"}
+        raise WaitingForDependency()
+
+    monkeypatch.setattr(builtin, "_wait_for_step_runs", suspend_on_first_layer)
+    first_sink = _Sink()
+    with pytest.raises(WaitingForDependency):
+        builtin.execute_workflow(payload, first_sink)
+
+    assert ("progress.updated", {"current": 0, "total": 2}) in first_sink.events
+
+    assert list(root.child_runs.values_list("node_key", flat=True)) == ["research"]
+    research = root.child_runs.get(node_key="research")
+    research.status = Run.Status.SUCCEEDED
+    research.output_summary = {"facts": ["one"]}
+    research.save(update_fields=("status", "output_summary"))
+
+    def finish_writer(_root, children, _sink, _organization_id, **_kwargs):
+        assert set(children) == {"writer"}
+        return {
+            "writer": {
+                "status": "completed",
+                "attempts": 1,
+                "output": {"result": "done"},
+                "child_run_id": str(children["writer"]),
+            }
+        }
+
+    monkeypatch.setattr(builtin, "_wait_for_step_runs", finish_writer)
+    resumed_sink = _Sink()
+    result = builtin.execute_workflow(payload, resumed_sink)
+
+    assert result["status"] == "completed"
+    progress = [
+        payload for event_type, payload in resumed_sink.events
+        if event_type == "progress.updated"
+    ]
+    assert progress == [
+        {"current": 1, "total": 2},
+        {"current": 2, "total": 2},
+    ]
+    writer = root.child_runs.get(node_key="writer")
+    assert writer.input["dependency_outputs"] == {"research": {"facts": ["one"]}}
+    assert writer.input["working_directory"] == root.input["working_directory"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -287,6 +385,56 @@ def test_durable_workflow_renders_guided_prompt_from_workflow_and_step_outputs(m
     layout = root.child_runs.get(node_key="layout")
     assert writer.input["message"] == "Topic: AI productivity\nMode: Full article"
     assert layout.input["message"] == "Topic: Rendered article\nMode: Full article"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_workflow_automatically_supplies_dependency_output_to_required_text_input():
+    actor = get_user_model().objects.create_user(username="auto-bound-dag-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="auto-bound-dag",
+        definition_snapshot={},
+        input_data={},
+    )
+    prompt = {
+        "key": "format",
+        "prompt_template": "Article:\n{article}\nTheme: {theme}",
+        "questions": [
+            {
+                "key": "article", "label": "Article", "type": "text",
+                "required": True,
+            },
+            {
+                "key": "theme", "label": "Theme", "type": "text",
+                "required": True, "default_value": "auto",
+            },
+        ],
+    }
+    step = {
+        "id": "step-format", "key": "format", "name": "Format",
+        "depends_on": ["writer"], "condition": {}, "max_attempts": 1,
+        "application_id": 1, "application_revision_id": "revision-1",
+        "application_content_hash": "a" * 64,
+        "executor_kind": "agent", "executor_key": "agent-completion",
+        "content": {"guided_prompts": [prompt]},
+        "effective_config": {},
+    }
+
+    child, created = builtin._create_or_load_step_run(
+        root,
+        step,
+        {},
+        {"writer": {"output": {"result": "Finished article"}}},
+        {},
+    )
+
+    assert created is True
+    assert child.input["message"] == "Article:\nFinished article\nTheme: auto"
 
 
 @pytest.mark.django_db(transaction=True)

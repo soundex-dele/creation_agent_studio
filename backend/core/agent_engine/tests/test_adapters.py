@@ -1,6 +1,7 @@
 """Tests for adapter registration and the Codex event bridge."""
 import os
 import sys
+import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ from django.test import override_settings
 
 from core.agent_engine.adapters.base import AgentAdapter
 from core.agent_engine.adapters.codex import (
+    _AppServerThread,
     CodexAdapter,
     _AppServerTransport,
     _consume_codex_turn,
@@ -300,6 +302,45 @@ class CodexIntegrationTest(TestCase):
             "input": "pwd",
         })
         self.assertEqual(events[-1][1]["result"], "E:/workspace")
+
+    def test_interrupts_active_turn_when_run_is_cancelled(self):
+        interrupted = threading.Event()
+        transport = MagicMock()
+
+        def request(method, _params):
+            if method == "turn/start":
+                return {"turn": {"id": "turn-1"}}
+            if method == "turn/interrupt":
+                interrupted.set()
+                return {}
+            raise AssertionError(method)
+
+        def next_notification():
+            assert interrupted.wait(timeout=1)
+            return {
+                "method": "turn/completed",
+                "params": {
+                    "threadId": "thread-1",
+                    "turn": {
+                        "id": "turn-1",
+                        "status": "interrupted",
+                        "error": None,
+                    },
+                },
+            }
+
+        transport.request.side_effect = request
+        transport.next_notification.side_effect = next_notification
+        thread = _AppServerThread(transport=transport, thread_id="thread-1")
+
+        result = _consume_codex_turn(thread, "hi", cancelled=lambda: True)
+
+        self.assertTrue(interrupted.is_set())
+        self.assertEqual(result.status, "interrupted")
+        self.assertEqual(
+            [call.args[0] for call in transport.request.call_args_list],
+            ["turn/start", "turn/interrupt"],
+        )
 
     @override_settings(
         CODEX_SANDBOX="workspace-write",

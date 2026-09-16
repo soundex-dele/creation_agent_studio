@@ -7,7 +7,13 @@ from apps.applications.models import (
     Application, ApplicationCategory, ChatApplication, Skill,
 )
 from apps.enterprise.models import Membership
-from modules.catalog.models import AgentDraft, ApplicationDraft
+from modules.catalog.models import (
+    AgentDraft,
+    ApplicationDeployment,
+    ApplicationDraft,
+    ApplicationRevision,
+    DeploymentEnvironment,
+)
 
 User = get_user_model()
 
@@ -218,3 +224,145 @@ class AgentFilterTest(TestCase):
 
         self.assertEqual(response.status_code, 409)
         self.assertTrue(Agent.objects.filter(id=agent.id).exists())
+
+    def test_historical_application_revision_does_not_block_agent_delete(self):
+        organization = self.user.organization_memberships.get().organization
+        agent = Agent.objects.create(
+            name='Historically Bound Agent',
+            slug='historically-bound-agent',
+            description='x',
+            category=self.cat_write,
+            created_by=self.user,
+            organization=organization,
+        )
+        app_category = ApplicationCategory.objects.create(
+            name='历史应用', slug='historical-apps')
+        application = Application.objects.create(
+            category=app_category,
+            name='Historical Bound App',
+            slug='historical-bound-app',
+            description='x',
+            created_by=self.user,
+            organization=organization,
+            kind=Application.Kind.CHAT,
+        )
+        content = {
+            'kind': 'chat', 'executor_kind': 'agent',
+            'executor_key': 'chat', 'renderer_key': 'chat',
+            'agent_bindings': [{'agent_id': agent.id, 'is_default': True}],
+        }
+        ApplicationRevision.objects.create(
+            organization=organization,
+            application=application,
+            revision_no=1,
+            content=content,
+            content_hash='a' * 64,
+            created_by=self.user,
+        )
+
+        response = self.client.delete(f'/api/v1/agents/{agent.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Agent.objects.filter(id=agent.id).exists())
+
+    def test_deployed_application_revision_blocks_agent_delete(self):
+        organization = self.user.organization_memberships.get().organization
+        agent = Agent.objects.create(
+            name='Deployed Bound Agent',
+            slug='deployed-bound-agent',
+            description='x',
+            category=self.cat_write,
+            created_by=self.user,
+            organization=organization,
+        )
+        app_category = ApplicationCategory.objects.create(
+            name='已部署应用', slug='deployed-apps')
+        application = Application.objects.create(
+            category=app_category,
+            name='Deployed Bound App',
+            slug='deployed-bound-app',
+            description='x',
+            created_by=self.user,
+            organization=organization,
+            kind=Application.Kind.CHAT,
+        )
+        content = {
+            'kind': 'chat', 'executor_kind': 'agent',
+            'executor_key': 'chat', 'renderer_key': 'chat',
+            'agent_bindings': [{'agent_id': agent.id, 'is_default': True}],
+        }
+        revision = ApplicationRevision.objects.create(
+            organization=organization,
+            application=application,
+            revision_no=1,
+            content=content,
+            content_hash='b' * 64,
+            created_by=self.user,
+        )
+        ApplicationDeployment.objects.create(
+            organization=organization,
+            application=application,
+            environment=DeploymentEnvironment.PRODUCTION,
+            revision=revision,
+            updated_by=self.user,
+        )
+
+        response = self.client.delete(f'/api/v1/agents/{agent.id}/')
+
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(Agent.objects.filter(id=agent.id).exists())
+
+    def test_previous_deployment_revision_is_cleared_on_agent_delete(self):
+        organization = self.user.organization_memberships.get().organization
+        agent = Agent.objects.create(
+            name='Rollback Bound Agent',
+            slug='rollback-bound-agent',
+            description='x',
+            category=self.cat_write,
+            created_by=self.user,
+            organization=organization,
+        )
+        app_category = ApplicationCategory.objects.create(
+            name='回滚应用', slug='rollback-apps')
+        application = Application.objects.create(
+            category=app_category,
+            name='Rollback Bound App',
+            slug='rollback-bound-app',
+            description='x',
+            created_by=self.user,
+            organization=organization,
+            kind=Application.Kind.CHAT,
+        )
+        previous = ApplicationRevision.objects.create(
+            organization=organization,
+            application=application,
+            revision_no=1,
+            content={
+                'agent_bindings': [{'agent_id': agent.id, 'is_default': True}],
+            },
+            content_hash='c' * 64,
+            created_by=self.user,
+        )
+        current = ApplicationRevision.objects.create(
+            organization=organization,
+            application=application,
+            revision_no=2,
+            content={'agent_bindings': []},
+            content_hash='d' * 64,
+            created_by=self.user,
+        )
+        deployment = ApplicationDeployment.objects.create(
+            organization=organization,
+            application=application,
+            environment=DeploymentEnvironment.DEVELOPMENT,
+            revision=current,
+            previous_revision=previous,
+            updated_by=self.user,
+        )
+
+        response = self.client.delete(f'/api/v1/agents/{agent.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Agent.objects.filter(id=agent.id).exists())
+        deployment.refresh_from_db()
+        self.assertIsNone(deployment.previous_revision_id)

@@ -165,14 +165,20 @@ def execute_agent_completion(run_payload, sink):
         "chat_latency stage=engine_call run_id=%s setup_ms=%.1f messages=%d",
         run_id, (time.perf_counter() - started) * 1000, len(messages),
     )
-    response = engine.complete(
-        messages,
-        approval_decision=approval_decision,
-        require_tool_approval=bool(governance.get("require_tool_approval", False)),
-        thread_id=thread_id,
-        skills=skills,
-        on_event=emit_runtime_event,
-    )
+    try:
+        response = engine.complete(
+            messages,
+            approval_decision=approval_decision,
+            require_tool_approval=bool(governance.get("require_tool_approval", False)),
+            thread_id=thread_id,
+            skills=skills,
+            on_event=emit_runtime_event,
+            cancelled=lambda: sink.cancelled,
+        )
+    except Exception:
+        if sink.cancelled:
+            return {}
+        raise
     flush_output_delta()
     logger.info(
         "chat_latency stage=engine_returned run_id=%s elapsed_ms=%.1f success=%s streamed=%s",
@@ -198,6 +204,8 @@ def execute_agent_completion(run_payload, sink):
             checkpoint=checkpoint_data,
             expires_in_seconds=expires_in_seconds,
         )
+    if sink.cancelled:
+        return {}
     if not response.success:
         raise RuntimeError(response.error or "Agent execution failed")
     # Adapters that do not expose incremental events still get the canonical
