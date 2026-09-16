@@ -123,6 +123,9 @@ class ExecutionCoordinator:
             "allowed_roots": list(
                 getattr(settings, "APPLICATION_RUNTIME_ALLOWED_ROOTS", [])
             ),
+            "allow_all_paths": bool(
+                getattr(settings, "APPLICATION_RUNTIME_ALLOW_ALL_PATHS", True)
+            ),
             "checkpoint": (
                 {
                     "artifact_id": str(checkpoint.id),

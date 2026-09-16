@@ -23,14 +23,17 @@ def execute_batch_transcribe(run_payload, sink):
         Path(root).expanduser().resolve(strict=False)
         for root in run_payload.get("allowed_roots", [])
     ]
-    if not allowed_roots or not _is_within_allowed_roots(folder_path, allowed_roots):
+    allow_all_paths = bool(run_payload.get("allow_all_paths", False))
+    if not allow_all_paths and (
+        not allowed_roots or not _is_within_allowed_roots(folder_path, allowed_roots)
+    ):
         raise PermissionError("Batch transcription folder is outside runtime roots.")
     model = config.get("model", "base")
     language = config.get("language") or None
     output_path = Path(
         config.get("output_dir") or folder_path / "transcripts"
     ).expanduser().resolve(strict=False)
-    if not _is_within_allowed_roots(output_path, allowed_roots):
+    if not allow_all_paths and not _is_within_allowed_roots(output_path, allowed_roots):
         raise PermissionError("Batch transcription output is outside runtime roots.")
     output_dir = str(output_path)
     videos = sorted(
@@ -38,7 +41,10 @@ def execute_batch_transcribe(run_payload, sink):
         for item in folder_path.iterdir()
         if item.is_file()
         and item.suffix.lower() in VIDEO_EXTENSIONS
-        and _is_within_allowed_roots(path := item.resolve(strict=False), allowed_roots)
+        and (
+            allow_all_paths
+            or _is_within_allowed_roots(path := item.resolve(strict=False), allowed_roots)
+        )
     ) if folder_path.is_dir() else []
     try:
         from faster_whisper import WhisperModel

@@ -23,6 +23,9 @@ CHAT_SKILL_APPS = {
     "wechat-viral-article": {
         "skill_slug": "wechat-viral-article",
     },
+    "wechat-viral-topics": {
+        "skill_slug": "wechat-viral-article",
+    },
 }
 
 
@@ -42,13 +45,13 @@ def test_sync_installs_all_packages_and_only_deploys_development():
     assert set(applications.values_list("slug", flat=True)) >= {
         "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
         "creation-master", "gzh-design", "html-cover-generator",
-        "wechat-html-optimizer", "wechat-viral-article",
+        "wechat-html-optimizer", "wechat-viral-article", "wechat-viral-topics",
     }
     for application in applications.filter(
         slug__in=(
             "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
             "creation-master", "gzh-design", "html-cover-generator",
-            "wechat-html-optimizer", "wechat-viral-article",
+            "wechat-html-optimizer", "wechat-viral-article", "wechat-viral-topics",
         )
     ):
         assert application.revisions.count() == 1

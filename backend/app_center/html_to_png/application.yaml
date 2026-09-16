@@ -1,0 +1,83 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: html-to-png
+  version: 1.0.0
+  name: HTML 批量转 PNG
+  description: 选择多个目录，将目录中的 HTML 文件批量渲染为 PNG。
+  category:
+    slug: image
+    name: 图片工具
+    order: 25
+  icon: "🖼️"
+  color: "#7c3aed"
+  tags: [HTML, PNG, 批量截图]
+  developer: Agent Studio
+spec:
+  application_kind: task
+  launch_mode: run
+  definition:
+    kind: task
+    executor_kind: media
+    executor_key: html-to-png
+    executor_protocol_version: 1
+    renderer_key: html-to-png
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+      required: [directories]
+      properties:
+        directories:
+          type: array
+          title: HTML 目录
+          minItems: 1
+          items:
+            type: string
+        orientation:
+          type: string
+          enum: [horizontal, vertical]
+          default: horizontal
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        device_scale_factor:
+          type: number
+          minimum: 1
+          maximum: 4
+          default: 2
+        selector:
+          type: string
+          default: .cover
+        full_page:
+          type: boolean
+          default: false
+        transparent:
+          type: boolean
+          default: false
+        no_web_fonts:
+          type: boolean
+          default: false
+        wait_until:
+          type: string
+          enum: [networkidle, load, domcontentloaded]
+          default: networkidle
+    output_schema:
+      type: object
+    default_config:
+      reference_script: D:/workspace/my-awesome-skills/animation/capture-vertical.js
+    dependencies:
+      agents: []
+      skills: []
+  backend:
+    executor_entrypoint: app_center.html_to_png.runtime.execute_html_to_png
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    initial_deployment: development

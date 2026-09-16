@@ -60,8 +60,12 @@ def application_working_directory(project) -> str:
 
 
 def validate_system_working_directory(raw_path: str) -> str:
-    """Validate a user-selected server directory against configured roots."""
+    """Validate that a user-selected server directory exists and is accessible."""
     target = Path(raw_path).expanduser().resolve(strict=False)
+    if getattr(settings, 'APPLICATION_RUNTIME_ALLOW_ALL_PATHS', True):
+        if not target.is_dir():
+            raise ValueError('所选系统工作目录不存在。')
+        return str(target)
     roots = [
         Path(root).expanduser().resolve(strict=False)
         for root in settings.APPLICATION_RUNTIME_ALLOWED_ROOTS

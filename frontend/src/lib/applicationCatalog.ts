@@ -24,6 +24,7 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
     new URLSearchParams({ slug: app.id }),
   ),
   'generic-task': (app, entry) => withEntry(`/applications/${app.applicationId}/run`, entry),
+  'html-to-png': (app, entry) => withEntry(`/applications/${app.applicationId}/run`, entry),
 };
 
 export function applicationPath(app: ApplicationLink, entry: EntryPoint = 'apps'): string {

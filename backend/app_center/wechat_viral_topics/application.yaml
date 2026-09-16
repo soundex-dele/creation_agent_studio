@@ -1,0 +1,179 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: wechat-viral-topics
+  version: 1.0.0
+  name: 公众号爆款选题
+  description: 使用公众号爆款写作 Skill，结合账号定位、目标读者和近期方向生成可执行的爆款选题方案。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "💡"
+  color: "#fa8c16"
+  tags: [公众号, 爆款选题, 内容策划, 标题, 热点]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: generate-viral-topics}
+    chat_profile:
+      welcome_message: 填写账号定位、目标读者和选题方向，我会调用公众号爆款写作 Skill 生成可直接进入创作的选题方案。
+      input_placeholder: 继续调整选题方向、数量、受众、标题或内容角度…
+      empty_state_title: 策划公众号爆款选题
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容策划专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-wechat-viral-article, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: generate-viral-topics
+        title: 生成公众号爆款选题
+        description: 根据账号定位和目标读者，生成经过传播潜力评估的选题清单与首选方案。
+        icon: "💡"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 wechat-viral-article Skill 完成下面的公众号爆款选题策划任务。
+
+          账号定位：{positioning}
+          目标读者：{audience}
+          核心领域或选题方向：{direction}
+          选题目标：{goal}
+          内容类型：{content_type}
+          时效范围：{timeliness}
+          选题数量：{count}
+          已有素材、近期热点或参考信息：
+          {source}
+
+          需要避开的方向或补充要求：
+          {requirements}
+
+          用户已通过应用表单确认以上设置，请直接执行，不要重复询问。严格依据 Skill 完成选题策划，不得虚构实时热点、事实或数据；无法确认时效的信息必须明确标注需要核验。
+
+          请交付：
+          1. 先总结账号当前最值得投入的 3 个内容方向；
+          2. 输出指定数量的候选选题，每个选题包含选题名、核心切口、目标读者痛点、传播钩子、推荐内容结构、3 个候选标题和时效性说明；
+          3. 分别按点击潜力、完读潜力、分享潜力、账号匹配度和合规风险进行 1–10 分评估；
+          4. 给出综合排序，选出最值得优先创作的 3 个选题并说明理由；
+          5. 对首选选题补充开头钩子、文章大纲、资料核验清单和发布建议。
+        questions:
+          - key: positioning
+            label: 账号定位
+            type: text
+            placeholder: 例如：AI 工具实测、职场成长、母婴科普
+            help_text: 描述账号长期提供的价值和擅长领域。
+            required: true
+            default_value: 干货型个人成长号
+            validation: {}
+            order: 0
+            options: []
+          - key: audience
+            label: 目标读者
+            type: text
+            placeholder: 例如：25–35 岁，希望提升效率的一线城市职场人
+            help_text: 尽量写明年龄、身份、场景和核心需求。
+            required: true
+            default_value: 25–40 岁微信深度阅读用户
+            validation: {}
+            order: 1
+            options: []
+          - key: direction
+            label: 核心领域或选题方向
+            type: text
+            placeholder: 例如：AI 办公提效、个人知识管理；也可以填写“自动探索”
+            help_text: 可以指定一个领域，也可以让 Skill 根据账号定位自动探索。
+            required: true
+            default_value: 自动探索
+            validation: {}
+            order: 2
+            options: []
+          - key: goal
+            label: 选题目标
+            type: single_choice
+            placeholder: 请选择
+            help_text: 决定选题评分和推荐排序的主要权重。
+            required: true
+            default_value: balanced
+            validation: {}
+            order: 3
+            options:
+              - {value: balanced, label: 阅读与分享兼顾（推荐）, description: 兼顾点击、完读和社交传播, icon: "", order: 0}
+              - {value: reading, label: 提升阅读量, description: 优先强点击和高完读选题, icon: "", order: 1}
+              - {value: followers, label: 精准涨粉, description: 突出账号价值和持续关注理由, icon: "", order: 2}
+              - {value: branding, label: 建立专业影响力, description: 优先观点、洞察和可信度, icon: "", order: 3}
+              - {value: sales, label: 产品或服务转化, description: 兼顾用户需求与商业合规, icon: "", order: 4}
+          - key: content_type
+            label: 内容类型
+            type: multi_choice
+            placeholder: 可多选
+            help_text: 未限制时建议多选，让选题组合更丰富。
+            required: true
+            default_value: [tutorial, insight, opinion]
+            validation: {}
+            order: 4
+            options:
+              - {value: tutorial, label: 干货教程, description: 可操作、可收藏, icon: "", order: 0}
+              - {value: insight, label: 行业洞察, description: 现象、分析与趋势判断, icon: "", order: 1}
+              - {value: opinion, label: 观点评论, description: 反常识切口与论证链, icon: "", order: 2}
+              - {value: story, label: 情感故事, description: 场景、冲突和情绪共鸣, icon: "", order: 3}
+              - {value: recommendation, label: 产品种草, description: 真实体验和合规利益点, icon: "", order: 4}
+          - key: timeliness
+            label: 时效范围
+            type: single_choice
+            placeholder: 请选择
+            help_text: 实时热点必须基于用户提供或可核验的信息。
+            required: true
+            default_value: mixed
+            validation: {}
+            order: 5
+            options:
+              - {value: mixed, label: 长效与热点组合（推荐）, description: 兼顾稳定流量和近期机会, icon: "", order: 0}
+              - {value: evergreen, label: 长效选题, description: 不依赖热点，可持续发布, icon: "", order: 1}
+              - {value: recent, label: 近期趋势, description: 围绕近期变化，需要核验时效, icon: "", order: 2}
+          - key: count
+            label: 选题数量
+            type: number
+            placeholder: 请输入 3–20
+            help_text: 建议生成 10 个，便于比较筛选。
+            required: true
+            default_value: 10
+            validation: {min: 3, max: 20}
+            order: 6
+            options: []
+          - key: source
+            label: 已有素材、热点或参考信息
+            type: text
+            placeholder: 可粘贴素材、热点信息、历史数据，或填写工作目录内的文件路径
+            help_text: 涉及时效、事实或数据时，请尽量提供可靠来源。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 7
+            options: []
+          - key: requirements
+            label: 避开方向与补充要求
+            type: text
+            placeholder: 例如：不做娱乐热点；避免焦虑营销；选题不要与上月文章重复
+            help_text: 可填写禁区、语气、竞品差异或近期已发布内容。
+            required: false
+            default_value: ""
+            validation: {}
+            order: 8
+            options: []
+  backend:
+    definition_factory: app_center.wechat_viral_topics.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, initial_deployment: development}

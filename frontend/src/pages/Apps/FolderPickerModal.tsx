@@ -28,7 +28,7 @@ interface Props {
 
 /**
  * Server-side folder browser. The browser can't read real filesystem paths, so
- * we navigate the configured application runtime roots through the backend
+ * we navigate the server filesystem through the backend
  * and hand the picked real absolute path back to the caller.
  *
  * Click a row to descend; "选择此文件夹" confirms the folder currently in view.
