@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Button, Checkbox, Empty, Modal, Spin } from 'antd';
 import {
   ArrowDownOutlined,
@@ -110,10 +110,11 @@ const HomeApplicationsSidebar: React.FC = () => {
             <button
               key={app.id}
               className={`home-app-item ${isActiveApplication(app) ? 'active' : ''}`}
+              style={{ '--app-accent': app.color || 'var(--color-primary)' } as CSSProperties}
               aria-current={isActiveApplication(app) ? 'page' : undefined}
               onClick={() => navigate(applicationPath(app, 'home'))}
             >
-              <span className="home-app-icon" style={app.color ? { background: app.color } : undefined}>{app.icon || <AppstoreOutlined />}</span>
+              <span className="home-app-icon">{app.icon || <AppstoreOutlined />}</span>
               <span className="home-app-copy"><strong>{app.name}</strong><small>{app.description}</small></span>
             </button>
           ))}

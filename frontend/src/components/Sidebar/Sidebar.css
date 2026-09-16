@@ -277,7 +277,17 @@
   box-shadow: inset 3px 0 0 var(--color-primary);
 }
 .home-app-item.active .home-app-copy strong { color: var(--color-primary); }
-.home-app-icon { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 10px; background: var(--color-bg-elevated); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); font-size: 18px; }
+.home-app-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--color-bg-elevated));
+  font-size: 19px;
+  line-height: 1;
+}
 .home-app-copy { min-width: 0; }
 .home-app-copy strong, .home-app-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-app-copy strong { color: var(--color-text); font-size: 13px; font-weight: 600; }

@@ -39,7 +39,7 @@ export interface GuidedQuestion {
 }
 
 export interface GuidedPrompt {
-  id: string;
+  id?: string;
   key: string;
   title: string;
   description?: string;

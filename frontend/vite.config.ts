@@ -5,12 +5,26 @@ import path from 'path'
 
 const wemdRoot = path.resolve(__dirname, '../backend/app_center/WeMD')
 const wemdPublicRoot = path.resolve(wemdRoot, 'apps/web/public')
-const wemdPackage = JSON.parse(
-  fs.readFileSync(path.resolve(wemdRoot, 'apps/web/package.json'), 'utf-8'),
+const wemdWebPackagePath = path.resolve(wemdRoot, 'apps/web/package.json')
+const wemdCorePackagePath = path.resolve(wemdRoot, 'packages/core/package.json')
+const wemdAvailable = [
+  wemdWebPackagePath,
+  wemdCorePackagePath,
+  wemdPublicRoot,
+  path.resolve(wemdRoot, 'apps/web/src/main.tsx'),
+  path.resolve(wemdRoot, 'packages/core/src/index.ts'),
+].every((requiredPath) => fs.existsSync(requiredPath))
+
+type PackageMetadata = {
+  version?: string
+  dependencies?: Record<string, string>
+}
+
+const readPackageMetadata = (packagePath: string): PackageMetadata => JSON.parse(
+  fs.readFileSync(packagePath, 'utf-8'),
 )
-const wemdCorePackage = JSON.parse(
-  fs.readFileSync(path.resolve(wemdRoot, 'packages/core/package.json'), 'utf-8'),
-)
+const wemdPackage = wemdAvailable ? readPackageMetadata(wemdWebPackagePath) : {}
+const wemdCorePackage = wemdAvailable ? readPackageMetadata(wemdCorePackagePath) : {}
 const wemdDependencyNames = new Set([
   ...Object.keys(wemdPackage.dependencies ?? {}),
   ...Object.keys(wemdCorePackage.dependencies ?? {}),
@@ -92,10 +106,13 @@ function wemdHostDependencies() {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), wemdHostDependencies(), wemdPublicAssets()],
-  define: {
+  plugins: [
+    react(),
+    ...(wemdAvailable ? [wemdHostDependencies(), wemdPublicAssets()] : []),
+  ],
+  define: wemdAvailable ? {
     __APP_VERSION__: JSON.stringify(wemdPackage.version),
-  },
+  } : {},
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
@@ -111,7 +128,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        wemd: path.resolve(__dirname, 'wemd.html'),
+        ...(wemdAvailable ? { wemd: path.resolve(__dirname, 'wemd.html') } : {}),
       },
       output: {
         manualChunks(id) {

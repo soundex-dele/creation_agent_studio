@@ -12,6 +12,7 @@ import { ArrowLeftOutlined, EditOutlined, RocketOutlined } from '@ant-design/ico
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import ChatContainer from '@/components/Chat/ChatContainer';
+import { guidedPromptIdentifier } from '@/lib/guidedPrompts';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { api } from '@/services/api';
 import { useAppStore } from '@/stores/useAppStore';
@@ -80,7 +81,9 @@ export default function ChatApplicationRuntimePage() {
   const prompts = useMemo(() => (
     [...(runtime?.guided_prompts ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   ), [runtime]);
-  const selectedPrompt = prompts.find((prompt) => prompt.id === selectedPromptId)
+  const selectedPrompt = prompts.find(
+    (prompt) => guidedPromptIdentifier(prompt) === selectedPromptId,
+  )
     ?? prompts[0]
     ?? null;
   const defaultAgent = runtime?.agent_bindings.find((binding) => binding.is_default)
@@ -89,7 +92,7 @@ export default function ChatApplicationRuntimePage() {
 
   useEffect(() => {
     if (!selectedPrompt) return;
-    setSelectedPromptId(selectedPrompt.id);
+    setSelectedPromptId(guidedPromptIdentifier(selectedPrompt));
     setAnswers(initialAnswers(selectedPrompt));
     setGeneratedPrompt('');
   }, [selectedPrompt]);
@@ -116,7 +119,7 @@ export default function ChatApplicationRuntimePage() {
     try {
       const response = await api.post<ComposePromptResponse>(
         `/apps/${application.id}/compose-prompt/`,
-        { prompt_id: selectedPrompt.id, answers },
+        { prompt_id: guidedPromptIdentifier(selectedPrompt), answers },
       );
       setGeneratedPrompt(response.prompt);
     } catch (error: any) {
@@ -215,9 +218,11 @@ export default function ChatApplicationRuntimePage() {
               <div className="chat-app-prompt-tabs">
                 {prompts.map((prompt) => (
                   <button
-                    key={prompt.id}
-                    className={prompt.id === selectedPrompt?.id ? 'active' : ''}
-                    onClick={() => setSelectedPromptId(prompt.id)}
+                    key={guidedPromptIdentifier(prompt)}
+                    className={
+                      guidedPromptIdentifier(prompt) === selectedPromptId ? 'active' : ''
+                    }
+                    onClick={() => setSelectedPromptId(guidedPromptIdentifier(prompt))}
                   >
                     <span>{prompt.icon || '✦'}</span>{prompt.title}
                   </button>
