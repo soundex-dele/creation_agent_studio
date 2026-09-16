@@ -1,95 +1,72 @@
 import React, { useEffect, useMemo } from 'react';
 import { ConfigProvider, theme as antTheme } from 'antd';
-import { useThemeStore } from '@/stores/useThemeStore';
-
-const darkToken = {
-  colorPrimary: '#E8A838',
-  colorBgContainer: '#1C1C28',
-  colorBgElevated: '#242434',
-  colorBgLayout: '#0C0C11',
-  colorBorder: '#2C2C3C',
-  colorBorderSecondary: '#3A3A4E',
-  colorText: '#EAEAF0',
-  colorTextSecondary: '#9898A8',
-  colorTextTertiary: '#5C5C6E',
-  colorTextQuaternary: '#3C3C4E',
-  colorFill: '#2C2C3C',
-  colorFillSecondary: '#242434',
-  colorFillTertiary: '#1C1C28',
-  colorFillQuaternary: '#14141C',
-  borderRadius: 10,
-  fontFamily: "'Noto Sans SC', 'Space Grotesk', sans-serif",
-};
-
-const lightToken = {
-  colorPrimary: '#D97706',
-  colorBgContainer: '#FFFFFF',
-  colorBgElevated: '#F1F3F5',
-  colorBgLayout: '#F8F9FA',
-  colorBorder: '#E5E7EB',
-  colorBorderSecondary: '#D1D5DB',
-  colorText: '#1F2937',
-  colorTextSecondary: '#6B7280',
-  colorTextTertiary: '#9CA3AF',
-  colorTextQuaternary: '#D1D5DB',
-  colorFill: '#F1F3F5',
-  colorFillSecondary: '#F8F9FA',
-  colorFillTertiary: '#FFFFFF',
-  colorFillQuaternary: '#FFFFFF',
-  borderRadius: 10,
-  fontFamily: "'Noto Sans SC', 'Space Grotesk', sans-serif",
-};
+import { getThemePreset } from '@/components/Theme/themePresets';
+import { applyThemeToDOM, useThemeStore } from '@/stores/useThemeStore';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
 }
 
 const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const theme = useThemeStore((s) => s.theme);
+  const themeId = useThemeStore((s) => s.theme);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    root.setAttribute('data-theme', theme);
-  }, [theme]);
+    applyThemeToDOM(themeId);
+  }, [themeId]);
 
   const antdThemeConfig = useMemo(() => {
-    const isDark = theme === 'dark';
+    const preset = getThemePreset(themeId);
+    const { colors } = preset;
+    const isDark = preset.mode === 'dark';
     return {
       algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-      token: isDark ? darkToken : lightToken,
+      token: {
+        colorPrimary: colors.primary,
+        colorTextLightSolid: colors.onPrimary,
+        colorBgContainer: colors.bgCard,
+        colorBgElevated: colors.bgElevated,
+        colorBgLayout: colors.bgVoid,
+        colorBorder: colors.border,
+        colorBorderSecondary: colors.borderLit,
+        colorText: colors.text,
+        colorTextSecondary: colors.textSecondary,
+        colorTextTertiary: colors.textDim,
+        colorTextQuaternary: colors.borderLit,
+        colorFill: colors.border,
+        colorFillSecondary: colors.bgElevated,
+        colorFillTertiary: colors.bgCard,
+        colorFillQuaternary: colors.bgSurface,
+        borderRadius: 10,
+        fontFamily: "'Noto Sans SC', 'Space Grotesk', sans-serif",
+      },
       components: {
         Layout: {
-          headerBg: isDark ? '#14141C' : '#FFFFFF',
-          siderBg: isDark ? '#14141C' : '#FFFFFF',
-          bodyBg: isDark ? '#0C0C11' : '#F8F9FA',
+          headerBg: colors.bgSurface,
+          siderBg: colors.bgSurface,
+          bodyBg: colors.bgVoid,
         },
         Menu: {
-          darkItemBg: '#14141C',
-          darkSubMenuItemBg: '#0C0C11',
-          itemBg: '#FFFFFF',
+          darkItemBg: colors.bgSurface,
+          darkSubMenuItemBg: colors.bgVoid,
+          itemBg: colors.bgSurface,
         },
         Card: {
-          colorBgContainer: isDark ? '#1C1C28' : '#FFFFFF',
+          colorBgContainer: colors.bgCard,
         },
         Modal: {
-          contentBg: isDark ? '#1C1C28' : '#FFFFFF',
-          headerBg: isDark ? '#1C1C28' : '#FFFFFF',
+          contentBg: colors.bgCard,
+          headerBg: colors.bgCard,
         },
         Input: {
-          colorBgContainer: isDark ? '#242434' : '#FFFFFF',
+          colorBgContainer: isDark ? colors.bgElevated : colors.bgCard,
         },
         Button: {
-          colorPrimary: isDark ? '#E8A838' : '#D97706',
+          colorPrimary: colors.primary,
           algorithm: true,
         },
       },
     };
-  }, [theme]);
+  }, [themeId]);
 
   return (
     <ConfigProvider theme={antdThemeConfig}>

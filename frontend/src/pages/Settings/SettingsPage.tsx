@@ -1,17 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import {
-  Alert, Button, Card, Descriptions, Popconfirm, Radio, Select, Space, Switch,
+  Alert, Button, Card, Descriptions, Popconfirm, Select, Space, Switch,
   Tag, Typography, message,
 } from 'antd';
 import {
-  BgColorsOutlined, KeyOutlined, MessageOutlined, ReloadOutlined,
+  BgColorsOutlined, CheckOutlined, KeyOutlined, MessageOutlined, MoonOutlined, ReloadOutlined,
   SafetyCertificateOutlined, TeamOutlined, UserOutlined,
+  BulbOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@/stores/useThemeStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { SELECTABLE_THEME_PRESETS } from '@/components/Theme/themePresets';
 import './SettingsPage.css';
 
 export default function SettingsPage() {
@@ -42,16 +44,51 @@ export default function SettingsPage() {
       <div className="settings-heading"><h1>设置</h1><p>调整界面、对话行为和当前团队工作区。</p></div>
 
       <div className="settings-grid">
-        <Card title={<><BgColorsOutlined /> 外观</>}>
-          <div className="settings-row">
-            <div><strong>界面主题</strong><p>主题设置会保存在当前浏览器中。</p></div>
-            <Radio.Group
-              optionType="button"
-              buttonStyle="solid"
-              value={theme}
-              onChange={(event) => setTheme(event.target.value)}
-              options={[{ value: 'light', label: '亮色' }, { value: 'dark', label: '暗色' }]}
-            />
+        <Card className="settings-appearance-card" title={<><BgColorsOutlined /> 外观</>}>
+          <div className="settings-theme-intro">
+            <strong>界面主题</strong>
+            <p>选择适合当前环境的配色，设置会保存在当前浏览器中。</p>
+          </div>
+          <div className="settings-theme-grid" role="radiogroup" aria-label="界面主题">
+            {SELECTABLE_THEME_PRESETS.map((preset) => {
+              const selected = preset.id === theme;
+              const previewStyle = {
+                '--theme-preview-bg': preset.colors.bgVoid,
+                '--theme-preview-surface': preset.colors.bgCard,
+                '--theme-preview-muted': preset.colors.bgElevated,
+                '--theme-preview-border': preset.colors.border,
+                '--theme-preview-accent': preset.colors.primary,
+              } as CSSProperties;
+              return (
+                <button
+                  type="button"
+                  key={preset.id}
+                  role="radio"
+                  aria-checked={selected}
+                  className={`settings-theme-option${selected ? ' selected' : ''}`}
+                  style={previewStyle}
+                  onClick={() => setTheme(preset.id)}
+                >
+                  <span className="settings-theme-preview" aria-hidden="true">
+                    <span className="settings-theme-preview-sidebar" />
+                    <span className="settings-theme-preview-content">
+                      <span /><span /><span />
+                    </span>
+                  </span>
+                  <span className="settings-theme-copy">
+                    <span className="settings-theme-title">
+                      <strong>{preset.name}</strong>
+                      {selected && <span className="settings-theme-selected"><CheckOutlined /> 已选择</span>}
+                    </span>
+                    <small>{preset.description}</small>
+                    <span className="settings-theme-mode">
+                      {preset.mode === 'dark' ? <MoonOutlined /> : <BulbOutlined />}
+                      {preset.mode === 'dark' ? '暗色' : '亮色'}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </Card>
 
