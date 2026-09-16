@@ -142,6 +142,7 @@ export interface Workflow {
   icon?: string;
   execution_mode: 'manual' | 'automatic';
   is_public: boolean;
+  can_delete?: boolean;
   step_count?: number;
   steps?: WorkflowStep[];
   created_at?: string;

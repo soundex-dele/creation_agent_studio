@@ -221,6 +221,10 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowsPage />)}</MainLayout></ProtectedRoute>,
   },
   {
+    path: '/workflows/new',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
     path: '/workflows/:id/edit',
     element: <ProtectedRoute><MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout></ProtectedRoute>,
   },

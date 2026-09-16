@@ -171,6 +171,117 @@ def test_run_list_uses_canonical_history_and_source_filter(
     assert invalid.status_code == 400
 
 
+@pytest.mark.django_db
+def test_finished_run_owner_can_delete_history(
+    authenticated_client, api_organization, api_run, api_artifact, settings, tmp_path,
+):
+    settings.ARTIFACT_ROOT = tmp_path
+    artifact_path = Path(tmp_path, api_artifact.object_key)
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_bytes(b"history artifact\n")
+    Run.objects.filter(pk=api_run.pk).update(
+        status=Run.Status.SUCCEEDED,
+        finished_at=timezone.now(),
+    )
+    api_run.refresh_from_db()
+
+    listed = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"source_type": "application"},
+    )
+    assert listed.status_code == 200
+    assert listed.data[0]["can_delete"] is True
+
+    deleted = authenticated_client.delete(_run_url(api_organization, api_run))
+    assert deleted.status_code == 204
+    assert not Run.objects.filter(pk=api_run.pk).exists()
+    assert not artifact_path.exists()
+
+
+@pytest.mark.django_db
+def test_queued_run_is_cancelled_and_deleted_in_one_request(
+    authenticated_client, api_organization, api_run,
+):
+    listed = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"source_type": "application"},
+    )
+    assert listed.data[0]["can_delete"] is True
+
+    deleted = authenticated_client.delete(_run_url(api_organization, api_run))
+
+    assert deleted.status_code == 204
+    assert not Run.objects.filter(pk=api_run.pk).exists()
+
+
+@pytest.mark.django_db
+def test_running_run_starts_cancellation_before_deletion(
+    authenticated_client, api_organization, api_run,
+):
+    Run.objects.filter(pk=api_run.pk).update(status=Run.Status.RUNNING)
+
+    pending = authenticated_client.delete(_run_url(api_organization, api_run))
+
+    assert pending.status_code == 202
+    assert pending.data["deletion_pending"] is True
+    api_run.refresh_from_db()
+    assert api_run.status == Run.Status.CANCELLING
+
+    Run.objects.filter(pk=api_run.pk).update(
+        status=Run.Status.CANCELLED,
+        finished_at=timezone.now(),
+    )
+    deleted = authenticated_client.delete(_run_url(api_organization, api_run))
+    assert deleted.status_code == 204
+    assert not Run.objects.filter(pk=api_run.pk).exists()
+
+
+@pytest.mark.django_db
+def test_active_manual_run_is_ended_and_deleted_in_one_request(
+    authenticated_client, api_organization, api_run,
+):
+    Run.objects.filter(pk=api_run.pk).update(
+        status=Run.Status.RUNNING,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-manual",
+        source_type="workflow",
+    )
+
+    deleted = authenticated_client.delete(_run_url(api_organization, api_run))
+
+    assert deleted.status_code == 204
+    assert not Run.objects.filter(pk=api_run.pk).exists()
+
+
+@pytest.mark.django_db
+def test_other_developer_cannot_delete_run(
+    authenticated_client, api_organization, api_run,
+):
+
+    Run.objects.filter(pk=api_run.pk).update(
+        status=Run.Status.FAILED,
+        finished_at=timezone.now(),
+    )
+    developer = get_user_model().objects.create_user(username="run-history-developer")
+    Membership.objects.update_or_create(
+        organization=api_organization,
+        user=developer,
+        defaults={"role": Membership.Role.DEVELOPER, "is_active": True},
+    )
+    authenticated_client.force_authenticate(developer)
+
+    listed = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"source_type": "application"},
+    )
+    assert listed.status_code == 200
+    assert listed.data[0]["can_delete"] is False
+
+    denied = authenticated_client.delete(_run_url(api_organization, api_run))
+    assert denied.status_code == 403
+    assert Run.objects.filter(pk=api_run.pk).exists()
+
+
 @pytest.fixture
 def api_artifact(api_run, api_organization):
     return RunArtifact.objects.create(

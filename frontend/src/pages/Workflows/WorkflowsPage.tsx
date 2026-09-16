@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Empty, Input, Modal, Segmented, Spin, Tag, message } from 'antd';
+import { Button, Card, Empty, Popconfirm, Spin, Tag, message } from 'antd';
 import {
-  AppstoreOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined,
+  AppstoreOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -14,15 +15,18 @@ import './Workflows.css';
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
   Array.isArray(value) ? value : value.results ?? [];
 
+const wait = (milliseconds: number) => new Promise((resolve) => {
+  window.setTimeout(resolve, milliseconds);
+});
+
 const WorkflowsPage = () => {
   const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [runs, setRuns] = useState<RunResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
-  const [executionMode, setExecutionMode] = useState<Workflow['execution_mode']>('manual');
+  const [deletingWorkflowId, setDeletingWorkflowId] = useState<string | null>(null);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,17 +48,6 @@ const WorkflowsPage = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const create = async () => {
-    if (!name.trim()) return;
-    const workflow = await api.post<Workflow>('/workflows/', {
-      name: name.trim(), description: '', icon: '🔀', execution_mode: executionMode,
-      is_public: false, steps: [],
-    });
-    setCreating(false);
-    setName('');
-    navigate(`/workflows/${workflow.id}/edit`);
-  };
-
   const start = async (workflow: Workflow) => {
     if (workflow.execution_mode === 'manual') {
       navigate(`/workflows/${workflow.id}/manual`);
@@ -72,11 +65,53 @@ const WorkflowsPage = () => {
     }
   };
 
+  const remove = async (workflow: Workflow) => {
+    setDeletingWorkflowId(workflow.id);
+    try {
+      await api.delete(`/workflows/${workflow.id}/`);
+      setWorkflows((current) => current.filter((item) => item.id !== workflow.id));
+      message.success('工作流已删除');
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '删除工作流失败');
+    } finally {
+      setDeletingWorkflowId(null);
+    }
+  };
+
+  const removeRun = async (run: RunResource) => {
+    if (!organizationId) return;
+    setDeletingRunId(run.id);
+    try {
+      const endpoint = `${tenantApiRoot(organizationId)}/runs/${run.id}`;
+      let deleted = false;
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        const result = await api.delete<{
+          deletion_pending?: boolean;
+          detail?: string;
+        } | undefined>(endpoint);
+        if (!result?.deletion_pending) {
+          deleted = true;
+          break;
+        }
+        await wait(500);
+      }
+      if (!deleted) {
+        throw new Error('取消工作流超时，请稍后重试');
+      }
+      setRuns((current) => current.filter((item) => item.id !== run.id));
+      message.success('执行历史已删除');
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || error?.message || '删除执行历史失败');
+    } finally {
+      setDeletingRunId(null);
+    }
+  };
+
   return (
     <div className="workflows-page">
       <div className="workflows-heading">
         <div><h1>工作流</h1><p>把多个应用组合成可手动操作或自动运行的业务流程</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflows/new')}>
           新建工作流
         </Button>
       </div>
@@ -96,6 +131,25 @@ const WorkflowsPage = () => {
                 </div>
                 <div className="workflow-card-actions">
                   <OutlinedButton onClick={() => navigate(`/workflows/${workflow.id}/edit`)} />
+                  {workflow.can_delete && (
+                    <Popconfirm
+                      title="删除工作流"
+                      description={`确定删除“${workflow.name}”吗？此操作不可撤销。`}
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => remove(workflow)}
+                    >
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={deletingWorkflowId === workflow.id}
+                        aria-label={`删除 ${workflow.name}`}
+                      >
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  )}
                   <Button
                     type="primary"
                     icon={workflow.execution_mode === 'manual'
@@ -125,28 +179,50 @@ const WorkflowsPage = () => {
                     execution_mode?: 'manual' | 'automatic';
                   };
                   return (
-                    <button
-                      key={run.id}
-                      className="workflow-history-item"
-                      onClick={() => navigate(definition.execution_mode === 'manual'
-                        ? `/workflows/${run.source_id}/manual?runId=${run.id}`
-                        : `/runs/${run.id}`)}
-                    >
-                      <span className="workflow-history-icon"><HistoryOutlined /></span>
-                      <span className="workflow-history-copy">
-                        <strong>{definition.workflow_name || `Workflow ${run.source_id || ''}`}</strong>
-                        <small>{new Date(run.created_at || '').toLocaleString()}</small>
-                      </span>
-                      <span className="workflow-history-progress">
-                        {definition.execution_mode === 'manual' ? '手动执行 · ' : ''}
-                        {definition.workflow_steps?.length || 0} 个应用
-                      </span>
-                      <span className={`workflow-history-status workflow-history-status--${run.status}`}>
-                        {run.status === 'succeeded' ? '已完成'
-                          : run.status === 'failed' ? '失败'
-                            : run.status === 'cancelled' ? '已取消' : '进行中'}
-                      </span>
-                    </button>
+                    <div key={run.id} className="workflow-history-item">
+                      <button
+                        type="button"
+                        className="workflow-history-link"
+                        onClick={() => navigate(definition.execution_mode === 'manual'
+                          ? `/workflows/${run.source_id}/manual?runId=${run.id}`
+                          : `/runs/${run.id}`)}
+                      >
+                        <span className="workflow-history-icon"><HistoryOutlined /></span>
+                        <span className="workflow-history-copy">
+                          <strong>{definition.workflow_name || `Workflow ${run.source_id || ''}`}</strong>
+                          <small>{new Date(run.created_at || '').toLocaleString()}</small>
+                        </span>
+                        <span className="workflow-history-progress">
+                          {definition.execution_mode === 'manual' ? '手动执行 · ' : ''}
+                          {definition.workflow_steps?.length || 0} 个应用
+                        </span>
+                        <span className={`workflow-history-status workflow-history-status--${run.status}`}>
+                          {run.status === 'succeeded' ? '已完成'
+                            : run.status === 'failed' ? '失败'
+                              : run.status === 'cancelled' ? '已取消' : '进行中'}
+                        </span>
+                      </button>
+                      {run.can_delete && (
+                        <Popconfirm
+                          title="删除执行历史"
+                          description={['succeeded', 'failed', 'cancelled'].includes(run.status)
+                            ? '确定删除这条执行历史吗？相关事件和产物也会删除，且无法恢复。'
+                            : '执行仍在进行。删除时会先自动取消或结束工作流，再清理相关事件和产物。'}
+                          okText="删除"
+                          cancelText="取消"
+                          okButtonProps={{ danger: true }}
+                          onConfirm={() => removeRun(run)}
+                        >
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            loading={deletingRunId === run.id}
+                            aria-label={`删除 ${definition.workflow_name || '工作流'} 的执行历史`}
+                          />
+                        </Popconfirm>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -154,30 +230,6 @@ const WorkflowsPage = () => {
           </section>
         </>
       )}
-      <Modal title="新建工作流" open={creating} okText="创建" cancelText="取消"
-        onOk={create} onCancel={() => setCreating(false)}>
-        <div className="workflow-create-form">
-          <Input autoFocus value={name} placeholder="例如：小红书内容生产"
-            onChange={(event) => setName(event.target.value)} onPressEnter={create} />
-          <div>
-            <span>执行方式</span>
-            <Segmented
-              block
-              value={executionMode}
-              options={[
-                { label: '手动执行', value: 'manual' },
-                { label: '自动执行', value: 'automatic' },
-              ]}
-              onChange={(value) => setExecutionMode(value as Workflow['execution_mode'])}
-            />
-            <small>
-              {executionMode === 'manual'
-                ? '从左侧应用列表逐个打开并操作。'
-                : '按依赖关系自动运行所有应用。'}
-            </small>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

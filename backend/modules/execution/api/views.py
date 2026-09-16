@@ -2,6 +2,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core import signing
+from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.http import FileResponse, StreamingHttpResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -23,6 +25,7 @@ from modules.execution.infrastructure.artifacts import (
     UnsafeArtifactObjectKey,
     artifact_token,
     decode_artifact_token,
+    delete_artifact_object,
     external_artifact_access_url,
     open_artifact,
 )
@@ -38,6 +41,7 @@ from modules.tenancy.permissions import HasPathOrganizationRole
 
 from .base import ProblemDetailsAPIView
 from .pagination import RunArtifactCursorPagination, RunAttemptCursorPagination
+from .permissions import TERMINAL_RUN_STATUSES, can_delete_run
 from .renderers import EventStreamRenderer
 from .serializers import (
     RunCommandSerializer,
@@ -122,7 +126,104 @@ class OrganizationRunView(ProblemDetailsAPIView):
                 title="Run not found",
                 detail="The requested run does not exist or is not accessible.",
             )
-        return Response(RunSerializer(run).data)
+        return Response(RunSerializer(run, context={"request": request}).data)
+
+    def delete(self, request, organization_id, run_id):
+        run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
+        if run is None:
+            return _problem(
+                request,
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="run_not_found",
+                title="Run not found",
+                detail="The requested run does not exist or is not accessible.",
+            )
+        if not can_delete_run(run, request):
+            return _problem(
+                request,
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="run_delete_forbidden",
+                title="Run deletion forbidden",
+                detail="无权删除该执行记录。",
+            )
+
+        if run.status not in TERMINAL_RUN_STATUSES:
+            if run.executor_key == "workflow-manual":
+                with transaction.atomic():
+                    locked = Run.objects.select_for_update().get(pk=run.pk)
+                    if locked.status not in TERMINAL_RUN_STATUSES:
+                        now = timezone.now()
+                        locked.status = Run.Status.CANCELLED
+                        locked.finished_at = now
+                        locked.version += 1
+                        locked.next_event_sequence += 1
+                        locked.save(update_fields=(
+                            "status", "finished_at", "version", "next_event_sequence",
+                        ))
+                        RunEvent.objects.create(
+                            organization_id=locked.organization_id,
+                            run=locked,
+                            sequence=locked.next_event_sequence,
+                            type="run.cancelled",
+                            payload={"reason": "delete_requested", "manual": True},
+                        )
+                run.refresh_from_db()
+            elif run.status != Run.Status.CANCELLING:
+                try:
+                    submit_run_command(
+                        run_id=run.id,
+                        organization_id=organization_id,
+                        actor=request.user,
+                        command_type="cancel",
+                        idempotency_key=f"delete-run:{run.id}:{run.version}",
+                        payload={"reason": "delete_requested"},
+                    )
+                except (CommandNotAllowed, ConcurrentRunUpdate):
+                    # A terminal transition may win the race after the initial
+                    # read. The next delete poll will either remove it or retry
+                    # cancellation against the new version.
+                    pass
+                run.refresh_from_db()
+
+        run_ids = [run.id]
+        frontier = [run.id]
+        while frontier:
+            frontier = list(
+                Run.objects.for_organization(organization_id)
+                .filter(parent_id__in=frontier)
+                .values_list("id", flat=True)
+            )
+            run_ids.extend(frontier)
+        active_statuses = set(Run.Status.values) - set(TERMINAL_RUN_STATUSES)
+        if Run.objects.filter(id__in=run_ids, status__in=active_statuses).exists():
+            return Response(
+                {
+                    "deletion_pending": True,
+                    "detail": "正在取消工作流，取消完成后将自动删除。",
+                    "status": run.status,
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+        object_keys = list(
+            RunArtifact.objects.filter(run_id__in=run_ids)
+            .values_list("object_key", flat=True)
+        )
+        try:
+            run.delete()
+        except ProtectedError:
+            return _problem(
+                request,
+                status_code=status.HTTP_409_CONFLICT,
+                code="run_is_referenced",
+                title="Run is referenced",
+                detail="该执行记录已关联到对话消息，无法删除。",
+            )
+        for object_key in filter(None, object_keys):
+            try:
+                delete_artifact_object(object_key)
+            except (OSError, UnsafeArtifactObjectKey):
+                continue
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class OrganizationRunsView(ProblemDetailsAPIView):
@@ -151,7 +252,9 @@ class OrganizationRunsView(ProblemDetailsAPIView):
                     ),
                 )
             runs = runs.filter(source_type=source_type)
-        return Response(RunSerializer(runs[:100], many=True).data)
+        return Response(RunSerializer(
+            runs[:100], many=True, context={"request": request}
+        ).data)
 
 
 class OrganizationRunEventsView(ProblemDetailsAPIView):

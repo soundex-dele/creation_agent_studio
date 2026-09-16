@@ -12,6 +12,7 @@ from apps.applications.models import (
     Skill,
 )
 from apps.conversations.models import Conversation
+from apps.enterprise.models import Membership
 from modules.catalog.models import (
     AgentDraft,
     ApplicationDeployment,
@@ -127,6 +128,45 @@ class WorkflowApiTest(TestCase):
         workflow.steps.all().delete()
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+
+    def test_owner_can_delete_workflow(self):
+        workflow = Workflow.objects.create(
+            organization=self.organization,
+            owner=self.user,
+            name="Disposable workflow",
+            is_public=True,
+        )
+
+        listed = self.client.get("/api/v1/workflows/", **self.headers)
+        self.assertEqual(listed.status_code, 200, listed.data)
+        results = listed.data.get("results", listed.data)
+        item = next(row for row in results if row["id"] == str(workflow.id))
+        self.assertTrue(item["can_delete"])
+
+        developer = get_user_model().objects.create_user(username="workflow-developer")
+        Membership.objects.update_or_create(
+            organization=self.organization,
+            user=developer,
+            defaults={"role": Membership.Role.DEVELOPER, "is_active": True},
+        )
+        self.client.force_authenticate(developer)
+        listed = self.client.get("/api/v1/workflows/", **self.headers)
+        results = listed.data.get("results", listed.data)
+        item = next(row for row in results if row["id"] == str(workflow.id))
+        self.assertFalse(item["can_delete"])
+        denied = self.client.delete(
+            f"/api/v1/workflows/{workflow.id}/",
+            **self.headers,
+        )
+        self.assertEqual(denied.status_code, 403, denied.data)
+
+        self.client.force_authenticate(self.user)
+        deleted = self.client.delete(
+            f"/api/v1/workflows/{workflow.id}/",
+            **self.headers,
+        )
+        self.assertEqual(deleted.status_code, 204, deleted.data)
+        self.assertFalse(Workflow.objects.filter(pk=workflow.id).exists())
 
     def test_manual_workflow_round_trips_and_cannot_start_automatically(self):
         chat_application = Application.objects.create(

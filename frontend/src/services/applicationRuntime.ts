@@ -46,6 +46,7 @@ export interface RunResource {
   pending_input_kind?: string;
   error_code?: string;
   error_message?: string;
+  can_delete?: boolean;
 }
 
 export interface RunArtifact {

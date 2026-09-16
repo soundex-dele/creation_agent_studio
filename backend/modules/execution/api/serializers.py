@@ -9,6 +9,7 @@ from modules.execution.models import (
     RunEvent,
     RunEventSnapshot,
 )
+from .permissions import can_delete_run
 
 
 class RunSerializer(serializers.ModelSerializer):
@@ -16,6 +17,7 @@ class RunSerializer(serializers.ModelSerializer):
     owner_id = serializers.ReadOnlyField()
     current_attempt_id = serializers.UUIDField(read_only=True, allow_null=True)
     parent_id = serializers.UUIDField(read_only=True, allow_null=True)
+    can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = Run
@@ -48,7 +50,11 @@ class RunSerializer(serializers.ModelSerializer):
             "created_at",
             "started_at",
             "finished_at",
+            "can_delete",
         )
+
+    def get_can_delete(self, obj):
+        return can_delete_run(obj, self.context.get("request"))
 
 
 class RunEventSerializer(serializers.ModelSerializer):

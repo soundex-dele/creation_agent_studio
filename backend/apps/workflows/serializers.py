@@ -3,7 +3,22 @@ from rest_framework import serializers
 
 from apps.applications.models import Application
 from apps.applications.serializers import ApplicationRuntimeSerializer
+from apps.enterprise.models import Membership
 from .models import Workflow, WorkflowStep
+
+
+def _can_delete_workflow(workflow, request):
+    if not request or not request.user.is_authenticated:
+        return False
+    membership = getattr(request, 'organization_membership', None)
+    if membership is None:
+        return False
+    if membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN):
+        return True
+    return (
+        membership.role == Membership.Role.DEVELOPER
+        and workflow.owner_id == request.user.id
+    )
 
 
 class WorkflowStepSerializer(serializers.ModelSerializer):
@@ -20,20 +35,28 @@ class WorkflowStepSerializer(serializers.ModelSerializer):
 
 class WorkflowListSerializer(serializers.ModelSerializer):
     step_count = serializers.IntegerField(read_only=True)
+    can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = Workflow
         fields = ['id', 'name', 'description', 'icon', 'execution_mode',
-                  'is_public', 'step_count', 'created_at', 'updated_at']
+                  'is_public', 'step_count', 'can_delete', 'created_at', 'updated_at']
+
+    def get_can_delete(self, obj):
+        return _can_delete_workflow(obj, self.context.get('request'))
 
 
 class WorkflowDetailSerializer(serializers.ModelSerializer):
     steps = WorkflowStepSerializer(many=True, read_only=True)
+    can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = Workflow
         fields = ['id', 'name', 'description', 'icon', 'execution_mode',
-                  'is_public', 'steps', 'created_at', 'updated_at']
+                  'is_public', 'steps', 'can_delete', 'created_at', 'updated_at']
+
+    def get_can_delete(self, obj):
+        return _can_delete_workflow(obj, self.context.get('request'))
 
 
 class WorkflowWriteSerializer(serializers.ModelSerializer):
