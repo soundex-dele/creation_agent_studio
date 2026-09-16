@@ -8,19 +8,13 @@ from apps.applications.models import Application, Skill
 
 CHAT_SKILL_APPS = {
     "wechat-html-optimizer": {
-        "agent_slug": "wechat-html-optimizer-assistant",
         "skill_slug": "optimize-wechat-html",
-        "system_prompt_fragment": "公众号 HTML 优化助手",
     },
     "article-html-illustrator": {
-        "agent_slug": "article-html-illustrator-assistant",
         "skill_slug": "baoyu-article-html-illustrator",
-        "system_prompt_fragment": "文章 HTML 配图助手",
     },
     "html-cover-generator": {
-        "agent_slug": "html-cover-designer-assistant",
         "skill_slug": "baoyu-html-cover",
-        "system_prompt_fragment": "HTML 封面设计助手",
     },
 }
 
@@ -50,15 +44,15 @@ def test_sync_installs_all_packages_and_only_deploys_development():
 
     for application_slug, expected in CHAT_SKILL_APPS.items():
         application = applications.get(slug=application_slug)
-        agent = Agent.objects.get(
-            organization=organization,
-            slug=expected["agent_slug"],
-        )
         skill = Skill.objects.get(
             organization=organization,
             slug=expected["skill_slug"],
         )
         definition = application.draft.content
+        agent = Agent.objects.get(
+            id=definition["agent_bindings"][0]["agent_id"],
+            slug="general",
+        )
 
         assert application.kind == Application.Kind.CHAT
         assert application.chat_application.application_id == application.id
@@ -78,5 +72,13 @@ def test_sync_installs_all_packages_and_only_deploys_development():
             "config": {},
             "order": 0,
         }]
-        assert expected["system_prompt_fragment"] in agent.draft.content["system_prompt"]
         assert "pending-" not in str(definition)
+
+    assert not Agent.objects.filter(
+        organization=organization,
+        slug__in=(
+            "wechat-html-optimizer-assistant",
+            "article-html-illustrator-assistant",
+            "html-cover-designer-assistant",
+        ),
+    ).exists()

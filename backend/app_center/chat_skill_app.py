@@ -1,4 +1,4 @@
-"""Provision stable Agent and Skill references for bundled guided chat apps."""
+"""Provision Skill references for bundled guided chat apps."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ from pathlib import Path
 
 from django.conf import settings
 
-from apps.agents.models import Agent, AgentCategory
+from apps.agents.models import Agent
 from apps.applications.models import Skill
-from modules.catalog.models import AgentDraft
 
 
 def provision_chat_skill_definition(
@@ -18,11 +17,6 @@ def provision_chat_skill_definition(
     definition,
     skill_slug: str,
     skill_description: str,
-    agent_slug: str,
-    agent_name: str,
-    agent_description: str,
-    agent_icon: str,
-    system_prompt: str,
 ):
     owner = organization.owner
     skill_root = Path(settings.CODEX_SKILLS_DIRECTORY).expanduser().resolve(strict=False)
@@ -43,47 +37,17 @@ def provision_chat_skill_definition(
             "is_active": True,
         },
     )
-    category, _ = AgentCategory.objects.get_or_create(
-        slug="design",
-        defaults={
-            "name": "视觉设计",
-            "description": "图文排版和视觉设计",
-            "icon": "🎨",
-            "order": 3,
-        },
-    )
-    agent, _ = Agent.objects.update_or_create(
+    agent = Agent.objects.filter(
         organization=organization,
-        slug=agent_slug,
-        defaults={
-            "name": agent_name,
-            "description": agent_description,
-            "icon": agent_icon,
-            "category": category,
-            "created_by": owner,
-            "is_public": True,
-            "is_active": True,
-        },
-    )
-    agent_content = {
-        "system_prompt": system_prompt,
-        "model_config": {},
-        "tool_config": [],
-        "knowledge_config": [],
-        "guardrail_config": {},
-        "workflow_config": {},
-        "skill_bindings": [],
-    }
-    draft, created = AgentDraft.objects.get_or_create(
-        organization=organization,
-        agent=agent,
-        defaults={"updated_by": owner, "content": agent_content},
-    )
-    if not created and draft.content != agent_content:
-        draft.content = agent_content
-        draft.version += 1
-        draft.updated_by = owner
-        draft.save(update_fields=("content", "version", "updated_by", "updated_at"))
+        slug="general",
+        is_active=True,
+    ).first() or Agent.objects.filter(
+        slug="general",
+        is_public=True,
+        is_active=True,
+    ).order_by("id").first()
+    if agent is None:
+        raise RuntimeError("The default general assistant is not available.")
 
     resolved = deepcopy(definition)
     resolved["agent_bindings"] = [{
