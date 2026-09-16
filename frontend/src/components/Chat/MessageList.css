@@ -137,21 +137,17 @@
 }
 
 .message-bubble-column {
-  position: relative;
   min-width: 0;
 }
 
 .message-actions {
-  position: absolute;
-  top: 100%;
-  left: 2px;
   display: flex;
   height: 18px;
+  padding: 0 2px;
 }
 
 .message-actions--user {
-  right: 2px;
-  left: auto;
+  justify-content: flex-end;
 }
 
 .message-copy-button.ant-btn {

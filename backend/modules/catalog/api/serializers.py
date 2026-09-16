@@ -48,6 +48,10 @@ class CreateApplicationSerializer(serializers.Serializer):
         return validate_json_object(value, "content")
 
 
+class UpdateApplicationStatusSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField()
+
+
 class ApplicationDraftSerializer(serializers.ModelSerializer):
     application_id = serializers.IntegerField(read_only=True)
     organization_id = serializers.UUIDField(read_only=True)

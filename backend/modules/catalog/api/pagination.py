@@ -3,6 +3,7 @@ from rest_framework.pagination import CursorPagination
 
 class ApplicationCursorPagination(CursorPagination):
     page_size = 50
+    page_size_query_param = "limit"
     max_page_size = 200
     ordering = ("-created_at", "-id")
 

@@ -43,7 +43,7 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        queryset = _runtime_prefetch(Application.objects.all())
+        queryset = _runtime_prefetch(Application.objects.filter(is_active=True))
         if self.request.user.is_authenticated:
             organization = resolve_organization(self.request, required=False)
             return queryset.filter(

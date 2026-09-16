@@ -428,6 +428,65 @@ def test_catalog_resources_are_scoped_to_path_organization(
 
 
 @pytest.mark.django_db
+def test_owner_can_disable_application_and_developer_cannot_change_status(
+    catalog_api_client, catalog_api_organization
+):
+    application, _ = _create_application(
+        catalog_api_client, catalog_api_organization
+    )
+    url = _application_url(catalog_api_organization, application)
+
+    disabled = catalog_api_client.patch(
+        url, {"is_active": False}, format="json"
+    )
+
+    developer = get_user_model().objects.create_user(
+        username="catalog-status-developer"
+    )
+    Membership.objects.create(
+        organization=catalog_api_organization,
+        user=developer,
+        role=Membership.Role.DEVELOPER,
+    )
+    developer_client = APIClient()
+    developer_client.force_authenticate(developer)
+    denied = developer_client.patch(
+        url, {"is_active": True}, format="json"
+    )
+
+    application.refresh_from_db()
+    assert disabled.status_code == 200
+    assert disabled.data["is_active"] is False
+    assert denied.status_code == 403
+    assert denied.data["code"] == "application_status_requires_admin"
+    assert application.is_active is False
+
+
+@pytest.mark.django_db
+def test_disabled_application_is_hidden_from_discovery(
+    catalog_api_client, catalog_api_organization
+):
+    application, _ = _create_application(
+        catalog_api_client, catalog_api_organization
+    )
+    application.is_active = False
+    application.save(update_fields=("is_active", "updated_at"))
+
+    response = catalog_api_client.get(
+        "/api/v1/apps/",
+        HTTP_X_ORGANIZATION_ID=str(catalog_api_organization.id),
+    )
+
+    assert response.status_code == 200
+    results = (
+        response.data["results"]
+        if isinstance(response.data, dict)
+        else response.data
+    )
+    assert application.slug not in {item["slug"] for item in results}
+
+
+@pytest.mark.django_db
 def test_skill_draft_cas_and_revision_publish_are_content_idempotent(
     catalog_api_client, catalog_api_organization
 ):

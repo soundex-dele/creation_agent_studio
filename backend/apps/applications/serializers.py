@@ -47,7 +47,7 @@ class ApplicationCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'description', 'icon', 'order', 'app_count']
 
     def get_app_count(self, obj):
-        return obj.applications.filter(is_public=True).count()
+        return obj.applications.filter(is_public=True, is_active=True).count()
 
 
 class SkillSerializer(serializers.ModelSerializer):

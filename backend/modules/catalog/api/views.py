@@ -47,6 +47,7 @@ from .serializers import (
     PublishApplicationSerializer,
     RollbackApplicationDeploymentSerializer,
     SwitchApplicationDeploymentSerializer,
+    UpdateApplicationStatusSerializer,
     UpdateApplicationDraftSerializer,
     SkillDeploymentSerializer,
     SkillDraftSerializer,
@@ -232,6 +233,33 @@ class OrganizationApplicationView(ProblemDetailsAPIView):
             many=True,
         ).data
         return Response(body)
+
+    def patch(self, request, organization_id, application_id):
+        if not _can_manage_production(request):
+            return _problem(
+                request,
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="application_status_requires_admin",
+                title="Application status requires administrator",
+                detail=(
+                    "Only organization administrators and owners can enable "
+                    "or disable applications."
+                ),
+            )
+        serializer = UpdateApplicationStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            application = (
+                Application.objects.for_organization(organization_id)
+                .select_for_update()
+                .filter(pk=application_id)
+                .first()
+            )
+            if application is None:
+                return _not_found(request)
+            application.is_active = serializer.validated_data["is_active"]
+            application.save(update_fields=("is_active", "updated_at"))
+        return Response(ApplicationSerializer(application).data)
 
 
 class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):

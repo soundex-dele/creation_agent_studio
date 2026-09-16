@@ -8,6 +8,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { api } from '@/services/api';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import AgentLifecyclePanel from './AgentLifecyclePanel';
+import ApplicationManagementPanel from './ApplicationManagementPanel';
 import OrganizationGovernancePanel from './OrganizationGovernancePanel';
 import './EnterprisePage.css';
 
@@ -23,6 +24,7 @@ const parseJson = (value: any, fallback: any) => {
 
 const sections: Record<string, { title: string; endpoint: string; fields?: Field[]; readOnly?: boolean }> = {
   organization: { title: '组织治理', endpoint: '' },
+  applications: { title: '应用管理', endpoint: '' },
   lifecycle: { title: '智能体发布', endpoint: '' },
   traces: { title: '运行追踪', endpoint: '/enterprise/traces/', readOnly: true },
   providers: { title: '模型供应商', endpoint: '/enterprise/providers/', fields: [
@@ -165,7 +167,7 @@ export default function EnterprisePage() {
     <div className="enterprise-grid"><Card><Statistic title="本月 Tokens" value={Number(usage.tokens || 0)} /></Card><Card><Statistic title="Token 配额" value={Number(usage.monthly_token_limit || 0)} /></Card><Card><Statistic title="本月成本" prefix="¥" value={Number(usage.cost || 0)} precision={4} /></Card><Card><Statistic title="成本预算" prefix="¥" value={Number(usage.monthly_cost_limit || 0)} /></Card></div>
     <div className="enterprise-table-card">
       <Tabs activeKey={active} onChange={setActive} items={Object.entries(sections).map(([key, value]) => ({ key, label: value.title }))} />
-      {active === 'organization' && currentOrganizationId ? <OrganizationGovernancePanel organizationId={currentOrganizationId} role={currentOrg?.role} /> : active === 'lifecycle' ? <AgentLifecyclePanel /> : <>
+      {active === 'organization' && currentOrganizationId ? <OrganizationGovernancePanel organizationId={currentOrganizationId} role={currentOrg?.role} /> : active === 'applications' && currentOrganizationId ? <ApplicationManagementPanel organizationId={currentOrganizationId} role={currentOrg?.role} /> : active === 'lifecycle' ? <AgentLifecyclePanel /> : <>
         <div className="enterprise-toolbar"><Typography.Text type="secondary">当前组织：{currentOrg?.name || '—'}</Typography.Text><Space><Button onClick={() => void reload()}>刷新</Button>{section.fields && <Button type="primary" onClick={openCreate}>新建</Button>}</Space></div>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 900 }} locale={{ emptyText: <Empty description="暂无数据" /> }} />
       </>}
