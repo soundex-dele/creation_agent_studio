@@ -85,6 +85,32 @@ class DurableAgentAdapterTest(TestCase):
         self.assertEqual(len(delta_calls), 2)
 
     @patch("apps.agents.execution.build_agent_engine")
+    def test_coalesces_tiny_streaming_deltas(self, mock_factory):
+        engine = MagicMock()
+        content = "x" * 2048
+
+        def complete(_messages, **options):
+            for character in content:
+                options["on_event"]("output.delta", {"text": character})
+            return LLMResponse(
+                content=content, usage=TokenUsage(), model="deepseek-chat"
+            )
+
+        engine.complete.side_effect = complete
+        mock_factory.return_value = engine
+        sink = MagicMock(cancelled=False)
+
+        execute_agent_completion(self._payload(self.organization.id), sink)
+
+        delta_calls = [
+            call for call in sink.emit.call_args_list if call.args[0] == "output.delta"
+        ]
+        self.assertEqual(
+            "".join(call.args[1]["text"] for call in delta_calls), content
+        )
+        self.assertLessEqual(len(delta_calls), 9)
+
+    @patch("apps.agents.execution.build_agent_engine")
     def test_failure_raises_for_coordinator(self, mock_factory):
         mock_factory.return_value.complete.return_value = LLMResponse(
             content="", usage=TokenUsage(), model="deepseek-chat",

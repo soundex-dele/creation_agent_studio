@@ -37,12 +37,14 @@ interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
   isStreaming?: boolean;
+  streamingMessageId?: string | null;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
   messages,
   isLoading = false,
   isStreaming = false,
+  streamingMessageId = null,
 }) => {
   const copyMessageContent = async (content: string) => {
     try {
@@ -122,6 +124,7 @@ const MessageList: React.FC<MessageListProps> = ({
     const selectedSkills = message.metadata?.composer?.skill_names
       ?? message.metadata?.composer?.skills
       ?? [];
+    const isStreamingMessage = message.id === streamingMessageId;
 
     return (
       <div
@@ -190,8 +193,10 @@ const MessageList: React.FC<MessageListProps> = ({
                   <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
                 </div>
               )}
-              {isUser || isSystem ? (
-                <span>{message.content}</span>
+              {isUser || isSystem || isStreamingMessage ? (
+                <span className={isStreamingMessage ? 'message-streaming-content' : undefined}>
+                  {message.content}
+                </span>
               ) : (
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               )}

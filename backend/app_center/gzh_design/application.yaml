@@ -48,7 +48,7 @@ spec:
         prompt_template: |
           请使用 gzh-design Skill 排版下面的公众号文章。
 
-          文章正文或文件路径：
+          从文章中提取出正文：
           {source}
 
           主题：{theme}

@@ -6,6 +6,9 @@ from apps.enterprise.models import Organization
 from core.llm.factory import build_agent_engine
 logger = logging.getLogger(__name__)
 
+OUTPUT_DELTA_FLUSH_CHARS = 256
+OUTPUT_DELTA_FLUSH_SECONDS = 0.05
+
 
 def _resume_answer_message(command_payload, input_request):
     answers = command_payload.get("answers")
@@ -119,16 +122,42 @@ def execute_agent_completion(run_payload, sink):
 
     emitted_output = False
     seen_events = set()
+    pending_output = []
+    pending_output_chars = 0
+    last_output_flush = time.perf_counter()
+
+    def flush_output_delta():
+        nonlocal pending_output, pending_output_chars, last_output_flush
+        if not pending_output:
+            return
+        sink.emit("output.delta", {"text": "".join(pending_output)})
+        pending_output = []
+        pending_output_chars = 0
+        last_output_flush = time.perf_counter()
 
     def emit_runtime_event(event_type, payload):
-        nonlocal emitted_output
+        nonlocal emitted_output, pending_output_chars
         if event_type not in seen_events:
             seen_events.add(event_type)
             logger.info(
                 "chat_latency stage=first_engine_event run_id=%s type=%s elapsed_ms=%.1f",
                 run_id, event_type, (time.perf_counter() - started) * 1000,
             )
-        if event_type in {"output.delta", "output.snapshot"}:
+        if event_type == "output.delta":
+            emitted_output = True
+            text = str(payload.get("text") or "")
+            if not text:
+                return
+            pending_output.append(text)
+            pending_output_chars += len(text)
+            if (
+                pending_output_chars >= OUTPUT_DELTA_FLUSH_CHARS
+                or time.perf_counter() - last_output_flush >= OUTPUT_DELTA_FLUSH_SECONDS
+            ):
+                flush_output_delta()
+            return
+        flush_output_delta()
+        if event_type == "output.snapshot":
             emitted_output = True
         sink.emit(event_type, payload)
 
@@ -144,6 +173,7 @@ def execute_agent_completion(run_payload, sink):
         skills=skills,
         on_event=emit_runtime_event,
     )
+    flush_output_delta()
     logger.info(
         "chat_latency stage=engine_returned run_id=%s elapsed_ms=%.1f success=%s streamed=%s",
         run_id, (time.perf_counter() - started) * 1000, response.success, emitted_output,

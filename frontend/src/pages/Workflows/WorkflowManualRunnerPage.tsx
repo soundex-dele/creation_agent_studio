@@ -22,7 +22,6 @@ export default function WorkflowManualRunnerPage() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [manualRun, setManualRun] = useState<RunResource | null>(null);
   const [selectedKey, setSelectedKey] = useState('');
-  const [openedKeys, setOpenedKeys] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [completing, setCompleting] = useState(false);
   const openingManualSession = useRef(false);
@@ -43,7 +42,6 @@ export default function WorkflowManualRunnerPage() {
         setWorkflow(workflowResult);
         setManualRun(runResult);
         setSelectedKey(firstKey);
-        setOpenedKeys(firstKey ? [firstKey] : []);
         if (!resumeRunId) {
           navigate(`/workflows/${id}/manual?runId=${runResult.id}`, { replace: true });
         }
@@ -57,10 +55,21 @@ export default function WorkflowManualRunnerPage() {
   const steps = workflow?.steps ?? [];
   const selectedStep = steps.find((step) => step.key === selectedKey) ?? steps[0];
 
-  const selectStep = (step: WorkflowStep) => {
+  const selectStep = async (step: WorkflowStep) => {
+    if (step.key === selectedKey) return;
+    if (id && manualRun) {
+      try {
+        const refreshedRun = await api.post<RunResource>(`/workflows/${id}/manual-session/`, {
+          action: 'open',
+          run_id: manualRun.id,
+        });
+        setManualRun(refreshedRun);
+      } catch (reason: any) {
+        message.error(reason?.response?.data?.detail || '无法切换工作流应用');
+        return;
+      }
+    }
     setSelectedKey(step.key);
-    setOpenedKeys((current) => current.includes(step.key)
-      ? current : [...current, step.key]);
   };
 
   const completeRun = async () => {
@@ -109,7 +118,7 @@ export default function WorkflowManualRunnerPage() {
               key={step.key}
               type="button"
               className={`workflow-run-step ${selectedStep?.key === step.key ? 'active' : ''}`}
-              onClick={() => selectStep(step)}
+              onClick={() => void selectStep(step)}
             >
               <span className="workflow-run-step-number">{index + 1}</span>
               <span className="workflow-run-step-icon">
@@ -157,17 +166,12 @@ export default function WorkflowManualRunnerPage() {
               </div>
             </header>
             <div className="workflow-run-application">
-              {steps.filter((step) => openedKeys.includes(step.key)).map((step) => (
-                <iframe
-                  key={step.key}
-                  className={`workflow-run-application-frame ${
-                    selectedStep.key === step.key ? 'active' : ''
-                  }`}
-                  src={workflowApplicationPath(step, true, id, manualRun)}
-                  title={step.name || step.application.application_name}
-                  aria-hidden={selectedStep.key !== step.key}
-                />
-              ))}
+              <iframe
+                key={selectedStep.key}
+                className="workflow-run-application-frame active"
+                src={workflowApplicationPath(selectedStep, true, id, manualRun)}
+                title={selectedStep.name || selectedStep.application.application_name}
+              />
             </div>
           </>
         ) : (

@@ -25,7 +25,7 @@ spec:
     output_schema: {}
     default_config: {guided_entry_prompt_key: generate-cover}
     chat_profile:
-      welcome_message: 填写标题、内容与画面偏好，我会生成提示词并在确认后制作 HTML 封面。
+      welcome_message: 填写文章内容与画面偏好，我会提取主题和标题并制作 HTML 封面。
       input_placeholder: 继续修改标题、构图、字体、配色或装饰…
       empty_state_title: 生成一张 HTML 文章封面
       allow_agent_selection: false
@@ -40,19 +40,18 @@ spec:
     guided_prompts:
       - key: generate-cover
         title: 填写封面需求
-        description: 明确标题和画面比例，其余维度可让智能体自动选择。
+        description: 提供文章内容并明确画面比例，其余维度可让智能体自动选择。
         icon: "🖼️"
         action: preview
         is_featured: true
         order: 0
         prompt_template: |
           请使用 baoyu-html-cover Skill 生成一张纯 HTML/CSS/SVG 文章封面。
+          从文章中提取出主题、封面标题、副标题。
 
-          文章主题或内容：
+          文章内容：
           {source}
 
-          标题（必须原样使用）：{title}
-          副标题（为空则不添加）：{subtitle}
           封面类型：{cover_type}
           配色：{palette}
           视觉风格：{style}
@@ -61,37 +60,17 @@ spec:
           画面比例：{aspect}
           其他要求：{requirements}
 
-          用户已通过应用表单确认全部设置。请按 --quick 语义直接生成，不要再次询问；画面比例必须使用上面指定的值。标题不得改写或意译。输出完整、自包含、固定尺寸的 cover.html。不要使用内置浏览器，不需要导出 PNG。
+          用户已通过应用表单确认全部设置。请按 --quick 语义直接生成，不要再次询问；画面比例必须使用上面指定的值。提取的封面标题必须来自原文，不得改写或意译；文章中没有合适的副标题时不要添加。输出完整、自包含、固定尺寸的 cover.html。不要使用内置浏览器，不需要导出 PNG。
         questions:
           - key: source
-            label: 文章主题或内容
+            label: 文章内容
             type: text
-            placeholder: 粘贴文章摘要、完整正文或主题说明
-            help_text: 用于判断语气、关键词和视觉隐喻。
+            placeholder: 粘贴文章正文、摘要或文件路径
+            help_text: 用于提取主题、封面标题、副标题，并判断视觉方向。
             required: true
             default_value: null
             validation: {}
             order: 0
-            options: []
-          - key: title
-            label: 封面标题
-            type: text
-            placeholder: 标题会原样出现在封面中
-            help_text: 智能体不得改写该标题。
-            required: true
-            default_value: null
-            validation: {}
-            order: 1
-            options: []
-          - key: subtitle
-            label: 副标题
-            type: text
-            placeholder: 可选
-            help_text: 留空则不添加。
-            required: false
-            default_value: ""
-            validation: {}
-            order: 2
             options: []
           - key: cover_type
             label: 封面类型
@@ -101,7 +80,7 @@ spec:
             required: true
             default_value: auto
             validation: {}
-            order: 3
+            order: 1
             options:
               - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
               - {value: hero, label: Hero 主视觉, description: "", icon: "", order: 1}
@@ -118,7 +97,7 @@ spec:
             required: true
             default_value: auto
             validation: {}
-            order: 4
+            order: 2
             options:
               - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
               - {value: warm, label: Warm, description: "", icon: "", order: 1}
@@ -141,7 +120,7 @@ spec:
             required: true
             default_value: auto
             validation: {}
-            order: 5
+            order: 3
             options:
               - {value: auto, label: 自动选择（推荐）, description: "", icon: "", order: 0}
               - {value: flat, label: Flat, description: "", icon: "", order: 1}
@@ -159,7 +138,7 @@ spec:
             required: true
             default_value: title-only
             validation: {}
-            order: 6
+            order: 4
             options:
               - {value: title-only, label: 仅标题（推荐）, description: "", icon: "", order: 0}
               - {value: none, label: 无文字, description: "", icon: "", order: 1}
@@ -173,7 +152,7 @@ spec:
             required: true
             default_value: clean
             validation: {}
-            order: 7
+            order: 5
             options:
               - {value: clean, label: Clean（推荐）, description: "", icon: "", order: 0}
               - {value: handwritten, label: Handwritten, description: "", icon: "", order: 1}
@@ -188,7 +167,7 @@ spec:
             required: true
             default_value: "16:9"
             validation: {}
-            order: 8
+            order: 6
             options:
               - {value: "16:9", label: "16:9 横版", description: "1920×1080", icon: "", order: 0}
               - {value: "9:16", label: "9:16 竖版", description: "1080×1920", icon: "", order: 1}
@@ -204,7 +183,7 @@ spec:
             required: false
             default_value: ""
             validation: {}
-            order: 9
+            order: 7
             options: []
   backend:
     definition_factory: app_center.html_cover_generator.provision.prepare_definition

@@ -48,7 +48,7 @@ spec:
         prompt_template: |
           请使用 baoyu-article-html-illustrator Skill 为下面的文章生成一套 HTML/CSS 配图。
 
-          文章内容或文件路径：
+          从文章中提取出正文：
           {article}
 
           配图预设/类型：{preset}

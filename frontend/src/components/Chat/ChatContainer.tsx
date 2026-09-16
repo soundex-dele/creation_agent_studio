@@ -276,7 +276,12 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             onScroll={handleMessagesScroll}
           >
             <div className="chat-messages-inner">
-              <MessageList messages={messages} isLoading={isLoading} isStreaming={isStreaming} />
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                isStreaming={isStreaming}
+                streamingMessageId={streamingMessageId}
+              />
               {agentActivity && isStreaming && (
                 <div className="agent-activity">{agentActivity}</div>
               )}
