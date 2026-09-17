@@ -122,7 +122,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     setInputValue(draftRequest.text);
   }, [draftRequest]);
 
-  const handleSendMessage = async (content: string, composer: ComposerContext) => {
+  const handleSendMessage = async (
+    content: string,
+    composer: ComposerContext,
+    images: File[],
+  ) => {
     if (creatingConversationRef.current) return;
     shouldAutoScrollRef.current = true;
 
@@ -153,7 +157,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         } as ConversationDetail);
       } catch (error) {
         console.error('Failed to create conversation:', error);
-        return;
+        throw error;
       } finally {
         creatingConversationRef.current = false;
         setIsCreatingConversation(false);
@@ -173,6 +177,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         permissionMode: composer.permissionMode,
         skillNames: composer.skillNames,
         agentId: composer.agentId,
+        images,
       });
       abortControllerRef.current = controller;
       if (!conversationId) {
@@ -181,6 +186,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       }
     } catch (error) {
       console.error('Failed to start stream:', error);
+      throw error;
     }
   };
 

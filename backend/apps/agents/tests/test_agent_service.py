@@ -45,6 +45,40 @@ class DurableAgentAdapterTest(TestCase):
         sink.emit.assert_any_call("output.delta", {"text": "hello"})
 
     @patch("apps.agents.execution.build_agent_engine")
+    def test_codex_receives_image_paths(self, mock_factory):
+        engine = MagicMock()
+        engine.adapter_name = "codex"
+        engine.complete.return_value = LLMResponse(
+            content="described", usage=TokenUsage(), model="codex-default"
+        )
+        mock_factory.return_value = engine
+        payload = self._payload(self.organization.id)
+        payload["input"]["attachments"] = [{
+            "path": "/tmp/example.png",
+            "content_type": "image/png",
+        }]
+
+        execute_agent_completion(payload, MagicMock(cancelled=False))
+
+        self.assertEqual(
+            engine.complete.call_args.kwargs["image_paths"],
+            ["/tmp/example.png"],
+        )
+
+    @patch("apps.agents.execution.build_agent_engine")
+    def test_graphflow_rejects_image_paths(self, mock_factory):
+        engine = MagicMock()
+        engine.adapter_name = "graphflow"
+        mock_factory.return_value = engine
+        payload = self._payload(self.organization.id)
+        payload["input"]["attachments"] = [{"path": "/tmp/example.png"}]
+
+        with self.assertRaisesMessage(RuntimeError, "GraphFlow"):
+            execute_agent_completion(payload, MagicMock(cancelled=False))
+
+        engine.complete.assert_not_called()
+
+    @patch("apps.agents.execution.build_agent_engine")
     def test_forwards_streaming_and_tool_events_without_duplicate_final_delta(
         self, mock_factory
     ):

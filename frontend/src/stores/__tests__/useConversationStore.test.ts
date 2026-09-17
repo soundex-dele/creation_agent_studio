@@ -261,6 +261,37 @@ describe('useConversationStore durable Run integration', () => {
     );
   });
 
+  it('submits images and composer selections as multipart form data', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      id: 'run-image',
+      organization_id: 'org-1',
+      status: 'queued',
+    });
+    const image = new File(['image-bytes'], 'diagram.png', { type: 'image/png' });
+
+    await useConversationStore.getState().sendMessage(
+      'conversation-1',
+      'Describe this',
+      { agentId: 42, skillNames: ['vision'], images: [image] },
+    );
+
+    const [url, body, config] = post.mock.calls[0];
+    expect(url).toBe('/conversations/conversation-1/send_message/');
+    expect(body).toBeInstanceOf(FormData);
+    const form = body as FormData;
+    expect(form.get('content')).toBe('Describe this');
+    expect(form.get('agent_id')).toBe('42');
+    expect(form.getAll('skill_names')).toEqual(['vision']);
+    expect((form.get('images') as File).name).toBe('diagram.png');
+    expect(config).toEqual({
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Idempotency-Key': expect.any(String),
+      },
+      timeout: 120000,
+    });
+  });
+
   it('preserves multiple Codex questions and submits structured answers', async () => {
     let emit: ((event: RunEventEnvelope) => void) | undefined;
     vi.spyOn(api, 'post').mockResolvedValue({

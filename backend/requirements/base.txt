@@ -32,5 +32,6 @@ croniter~=6.0.0
 faster-whisper==1.2.0
 pypdf~=6.0
 python-docx~=1.2
+Pillow~=11.3
 pgvector~=0.4
 sqlite-vec~=0.1

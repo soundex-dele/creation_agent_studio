@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Dropdown, Empty } from 'antd';
+import { Dropdown, Empty, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   CloseOutlined,
   FolderOutlined,
+  PictureOutlined,
   PlusOutlined,
   RobotOutlined,
   SafetyCertificateOutlined,
@@ -37,7 +38,11 @@ export type ComposerAgent = Pick<Agent, 'id' | 'name' | 'description'>;
 interface MessageInputProps {
   value?: string;
   onValueChange?: (value: string) => void;
-  onSendMessage: (content: string, context: ComposerContext) => void;
+  onSendMessage: (
+    content: string,
+    context: ComposerContext,
+    images: File[],
+  ) => void | Promise<void>;
   disabled?: boolean;
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
@@ -60,12 +65,27 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<ComposerAgent | null>(currentAgent);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<Array<{
+    file: File;
+    previewUrl: string;
+  }>>([]);
+  const selectedImagesRef = useRef(selectedImages);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const defaultPermissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
   const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects, loadProjects } = useProjectStore();
   const { agents, loadAgents } = useAgentStore();
+
+  useEffect(() => {
+    selectedImagesRef.current = selectedImages;
+  }, [selectedImages]);
+
+  useEffect(() => () => {
+    selectedImagesRef.current.forEach(({ previewUrl }) => URL.revokeObjectURL(previewUrl));
+  }, []);
 
   useEffect(() => {
     void loadProjects();
@@ -102,19 +122,63 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
   useEffect(autosizeTextarea, [content]);
 
-  const handleSend = () => {
-    if (content.trim() && !disabled) {
-      onSendMessage(content.trim(), {
-        projectId: selectedProject?.id,
-        workingDirectory: selectedSystemDirectory || undefined,
-        agentId: selectedAgent?.id ?? null,
-        agent: selectedAgent,
-        permissionMode,
-        skillNames: selectedSkills,
-      });
-      setContent('');
-      setSelectedSkills([]);
+  const handleSend = async () => {
+    if ((content.trim() || selectedImages.length > 0) && !disabled && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        await onSendMessage(content.trim(), {
+          projectId: selectedProject?.id,
+          workingDirectory: selectedSystemDirectory || undefined,
+          agentId: selectedAgent?.id ?? null,
+          agent: selectedAgent,
+          permissionMode,
+          skillNames: selectedSkills,
+        }, selectedImages.map(({ file }) => file));
+        setContent('');
+        setSelectedSkills([]);
+        selectedImages.forEach(({ previewUrl }) => URL.revokeObjectURL(previewUrl));
+        setSelectedImages([]);
+      } catch {
+        // Keep the draft and selected images so the user can retry.
+      } finally {
+        setIsSubmitting(false);
+      }
     }
+  };
+
+  const handleImageSelection = (files: FileList | null) => {
+    if (!files?.length) return;
+    const availableSlots = 4 - selectedImages.length;
+    if (availableSlots <= 0) {
+      message.warning('每条消息最多上传 4 张图片');
+      return;
+    }
+    const allowedTypes = new Set([
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
+    ]);
+    const accepted: Array<{ file: File; previewUrl: string }> = [];
+    Array.from(files).slice(0, availableSlots).forEach((file) => {
+      const hasAllowedExtension = /\.(?:jpe?g|png|webp)$/i.test(file.name);
+      const hasGenericType = file.type === '' || file.type === 'application/octet-stream';
+      if (!allowedTypes.has(file.type) && !(hasGenericType && hasAllowedExtension)) {
+        message.error(`${file.name} 不是支持的 JPG、PNG 或 WebP 图片`);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        message.error(`${file.name} 超过 10MB`);
+        return;
+      }
+      accepted.push({ file, previewUrl: URL.createObjectURL(file) });
+    });
+    if (files.length > availableSlots) {
+      message.warning('每条消息最多上传 4 张图片');
+    }
+    if (accepted.length) setSelectedImages((current) => [...current, ...accepted]);
+  };
+
+  const removeImage = (previewUrl: string) => {
+    URL.revokeObjectURL(previewUrl);
+    setSelectedImages((current) => current.filter((item) => item.previewUrl !== previewUrl));
   };
 
   const workspaceItems: MenuProps['items'] = [
@@ -131,6 +195,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   ];
 
   const attachmentItems = useMemo<MenuProps['items']>(() => [
+    {
+      key: 'images',
+      icon: <PictureOutlined />,
+      label: '图片',
+    },
     {
       key: 'skills',
       icon: <ThunderboltOutlined />,
@@ -158,7 +227,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
   ], [agents, skills]);
 
   const handleAttachmentClick: MenuProps['onClick'] = ({ key }) => {
-    if (key.startsWith('skill:')) {
+    if (key === 'images') {
+      imageInputRef.current?.click();
+    } else if (key.startsWith('skill:')) {
       const name = key.slice(6);
       setSelectedSkills((current) => current.includes(name) ? current : [...current, name]);
     } else if (key.startsWith('agent:')) {
@@ -173,7 +244,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       : e.key === 'Enter' && (e.ctrlKey || e.metaKey);
     if (shouldSend) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -194,12 +265,30 @@ const MessageInput: React.FC<MessageInputProps> = ({
         />
         <button
           className="chat-send-btn"
-          onClick={handleSend}
-          disabled={!content.trim() || disabled}
+          onClick={() => void handleSend()}
+          disabled={(!content.trim() && selectedImages.length === 0) || disabled || isSubmitting}
         >
           <SendOutlined />
         </button>
       </div>
+
+      {selectedImages.length > 0 && (
+        <div className="chat-composer-images" aria-label="待发送图片">
+          {selectedImages.map(({ file, previewUrl }) => (
+            <div className="chat-composer-image" key={previewUrl}>
+              <img src={previewUrl} alt={file.name} />
+              <button
+                type="button"
+                onClick={() => removeImage(previewUrl)}
+                aria-label={`移除图片 ${file.name}`}
+              >
+                <CloseOutlined />
+              </button>
+              <span title={file.name}>{file.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(selectedAgent || selectedSkills.length > 0) && (
         <div className="chat-composer-attachments">
@@ -269,10 +358,21 @@ const MessageInput: React.FC<MessageInputProps> = ({
           placement="topLeft"
           menu={{ items: attachmentItems, onClick: handleAttachmentClick }}
         >
-          <button className="chat-composer-plus" disabled={disabled} aria-label="添加 Skill 或 Agent">
+          <button className="chat-composer-plus" disabled={disabled} aria-label="添加图片、Skill 或 Agent">
             <PlusOutlined />
           </button>
         </Dropdown>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          hidden
+          onChange={(event) => {
+            handleImageSelection(event.target.files);
+            event.target.value = '';
+          }}
+        />
       </div>
       <FolderPickerModal
         open={folderPickerOpen}

@@ -17,6 +17,7 @@ from core.agent_engine.adapters.codex import (
     _AppServerTransport,
     _consume_codex_turn,
     _text_input,
+    _turn_input,
     load_codex_sdk,
     resolve_codex_binary,
 )
@@ -247,6 +248,26 @@ class CodexIntegrationTest(TestCase):
                 "text_elements": [],
             }],
         )
+
+    def test_builds_native_local_image_inputs(self):
+        with TemporaryDirectory() as directory:
+            first = Path(directory) / "first.png"
+            second = Path(directory) / "second.webp"
+
+            result = _turn_input(
+                "Compare these images",
+                image_paths=[str(first), str(second)],
+            )
+
+        self.assertEqual(result, [
+            {
+                "type": "text",
+                "text": "Compare these images",
+                "text_elements": [],
+            },
+            {"type": "localImage", "path": str(first.resolve())},
+            {"type": "localImage", "path": str(second.resolve())},
+        ])
 
     def test_streams_agent_deltas_and_tool_lifecycle(self):
         notifications = [

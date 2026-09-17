@@ -63,6 +63,19 @@ def execute_agent_completion(run_payload, sink):
         getattr(engine, "adapter_name", "") or model_config.get("adapter") or ""
     )
     input_data = dict(run_payload.get("input") or {})
+    attachments = input_data.get("attachments")
+    if not isinstance(attachments, list):
+        attachments = []
+    image_paths = [
+        str(item.get("path"))
+        for item in attachments
+        if isinstance(item, dict) and item.get("path")
+    ]
+    if image_paths and provider_name != "codex":
+        raise RuntimeError(
+            "Image attachments are supported only by the Codex adapter; "
+            "GraphFlow does not support image input."
+        )
     skills = input_data.get("skills")
     if not isinstance(skills, list):
         skills = []
@@ -172,6 +185,7 @@ def execute_agent_completion(run_payload, sink):
             require_tool_approval=bool(governance.get("require_tool_approval", False)),
             thread_id=thread_id,
             skills=skills,
+            image_paths=[] if resume_command else image_paths,
             on_event=emit_runtime_event,
             cancelled=lambda: sink.cancelled,
         )

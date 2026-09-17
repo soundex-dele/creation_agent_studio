@@ -7,15 +7,46 @@ from apps.agents.models import Agent
 from apps.projects.services.workspace_paths import validate_system_working_directory
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.models import Run
-from .models import Conversation, Message
+from .models import Conversation, Message, MessageAttachment
+
+
+MAX_MESSAGE_IMAGES = 4
+MAX_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024
+ALLOWED_IMAGE_FORMATS = {
+    'JPEG': 'image/jpeg',
+    'PNG': 'image/png',
+    'WEBP': 'image/webp',
+}
+
+
+class MessageAttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageAttachment
+        fields = [
+            'id', 'url', 'original_name', 'content_type', 'byte_size',
+            'width', 'height', 'created_at',
+        ]
+
+    def get_url(self, obj):
+        if not obj.file:
+            return ''
+        url = f"/{obj.file.url.lstrip('/')}"
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
 
 
 class MessageSerializer(serializers.ModelSerializer):
     """消息序列化器"""
+    attachments = MessageAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Message
-        fields = ['id', 'run_id', 'role', 'content', 'metadata', 'created_at']
+        fields = [
+            'id', 'run_id', 'role', 'content', 'metadata', 'attachments',
+            'created_at',
+        ]
 
 
 class AgentNestedSerializer(serializers.ModelSerializer):
@@ -137,8 +168,40 @@ class CreateConversationSerializer(serializers.Serializer):
 
 class SendMessageSerializer(serializers.Serializer):
     """发送消息序列化器"""
-    content = serializers.CharField(required=True)
+    content = serializers.CharField(
+        required=False, allow_blank=True, default='', trim_whitespace=False)
+    images = serializers.ListField(
+        child=serializers.ImageField(allow_empty_file=False),
+        required=False,
+        default=list,
+        max_length=MAX_MESSAGE_IMAGES,
+        write_only=True,
+    )
     conversation_id = serializers.IntegerField(required=False)
     agent_id = serializers.IntegerField(required=False, allow_null=True)
     skill_names = serializers.ListField(
         child=serializers.CharField(max_length=160), required=False, default=list)
+
+    def validate_images(self, images):
+        for image in images:
+            if image.size > MAX_MESSAGE_IMAGE_BYTES:
+                raise serializers.ValidationError('每张图片不能超过 10MB。')
+            image_format = str(getattr(getattr(image, 'image', None), 'format', '')).upper()
+            detected_type = ALLOWED_IMAGE_FORMATS.get(image_format)
+            if detected_type is None:
+                raise serializers.ValidationError('仅支持 JPG、PNG 和 WebP 图片。')
+            declared_type = str(getattr(image, 'content_type', '') or '').lower()
+            if declared_type == 'image/jpg':
+                declared_type = 'image/jpeg'
+            if (
+                declared_type not in ('', 'application/octet-stream')
+                and declared_type != detected_type
+            ):
+                raise serializers.ValidationError('图片内容与文件类型不匹配。')
+            image.content_type = detected_type
+        return images
+
+    def validate(self, attrs):
+        if not str(attrs.get('content') or '').strip() and not attrs.get('images'):
+            raise serializers.ValidationError('请输入消息或选择至少一张图片。')
+        return attrs

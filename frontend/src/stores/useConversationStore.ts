@@ -15,12 +15,24 @@ import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
 import { tenantApiRoot } from '@/services/tenantContext';
 
+export interface MessageAttachment {
+  id: string;
+  url: string;
+  original_name: string;
+  content_type: string;
+  byte_size: number;
+  width?: number | null;
+  height?: number | null;
+  created_at?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
   metadata?: Record<string, any>;
+  attachments?: MessageAttachment[];
 }
 
 export interface Conversation {
@@ -45,6 +57,7 @@ export interface ChatRunOptions {
   permissionMode?: 'default' | 'allow_all';
   skillNames?: string[];
   agentId?: number | null;
+  images?: File[];
 }
 
 const normalizeConversation = (item: any): Conversation => ({
@@ -137,6 +150,12 @@ const answerMessageContent = (
 const toolValue = (value: unknown): string | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
   return typeof value === 'string' ? value : JSON.stringify(value);
+};
+
+const revokeOptimisticImageUrls = (messages: Message[] | undefined) => {
+  messages?.forEach((item) => item.attachments?.forEach((attachment) => {
+    if (attachment.url.startsWith('blob:')) URL.revokeObjectURL(attachment.url);
+  }));
 };
 
 const asToolCall = (event: RunEventEnvelope): AgentToolCall => ({
@@ -411,6 +430,7 @@ export const useConversationStore = create<ConversationState>()(
           try {
             const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
             if (requestId === latestConversationDetailRequest) {
+              revokeOptimisticImageUrls(get().currentConversation?.messages);
               set({
                 currentConversation: { ...response, id: String(response.id) },
                 isLoading: false,
@@ -460,6 +480,27 @@ export const useConversationStore = create<ConversationState>()(
         },
 
         sendMessage: async (conversationId, content, options = {}) => {
+          if (options.images?.length) {
+            const payload = new FormData();
+            payload.append('content', content);
+            options.images.forEach((image) => payload.append('images', image, image.name));
+            options.skillNames?.forEach((skillName) => payload.append('skill_names', skillName));
+            if (options.agentId === null) payload.append('agent_id', '');
+            else if (options.agentId !== undefined) {
+              payload.append('agent_id', String(options.agentId));
+            }
+            return api.post<RunResource>(
+              `/conversations/${conversationId}/send_message/`,
+              payload,
+              {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                  'Idempotency-Key': crypto.randomUUID(),
+                },
+                timeout: 120000,
+              },
+            );
+          }
           const payload: Record<string, unknown> = { content };
           if (options.agentId !== undefined) {
             payload.agent_id = options.agentId;
@@ -501,6 +542,13 @@ export const useConversationStore = create<ConversationState>()(
                 permission_mode: options.permissionMode ?? 'default',
               },
             },
+            attachments: (options.images ?? []).map((image, index) => ({
+              id: `pending-image-${stamp}-${index}`,
+              url: URL.createObjectURL(image),
+              original_name: image.name,
+              content_type: image.type,
+              byte_size: image.size,
+            })),
           };
           const assistantMessage: Message = {
             id: assistantMessageId,
@@ -556,8 +604,12 @@ export const useConversationStore = create<ConversationState>()(
             });
           }).catch((error: any) => {
             if (!controller.signal.aborted) {
+              const responseData = error.response?.data;
+              const imageError = Array.isArray(responseData?.images)
+                ? responseData.images.join(' ')
+                : responseData?.images;
               set({
-                error: error.response?.data?.detail || '创建 Run 失败',
+                error: responseData?.detail || imageError || '创建 Run 失败',
                 streamingMessageId: null,
                 agentActivity: null,
               });

@@ -1,9 +1,27 @@
-"""
-Models for conversations app.
-"""
+"""Models for conversations app."""
+import uuid
+from pathlib import Path
+
 from django.db import models
 from apps.users.models import User
 from modules.tenancy.models import TenantOwnedQuerySet
+
+
+def message_attachment_upload_to(instance, filename):
+    """Keep tenant/conversation uploads isolated and filenames unguessable."""
+
+    extension_by_type = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/webp': '.webp',
+    }
+    extension = extension_by_type.get(instance.content_type)
+    if extension is None:
+        extension = Path(filename).suffix.lower()[:10]
+    return (
+        f'conversations/{instance.organization_id}/'
+        f'{instance.conversation_id}/{instance.id}{extension}'
+    )
 
 
 class Conversation(models.Model):
@@ -117,3 +135,42 @@ class Message(models.Model):
 
     def __str__(self):
         return f'{self.role}: {self.content[:50]}'
+
+
+class MessageAttachment(models.Model):
+    """A validated image attached to one persisted conversation message."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        'enterprise.Organization',
+        on_delete=models.CASCADE,
+        related_name='message_attachments',
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to=message_attachment_upload_to, max_length=500)
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    byte_size = models.PositiveBigIntegerField()
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    checksum_sha256 = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = TenantOwnedQuerySet.as_manager()
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        db_table = 'message_attachments'
+        indexes = [models.Index(fields=['conversation', 'message'])]
+
+    def __str__(self):
+        return self.original_name

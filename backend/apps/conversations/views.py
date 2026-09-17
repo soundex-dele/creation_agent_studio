@@ -1,7 +1,10 @@
 """Conversation resources backed exclusively by the durable Run plane."""
+import hashlib
 import logging
 import time
+import uuid
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db import OperationalError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -45,7 +48,12 @@ from modules.execution.application.start_runs import (
 )
 from modules.execution.models import IdempotencyRecord, Run
 
-from .models import Conversation, ConversationSkillBinding, Message
+from .models import (
+    Conversation,
+    ConversationSkillBinding,
+    Message,
+    MessageAttachment,
+)
 from .serializers import (
     ConversationDetailSerializer,
     ConversationListSerializer,
@@ -61,6 +69,69 @@ logger = logging.getLogger(__name__)
 
 class ConversationRunActive(Exception):
     pass
+
+
+def prepare_image_specs(images):
+    """Read stable image metadata once before transaction retries begin."""
+
+    specs = []
+    for image in images or ():
+        image.seek(0)
+        checksum = hashlib.sha256()
+        for chunk in image.chunks():
+            checksum.update(chunk)
+        image.seek(0)
+        dimensions = getattr(getattr(image, 'image', None), 'size', (None, None))
+        specs.append({
+            'id': uuid.uuid4(),
+            'file': image,
+            'original_name': str(image.name or 'image')[:255],
+            'content_type': str(image.content_type),
+            'byte_size': image.size,
+            'width': dimensions[0],
+            'height': dimensions[1],
+            'checksum_sha256': checksum.hexdigest(),
+        })
+    return specs
+
+
+def persist_message_attachments(
+    *, message, conversation, specs, saved_storage_names,
+):
+    """Persist validated uploads and return JSON-safe Codex attachment input."""
+
+    runtime_attachments = []
+    for spec in specs:
+        attachment = MessageAttachment(
+            id=spec['id'],
+            organization=conversation.organization,
+            conversation=conversation,
+            message=message,
+            original_name=spec['original_name'],
+            content_type=spec['content_type'],
+            byte_size=spec['byte_size'],
+            width=spec['width'],
+            height=spec['height'],
+            checksum_sha256=spec['checksum_sha256'],
+        )
+        spec['file'].seek(0)
+        attachment.file.save(spec['original_name'], spec['file'], save=False)
+        saved_storage_names.append(attachment.file.name)
+        attachment.save()
+        try:
+            local_path = attachment.file.path
+        except NotImplementedError as exc:
+            raise ValidationError({
+                'images': 'Codex 图片输入要求使用可访问的本地文件存储。',
+            }) from exc
+        runtime_attachments.append({
+            'id': str(attachment.id),
+            'name': attachment.original_name,
+            'content_type': attachment.content_type,
+            'byte_size': attachment.byte_size,
+            'path': str(local_path),
+        })
+    return runtime_attachments
 
 
 def resolve_agent(agent_id, organization, *, use_default=False):
@@ -351,6 +422,10 @@ class ConversationViewSet(viewsets.ViewSet):
             repair_conversation_messages,
         )
         repair_conversation_messages(conversation)
+        conversation = Conversation.objects.prefetch_related(
+            "messages__attachments",
+            "skill_bindings__skill",
+        ).get(pk=conversation.pk)
         return Response(ConversationDetailSerializer(conversation).data)
 
     @action(detail=True, methods=["get"], url_path="workspace-files")
@@ -395,9 +470,11 @@ class ConversationViewSet(viewsets.ViewSet):
         idempotency_key,
         requested_agent_id=AGENT_SELECTION_UNSET,
         requested_skill_names=(),
+        image_specs=(),
         max_retries=6,
     ):
         for retry_no in range(max_retries):
+            saved_storage_names = []
             try:
                 return self._create_run_once(
                     request,
@@ -406,12 +483,20 @@ class ConversationViewSet(viewsets.ViewSet):
                     idempotency_key,
                     requested_agent_id=requested_agent_id,
                     requested_skill_names=requested_skill_names,
+                    image_specs=image_specs,
+                    saved_storage_names=saved_storage_names,
                 )
             except OperationalError as exc:
+                for storage_name in saved_storage_names:
+                    default_storage.delete(storage_name)
                 is_busy = "locked" in str(exc).lower() or "busy" in str(exc).lower()
                 if not is_busy or retry_no + 1 >= max_retries:
                     raise
                 time.sleep(0.02 * (2**retry_no))
+            except Exception:
+                for storage_name in saved_storage_names:
+                    default_storage.delete(storage_name)
+                raise
 
         raise RuntimeError("Unable to create conversation run after retries")
 
@@ -424,7 +509,11 @@ class ConversationViewSet(viewsets.ViewSet):
         idempotency_key,
         requested_agent_id=AGENT_SELECTION_UNSET,
         requested_skill_names=(),
+        image_specs=(),
+        saved_storage_names=None,
     ):
+        if saved_storage_names is None:
+            saved_storage_names = []
         conversation = Conversation.objects.select_for_update().get(
             pk=conversation.pk,
             organization_id=conversation.organization_id,
@@ -476,6 +565,10 @@ class ConversationViewSet(viewsets.ViewSet):
         working_directory = conversation_working_directory(conversation)
         validate_requested_skill_names(conversation, requested_skill_names)
         if agent.kind == Agent.Kind.SUPERVISOR:
+            if image_specs:
+                raise ValidationError({
+                    "images": "主管智能体（GraphFlow）暂不支持图片，请仅发送文本。",
+                })
             run, replayed = start_supervisor_run(
                 organization_id=organization.id,
                 supervisor_id=agent.id,
@@ -506,6 +599,10 @@ class ConversationViewSet(viewsets.ViewSet):
             (definition.get("model_config") or {}).get("adapter")
             or settings.AGENT_ENGINE_ADAPTER
         )
+        if image_specs and adapter != "codex":
+            raise ValidationError({
+                "images": "当前 GraphFlow 智能体不支持图片，请改用 Codex 智能体。",
+            })
         effective_skill_names = [
             binding.skill.slug
             for binding in conversation.skill_bindings.select_related("skill").filter(
@@ -521,6 +618,29 @@ class ConversationViewSet(viewsets.ViewSet):
             skill_inputs = resolve_runtime_skills(effective_skill_names, adapter)
         except ValueError as exc:
             raise ValidationError({"skill_names": str(exc)}) from exc
+        runtime_attachments = []
+        if not is_idempotent_replay:
+            user_message = Message.objects.create(
+                conversation=conversation,
+                role="user",
+                content=message,
+                metadata={
+                    "run_request_id": getattr(request, "request_id", ""),
+                    "composer": {
+                        "agent_id": getattr(selected_agent, "id", None),
+                        "skill_names": sorted(
+                            str(value) for value in requested_skill_names),
+                        "skills": [item["name"] for item in skill_inputs],
+                    },
+                },
+            )
+            runtime_attachments = persist_message_attachments(
+                message=user_message,
+                conversation=conversation,
+                specs=image_specs,
+                saved_storage_names=saved_storage_names,
+            )
+
         run, replayed = start_agent_run(
             organization_id=organization.id,
             agent_id=agent.id,
@@ -530,6 +650,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 "messages": history,
                 "working_directory": working_directory,
                 "skills": skill_inputs,
+                "attachments": runtime_attachments,
                 # Agent selection changes the instructions, not the conversation
                 # identity. Supplying the persisted thread makes Codex use
                 # thread/resume with the newly selected Agent's system prompt.
@@ -543,6 +664,15 @@ class ConversationViewSet(viewsets.ViewSet):
                 "message": message,
                 "skill_names": sorted(
                     str(value) for value in requested_skill_names),
+                "images": [
+                    {
+                        "name": spec["original_name"],
+                        "content_type": spec["content_type"],
+                        "byte_size": spec["byte_size"],
+                        "checksum_sha256": spec["checksum_sha256"],
+                    }
+                    for spec in image_specs
+                ],
             },
             source_type="conversation",
             source_id=conversation.id,
@@ -557,22 +687,14 @@ class ConversationViewSet(viewsets.ViewSet):
                 conversation.agent = selected_agent
                 update_fields.append("agent")
             if not conversation.title:
-                conversation.title = message[:50]
+                conversation.title = (
+                    message[:50]
+                    or (
+                        str(image_specs[0]["original_name"])[:50]
+                        if image_specs else "新对话"
+                    )
+                )
             conversation.save(update_fields=update_fields)
-            Message.objects.create(
-                conversation=conversation,
-                role="user",
-                content=message,
-                metadata={
-                    "run_request_id": getattr(request, "request_id", ""),
-                    "composer": {
-                        "agent_id": getattr(selected_agent, "id", None),
-                        "skill_names": sorted(
-                            str(value) for value in requested_skill_names),
-                        "skills": [item["name"] for item in skill_inputs],
-                    },
-                },
-            )
         return run, replayed
 
     @action(detail=True, methods=["post"])
@@ -594,15 +716,17 @@ class ConversationViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
+            image_specs = prepare_image_specs(serializer.validated_data.get("images", ()))
             run, replayed = self._create_run(
                 request,
                 conversation,
-                serializer.validated_data["content"],
+                serializer.validated_data["content"].strip(),
                 idempotency_key,
                 requested_agent_id=serializer.validated_data.get(
                     "agent_id", AGENT_SELECTION_UNSET),
                 requested_skill_names=serializer.validated_data.get(
                     "skill_names", ()),
+                image_specs=image_specs,
             )
         except ValidationError as exc:
             logger.warning(

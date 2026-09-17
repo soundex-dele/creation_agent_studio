@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -6,11 +7,12 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.db import OperationalError
 from django.test import TestCase, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
-from apps.conversations.models import Conversation, Message
+from apps.conversations.models import Conversation, Message, MessageAttachment
 from apps.conversations.views import ConversationViewSet
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash
@@ -63,6 +65,162 @@ class DurableConversationRunTest(TestCase):
             title="Chat",
             agent=self.agent,
         )
+
+    @staticmethod
+    def image_file(name="diagram.png", image_format="PNG"):
+        from PIL import Image
+
+        data = BytesIO()
+        Image.new("RGB", (8, 6), color=(24, 90, 160)).save(
+            data, format=image_format,
+        )
+        content_type = "image/jpeg" if image_format == "JPEG" else "image/png"
+        return SimpleUploadedFile(name, data.getvalue(), content_type=content_type)
+
+    def test_image_only_message_persists_attachment_and_run_input(self):
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                f"/api/v1/conversations/{self.conversation.id}/send_message/",
+                {"content": "", "images": [self.image_file()]},
+                format="multipart",
+                HTTP_IDEMPOTENCY_KEY="conversation-image-only",
+                **self.headers,
+            )
+
+            self.assertEqual(response.status_code, 202, response.data)
+            message = Message.objects.get(conversation=self.conversation, role="user")
+            self.assertEqual(message.content, "")
+            attachment = MessageAttachment.objects.get(message=message)
+            self.assertEqual(attachment.content_type, "image/png")
+            self.assertEqual((attachment.width, attachment.height), (8, 6))
+            self.assertTrue(Path(attachment.file.path).is_file())
+            run = Run.objects.get(pk=response.data["id"])
+            self.assertEqual(len(run.input["attachments"]), 1)
+            self.assertEqual(
+                run.input["attachments"][0]["path"], attachment.file.path,
+            )
+
+            detail = self.client.get(
+                f"/api/v1/conversations/{self.conversation.id}/",
+                **self.headers,
+            )
+            serialized = detail.data["messages"][0]["attachments"][0]
+            self.assertEqual(serialized["original_name"], "diagram.png")
+            self.assertIn("/media/conversations/", serialized["url"])
+
+    def test_rejects_invalid_image_content(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {
+                "content": "inspect",
+                "images": [SimpleUploadedFile(
+                    "fake.png", b"not-an-image", content_type="image/png",
+                )],
+            },
+            format="multipart",
+            HTTP_IDEMPOTENCY_KEY="conversation-invalid-image",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("images", response.data)
+        self.assertFalse(MessageAttachment.objects.exists())
+
+    def test_rejects_more_than_four_images(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {
+                "content": "inspect",
+                "images": [self.image_file(f"image-{index}.png") for index in range(5)],
+            },
+            format="multipart",
+            HTTP_IDEMPOTENCY_KEY="conversation-too-many-images",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("images", response.data)
+        self.assertFalse(MessageAttachment.objects.exists())
+
+    def test_rejects_images_larger_than_ten_megabytes(self):
+        image = self.image_file()
+        oversized = SimpleUploadedFile(
+            image.name,
+            image.read() + b"\0" * (10 * 1024 * 1024),
+            content_type="image/png",
+        )
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "inspect", "images": [oversized]},
+            format="multipart",
+            HTTP_IDEMPOTENCY_KEY="conversation-oversized-image",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("10MB", str(response.data["images"]))
+        self.assertFalse(MessageAttachment.objects.exists())
+
+    def test_image_idempotency_replay_does_not_duplicate_attachment(self):
+        url = f"/api/v1/conversations/{self.conversation.id}/send_message/"
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            first = self.client.post(
+                url,
+                {"content": "inspect", "images": [self.image_file()]},
+                format="multipart",
+                HTTP_IDEMPOTENCY_KEY="conversation-image-replay",
+                **self.headers,
+            )
+            replay = self.client.post(
+                url,
+                {"content": "inspect", "images": [self.image_file()]},
+                format="multipart",
+                HTTP_IDEMPOTENCY_KEY="conversation-image-replay",
+                **self.headers,
+            )
+
+            self.assertEqual(first.status_code, 202, first.data)
+            self.assertEqual(replay.status_code, 202, replay.data)
+            self.assertEqual(replay["Idempotent-Replay"], "true")
+            self.assertEqual(MessageAttachment.objects.count(), 1)
+
+    @override_settings(AGENT_ENGINE_ADAPTER="graphflow")
+    def test_graphflow_rejects_images_explicitly(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "inspect", "images": [self.image_file()]},
+            format="multipart",
+            HTTP_IDEMPOTENCY_KEY="conversation-graphflow-image",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("GraphFlow", str(response.data["images"]))
+        self.assertFalse(MessageAttachment.objects.exists())
+
+    @patch("apps.conversations.views.start_agent_run")
+    def test_failed_image_run_removes_database_and_storage_file(self, start_run):
+        from modules.execution.application.errors import DeploymentUnavailable
+
+        start_run.side_effect = DeploymentUnavailable("unavailable")
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                f"/api/v1/conversations/{self.conversation.id}/send_message/",
+                {"content": "inspect", "images": [self.image_file()]},
+                format="multipart",
+                HTTP_IDEMPOTENCY_KEY="conversation-image-failure",
+                **self.headers,
+            )
+
+            self.assertEqual(response.status_code, 409, response.data)
+            self.assertFalse(Message.objects.filter(
+                conversation=self.conversation, role="user",
+            ).exists())
+            self.assertFalse(MessageAttachment.objects.exists())
+            self.assertEqual(
+                [path for path in Path(media_root).rglob("*") if path.is_file()],
+                [],
+            )
 
     def test_send_message_creates_run_instead_of_synchronous_execution(self):
         response = self.client.post(

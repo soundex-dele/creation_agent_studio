@@ -134,13 +134,24 @@ def _codex_tool_payload(item):
 
 
 def _consume_codex_turn(
-    thread, text, *, model="", skills=None, on_event=None, cancelled=None,
+    thread, text, *, model="", skills=None, image_paths=None, on_event=None,
+    cancelled=None,
 ):
     """Consume one Codex turn while preserving text and tool notifications."""
 
     if isinstance(thread, _AppServerThread):
-        turn = thread.turn(text, model=model or None, skills=skills)
+        turn = thread.turn(
+            text,
+            model=model or None,
+            skills=skills,
+            image_paths=image_paths,
+        )
     else:
+        if image_paths:
+            raise RuntimeError(
+                "Codex Python SDK transport does not support image input; "
+                "use CODEX_TRANSPORT=app-server."
+            )
         turn = thread.turn(_skill_marked_text(text, skills), model=model or None)
     stop_watcher = threading.Event()
 
@@ -491,6 +502,16 @@ def _text_input(text: str, skills=None) -> list[dict]:
     return inputs
 
 
+def _turn_input(text: str, skills=None, image_paths=None) -> list[dict]:
+    inputs = _text_input(text, skills)
+    inputs.extend(
+        {"type": "localImage", "path": str(Path(path).expanduser().resolve())}
+        for path in image_paths or []
+        if str(path).strip()
+    )
+    return inputs
+
+
 def _approval_settings(approval_mode: str) -> tuple[str, str]:
     if approval_mode == "auto_review":
         return "on-request", "auto_review"
@@ -500,13 +521,14 @@ def _approval_settings(approval_mode: str) -> tuple[str, str]:
 class _AppServerTurn:
     def __init__(
         self, *, transport: _AppServerTransport, thread_id: str, text: str,
-        model: str, skills=None,
+        model: str, skills=None, image_paths=None,
     ):
         self._transport = transport
         self._thread_id = thread_id
         self._text = text
         self._model = model
         self._skills = skills or []
+        self._image_paths = image_paths or []
         self.id = ""
 
     def _start(self) -> None:
@@ -514,7 +536,9 @@ class _AppServerTurn:
             return
         params = {
             "threadId": self._thread_id,
-            "input": _text_input(self._text, self._skills),
+            "input": _turn_input(
+                self._text, self._skills, self._image_paths,
+            ),
         }
         if self._model:
             params["model"] = self._model
@@ -563,6 +587,7 @@ class _AppServerThread:
 
     def turn(
         self, text: str, *, model: Optional[str] = None, skills=None,
+        image_paths=None,
     ) -> _AppServerTurn:
         return _AppServerTurn(
             transport=self._transport,
@@ -570,6 +595,7 @@ class _AppServerThread:
             text=text,
             model=model or "",
             skills=skills,
+            image_paths=image_paths,
         )
 
     def run(self, text: str, *, model: Optional[str] = None):
@@ -900,6 +926,7 @@ class CodexAdapter(AgentAdapter):
                 query,
                 model=self.model or "",
                 skills=options.get("skills") or [],
+                image_paths=options.get("image_paths") or [],
                 on_event=options.get("on_event"),
                 cancelled=options.get("cancelled"),
             )

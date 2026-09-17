@@ -16,6 +16,4 @@ class ConversationsConfig(AppConfig):
         """
         Import signal handlers when the app is ready.
         """
-        # Import signal handlers here when needed
-        # Example: import apps.conversations.signals
-        pass
+        import apps.conversations.signals  # noqa: F401

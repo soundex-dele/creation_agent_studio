@@ -2,7 +2,7 @@
 Admin configuration for conversations app.
 """
 from django.contrib import admin
-from apps.conversations.models import Conversation, Message
+from apps.conversations.models import Conversation, Message, MessageAttachment
 
 
 @admin.register(Conversation)
@@ -34,3 +34,14 @@ class MessageAdmin(admin.ModelAdmin):
         """
         return obj.content[:100]
     content_preview.short_description = 'Content'
+
+
+@admin.register(MessageAttachment)
+class MessageAttachmentAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'conversation', 'message', 'original_name', 'content_type',
+        'byte_size', 'created_at',
+    ]
+    list_filter = ['content_type', 'created_at']
+    search_fields = ['original_name', 'checksum_sha256']
+    readonly_fields = ['created_at']

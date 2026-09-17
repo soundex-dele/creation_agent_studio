@@ -1,5 +1,5 @@
 import React from 'react';
-import { Avatar, Button, message as toast, Tooltip, Typography } from 'antd';
+import { Avatar, Button, Image, message as toast, Tooltip, Typography } from 'antd';
 import {
   CopyOutlined,
   RobotOutlined,
@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import type { AgentToolCall } from '@/entities/run';
+import type { MessageAttachment } from '@/stores/useConversationStore';
 import './MessageList.css';
 
 const { Text } = Typography;
@@ -31,6 +32,7 @@ interface Message {
       loaded_skills?: string[];
     };
   };
+  attachments?: MessageAttachment[];
 }
 
 interface MessageListProps {
@@ -183,6 +185,21 @@ const MessageList: React.FC<MessageListProps> = ({
                   ))}
                 </div>
               )}
+              {message.attachments && message.attachments.length > 0 && (
+                <div className="message-image-grid" aria-label="消息图片">
+                  <Image.PreviewGroup>
+                    {message.attachments.map((attachment) => (
+                      <Image
+                        key={attachment.id}
+                        src={attachment.url}
+                        alt={attachment.original_name}
+                        className="message-image"
+                        fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='120'%3E%3Crect width='100%25' height='100%25' fill='%23eeeeee'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23888888'%3E图片加载失败%3C/text%3E%3C/svg%3E"
+                      />
+                    ))}
+                  </Image.PreviewGroup>
+                </div>
+              )}
               {!isUser && toolCalls.length > 0 && (
                 <div className="tool-call-list">
                   {toolCalls.map(renderToolCall)}
@@ -193,13 +210,13 @@ const MessageList: React.FC<MessageListProps> = ({
                   <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
                 </div>
               )}
-              {isUser || isSystem || isStreamingMessage ? (
+              {message.content && (isUser || isSystem || isStreamingMessage ? (
                 <span className={isStreamingMessage ? 'message-streaming-content' : undefined}>
                   {message.content}
                 </span>
               ) : (
                 <ReactMarkdown>{message.content}</ReactMarkdown>
-              )}
+              ))}
             </div>
           </div>
 
