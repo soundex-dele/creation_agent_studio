@@ -26,6 +26,7 @@ from modules.catalog.models import (
 )
 from modules.catalog.services import canonical_content_hash
 from modules.execution.models import Run
+from modules.execution.application.runs import create_run
 
 from .models import Workflow
 
@@ -139,6 +140,67 @@ class WorkflowApiTest(TestCase):
         workflow.steps.all().delete()
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
+
+    def test_retry_step_reuses_successful_unaffected_outputs(self):
+        response = self.client.post("/api/v1/workflows/", {
+            "name": "Retry flow",
+            "output_mapping": {
+                "final": {"from": "steps.second.output.result"},
+            },
+            "steps": [
+                {
+                    "key": "first", "application_id": self.applications[0].id,
+                    "name": "First", "order": 0, "depends_on": [],
+                },
+                {
+                    "key": "second", "application_id": self.applications[1].id,
+                    "name": "Second", "order": 1, "depends_on": ["first"],
+                },
+            ],
+        }, format="json", **self.headers)
+        workflow = Workflow.objects.get(pk=response.data["id"])
+        started = self.client.post(
+            f"/api/v1/workflows/{workflow.id}/start/",
+            {"input": {"topic": "retry"}}, format="json",
+            HTTP_IDEMPOTENCY_KEY="retry-original", **self.headers,
+        )
+        previous = Run.objects.get(pk=started.data["id"])
+        first = create_run(
+            organization=self.organization, owner=self.user, parent=previous,
+            node_key="first", executor_kind=Run.ExecutorKind.MEDIA,
+            executor_key="batch-transcribe", source_type="workflow_step",
+            source_id="first", definition_snapshot={}, input_data={},
+        )
+        second = create_run(
+            organization=self.organization, owner=self.user, parent=previous,
+            node_key="second", executor_kind=Run.ExecutorKind.MEDIA,
+            executor_key="batch-transcribe", source_type="workflow_step",
+            source_id="second", definition_snapshot={}, input_data={},
+        )
+        Run.objects.filter(pk=first.pk).update(
+            status=Run.Status.SUCCEEDED, output_summary={"result": "kept"}
+        )
+        Run.objects.filter(pk=second.pk).update(
+            status=Run.Status.FAILED, error_message="failed"
+        )
+        Run.objects.filter(pk=previous.pk).update(status=Run.Status.FAILED)
+
+        retried = self.client.post(
+            f"/api/v1/workflows/{workflow.id}/retry-step/",
+            {"run_id": str(previous.id), "step_key": "second"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="retry-second", **self.headers,
+        )
+
+        self.assertEqual(retried.status_code, 202, retried.data)
+        retry_run = Run.objects.get(pk=retried.data["id"])
+        self.assertEqual(
+            retry_run.definition_snapshot["initial_results"]["first"]["output"],
+            {"result": "kept"},
+        )
+        self.assertNotIn("second", retry_run.definition_snapshot["initial_results"])
+        self.assertEqual(
+            retry_run.definition_snapshot["output_mapping"], workflow.output_mapping
+        )
 
     def test_owner_can_delete_workflow(self):
         workflow = Workflow.objects.create(

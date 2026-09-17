@@ -129,6 +129,69 @@ def _chat_step_snapshot(step, organization):
     }
 
 
+def build_workflow_step_snapshots(workflow):
+    """Freeze the current editable workflow into executable step snapshots."""
+    steps = list(workflow.steps.select_related(
+        "application", "application__draft"
+    ).order_by("order", "id"))
+    if not steps:
+        raise ValueError("工作流至少需要一个应用。")
+    snapshots = []
+    for step in steps:
+        if step.application.kind == Application.Kind.CHAT:
+            runtime = _chat_step_snapshot(step, workflow.organization)
+        else:
+            deployment = ApplicationDeployment.objects.for_organization(
+                workflow.organization_id
+            ).select_related("revision").filter(
+                application=step.application,
+                environment=DeploymentEnvironment.PRODUCTION,
+            ).first()
+            if deployment is None:
+                raise ValueError(
+                    f"步骤“{step.name or step.application.name}”没有 production 部署。"
+                )
+            runtime = {
+                "application_revision_id": str(deployment.revision_id),
+                "application_content_hash": deployment.revision.content_hash,
+                "content": deployment.revision.content,
+                "executor_kind": deployment.revision.content.get("executor_kind"),
+                "executor_key": deployment.revision.content.get("executor_key"),
+                "deployment_override": deployment.config_override,
+                "runtime_input": {},
+            }
+        content = runtime["content"]
+        kind = runtime["executor_kind"]
+        key = runtime["executor_key"]
+        if key not in settings.EXECUTION_CHILD_ADAPTERS.get(kind, {}):
+            raise ValueError(f"步骤执行器未注册：{kind}/{key}")
+        snapshots.append({
+            "id": str(step.id),
+            "key": step.key,
+            "name": step.name or step.application.name,
+            "depends_on": step.depends_on,
+            "condition": step.condition,
+            "max_attempts": step.max_attempts,
+            "application_id": step.application_id,
+            "application_revision_id": runtime["application_revision_id"],
+            "application_content_hash": runtime["application_content_hash"],
+            **({
+                "application_draft_id": runtime["application_draft_id"],
+                "application_draft_version": runtime["application_draft_version"],
+            } if "application_draft_id" in runtime else {}),
+            "executor_kind": kind,
+            "executor_key": key,
+            "content": content,
+            "runtime_input": runtime["runtime_input"],
+            "effective_config": {
+                **dict(content.get("default_config") or {}),
+                **dict(runtime["deployment_override"] or {}),
+                **dict(step.config or {}),
+            },
+        })
+    return steps, snapshots
+
+
 def _backfill_manual_conversations(workflow, run, user):
     """Recover chat links for manual Runs created before explicit binding."""
 
@@ -379,71 +442,10 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 {"detail": "Idempotency-Key must contain between 1 and 160 characters."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        steps = list(workflow.steps.select_related(
-            "application", "application__draft"
-        ).order_by("order", "id"))
-        if not steps:
-            return Response({"detail": "工作流至少需要一个应用。"}, status=400)
-        snapshots = []
-        for step in steps:
-            if step.application.kind == Application.Kind.CHAT:
-                try:
-                    runtime = _chat_step_snapshot(step, workflow.organization)
-                except ValueError as exc:
-                    return Response({"detail": str(exc)}, status=409)
-            else:
-                deployment = ApplicationDeployment.objects.for_organization(
-                    workflow.organization_id
-                ).select_related("revision").filter(
-                    application=step.application,
-                    environment=DeploymentEnvironment.PRODUCTION,
-                ).first()
-                if deployment is None:
-                    return Response(
-                        {"detail": f"步骤“{step.name or step.application.name}”没有 production 部署。"},
-                        status=409,
-                    )
-                runtime = {
-                    "application_revision_id": str(deployment.revision_id),
-                    "application_content_hash": deployment.revision.content_hash,
-                    "content": deployment.revision.content,
-                    "executor_kind": deployment.revision.content.get("executor_kind"),
-                    "executor_key": deployment.revision.content.get("executor_key"),
-                    "deployment_override": deployment.config_override,
-                    "runtime_input": {},
-                }
-            content = runtime["content"]
-            kind = runtime["executor_kind"]
-            key = runtime["executor_key"]
-            if key not in settings.EXECUTION_CHILD_ADAPTERS.get(kind, {}):
-                return Response(
-                    {"detail": f"步骤执行器未注册：{kind}/{key}"},
-                    status=422,
-                )
-            snapshots.append({
-                "id": str(step.id),
-                "key": step.key,
-                "name": step.name or step.application.name,
-                "depends_on": step.depends_on,
-                "condition": step.condition,
-                "max_attempts": step.max_attempts,
-                "application_id": step.application_id,
-                "application_revision_id": runtime["application_revision_id"],
-                "application_content_hash": runtime["application_content_hash"],
-                **({
-                    "application_draft_id": runtime["application_draft_id"],
-                    "application_draft_version": runtime["application_draft_version"],
-                } if "application_draft_id" in runtime else {}),
-                "executor_kind": kind,
-                "executor_key": key,
-                "content": content,
-                "runtime_input": runtime["runtime_input"],
-                "effective_config": {
-                    **dict(content.get("default_config") or {}),
-                    **dict(runtime["deployment_override"] or {}),
-                    **dict(step.config or {}),
-                },
-            })
+        try:
+            _steps, snapshots = build_workflow_step_snapshots(workflow)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=409)
         try:
             with transaction.atomic():
                 run, replayed = start_workflow_run(
@@ -455,6 +457,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     input_data=request.data.get("input") or {},
                     priority=int(request.data.get("priority") or 0),
                     idempotency_key=idempotency_key,
+                    output_mapping=workflow.output_mapping,
                 )
                 working_directory = workflow_working_directory(
                     request.user, workflow.organization, run.id
@@ -466,6 +469,93 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     run.input = run_input
         except IdempotencyKeyReused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        body = RunSerializer(run).data
+        body["organization_id"] = str(workflow.organization_id)
+        response = Response(body, status=status.HTTP_202_ACCEPTED)
+        if replayed:
+            response["Idempotent-Replay"] = "true"
+        return response
+
+    @action(detail=True, methods=["post"], url_path="retry-step")
+    def retry_step(self, request, pk=None):
+        """Create a new Run that reuses successful unaffected step outputs."""
+        workflow = self.get_object()
+        if workflow.execution_mode != Workflow.ExecutionMode.AUTOMATIC:
+            return Response({"detail": "只有自动工作流支持节点重跑。"}, status=409)
+        previous = Run.objects.for_organization(workflow.organization_id).filter(
+            pk=request.data.get("run_id"),
+            owner=request.user,
+            source_type="workflow",
+            source_id=str(workflow.id),
+        ).first()
+        if previous is None:
+            return Response({"detail": "原工作流 Run 不存在。"}, status=404)
+        if previous.status not in (
+            Run.Status.FAILED, Run.Status.CANCELLED, Run.Status.SUCCEEDED,
+        ):
+            return Response({"detail": "只能从已结束的 Run 重跑节点。"}, status=409)
+        idempotency_key = (request.headers.get("Idempotency-Key") or "").strip()
+        if not idempotency_key or len(idempotency_key) > 160:
+            return Response({"detail": "请提供有效的 Idempotency-Key。"}, status=400)
+        try:
+            _steps, snapshots = build_workflow_step_snapshots(workflow)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=409)
+        by_key = {step["key"]: step for step in snapshots}
+        requested_key = str(request.data.get("step_key") or "")
+        failed_children = list(previous.child_runs.filter(
+            status__in=(Run.Status.FAILED, Run.Status.CANCELLED),
+        ))
+        retry_key = requested_key or (
+            failed_children[0].node_key if failed_children else ""
+        )
+        if retry_key not in by_key:
+            return Response({"detail": "请选择有效的失败节点。"}, status=400)
+
+        rerun_keys = {retry_key}
+        changed = True
+        while changed:
+            changed = False
+            for key, step in by_key.items():
+                if key not in rerun_keys and set(step.get("depends_on") or []) & rerun_keys:
+                    rerun_keys.add(key)
+                    changed = True
+        initial_results = {}
+        for child in previous.child_runs.filter(status=Run.Status.SUCCEEDED):
+            if child.node_key in by_key and child.node_key not in rerun_keys:
+                initial_results[child.node_key] = {
+                    "status": "completed",
+                    "attempts": child.attempt_count,
+                    "output": child.output_summary,
+                    "child_run_id": str(child.id),
+                    "reused": True,
+                }
+        try:
+            with transaction.atomic():
+                run, replayed = start_workflow_run(
+                    organization=workflow.organization,
+                    workflow_id=workflow.id,
+                    workflow_name=workflow.name,
+                    steps=snapshots,
+                    actor=request.user,
+                    input_data=previous.input,
+                    priority=previous.priority,
+                    idempotency_key=idempotency_key,
+                    output_mapping=workflow.output_mapping,
+                    initial_results=initial_results,
+                )
+                working_directory = (
+                    (previous.input or {}).get("working_directory")
+                    or workflow_working_directory(
+                        request.user, workflow.organization, run.id
+                    )
+                )
+                run_input = dict(run.input or {})
+                run_input["working_directory"] = working_directory
+                Run.objects.filter(pk=run.pk).update(input=run_input)
+                run.input = run_input
+        except IdempotencyKeyReused as exc:
+            return Response({"detail": str(exc)}, status=409)
         body = RunSerializer(run).data
         body["organization_id"] = str(workflow.organization_id)
         response = Response(body, status=status.HTTP_202_ACCEPTED)

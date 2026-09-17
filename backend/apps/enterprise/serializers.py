@@ -190,4 +190,11 @@ class AutomationTriggerSerializer(serializers.ModelSerializer):
                     for value in range(60)):
                 raise serializers.ValidationError(
                     {'schedule': 'Use a valid five-field cron expression.'})
+        target_type = attrs.get(
+            'target_type', getattr(self.instance, 'target_type', '')
+        )
+        if target_type not in {'agent', 'application', 'workflow'}:
+            raise serializers.ValidationError({
+                'target_type': 'Use agent, application, or workflow.'
+            })
         return attrs

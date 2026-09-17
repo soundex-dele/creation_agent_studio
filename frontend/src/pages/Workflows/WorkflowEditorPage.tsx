@@ -18,6 +18,7 @@ const WorkflowEditorPage = () => {
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [saving, setSaving] = useState(false);
   const [appPickerOpen, setAppPickerOpen] = useState(false);
+  const [addingApplicationId, setAddingApplicationId] = useState<number | null>(null);
   const nameInputRef = useRef<InputRef>(null);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ const WorkflowEditorPage = () => {
         description: '',
         icon: '🔀',
         execution_mode: 'manual',
+        output_mapping: {},
         is_public: false,
         steps: [],
       });
@@ -54,54 +56,31 @@ const WorkflowEditorPage = () => {
 
   if (!workflow) return <div className="workflows-loading"><Spin size="large" /></div>;
 
-  const addStep = (applicationId: number) => {
+  const addStep = async (applicationId: number) => {
     const app = apps.find((item) => item.applicationId === applicationId);
     if (!app) return;
-    const key = `step-${Date.now()}`;
-    const applicationBase = {
-      id: applicationId,
-      application_id: applicationId,
-      application_slug: app.id,
-      application_name: app.name,
-      application_description: app.description,
-      application_icon: app.icon,
-      application_color: app.color,
-      executor_key: undefined,
-      default_config: {},
-    };
-    const application: ApplicationRuntime = app.kind === 'chat'
-      ? {
-          ...applicationBase,
-          kind: 'chat',
-          renderer_key: 'chat',
-          chat_profile: {
-            allow_agent_selection: false,
-            allow_skill_selection: true,
-            allow_extra_skills: false,
-            starter_layout: 'cards',
-          },
-          agent_bindings: [],
-          skill_bindings: [],
-          guided_prompts: [],
-        }
-      : {
-          ...applicationBase,
-          kind: app.kind === 'custom' ? 'custom' : 'task',
-          renderer_key: app.rendererKey || 'generic-task',
-        };
-    setSteps((current) => [...current, {
-      id: `draft-${Date.now()}`,
-      key,
-      name: app.name,
-      order: current.length,
-      config: {},
-      depends_on: current.length ? [current[current.length - 1].key] : [],
-      condition: {},
-      max_attempts: 1,
-      application_id: applicationId,
-      application,
-    }]);
-    setAppPickerOpen(false);
+    setAddingApplicationId(applicationId);
+    try {
+      const application = await api.get<ApplicationRuntime>(`/apps/${app.id}/`);
+      const stamp = Date.now();
+      setSteps((current) => [...current, {
+        id: `draft-${stamp}`,
+        key: `step-${stamp}`,
+        name: app.name,
+        order: current.length,
+        config: {},
+        depends_on: current.length ? [current[current.length - 1].key] : [],
+        condition: {},
+        max_attempts: 1,
+        application_id: applicationId,
+        application,
+      }]);
+      setAppPickerOpen(false);
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '应用详情加载失败，请重试');
+    } finally {
+      setAddingApplicationId(null);
+    }
   };
 
   const move = (index: number, delta: number) => {
@@ -110,6 +89,30 @@ const WorkflowEditorPage = () => {
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
     setSteps(next.map((step, order) => ({ ...step, order })));
+  };
+
+  const updateStepAutomation = (
+    stepKey: string,
+    updater: (automation: Record<string, any>) => Record<string, any>,
+  ) => {
+    setSteps((current) => current.map((step) => {
+      if (step.key !== stepKey) return step;
+      const config = { ...(step.config || {}) };
+      config.automation = updater({ ...((config.automation as Record<string, any>) || {}) });
+      return { ...step, config };
+    }));
+  };
+
+  const setOutputAlias = (stepKey: string, alias: string) => {
+    const current = { ...(workflow.output_mapping || {}) };
+    Object.entries(current).forEach(([name, binding]) => {
+      const source = typeof binding === 'string' ? binding : binding?.from;
+      if (source === `steps.${stepKey}.output.result`) delete current[name];
+    });
+    if (alias.trim()) {
+      current[alias.trim()] = { from: `steps.${stepKey}.output.result` };
+    }
+    setWorkflow({ ...workflow, output_mapping: current });
   };
 
   const save = async () => {
@@ -125,6 +128,7 @@ const WorkflowEditorPage = () => {
         description: workflow.description || '',
         icon: workflow.icon || '🔀',
         execution_mode: workflow.execution_mode,
+        output_mapping: workflow.output_mapping || {},
         is_public: workflow.is_public,
         steps: steps.map((step, order) => ({
           application_id: step.application_id || step.application.id,
@@ -204,9 +208,12 @@ const WorkflowEditorPage = () => {
                 key={app.applicationId}
                 type="button"
                 className="workflow-app-picker-item"
-                onClick={() => addStep(app.applicationId!)}
+                disabled={addingApplicationId !== null}
+                onClick={() => void addStep(app.applicationId!)}
               >
-                <span className="workflow-app-picker-icon">{app.icon || '◈'}</span>
+                <span className="workflow-app-picker-icon">
+                  {addingApplicationId === app.applicationId ? <Spin size="small" /> : (app.icon || '◈')}
+                </span>
                 <span className="workflow-app-picker-copy">
                   <strong>{app.name}</strong>
                   <small>{app.description || '暂无应用说明'}</small>
@@ -243,6 +250,84 @@ const WorkflowEditorPage = () => {
                         onChange={(value) => setSteps((current) => current.map((item) =>
                           item.key === step.key ? { ...item, max_attempts: value || 1 } : item))} />
                     </span>
+                    {step.application.kind === 'chat'
+                      && step.application.guided_prompts.length > 0 && (() => {
+                        const automation = (
+                          (step.config?.automation as Record<string, any>) || {}
+                        );
+                        const selectedPromptKey = String(
+                          automation.guided_prompt_key
+                          || step.application.default_config.guided_entry_prompt_key
+                          || step.application.guided_prompts[0].key,
+                        );
+                        const prompt = step.application.guided_prompts.find((item) => (
+                          String(item.id || item.key) === selectedPromptKey
+                        )) || step.application.guided_prompts[0];
+                        const answers = (automation.answers || {}) as Record<string, any>;
+                        return (
+                          <div className="workflow-step-mapping">
+                            <strong>自动输入映射</strong>
+                            <Select
+                              value={selectedPromptKey}
+                              options={step.application.guided_prompts.map((item) => ({
+                                value: String(item.id || item.key), label: item.title,
+                              }))}
+                              onChange={(guided_prompt_key) => updateStepAutomation(
+                                step.key,
+                                (value) => ({ ...value, guided_prompt_key, answers: {} }),
+                              )}
+                            />
+                            {prompt.questions.map((question) => {
+                              const binding = answers[question.key];
+                              const selected = binding?.from
+                                ? `from:${binding.from}`
+                                : Object.prototype.hasOwnProperty.call(binding || {}, 'value')
+                                  ? 'fixed' : 'default';
+                              return (
+                                <div className="workflow-mapping-row" key={question.key}>
+                                  <span>{question.label}</span>
+                                  <Select
+                                    value={selected}
+                                    options={[
+                                      { value: 'default', label: '应用默认值' },
+                                      {
+                                        value: `from:workflow.input.${question.key}`,
+                                        label: `启动输入 · ${question.label}`,
+                                      },
+                                      ...step.depends_on.map((dependency) => ({
+                                        value: `from:steps.${dependency}.output.result`,
+                                        label: `节点输出 · ${steps.find((item) => item.key === dependency)?.name || dependency}`,
+                                      })),
+                                      { value: 'fixed', label: '固定值' },
+                                    ]}
+                                    onChange={(value) => updateStepAutomation(step.key, (current) => {
+                                      const nextAnswers = { ...(current.answers || {}) };
+                                      if (value === 'default') delete nextAnswers[question.key];
+                                      else if (value === 'fixed') nextAnswers[question.key] = { value: '' };
+                                      else nextAnswers[question.key] = { from: value.replace(/^from:/, '') };
+                                      return { ...current, guided_prompt_key: selectedPromptKey, answers: nextAnswers };
+                                    })}
+                                  />
+                                  {selected === 'fixed' && (
+                                    <Input
+                                      value={String(binding?.value || '')}
+                                      placeholder="固定输入值"
+                                      onChange={(event) => updateStepAutomation(step.key, (current) => ({
+                                        ...current,
+                                        guided_prompt_key: selectedPromptKey,
+                                        answers: {
+                                          ...(current.answers || {}),
+                                          [question.key]: { value: event.target.value },
+                                        },
+                                      }))}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                   </>
                 )}
               </div>
@@ -262,6 +347,27 @@ const WorkflowEditorPage = () => {
             </Card>
           ))}
       </div>
+      {workflow.execution_mode === 'automatic' && steps.length > 0 && (
+        <Card title="最终成品汇总" className="workflow-output-mapping">
+          <p>为需要交付的节点结果填写字段名；留空的节点仍保留在 outputs 中。</p>
+          {steps.map((step) => {
+            const source = `steps.${step.key}.output.result`;
+            const alias = Object.entries(workflow.output_mapping || {}).find(([, binding]) => (
+              (typeof binding === 'string' ? binding : binding?.from) === source
+            ))?.[0] || '';
+            return (
+              <label key={step.key}>
+                <span>{step.name || step.application.application_name}</span>
+                <Input
+                  value={alias}
+                  placeholder="例如 article、layout、cover"
+                  onChange={(event) => setOutputAlias(step.key, event.target.value)}
+                />
+              </label>
+            );
+          })}
+        </Card>
+      )}
     </div>
   );
 };

@@ -544,7 +544,7 @@ def start_agent_run(
 
 def start_workflow_run(
     *, organization, workflow_id, workflow_name, steps, actor,
-    input_data, priority, idempotency_key,
+    input_data, priority, idempotency_key, output_mapping=None, initial_results=None,
 ):
     """Create the canonical durable representation of a Workflow execution."""
     if not idempotency_key or len(idempotency_key) > 160:
@@ -554,6 +554,8 @@ def start_workflow_run(
         "steps": steps,
         "input": input_data,
         "priority": priority,
+        "output_mapping": output_mapping or {},
+        "initial_results": initial_results or {},
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     replay = _load_replay(
         organization_id=organization.id,
@@ -619,6 +621,8 @@ def start_workflow_run(
                 "workflow_id": str(workflow_id),
                 "workflow_name": workflow_name,
                 "workflow_steps": frozen_steps,
+                "output_mapping": output_mapping or {},
+                "initial_results": initial_results or {},
                 "governance": governance,
                 "durable_children": True,
             },

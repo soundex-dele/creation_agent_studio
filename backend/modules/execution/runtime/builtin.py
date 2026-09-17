@@ -125,6 +125,36 @@ def _resolve_automation_value(binding, workflow_input, dependency_results):
     raise RuntimeError(f"Unsupported workflow input binding: {source or binding}")
 
 
+def _resolve_workflow_outputs(output_mapping, results):
+    """Project step outputs into the workflow's stable result contract."""
+    outputs = {
+        key: value.get("output", {})
+        for key, value in results.items()
+    }
+    if not output_mapping:
+        return outputs
+    projected = {}
+    for name, binding in output_mapping.items():
+        if isinstance(binding, str):
+            binding = {"from": binding}
+        if not isinstance(binding, dict) or "from" not in binding:
+            projected[name] = binding
+            continue
+        source = str(binding["from"])
+        if not source.startswith("steps."):
+            raise RuntimeError(f"Unsupported workflow output binding: {source}")
+        remainder = source.removeprefix("steps.")
+        step_key, separator, path = remainder.partition(".output")
+        if not separator or step_key not in results:
+            projected[name] = None
+            continue
+        value, exists = _value_at_path(
+            results[step_key].get("output", {}), path.lstrip(".")
+        )
+        projected[name] = value if exists else None
+    return projected
+
+
 def _render_step_message(step, workflow_input, dependency_results):
     """Render a chat application's guided prompt for unattended execution."""
     content = step.get("content") or {}
@@ -392,6 +422,13 @@ def _wait_for_step_runs(root, children, sink, organization_id, poll_interval=Non
             if child.status == Run.Status.SUCCEEDED:
                 results[key] = _completed_step_result(child)
             elif child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
+                sink.emit("workflow.step.failed", {
+                    "workflow_step_key": key,
+                    "child_run_id": str(child.id),
+                    "status": child.status,
+                    "error_code": child.error_code,
+                    "error_message": child.error_message,
+                })
                 raise RuntimeError(
                     f"Workflow step {key} {child.status}: "
                     f"{child.error_message or child.error_code}"
@@ -415,7 +452,9 @@ def _execute_workflow_durable(run_payload, sink):
     by_key = _validate_workflow_steps(steps)
     workflow_input = dict(run_payload.get("input") or {})
     governance = (run_payload.get("definition_snapshot") or {}).get("governance") or {}
-    results = {}
+    results = dict(
+        (run_payload.get("definition_snapshot") or {}).get("initial_results") or {}
+    )
     max_parallelism = max(1, int(getattr(
         settings, "EXECUTION_WORKFLOW_MAX_PARALLELISM", 4
     )))
@@ -439,6 +478,16 @@ def _execute_workflow_durable(run_payload, sink):
         ).order_by("-sequence").values_list("payload", flat=True).first() or {}
         for child in root.child_runs.all():
             if child.status in (Run.Status.FAILED, Run.Status.CANCELLED):
+                if child.node_key in by_key:
+                    _WorkflowSink(sink, by_key[child.node_key]).emit(
+                        "workflow.step.failed",
+                        {
+                            "child_run_id": str(child.id),
+                            "status": child.status,
+                            "error_code": child.error_code,
+                            "error_message": child.error_message,
+                        },
+                    )
                 raise RuntimeError(
                     f"Workflow step {child.node_key} {child.status}: "
                     f"{child.error_message or child.error_code}"
@@ -450,6 +499,15 @@ def _execute_workflow_durable(run_payload, sink):
                     _WorkflowSink(sink, by_key[child.node_key]).emit(
                         "workflow.step.completed", result
                     )
+        for key, result in results.items():
+            if (
+                key in by_key
+                and result.get("reused")
+                and key not in emitted["workflow.step.completed"]
+            ):
+                _WorkflowSink(sink, by_key[key]).emit(
+                    "workflow.step.completed", result
+                )
         for key in emitted["workflow.step.skipped"]:
             if key in by_key:
                 results[key] = {"status": "skipped", "attempts": 0, "output": {}}
@@ -537,8 +595,17 @@ def _execute_workflow_durable(run_payload, sink):
                 "workflow.step.completed", result
             )
             emit_progress(completed)
+    outputs = {
+        key: value.get("output", {})
+        for key, value in results.items()
+    }
     return {
         "status": "completed",
+        "outputs": outputs,
+        "result": _resolve_workflow_outputs(
+            (run_payload.get("definition_snapshot") or {}).get("output_mapping") or {},
+            results,
+        ),
         "steps": [
             {"step_id": step["id"], "step_key": step["key"], **results[step["key"]]}
             for step in steps

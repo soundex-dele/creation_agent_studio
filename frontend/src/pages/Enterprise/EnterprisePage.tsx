@@ -52,7 +52,7 @@ const sections: Record<string, { title: string; endpoint: string; fields?: Field
   ] },
   automations: { title: '自动化', endpoint: '/enterprise/automations/', fields: [
     { name: 'name', label: '名称', required: true }, { name: 'trigger_type', label: '触发类型', kind: 'select', initialValue: 'webhook', options: [{ value: 'webhook' }, { value: 'schedule' }, { value: 'event' }] },
-    { name: 'target_type', label: '目标类型', kind: 'select', initialValue: 'agent', options: [{ value: 'agent' }, { value: 'application' }] }, { name: 'target_id', label: '目标 ID', required: true },
+    { name: 'target_type', label: '目标类型', kind: 'select', initialValue: 'agent', options: [{ value: 'agent' }, { value: 'application' }, { value: 'workflow' }] }, { name: 'target_id', label: '目标 ID', required: true },
     { name: 'schedule', label: 'Cron（计划任务）' }, { name: 'event_name', label: '事件名称' }, { name: 'input_mapping', label: '输入映射（JSON）', kind: 'json', initialValue: '{}' },
   ] },
   identity: { title: '身份提供商', endpoint: '/enterprise/identity-providers/', fields: [

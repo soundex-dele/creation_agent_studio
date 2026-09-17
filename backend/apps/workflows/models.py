@@ -26,6 +26,7 @@ class Workflow(models.Model):
         choices=ExecutionMode.choices,
         default=ExecutionMode.AUTOMATIC,
     )
+    output_mapping = models.JSONField(default=dict, blank=True)
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

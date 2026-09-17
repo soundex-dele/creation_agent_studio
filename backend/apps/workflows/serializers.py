@@ -52,7 +52,7 @@ class WorkflowDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'execution_mode',
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'output_mapping',
                   'is_public', 'steps', 'can_delete', 'created_at', 'updated_at']
 
     def get_can_delete(self, obj):
@@ -64,7 +64,7 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'execution_mode',
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'output_mapping',
                   'is_public', 'steps']
         read_only_fields = ['id']
 
@@ -123,6 +123,40 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
         if requested != allowed:
             raise serializers.ValidationError('包含不可用或未发布的应用版本。')
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        mapping = attrs.get(
+            'output_mapping', getattr(self.instance, 'output_mapping', {})
+        ) or {}
+        if not isinstance(mapping, dict):
+            raise serializers.ValidationError({
+                'output_mapping': 'output_mapping 必须是对象。'
+            })
+        steps = attrs.get('steps')
+        known_keys = {
+            item['key'] for item in steps
+        } if steps is not None else {
+            step.key for step in self.instance.steps.all()
+        } if self.instance else set()
+        for name, binding in mapping.items():
+            if not isinstance(name, str) or not name.strip():
+                raise serializers.ValidationError({
+                    'output_mapping': '最终输出字段名不能为空。'
+                })
+            source = binding if isinstance(binding, str) else (
+                binding.get('from') if isinstance(binding, dict) else None
+            )
+            if not isinstance(source, str) or not source.startswith('steps.'):
+                raise serializers.ValidationError({
+                    'output_mapping': f'{name} 必须引用步骤输出。'
+                })
+            step_key = source.removeprefix('steps.').partition('.output')[0]
+            if '.output' not in source or step_key not in known_keys:
+                raise serializers.ValidationError({
+                    'output_mapping': f'{name} 引用了不存在的步骤。'
+                })
+        return attrs
 
     @staticmethod
     def _validate_condition(step_key, condition, known_keys, dependencies):

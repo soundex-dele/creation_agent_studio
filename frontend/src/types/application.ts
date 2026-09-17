@@ -141,6 +141,7 @@ export interface Workflow {
   description?: string;
   icon?: string;
   execution_mode: 'manual' | 'automatic';
+  output_mapping?: Record<string, { from: string } | string>;
   is_public: boolean;
   can_delete?: boolean;
   step_count?: number;

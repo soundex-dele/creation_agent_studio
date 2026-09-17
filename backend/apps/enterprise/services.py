@@ -503,7 +503,7 @@ def enforce_skill_policy(organization, skills):
 
 def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
     from .models import RunTrace
-    payload = payload or {}
+    payload = {**dict(trigger.input_mapping or {}), **dict(payload or {})}
     occurrence = scheduled_for or timezone.now()
     occurrence_key = occurrence.replace(second=0, microsecond=0).isoformat()
     trace = RunTrace.objects.create(
@@ -540,6 +540,37 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
                 priority=0,
                 idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
             )
+            trace.status = RunTrace.Status.QUEUED
+            trace.output = {'run_id': str(run.id)}
+        elif trigger.target_type == 'workflow':
+            from apps.projects.services.workspace_paths import workflow_working_directory
+            from apps.workflows.models import Workflow
+            from apps.workflows.views import build_workflow_step_snapshots
+            from modules.execution.application.start_runs import start_workflow_run
+            from modules.execution.models import Run
+
+            workflow = Workflow.objects.get(
+                id=trigger.target_id,
+                organization=trigger.organization,
+                execution_mode=Workflow.ExecutionMode.AUTOMATIC,
+            )
+            _steps, snapshots = build_workflow_step_snapshots(workflow)
+            run, _ = start_workflow_run(
+                organization=trigger.organization,
+                workflow_id=workflow.id,
+                workflow_name=workflow.name,
+                steps=snapshots,
+                actor=user,
+                input_data=payload,
+                priority=0,
+                idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
+                output_mapping=workflow.output_mapping,
+            )
+            run_input = dict(run.input or {})
+            run_input['working_directory'] = workflow_working_directory(
+                user, trigger.organization, run.id
+            )
+            Run.objects.filter(pk=run.pk).update(input=run_input)
             trace.status = RunTrace.Status.QUEUED
             trace.output = {'run_id': str(run.id)}
         else:

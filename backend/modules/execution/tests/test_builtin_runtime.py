@@ -188,6 +188,9 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
             "durable_children": True,
             "workflow_steps": steps,
             "governance": {"require_tool_approval": True},
+            "output_mapping": {
+                "final": {"from": "steps.second.output.node"},
+            },
         },
         "input": {
             "topic": "durable",
@@ -199,6 +202,8 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     second_result = builtin.execute_workflow(payload, _Sink())
 
     assert first_result["status"] == "completed"
+    assert first_result["outputs"]["second"] == {"node": "second"}
+    assert first_result["result"] == {"final": "second"}
     assert second_result["status"] == "completed"
     assert root.child_runs.count() == 2
     first = root.child_runs.get(node_key="first")
@@ -211,6 +216,42 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     assert second.input["dependency_outputs"]["first"] == {"node": "first"}
     assert second.input["skills"] == [{"name": "article-writer"}]
     assert second.definition_snapshot["governance"]["require_tool_approval"] is True
+
+    retry_root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="dag-1",
+        definition_snapshot={},
+        input_data={"topic": "durable"},
+    )
+    retry_payload = {
+        **payload,
+        "run_id": str(retry_root.id),
+        "definition_snapshot": {
+            **payload["definition_snapshot"],
+            "initial_results": {
+                "first": {
+                    "status": "completed",
+                    "attempts": 1,
+                    "output": {"node": "reused-first"},
+                    "child_run_id": "original-first",
+                    "reused": True,
+                },
+            },
+        },
+    }
+
+    retry_result = builtin.execute_workflow(retry_payload, _Sink())
+
+    assert retry_result["outputs"]["first"] == {"node": "reused-first"}
+    assert retry_root.child_runs.count() == 1
+    retried_second = retry_root.child_runs.get(node_key="second")
+    assert retried_second.input["dependency_outputs"]["first"] == {
+        "node": "reused-first",
+    }
 
 
 @pytest.mark.django_db(transaction=True)

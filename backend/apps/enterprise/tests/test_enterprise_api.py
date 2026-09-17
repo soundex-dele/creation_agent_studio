@@ -7,6 +7,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.enterprise.models import (
     AuditLog,
+    AutomationTrigger,
     Connector,
     EvaluationCase,
     EvaluationRun,
@@ -21,6 +22,7 @@ from apps.enterprise.services import (
     apply_input_guardrails,
     enforce_model_policy,
     execution_governance_snapshot,
+    dispatch_automation,
 )
 
 pytestmark = pytest.mark.django_db
@@ -194,6 +196,68 @@ def test_schedule_requires_valid_cron_expression():
             'target_id': '1', 'schedule': 'not cron',
         }, format='json')
     assert response.status_code == 400
+
+
+def test_webhook_automation_can_start_workflow(monkeypatch, tmp_path):
+    from apps.workflows.models import Workflow
+    from modules.execution.application.runs import create_run
+    from modules.execution.models import Run
+
+    owner = get_user_model().objects.create_user(username='workflow-hook-owner')
+    organization = owner.organization_memberships.get().organization
+    workflow = Workflow.objects.create(
+        organization=organization,
+        owner=owner,
+        name='Webhook workflow',
+        execution_mode=Workflow.ExecutionMode.AUTOMATIC,
+        output_mapping={'article': {'from': 'steps.writer.output.result'}},
+    )
+    trigger = AutomationTrigger.objects.create(
+        organization=organization,
+        name='Workflow webhook',
+        trigger_type='webhook',
+        target_type='workflow',
+        target_id=str(workflow.id),
+        input_mapping={'audience': 'developers'},
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        'apps.workflows.views.build_workflow_step_snapshots',
+        lambda _workflow: ([], [{'key': 'writer'}]),
+    )
+
+    def fake_start_workflow_run(**kwargs):
+        captured.update(kwargs)
+        return create_run(
+            organization=organization,
+            owner=owner,
+            executor_kind=Run.ExecutorKind.WORKFLOW,
+            executor_key='workflow-dag',
+            source_type='workflow',
+            source_id=workflow.id,
+            definition_snapshot={},
+            input_data=kwargs['input_data'],
+        ), False
+
+    monkeypatch.setattr(
+        'modules.execution.application.start_runs.start_workflow_run',
+        fake_start_workflow_run,
+    )
+    monkeypatch.setattr(
+        'apps.projects.services.workspace_paths.workflow_working_directory',
+        lambda *_args: str(tmp_path),
+    )
+
+    trace = dispatch_automation(trigger, owner, {'topic': 'AI workflow'})
+
+    assert trace.status == trace.Status.QUEUED
+    assert captured['input_data'] == {
+        'audience': 'developers', 'topic': 'AI workflow',
+    }
+    assert captured['output_mapping'] == workflow.output_mapping
+    run = Run.objects.get(pk=trace.output['run_id'])
+    assert run.input['working_directory'] == str(tmp_path)
 
 
 def test_viewer_can_read_but_cannot_update_governance_and_quota():

@@ -26,6 +26,7 @@ const WorkflowRunnerPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [openingWorkspace, setOpeningWorkspace] = useState(false);
+  const [retryingStep, setRetryingStep] = useState<string | null>(null);
   const projection = useRunStream({
     organizationId: organizationId || '',
     runId: runId || null,
@@ -66,6 +67,23 @@ const WorkflowRunnerPage = () => {
       message.error(reason?.response?.data?.detail || '无法打开当前工作流目录');
     } finally {
       setOpeningWorkspace(false);
+    }
+  };
+
+  const retryStep = async (stepKey: string) => {
+    if (!runId || !run?.source_id) return;
+    setRetryingStep(stepKey);
+    try {
+      const nextRun = await api.post<{ id: string }>(
+        `/workflows/${run.source_id}/retry-step/`,
+        { run_id: runId, step_key: stepKey },
+        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      );
+      navigate(`/runs/${nextRun.id}`);
+    } catch (reason: any) {
+      message.error(reason?.response?.data?.detail || '失败节点重跑失败');
+    } finally {
+      setRetryingStep(null);
     }
   };
 
@@ -154,7 +172,18 @@ const WorkflowRunnerPage = () => {
             const isChatStep = step.content?.kind === 'chat';
             return (
               <List.Item
-                actions={isChatStep ? [
+                actions={[
+                  ...(stepState.event_type === 'workflow.step.failed' ? [
+                    <Button
+                      key="retry"
+                      size="small"
+                      loading={retryingStep === step.key}
+                      onClick={() => void retryStep(step.key)}
+                    >
+                      重跑此节点
+                    </Button>,
+                  ] : []),
+                  ...(isChatStep ? [
                   <Button
                     key="conversation"
                     size="small"
@@ -169,7 +198,8 @@ const WorkflowRunnerPage = () => {
                   >
                     查看对话
                   </Button>,
-                ] : undefined}
+                  ] : []),
+                ]}
               >
                 <List.Item.Meta
                   title={`${index + 1}. ${step.name}`}
