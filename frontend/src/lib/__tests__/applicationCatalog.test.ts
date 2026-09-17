@@ -17,6 +17,12 @@ describe('application renderer registry', () => {
     })).toBe('/applications/16/wemd?entry=apps');
   });
 
+  it('opens the new media workbench in its dedicated runtime', () => {
+    expect(applicationPath({
+      id: 'newmedia-workbench', applicationId: 19, kind: 'custom', rendererKey: 'newmedia-workbench',
+    })).toBe('/applications/19/newmedia-workbench?entry=apps');
+  });
+
   it('opens Skill-backed generators as guided chat applications', () => {
     [
       'wechat-html-optimizer',

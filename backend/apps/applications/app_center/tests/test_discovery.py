@@ -22,7 +22,7 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     assert {
         "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
         "gzh-design", "html-cover-generator", "wechat-html-optimizer",
-        "wechat-viral-article",
+        "wechat-viral-article", "newmedia-workbench",
     } <= package_ids
     assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
         "app_center.batch_transcribe.runtime.execute_batch_transcribe"

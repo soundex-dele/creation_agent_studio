@@ -1,0 +1,51 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: newmedia-workbench
+  version: 1.0.0
+  name: 新媒体工作台
+  description: 从热点选题、内容制作、IP 管理到多平台发布和数据复盘的一站式 AI 内容工厂。
+  category:
+    slug: creative
+    name: 内容创作
+    description: 文章、视频与新媒体内容生产工具
+    icon: edit
+    order: 1
+  icon: "新"
+  color: "#ff4d2e"
+  tags: [新媒体, 内容工厂, 多平台发布]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: newmedia-workbench
+    executor_protocol_version: 1
+    renderer_key: newmedia-workbench
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+      storage: local-first
+    dependencies:
+      agents: []
+      skills: []
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    activate: true
+  frontends:
+    - id: web
+      type: react
+      renderer_key: newmedia-workbench
+      directory: react
+      platforms: [web]

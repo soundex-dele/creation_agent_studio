@@ -26,6 +26,7 @@ const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
+const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchPage'));
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
@@ -236,6 +237,16 @@ const router = createBrowserRouter([
         <MainLayout hideSidebar>
           {page(<KnowledgePage />)}
         </MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/newmedia-workbench',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>
+          {page(<NewMediaWorkbenchPage />)}
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },
