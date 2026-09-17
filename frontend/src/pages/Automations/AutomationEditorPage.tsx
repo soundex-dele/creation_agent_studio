@@ -98,7 +98,7 @@ export default function AutomationEditorPage() {
   };
 
   return <div className="automation-editor animate-fade-in">
-    <div className="automations-hero"><div><Typography.Title level={2}>{title}</Typography.Title><Typography.Text type="secondary">配置触发方式、Production 目标和默认参数</Typography.Text></div><Button onClick={() => navigate('/automations')}>返回</Button></div>
+    <div className="automations-hero"><div><h1 className="page-title">{title}</h1><p className="page-subtitle">配置触发方式、Production 目标和默认参数</p></div><Button onClick={() => navigate('/automations')}>返回</Button></div>
     <Form form={form} layout="vertical" initialValues={{ trigger_type: 'schedule', target_type: 'application', schedule_kind: 'cron', timezone: 'Asia/Shanghai', preset: '0 9 * * *', default_input_text: '{}' }}>
       <Card title="基本信息"><Form.Item name="name" label="名称" rules={[{ required: true }]}><Input maxLength={160} /></Form.Item><Form.Item name="description" label="描述"><Input.TextArea rows={3} /></Form.Item></Card>
       <Card title="执行目标"><Space direction="vertical" size="middle" className="automation-full"><Form.Item name="target_type" label="目标类型" rules={[{ required: true }]}><Radio.Group options={[{ value: 'application', label: '应用' }, { value: 'workflow', label: '工作流' }]} /></Form.Item><Form.Item name="target_id" label="Production 目标" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={targets.map(target => ({ value: target.id, label: target.name }))} placeholder="请选择目标" /></Form.Item></Space></Card>

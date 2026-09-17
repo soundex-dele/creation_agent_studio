@@ -199,7 +199,7 @@ export default function KnowledgePage() {
   ];
 
   return <div className="knowledge-page">
-    <header className="knowledge-header"><div><h1>知识库</h1><p>组织资料的索引、检索与有据问答</p></div>{canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => { baseForm.resetFields(); baseForm.setFieldsValue({ chunk_size: 600, chunk_overlap: 80 }); setBaseModal(true); }}>新建知识库</Button>}</header>
+    <header className="knowledge-header"><div><h1 className="page-title">知识库</h1><p className="page-subtitle">组织资料的索引、检索与有据问答</p></div>{canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => { baseForm.resetFields(); baseForm.setFieldsValue({ chunk_size: 600, chunk_overlap: 80 }); setBaseModal(true); }}>新建知识库</Button>}</header>
     <div className="knowledge-layout">
       <Card className="knowledge-bases" loading={loading}><List dataSource={bases} locale={{ emptyText: <Empty description="暂无知识库" /> }} renderItem={item => <List.Item className={item.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(item.id)}><List.Item.Meta title={item.name} description={`${item.document_count} 个文档`} /></List.Item>} /></Card>
       <Card className="knowledge-main">{selected ? <><div className="knowledge-title"><div><Typography.Title level={3}>{selected.name}</Typography.Title><Typography.Text type="secondary">{selected.description || '暂无描述'}</Typography.Text></div><Space>{canWrite && <Button onClick={openSettings}>设置</Button>}{canAdmin && <Popconfirm title="确认删除整个知识库？" onConfirm={async () => { await api.delete(`${root}/knowledge-bases/${selected.id}/`); setSelectedId(null); await loadBases(); }}><Button danger>删除</Button></Popconfirm>}</Space></div><Tabs items={tabs} /></> : <Empty description="选择或新建一个知识库" />}</Card>

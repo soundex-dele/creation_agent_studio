@@ -149,7 +149,7 @@ export default function EnterprisePage() {
 
   const currentOrg = organizations.find(o => o.id === currentOrganizationId);
   return <div className="enterprise-page animate-fade-in">
-    <div className="enterprise-hero"><div><h1 className="enterprise-title">控制台</h1><div className="enterprise-subtitle">{singleTenantMode ? '组织治理、运行观测、知识评测与系统集成' : '多组织治理、运行观测、知识评测与系统集成'}</div></div>{singleTenantMode ? <Tag color="blue">{currentOrg?.name || '当前组织'}</Tag> : <Select style={{ width: 280 }} value={currentOrganizationId} onChange={selectOrganization} options={organizations.map(o => ({ value: o.id, label: `${o.name} · ${o.role}` }))} />}</div>
+    <div className="enterprise-hero"><div><h1 className="page-title">控制台</h1><p className="page-subtitle">{singleTenantMode ? '组织治理、运行观测、知识评测与系统集成' : '多组织治理、运行观测、知识评测与系统集成'}</p></div>{singleTenantMode ? <Tag color="blue">{currentOrg?.name || '当前组织'}</Tag> : <Select style={{ width: 280 }} value={currentOrganizationId} onChange={selectOrganization} options={organizations.map(o => ({ value: o.id, label: `${o.name} · ${o.role}` }))} />}</div>
     {!currentOrganizationId && <Alert type="warning" showIcon message="暂无可用组织" description={singleTenantMode ? '默认组织尚未完成初始化。' : '当前账号尚未加入任何组织。'} />}
     <div className="enterprise-grid"><Card><Statistic title="本月 Tokens" value={Number(usage.tokens || 0)} /></Card><Card><Statistic title="Token 配额" value={Number(usage.monthly_token_limit || 0)} /></Card><Card><Statistic title="本月成本" prefix="¥" value={Number(usage.cost || 0)} precision={4} /></Card><Card><Statistic title="成本预算" prefix="¥" value={Number(usage.monthly_cost_limit || 0)} /></Card></div>
     <div className="enterprise-table-card">

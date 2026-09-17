@@ -13,14 +13,13 @@
 }
 
 .skills-page-header h1 {
-  font-family: var(--font-display);
-  font-size: 26px;
   line-height: 1.3;
   margin-bottom: 4px;
 }
 
 .skills-page-header p,
 .skill-detail-header p {
+  margin: 0;
   color: var(--color-text-sec);
 }
 

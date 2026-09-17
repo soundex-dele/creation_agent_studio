@@ -241,7 +241,7 @@ export default function ProfilePage() {
 
   return (
     <div className="profile-page animate-fade-in">
-      <div className="profile-heading"><h1>个人中心</h1><p>管理你的公开资料、登录安全和 API 访问凭据。</p></div>
+      <div className="profile-heading"><h1 className="page-title">个人中心</h1><p className="page-subtitle">管理你的公开资料、登录安全和 API 访问凭据。</p></div>
       <Tabs activeKey={searchParams.get('tab') === 'security' ? 'security' : 'profile'} onChange={(tab) => {
         if (tab === 'security') setSearchParams({ tab: 'security' });
         else setSearchParams({});

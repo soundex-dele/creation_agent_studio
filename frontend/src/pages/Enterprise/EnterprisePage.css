@@ -1,7 +1,7 @@
 .enterprise-page { max-width: 1440px; margin: 0 auto; }
 .enterprise-hero { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; }
-.enterprise-title { font-size:28px; font-weight:700; margin:0; }
-.enterprise-subtitle { color:var(--color-text-muted); margin-top:4px; }
+.enterprise-hero .page-title { margin:0; }
+.enterprise-hero .page-subtitle { margin:4px 0 0; }
 .enterprise-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:24px; }
 .enterprise-card { background:var(--color-bg-surface); border:1px solid var(--color-border); border-radius:14px; padding:18px; }
 .enterprise-metric { font-size:26px; font-weight:700; margin-top:8px; }

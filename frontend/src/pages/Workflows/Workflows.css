@@ -1,6 +1,6 @@
 .workflows-page, .workflow-editor { max-width: 1180px; margin: 0 auto; padding: 28px; }
 .workflows-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
-.workflows-heading h1 { margin: 0 0 6px; font-size: 28px; }
+.workflows-heading h1 { margin: 0 0 6px; }
 .workflows-heading p { margin: 0; color: var(--color-text-sec); }
 .workflows-heading > div { flex: 1; }
 .workflows-loading, .workflow-run-loading { min-height: 420px; display: grid; place-items: center; }

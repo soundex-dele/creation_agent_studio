@@ -142,7 +142,7 @@ const DelegateEditorPage = () => {
   if (loading) return <Spin size="large" />;
   return (
     <div className="delegate-editor">
-      <div className="delegates-heading"><div><h1>{id ? '配置 AI 分身' : '新建 AI 分身'}</h1><p>定义职责、可调度团队和安全执行边界。</p></div></div>
+      <div className="delegates-heading"><div><h1 className="page-title">{id ? '配置 AI 分身' : '新建 AI 分身'}</h1><p className="page-subtitle">定义职责、可调度团队和安全执行边界。</p></div></div>
       <Form form={form} layout="vertical">
         <Card title="身份与职责">
           <div className="delegate-form-grid">

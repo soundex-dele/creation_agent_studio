@@ -57,8 +57,8 @@ const SkillsPage = () => {
     <div className="skills-page animate-fade-in">
       <div className="skills-page-header">
         <div>
-          <h1>技能</h1>
-          <p>实时读取当前 Agent Engine 目录中的最新技能，不使用数据库版本。</p>
+          <h1 className="page-title">技能</h1>
+          <p className="page-subtitle">实时读取当前 Agent Engine 目录中的最新技能，不使用数据库版本。</p>
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => void load()}>
           刷新

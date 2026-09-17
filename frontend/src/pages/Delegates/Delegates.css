@@ -1,7 +1,7 @@
 .delegates-page, .delegate-editor { max-width: 1180px; margin: 0 auto; }
 .delegates-heading, .delegate-board-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .delegates-heading h1, .delegate-board-heading h2 { margin: 0; }
-.delegates-heading p { color: var(--color-text-sec); }
+.delegates-heading p { margin: 4px 0 0; color: var(--color-text-sec); }
 .delegate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
 .delegate-card { display: grid; grid-template-columns: 56px 1fr; gap: 16px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card); }
 .delegate-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; font-size: 28px; background: color-mix(in srgb, var(--color-primary) 14%, transparent); }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Empty, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Empty, Input, Select, Space, Table, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import { automationApi } from '@/services/automations';
@@ -73,7 +73,7 @@ export default function AutomationsPage() {
   const filtered = rows.filter(row => `${row.name} ${row.target_name}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="automations-page animate-fade-in">
     <div className="automations-hero">
-      <div><Typography.Title level={2}>自动化</Typography.Title><Typography.Text type="secondary">按计划或 Webhook 自动运行应用与工作流</Typography.Text></div>
+      <div><h1 className="page-title">自动化</h1><p className="page-subtitle">按计划或 Webhook 自动运行应用与工作流</p></div>
       {canCreate && <Button type="primary" onClick={() => navigate('/automations/new')}>新建自动化</Button>}
     </div>
     <div className="automations-toolbar">

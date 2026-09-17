@@ -89,7 +89,7 @@ const DelegatesPage = () => {
   return (
     <div className="delegates-page">
       <div className="delegates-heading">
-        <div><h1>AI 分身</h1><p>创建代表你的总指挥，规划并调度智能体和应用完成复杂任务。</p></div>
+        <div><h1 className="page-title">AI 分身</h1><p className="page-subtitle">创建代表你的总指挥，规划并调度智能体和应用完成复杂任务。</p></div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/delegates/new')}>新建分身</Button>
       </div>
       {loading ? <Spin size="large" /> : items.length === 0 ? (

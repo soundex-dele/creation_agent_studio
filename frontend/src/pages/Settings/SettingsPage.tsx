@@ -60,7 +60,7 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-page animate-fade-in">
-      <div className="settings-heading"><h1>设置</h1><p>调整界面、对话行为和当前团队工作区。</p></div>
+      <div className="settings-heading"><h1 className="page-title">设置</h1><p className="page-subtitle">调整界面、对话行为和当前团队工作区。</p></div>
 
       <div className="settings-grid">
         <Card className="settings-appearance-card" title={<><BgColorsOutlined /> 外观</>}>

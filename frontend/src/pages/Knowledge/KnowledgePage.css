@@ -1,6 +1,6 @@
 .knowledge-page { max-width: 1440px; margin: 0 auto; }
 .knowledge-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.knowledge-header h1 { margin: 0; font-size: 28px; }
+.knowledge-header h1 { margin: 0; }
 .knowledge-header p { margin: 6px 0 0; color: var(--color-text-sec); }
 .knowledge-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
 .knowledge-bases .ant-list-item { padding: 14px 12px; border-radius: var(--border-radius-sm); cursor: pointer; }
