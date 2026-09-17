@@ -167,7 +167,11 @@ class AgentFilterTest(TestCase):
 
         response = self.client.delete(f'/api/v1/agents/{agent.id}/')
         self.assertEqual(response.status_code, 204)
-        self.assertFalse(Agent.objects.filter(id=agent.id).exists())
+        agent.refresh_from_db()
+        self.assertFalse(agent.is_active)
+        self.assertFalse(Agent.objects.filter(
+            id=agent.id, is_active=True,
+        ).exists())
 
     def test_agent_rejects_inaccessible_skill(self):
         other = User.objects.create_user(username='other-skill-owner', password='p')

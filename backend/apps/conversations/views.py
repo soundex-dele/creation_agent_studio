@@ -181,6 +181,23 @@ class ConversationViewSet(viewsets.ViewSet):
         queryset = request.user.conversations.filter(organization=organization)
         application_id = request.query_params.get("application_id")
         project_id = request.query_params.get("project_id")
+        agent_id = request.query_params.get("agent_id")
+        agent_kind = request.query_params.get("agent_kind")
+        if agent_id:
+            try:
+                queryset = queryset.filter(agent_id=int(agent_id))
+            except (TypeError, ValueError):
+                return Response(
+                    {"agent_id": "agent_id 必须是整数。"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if agent_kind:
+            if agent_kind not in Agent.Kind.values:
+                return Response(
+                    {"agent_kind": "未知的智能体类型。"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            queryset = queryset.filter(agent__kind=agent_kind)
         if application_id:
             queryset = queryset.filter(chat_application_id=application_id)
         if project_id:
@@ -193,7 +210,8 @@ class ConversationViewSet(viewsets.ViewSet):
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(title__icontains=search)
-        return Response(ConversationListSerializer(queryset[:20], many=True).data)
+        limit = 100 if agent_kind == Agent.Kind.SUPERVISOR else 20
+        return Response(ConversationListSerializer(queryset[:limit], many=True).data)
 
     def create(self, request):
         serializer = CreateConversationSerializer(data=request.data)
@@ -622,5 +640,44 @@ class ConversationViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["delete"])
     def delete_conversation(self, request, pk=None):
-        self.get_conversation(request, pk).delete()
+        conversation = self.get_conversation(request, pk)
+        with transaction.atomic():
+            conversation = Conversation.objects.select_for_update().get(
+                pk=conversation.pk,
+                organization_id=conversation.organization_id,
+                user_id=conversation.user_id,
+            )
+            has_active_run = Run.objects.for_organization(
+                conversation.organization_id
+            ).filter(
+                Q(source_type="conversation", source_id=str(conversation.id))
+                | Q(
+                    source_type="supervisor",
+                    definition_snapshot__conversation_id=str(conversation.id),
+                ),
+                status__in=(
+                    Run.Status.QUEUED,
+                    Run.Status.RUNNING,
+                    Run.Status.WAITING_INPUT,
+                    Run.Status.WAITING_CHILDREN,
+                    Run.Status.CANCELLING,
+                ),
+            ).exists()
+            if has_active_run:
+                instance_name = (
+                    "分身实例"
+                    if conversation.agent
+                    and conversation.agent.kind == Agent.Kind.SUPERVISOR
+                    else "对话"
+                )
+                return Response(
+                    {
+                        "detail": (
+                            f"当前{instance_name}仍在执行，请先等待任务结束"
+                            "或取消任务后再删除。"
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            conversation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

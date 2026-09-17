@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, List, Space, Spin, Steps, Tag, Typography, message } from 'antd';
-import { CheckOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { ArrowLeftOutlined, CheckOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useRunStream } from '@/features/run-stream';
 import { api } from '@/services/api';
@@ -10,12 +10,13 @@ import type { SupervisorPlan } from '@/types/delegate';
 import './Delegates.css';
 
 interface RunResource { id: string; status: string; version: number; pending_input_request_id?: string | null; output_summary?: Record<string, any> }
-interface ConversationDetail { id: number; title: string; messages: Array<{ id: number; role: string; content: string }>; active_run?: RunResource | null }
+interface ConversationDetail { id: number; title: string; messages: Array<{ id: number; role: string; content: string }>; active_run?: RunResource | null; latest_run?: RunResource | null }
 interface ChildRun { id: string; node_key: string; status: string; definition_snapshot: Record<string, any>; error_message?: string }
 interface Artifact { id: string; run_id: string; kind: string; mime_type: string; size: number; metadata: Record<string, any> }
 
 const DelegateTaskPage = () => {
   const { conversationId } = useParams<{ id: string; conversationId: string }>();
+  const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId) || '';
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [run, setRun] = useState<RunResource | null>(null);
@@ -30,7 +31,11 @@ const DelegateTaskPage = () => {
     if (!conversationId) return;
     const value = await api.get<ConversationDetail>(`/conversations/${conversationId}/`);
     setConversation(value);
-    if (value.active_run) setRun(value.active_run);
+    setRun(value.active_run || value.latest_run || null);
+    if (!value.active_run && !value.latest_run) {
+      setChildren([]);
+      setArtifacts([]);
+    }
   }, [conversationId]);
 
   const refreshRun = useCallback(async () => {
@@ -113,7 +118,13 @@ const DelegateTaskPage = () => {
   return (
     <div className="delegate-task-page">
       <section className="delegate-chat-pane">
-        <header><h2>{conversation.title || '新任务'}</h2><Tag>{projection.connected ? '实时连接' : '任务会话'}</Tag></header>
+        <header>
+          <Space>
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/delegates')} aria-label="返回分身实例" />
+            <h2>{conversation.title || `分身实例 #${conversation.id}`}</h2>
+          </Space>
+          <Tag>{projection.connected ? '实时连接' : '任务会话'}</Tag>
+        </header>
         <div className="delegate-message-list">
           {conversation.messages.length === 0 ? <Empty description="告诉分身你想完成什么" /> : conversation.messages.map((item) => (
             <div className={`delegate-message delegate-message--${item.role}`} key={item.id}>
@@ -125,10 +136,23 @@ const DelegateTaskPage = () => {
             <div className="delegate-message delegate-message--assistant"><strong>AI 分身</strong><Typography.Paragraph>{projection.state.output}</Typography.Paragraph></div>
           )}
         </div>
-        <Space.Compact block>
-          <Input.TextArea value={goal} autoSize={{ minRows: 2, maxRows: 6 }} disabled={Boolean(run && !['succeeded', 'failed', 'cancelled'].includes(run.status))} placeholder="描述目标、背景和期望交付…" onChange={(event) => setGoal(event.target.value)} />
-          <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={() => void send()}>发送</Button>
-        </Space.Compact>
+        <div className="delegate-composer">
+          <Input.TextArea
+            value={goal}
+            autoSize={{ minRows: 1, maxRows: 6 }}
+            size="large"
+            disabled={Boolean(run && !['succeeded', 'failed', 'cancelled'].includes(run.status))}
+            placeholder="描述目标、背景和期望交付…"
+            onChange={(event) => setGoal(event.target.value)}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            loading={submitting}
+            disabled={!goal.trim() || Boolean(run && !['succeeded', 'failed', 'cancelled'].includes(run.status))}
+            onClick={() => void send()}
+          >发送</Button>
+        </div>
       </section>
       <aside className="delegate-board-pane">
         <div className="delegate-board-heading"><h2>执行看板</h2><Button icon={<ReloadOutlined />} onClick={() => void refreshRun()} /></div>

@@ -7,8 +7,8 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from unittest.mock import patch
 
-from apps.agents.models import Agent, AgentCategory
-from apps.conversations.models import Message
+from apps.agents.models import Agent, AgentCategory, SupervisorProfile
+from apps.conversations.models import Conversation, Message
 
 User = get_user_model()
 
@@ -93,6 +93,46 @@ class CreateConversationTest(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['agent']['id'], self.agent.id)
         self.assertEqual(response.data['agent']['name'], '脚本助手')
+
+    def test_list_can_filter_supervisor_instances(self):
+        organization = self.user.owned_organizations.get()
+        supervisor = Agent.objects.create(
+            name='任务总指挥',
+            slug='task-supervisor',
+            description='规划任务',
+            category=self.category,
+            created_by=self.user,
+            organization=organization,
+            kind=Agent.Kind.SUPERVISOR,
+            is_public=False,
+        )
+        SupervisorProfile.objects.create(agent=supervisor)
+        instance = Conversation.objects.create(
+            user=self.user,
+            organization=organization,
+            agent=supervisor,
+            title='已有任务实例',
+        )
+        Conversation.objects.create(
+            user=self.user,
+            organization=organization,
+            agent=self.agent,
+            title='普通智能体会话',
+        )
+
+        response = self.client.get(
+            '/api/v1/conversations/',
+            {'agent_kind': Agent.Kind.SUPERVISOR},
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual([item['id'] for item in response.data], [instance.id])
+
+        by_agent = self.client.get(
+            '/api/v1/conversations/',
+            {'agent_id': supervisor.id},
+        )
+        self.assertEqual([item['id'] for item in by_agent.data], [instance.id])
 
     def test_retrieve_created_conversation_resolves_organization(self):
         created = self.client.post(

@@ -42,7 +42,7 @@ class AgentCategoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.filter(
-        is_public=True, kind=Agent.Kind.STANDARD,
+        is_public=True, is_active=True, kind=Agent.Kind.STANDARD,
     ).select_related('category')
     filter_backends = [SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'description']
@@ -61,7 +61,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Agent.objects.filter(kind=Agent.Kind.STANDARD).select_related(
+        queryset = Agent.objects.filter(
+            kind=Agent.Kind.STANDARD, is_active=True,
+        ).select_related(
             'category', 'created_by', 'draft'
         )
         if not self.request.user.is_authenticated:
@@ -90,11 +92,19 @@ class AgentViewSet(viewsets.ModelViewSet):
                 Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.DEVELOPER):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Developer role is required to create an agent.')
-        serializer.save(
-            created_by=self.request.user,
-            organization=organization,
-            kind=Agent.Kind.STANDARD,
-        )
+        with transaction.atomic():
+            agent = serializer.save(
+                created_by=self.request.user,
+                organization=organization,
+                kind=Agent.Kind.STANDARD,
+            )
+            draft = AgentDraft.objects.get(agent=agent)
+            publish_agent(
+                agent=agent,
+                actor=self.request.user,
+                expected_draft_version=draft.version,
+                release_notes='Initial version 1.0.0',
+            )
 
     def perform_update(self, serializer):
         from apps.enterprise.models import Membership
@@ -144,7 +154,11 @@ class AgentViewSet(viewsets.ModelViewSet):
                 ApplicationDeployment.objects.filter(
                     id__in=stale_rollback_ids,
                 ).update(previous_revision=None)
-            locked.delete()
+            if locked.revisions.exists():
+                locked.is_active = False
+                locked.save(update_fields=['is_active', 'updated_at'])
+            else:
+                locked.delete()
 
     def destroy(self, request, *args, **kwargs):
         try:

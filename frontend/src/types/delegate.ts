@@ -47,3 +47,18 @@ export interface SupervisorPlan {
   delivery_criteria: string[];
   budget: Record<string, number>;
 }
+
+export interface DelegateInstance {
+  id: number;
+  title: string;
+  agent: { id: number; name: string; icon: string; description: string } | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message: {
+    id: number;
+    role: string;
+    content: string;
+    created_at: string;
+  } | null;
+}

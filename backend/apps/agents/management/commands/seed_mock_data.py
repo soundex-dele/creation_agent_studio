@@ -14,7 +14,8 @@ from apps.agents.models import AgentCategory, Agent
 from apps.applications.models import (
     Application, ApplicationCategory, ChatApplication,
 )
-from modules.catalog.models import AgentDraft, ApplicationDraft
+from modules.catalog.models import AgentDraft, AgentRevision, ApplicationDraft
+from modules.catalog.services import publish_agent
 from apps.templates.models import Template, TemplateAnalysisSection, TemplateCategory
 from apps.conversations.models import Conversation, Message
 
@@ -205,17 +206,25 @@ class Command(BaseCommand):
                     'is_public': True,
                 }
             )
-            AgentDraft.objects.update_or_create(
+            draft, _ = AgentDraft.objects.update_or_create(
                 agent=agent,
                 defaults={
                     'organization': organization, 'updated_by': creator,
                     'content': {
+                        'version': '1.0.0',
                         'system_prompt': system_prompt,
                         'model_config': {}, 'tool_config': [],
                         'knowledge_config': [], 'guardrail_config': {},
                         'workflow_config': {}, 'skill_bindings': [],
                     },
                 })
+            if not AgentRevision.objects.filter(agent=agent).exists():
+                publish_agent(
+                    agent=agent,
+                    actor=creator,
+                    expected_draft_version=draft.version,
+                    release_notes='Initial version 1.0.0',
+                )
             agents.append(agent)
         return agents
 

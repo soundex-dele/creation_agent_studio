@@ -60,6 +60,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
     application_id = serializers.IntegerField(read_only=True)
     skills = serializers.SerializerMethodField()
     active_run = serializers.SerializerMethodField()
+    latest_run = serializers.SerializerMethodField()
     organization_id = serializers.UUIDField(read_only=True)
 
     class Meta:
@@ -68,7 +69,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
                   'application_id',
                   'working_directory',
                   'skills', 'created_at', 'updated_at',
-                  'messages', 'active_run']
+                  'messages', 'active_run', 'latest_run']
 
     def get_skills(self, obj):
         return [{
@@ -79,8 +80,8 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
             'enabled': binding.enabled,
         } for binding in obj.skill_bindings.select_related('skill').all()]
 
-    def get_active_run(self, obj):
-        run = Run.objects.for_organization(obj.organization_id).filter(
+    def _related_runs(self, obj):
+        return Run.objects.for_organization(obj.organization_id).filter(
             Q(source_type='conversation', source_id=str(obj.id))
             | Q(
                 source_type='supervisor',
@@ -89,7 +90,11 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
             | Q(
                 source_type='workflow_step',
                 definition_snapshot__conversation_id=str(obj.id),
-            ),
+            )
+        ).select_related('current_attempt').order_by('-created_at')
+
+    def get_active_run(self, obj):
+        run = self._related_runs(obj).filter(
             status__in=(
                 Run.Status.QUEUED,
                 Run.Status.RUNNING,
@@ -97,7 +102,11 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
                 Run.Status.WAITING_CHILDREN,
                 Run.Status.CANCELLING,
             ),
-        ).select_related('current_attempt').order_by('-created_at').first()
+        ).first()
+        return RunSerializer(run).data if run else None
+
+    def get_latest_run(self, obj):
+        run = self._related_runs(obj).first()
         return RunSerializer(run).data if run else None
 
 

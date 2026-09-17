@@ -177,6 +177,7 @@ class AgentWriteSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         skill_ids = validated_data.pop('skill_ids', [])
         content = self._pop_definition(validated_data, skill_ids)
+        content.setdefault('version', '1.0.0')
         agent = super().create(validated_data)
         self._sync_draft(agent, content)
         return agent
@@ -237,13 +238,19 @@ class AgentDeploymentSerializer(serializers.ModelSerializer):
 
 
 class AgentRevisionSerializer(serializers.ModelSerializer):
+    version = serializers.SerializerMethodField()
+
     class Meta:
         model = AgentRevision
         fields = [
-            'id', 'revision_no', 'schema_version', 'content', 'content_hash',
+            'id', 'version', 'revision_no', 'schema_version', 'content', 'content_hash',
             'release_notes', 'created_by_id', 'created_at',
         ]
         read_only_fields = fields
+
+    def get_version(self, obj):
+        configured = (obj.content or {}).get('version')
+        return str(configured or f'{obj.revision_no}.0.0')
 
 
 class ExecuteAgentSerializer(serializers.Serializer):

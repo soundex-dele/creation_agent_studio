@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.db import OperationalError
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
@@ -238,6 +239,28 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(detail.data["active_run"]["id"], sent.data["id"])
         self.assertEqual(detail.data["active_run"]["source_type"], "conversation")
 
+    def test_conversation_detail_exposes_latest_terminal_run_for_task_restore(self):
+        sent = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "remember this completed task"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-latest-run-recovery",
+            **self.headers,
+        )
+        Run.objects.filter(pk=sent.data["id"]).update(
+            status=Run.Status.SUCCEEDED,
+            finished_at=timezone.now(),
+        )
+
+        detail = self.client.get(
+            f"/api/v1/conversations/{self.conversation.id}/",
+            **self.headers,
+        )
+
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertIsNone(detail.data["active_run"])
+        self.assertEqual(detail.data["latest_run"]["id"], sent.data["id"])
+
     def test_switching_agent_resumes_thread_and_keeps_composer_skills(self):
         selected_agent = Agent.objects.create(
             category=self.agent.category,
@@ -406,6 +429,36 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(self.conversation.agent_thread_provider, "")
         self.assertEqual(self.conversation.agent_thread_id, "")
         self.assertFalse(self.conversation.messages.exists())
+
+    def test_delete_conversation_removes_idle_delegate_instance(self):
+        response = self.client.delete(
+            f"/api/v1/conversations/{self.conversation.id}/delete_conversation/",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Conversation.objects.filter(pk=self.conversation.id).exists())
+
+    def test_delete_conversation_rejects_active_delegate_instance(self):
+        Run.objects.create(
+            organization=self.organization,
+            owner=self.user,
+            executor_kind=Run.ExecutorKind.WORKFLOW,
+            executor_key="supervisor",
+            source_type="supervisor",
+            source_id=str(self.agent.id),
+            definition_snapshot={"conversation_id": str(self.conversation.id)},
+            status=Run.Status.QUEUED,
+        )
+
+        response = self.client.delete(
+            f"/api/v1/conversations/{self.conversation.id}/delete_conversation/",
+            **self.headers,
+        )
+
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertIn("仍在执行", response.data["detail"])
+        self.assertTrue(Conversation.objects.filter(pk=self.conversation.id).exists())
 
     def test_terminal_projection_preserves_tool_history(self):
         response = self.client.post(

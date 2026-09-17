@@ -16,6 +16,7 @@ from modules.catalog.models import (
     ApplicationDraft,
 )
 from modules.catalog import models as catalog_models
+from apps.agents.serializers import AgentRevisionSerializer
 
 
 @pytest.fixture
@@ -58,6 +59,7 @@ def test_seeded_general_agent_has_an_active_deployment():
 
     assert deployment.organization_id == agent.organization_id
     assert deployment.revision.content == draft.content
+    assert AgentRevisionSerializer(deployment.revision).data["version"] == "1.0.0"
 
 
 @pytest.mark.django_db
@@ -81,6 +83,10 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     agent = ProductAgent.objects.get(pk=response.data["id"])
     draft = AgentDraft.objects.get(agent=agent)
     assert draft.organization_id == organization.id
+    initial_revision = AgentRevision.objects.get(agent=agent)
+    assert initial_revision.revision_no == 1
+    assert initial_revision.content["version"] == "1.0.0"
+    assert initial_revision.release_notes == "Initial version 1.0.0"
 
     version = client.post(
         f"/api/v1/agents/{agent.id}/versions/",
@@ -90,6 +96,8 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     )
     assert version.status_code == 201
     revision = AgentRevision.objects.get(pk=version.data["id"])
+    assert revision.id == initial_revision.id
+    assert version.data["version"] == "1.0.0"
 
     deployed = client.post(
         f"/api/v1/agents/{agent.id}/deploy/",
