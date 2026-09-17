@@ -25,6 +25,7 @@ const WorkflowManualRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowMa
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
+const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWithMethodPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchPage'));
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
@@ -206,6 +207,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ApplicationShell>
           {page(<ContactsPage />)}
+        </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/study-with-method',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>
+          {page(<StudyWithMethodPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),

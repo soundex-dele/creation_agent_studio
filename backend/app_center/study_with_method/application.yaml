@@ -1,0 +1,82 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: study-with-method
+  version: 1.0.0
+  name: 学之有道
+  description: 贴合校内进度的个性化学习闭环，从每日计划、分步辅导到错题复习与家长周报。
+  category:
+    slug: education
+    name: 学习成长
+    description: 个性化学习、复习与成长工具
+    icon: "📖"
+    order: 8
+  icon: "🧭"
+  color: "#326B5B"
+  tags: [高中学习, 数学, 错题本, 复习计划]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: study-with-method
+    executor_protocol_version: 1
+    renderer_key: study-with-method
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 3
+      retry_safe: true
+    input_schema:
+      type: object
+      required: [operation, subject, grade_stage, problem]
+      properties:
+        operation:
+          type: string
+          enum: [analyze, hint, solution, variant]
+        subject:
+          type: string
+          enum: [math]
+        grade_stage:
+          type: string
+        problem:
+          type: string
+        student_thought:
+          type: string
+        hint_level:
+          type: integer
+          minimum: 1
+          maximum: 4
+    output_schema:
+      type: object
+      properties:
+        subject: {type: string}
+        recognized_problem: {type: string}
+        knowledge_points: {type: array, items: {type: string}}
+        hint_level: {type: integer}
+        hint: {type: string}
+        steps: {type: array, items: {type: string}}
+        final_answer: {type: string}
+        validation_status: {type: string}
+        variant_problem: {type: string}
+    default_config:
+      launch_mode: dedicated
+      enabled_subjects: [math]
+      tutoring_policy: hints_before_solution
+      response_schema_version: 1
+    dependencies:
+      agents: []
+      skills: []
+  backend:
+    django_app: app_center.study_with_method.backend.apps.StudyWithMethodConfig
+    install_hook: app_center.study_with_method.backend.install.install
+    urlconf: app_center.study_with_method.backend.urls
+    executor_entrypoint: app_center.study_with_method.runtime.execute_study_with_method
+  database:
+    mode: django-migrations
+    schema_version: 1
+    tenant_scoped: true
+  install:
+    scope: per-organization
+    activate: true

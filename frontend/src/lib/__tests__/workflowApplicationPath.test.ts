@@ -37,6 +37,12 @@ describe('workflow application path', () => {
     );
   });
 
+  it('opens 学之有道 with its dedicated renderer', () => {
+    expect(workflowApplicationPath(step('study-with-method'))).toBe(
+      '/applications/6/study-with-method?embedded=1',
+    );
+  });
+
   it('opens Skill-backed generators as chat applications', () => {
     expect(workflowApplicationPath(step('wechat-html-optimizer', 'chat'))).toBe(
       '/applications/6/chat?slug=wechat-html-optimizer&embedded=1',

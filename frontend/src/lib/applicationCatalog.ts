@@ -14,6 +14,9 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
   'case-library': (_app, entry) => withEntry('/apps/case-library', entry),
   contacts: (app, entry) => withEntry(`/applications/${app.applicationId}/contacts`, entry),
+  'study-with-method': (app, entry) => withEntry(
+    `/applications/${app.applicationId}/study-with-method`, entry,
+  ),
   'creation-master': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-master`, entry,
   ),

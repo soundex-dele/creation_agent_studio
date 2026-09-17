@@ -32,6 +32,11 @@ export function workflowApplicationPath(
   if (application.renderer_key === 'contacts') {
     return `/applications/${applicationId}/contacts${embeddedQuery ? `?${embeddedQuery}` : ''}`;
   }
+  if (application.renderer_key === 'study-with-method') {
+    return `/applications/${applicationId}/study-with-method${
+      embeddedQuery ? `?${embeddedQuery}` : ''
+    }`;
+  }
   if (application.renderer_key === 'creation-master') {
     return `/applications/${applicationId}/creation-master${
       embeddedQuery ? `?${embeddedQuery}` : ''

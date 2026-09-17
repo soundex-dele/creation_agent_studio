@@ -48,6 +48,15 @@ describe('application renderer registry', () => {
     expect(applicationRendererRegistry['case-library']).toBeTypeOf('function');
   });
 
+  it('opens 学之有道 in its dedicated learning runtime', () => {
+    const app = {
+      id: 'study-with-method', applicationId: 21, kind: 'custom' as const,
+      rendererKey: 'study-with-method',
+    };
+    expect(applicationPath(app)).toBe('/applications/21/study-with-method?entry=apps');
+    expect(applicationRendererRegistry['study-with-method']).toBeTypeOf('function');
+  });
+
   it('opens catalog applications directly in their runtime', () => {
     expect(applicationPath({
       id: 'writer', applicationId: 12, kind: 'chat', rendererKey: 'chat',

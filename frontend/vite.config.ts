@@ -184,6 +184,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      '/media': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     }
   }
 })
