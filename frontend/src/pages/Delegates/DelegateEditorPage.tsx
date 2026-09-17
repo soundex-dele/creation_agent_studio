@@ -69,7 +69,7 @@ const DelegateEditorPage = () => {
           { expected_draft_version: saved.draft_version, release_notes: '发布 AI 分身配置' },
         );
         await api.post(`/organizations/${organizationId}/delegates/${saved.id}/deploy`, {
-          environment: 'production', revision_id: revision.id,
+          revision_id: revision.id,
         });
         message.success('AI 分身已保存并部署');
       } else message.success('草稿已保存');

@@ -5,27 +5,6 @@ import type { ApplicationDefinition } from '@/types/application';
 import { tenantApiRoot } from './tenantContext';
 
 
-export type DeploymentEnvironment = 'development' | 'staging' | 'production';
-
-const DEPLOYMENT_ENVIRONMENTS: readonly DeploymentEnvironment[] = [
-  'development',
-  'staging',
-  'production',
-];
-
-export function resolveDefaultDeploymentEnvironment(
-  configured: string | undefined = import.meta.env.VITE_DEPLOYMENT_ENVIRONMENT,
-  isDevelopment: boolean = import.meta.env.DEV,
-): DeploymentEnvironment {
-  const normalized = configured?.trim().toLowerCase();
-  if (DEPLOYMENT_ENVIRONMENTS.includes(normalized as DeploymentEnvironment)) {
-    return normalized as DeploymentEnvironment;
-  }
-  return isDevelopment ? 'development' : 'production';
-}
-
-export const DEFAULT_DEPLOYMENT_ENVIRONMENT = resolveDefaultDeploymentEnvironment();
-
 export interface RunResource {
   id: string;
   organization_id: string;
@@ -66,7 +45,6 @@ export interface ApplicationRuntimeDescriptor {
   name: string;
   slug: string;
   description: string;
-  environment: DeploymentEnvironment;
   deployment_id: string;
   deployment_version: number;
   revision_id: string;
@@ -85,26 +63,23 @@ export interface CursorPage<T> {
 export interface RuntimeClientOptions {
   organizationId: string;
   applicationId: string;
-  environment?: DeploymentEnvironment;
 }
 
 export function createApplicationRuntimeClient({
   organizationId,
   applicationId,
-  environment = DEFAULT_DEPLOYMENT_ENVIRONMENT,
 }: RuntimeClientOptions) {
   const root = tenantApiRoot(organizationId);
   return {
     organizationId,
     applicationId,
-    environment,
 
     startRun: async (
       input: Record<string, unknown>,
       idempotencyKey: string,
     ): Promise<RunResource> => api.post<RunResource>(
       `${root}/applications/${applicationId}/runs`,
-      { environment, input },
+      { input },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     ) as Promise<RunResource>,
 
@@ -147,11 +122,9 @@ export function createApplicationRuntimeClient({
 export async function loadApplicationRuntime(
   organizationId: string,
   applicationId: string,
-  environment: DeploymentEnvironment = DEFAULT_DEPLOYMENT_ENVIRONMENT,
 ): Promise<ApplicationRuntimeDescriptor> {
   return api.get<ApplicationRuntimeDescriptor>(
     `${tenantApiRoot(organizationId)}/applications/${applicationId}/runtime`,
-    { environment },
   );
 }
 

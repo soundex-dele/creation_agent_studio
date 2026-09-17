@@ -30,7 +30,7 @@ CHAT_SKILL_APPS = {
 
 
 @pytest.mark.django_db
-def test_sync_installs_all_packages_and_only_deploys_development():
+def test_sync_installs_all_packages_and_activates_deployments():
     owner = get_user_model().objects.create_user(username="app-center-sync-owner")
     organization = owner.owned_organizations.get()
 
@@ -55,8 +55,7 @@ def test_sync_installs_all_packages_and_only_deploys_development():
         )
     ):
         assert application.revisions.count() == 1
-        assert application.deployments.filter(environment="development").count() == 1
-        assert not application.deployments.filter(environment="production").exists()
+        assert application.deployments.count() == 1
 
     for application_slug, expected in CHAT_SKILL_APPS.items():
         application = applications.get(slug=application_slug)

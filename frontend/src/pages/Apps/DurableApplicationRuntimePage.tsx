@@ -253,7 +253,7 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
       )}
       {isHtmlToPng ? <HtmlToPngInput loading={starting} onStart={start} /> : <Card>
         <Typography.Paragraph type="secondary">
-          Revision {descriptor.revision_no} · {descriptor.environment} ·{' '}
+          Revision {descriptor.revision_no} ·{' '}
           {String(descriptor.definition.executor_key ?? '')}
         </Typography.Paragraph>
         <Input.TextArea
@@ -327,7 +327,6 @@ export default function DurableApplicationRuntimePage() {
     <ApplicationRuntimeProvider
       organizationId={descriptor.organization_id}
       applicationId={descriptor.application_id}
-      environment={descriptor.environment}
     >
       <RuntimeConsole
         descriptor={descriptor}

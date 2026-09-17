@@ -34,10 +34,13 @@ def deploy_seeded_general_agent(apps, schema_editor):
                     "SELECT set_config('app.organization_id', %s, true)",
                     [str(agent.organization_id)],
                 )
-        if AgentDeployment.objects.filter(
-            agent_id=agent.id,
-            environment='production',
-        ).exists():
+        has_environment = any(
+            field.name == 'environment' for field in AgentDeployment._meta.fields
+        )
+        deployment_lookup = {'agent_id': agent.id}
+        if has_environment:
+            deployment_lookup['environment'] = 'production'
+        if AgentDeployment.objects.filter(**deployment_lookup).exists():
             continue
 
         revision = AgentRevision.objects.filter(
@@ -58,14 +61,18 @@ def deploy_seeded_general_agent(apps, schema_editor):
                 created_by_id=agent.created_by_id,
             )
 
+        deployment_values = {
+            'organization_id': agent.organization_id,
+            'agent_id': agent.id,
+            'revision_id': revision.id,
+            'config_override': {},
+            'version': 1,
+            'updated_by_id': agent.created_by_id,
+        }
+        if has_environment:
+            deployment_values['environment'] = 'production'
         AgentDeployment.objects.create(
-            organization_id=agent.organization_id,
-            agent_id=agent.id,
-            environment='production',
-            revision_id=revision.id,
-            config_override={},
-            version=1,
-            updated_by_id=agent.created_by_id,
+            **deployment_values,
         )
 
 

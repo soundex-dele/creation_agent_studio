@@ -7,7 +7,7 @@ from modules.catalog.errors import InvalidApplicationDefinition, QualityGateNotP
 
 
 class DjangoCatalogDomainPort:
-    def enforce_production_quality_gate(
+    def enforce_deployment_quality_gate(
         self, *, organization_id, target_type, target_id, revision_id
     ):
         suites = EvaluationSuite.objects.filter(
@@ -26,7 +26,7 @@ class DjangoCatalogDomainPort:
                 failed.append(suite.name)
         if failed:
             raise QualityGateNotPassed(
-                "Production deployment requires passing evaluations: "
+                "Deployment requires passing evaluations: "
                 + ", ".join(failed)
             )
 

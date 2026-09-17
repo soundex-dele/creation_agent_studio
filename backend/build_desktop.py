@@ -35,7 +35,6 @@ def build() -> None:
     print("[1/4] Building React frontend without Creation Master")
     frontend_env = os.environ.copy()
     frontend_env["VITE_EXCLUDE_CREATION_MASTER"] = "true"
-    frontend_env["VITE_DEPLOYMENT_ENVIRONMENT"] = "development"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     run([npm, "run", "build"], cwd=FRONTEND_ROOT, env=frontend_env)
 

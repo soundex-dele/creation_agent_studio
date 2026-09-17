@@ -16,7 +16,6 @@ from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
-    DeploymentEnvironment,
     SkillDeployment,
     SkillDraft,
     SkillRevision,
@@ -109,7 +108,7 @@ def _skill_not_found(request):
     )
 
 
-def _can_manage_production(request):
+def _can_manage_deployment(request):
     if request.user.is_superuser:
         return True
     membership = getattr(request, "organization_membership", None)
@@ -118,26 +117,14 @@ def _can_manage_production(request):
     ]
 
 
-def _validate_environment(request, environment, *, require_production_admin=True):
-    if environment not in DeploymentEnvironment.values:
-        return _problem(
-            request,
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="invalid_deployment_environment",
-            title="Invalid deployment environment",
-            detail="environment must be development, staging, or production.",
-        )
-    if (
-        require_production_admin
-        and environment == DeploymentEnvironment.PRODUCTION
-        and not _can_manage_production(request)
-    ):
+def _require_deployment_admin(request):
+    if not _can_manage_deployment(request):
         return _problem(
             request,
             status_code=status.HTTP_403_FORBIDDEN,
-            code="production_deployment_requires_admin",
-            title="Production deployment requires administrator",
-            detail="Only organization administrators and owners can change production deployments.",
+            code="deployment_requires_admin",
+            title="Deployment requires administrator",
+            detail="Only organization administrators and owners can change deployments.",
         )
     return None
 
@@ -226,16 +213,18 @@ class OrganizationApplicationView(ProblemDetailsAPIView):
             application=application
         ).first()
         body["draft"] = ApplicationDraftSerializer(draft).data if draft else None
-        body["deployments"] = ApplicationDeploymentSerializer(
+        deployment = (
             ApplicationDeployment.objects.for_organization(organization_id)
             .filter(application=application)
-            .order_by("environment"),
-            many=True,
-        ).data
+            .first()
+        )
+        body["deployment"] = (
+            ApplicationDeploymentSerializer(deployment).data if deployment else None
+        )
         return Response(body)
 
     def patch(self, request, organization_id, application_id):
-        if not _can_manage_production(request):
+        if not _can_manage_deployment(request):
             return _problem(
                 request,
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -269,21 +258,10 @@ class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
         application = _application(organization_id, application_id)
         if application is None:
             return _not_found(request)
-        environment = request.query_params.get(
-            "environment", DeploymentEnvironment.PRODUCTION
-        )
-        if environment not in DeploymentEnvironment.values:
-            return _problem(
-                request,
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="invalid_deployment_environment",
-                title="Invalid deployment environment",
-                detail="environment must be development, staging, or production.",
-            )
         deployment = (
             ApplicationDeployment.objects.for_organization(organization_id)
             .select_related("revision")
-            .filter(application=application, environment=environment)
+            .filter(application=application)
             .first()
         )
         if deployment is None:
@@ -292,7 +270,7 @@ class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
                 status_code=status.HTTP_409_CONFLICT,
                 code="application_deployment_unavailable",
                 title="Application deployment unavailable",
-                detail=f"The application has no {environment} deployment.",
+                detail="The application has no active deployment.",
             )
         revision = deployment.revision
         return Response(
@@ -302,7 +280,6 @@ class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
                 "name": application.name,
                 "slug": application.slug,
                 "description": application.description,
-                "environment": deployment.environment,
                 "deployment_id": str(deployment.id),
                 "deployment_version": deployment.version,
                 "revision_id": str(revision.id),
@@ -463,31 +440,16 @@ class OrganizationApplicationRevisionView(ProblemDetailsAPIView):
         return Response(ApplicationRevisionSerializer(revision).data)
 
 
-class OrganizationApplicationDeploymentsView(ProblemDetailsAPIView):
+class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
     def get(self, request, organization_id, application_id):
         application = _application(organization_id, application_id)
         if application is None:
             return _not_found(request)
-        deployments = ApplicationDeployment.objects.for_organization(
-            organization_id
-        ).filter(application=application).order_by("environment")
-        return Response(ApplicationDeploymentSerializer(deployments, many=True).data)
-
-
-class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
-
-    def get(self, request, organization_id, application_id, environment):
-        application = _application(organization_id, application_id)
-        if application is None:
-            return _not_found(request)
-        if environment not in DeploymentEnvironment.values:
-            return _validate_environment(request, environment)
         deployment = ApplicationDeployment.objects.for_organization(
             organization_id
-        ).filter(application=application, environment=environment).first()
+        ).filter(application=application).first()
         if deployment is None:
             return _problem(
                 request,
@@ -498,10 +460,10 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
             )
         return Response(ApplicationDeploymentSerializer(deployment).data)
 
-    def put(self, request, organization_id, application_id, environment):
-        environment_problem = _validate_environment(request, environment)
-        if environment_problem is not None:
-            return environment_problem
+    def put(self, request, organization_id, application_id):
+        permission_problem = _require_deployment_admin(request)
+        if permission_problem is not None:
+            return permission_problem
         application = _application(organization_id, application_id)
         if application is None:
             return _not_found(request)
@@ -512,7 +474,6 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
             deployment = switch_application_deployment(
                 application=application,
                 actor=request.user,
-                environment=environment,
                 revision_id=serializer.validated_data["revision_id"],
                 expected_version=expected_version,
                 config_override=serializer.validated_data["config_override"],
@@ -538,7 +499,7 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
                 request,
                 status_code=status.HTTP_409_CONFLICT,
                 code=exc.code,
-                title="Production quality gate not passed",
+                title="Deployment quality gate not passed",
                 detail=str(exc),
             )
         return Response(
@@ -554,10 +515,10 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
 class OrganizationApplicationDeploymentRollbackView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
-    def post(self, request, organization_id, application_id, environment):
-        environment_problem = _validate_environment(request, environment)
-        if environment_problem is not None:
-            return environment_problem
+    def post(self, request, organization_id, application_id):
+        permission_problem = _require_deployment_admin(request)
+        if permission_problem is not None:
+            return permission_problem
         application = _application(organization_id, application_id)
         if application is None:
             return _not_found(request)
@@ -567,7 +528,6 @@ class OrganizationApplicationDeploymentRollbackView(ProblemDetailsAPIView):
             deployment = rollback_application_deployment(
                 application=application,
                 actor=request.user,
-                environment=environment,
                 expected_version=serializer.validated_data["expected_version"],
             )
         except DeploymentVersionConflict as exc:
@@ -698,33 +658,15 @@ class OrganizationSkillRevisionView(ProblemDetailsAPIView):
         return Response(SkillRevisionSerializer(revision).data)
 
 
-class OrganizationSkillDeploymentsView(ProblemDetailsAPIView):
+class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
     def get(self, request, organization_id, skill_id):
         skill = _skill(organization_id, skill_id)
         if skill is None:
             return _skill_not_found(request)
-        deployments = SkillDeployment.objects.for_organization(organization_id).filter(
-            skill=skill
-        ).order_by("environment")
-        return Response(SkillDeploymentSerializer(deployments, many=True).data)
-
-
-class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
-
-    def get(self, request, organization_id, skill_id, environment):
-        skill = _skill(organization_id, skill_id)
-        if skill is None:
-            return _skill_not_found(request)
-        environment_problem = _validate_environment(
-            request, environment, require_production_admin=False
-        )
-        if environment_problem is not None:
-            return environment_problem
         deployment = SkillDeployment.objects.for_organization(organization_id).filter(
-            skill=skill, environment=environment
+            skill=skill
         ).first()
         if deployment is None:
             return _problem(
@@ -734,10 +676,10 @@ class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
             )
         return Response(SkillDeploymentSerializer(deployment).data)
 
-    def put(self, request, organization_id, skill_id, environment):
-        environment_problem = _validate_environment(request, environment)
-        if environment_problem is not None:
-            return environment_problem
+    def put(self, request, organization_id, skill_id):
+        permission_problem = _require_deployment_admin(request)
+        if permission_problem is not None:
+            return permission_problem
         skill = _skill(organization_id, skill_id)
         if skill is None:
             return _skill_not_found(request)
@@ -747,7 +689,6 @@ class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
             deployment = switch_skill_deployment(
                 skill=skill,
                 actor=request.user,
-                environment=environment,
                 revision_id=serializer.validated_data["revision_id"],
                 expected_version=serializer.validated_data["expected_version"],
             )
@@ -764,7 +705,7 @@ class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
         except QualityGateNotPassed as exc:
             return _problem(
                 request, status_code=409, code=exc.code,
-                title="Production quality gate not passed", detail=str(exc),
+                title="Deployment quality gate not passed", detail=str(exc),
             )
         return Response(
             SkillDeploymentSerializer(deployment).data,
@@ -775,10 +716,10 @@ class OrganizationSkillDeploymentView(ProblemDetailsAPIView):
 class OrganizationSkillDeploymentRollbackView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
-    def post(self, request, organization_id, skill_id, environment):
-        environment_problem = _validate_environment(request, environment)
-        if environment_problem is not None:
-            return environment_problem
+    def post(self, request, organization_id, skill_id):
+        permission_problem = _require_deployment_admin(request)
+        if permission_problem is not None:
+            return permission_problem
         skill = _skill(organization_id, skill_id)
         if skill is None:
             return _skill_not_found(request)
@@ -788,7 +729,6 @@ class OrganizationSkillDeploymentRollbackView(ProblemDetailsAPIView):
             deployment = rollback_skill_deployment(
                 skill=skill,
                 actor=request.user,
-                environment=environment,
                 expected_version=serializer.validated_data["expected_version"],
             )
         except (DeploymentVersionConflict, DeploymentRollbackUnavailable) as exc:

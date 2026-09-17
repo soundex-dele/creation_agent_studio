@@ -429,9 +429,9 @@
                 }
             ]
         },
-        "/agents/{id}/deployments/": {
+        "/agents/{id}/deployment/": {
             "get": {
-                "operationId": "agents_deployments",
+                "operationId": "agents_deployment",
                 "description": "",
                 "responses": {
                     "200": {
@@ -812,33 +812,9 @@
                 }
             ]
         },
-        "/applications/{application_id}/deployments": {
+        "/applications/{application_id}/deployment": {
             "get": {
-                "operationId": "applications_deployments_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/deployments/{environment}": {
-            "get": {
-                "operationId": "applications_deployments_read",
+                "operationId": "applications_deployment_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -850,7 +826,7 @@
                 ]
             },
             "put": {
-                "operationId": "applications_deployments_update",
+                "operationId": "applications_deployment_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -869,20 +845,12 @@
                     "schema": {
                         "type": "string"
                     }
-                },
-                {
-                    "name": "environment",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
                 }
             ]
         },
-        "/applications/{application_id}/deployments/{environment}/rollback": {
+        "/applications/{application_id}/deployment/rollback": {
             "post": {
-                "operationId": "applications_deployments_rollback_create",
+                "operationId": "applications_deployment_rollback_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -896,14 +864,6 @@
             "parameters": [
                 {
                     "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "environment",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -6168,41 +6128,9 @@
                 }
             ]
         },
-        "/organizations/{organization_id}/applications/{application_id}/deployments": {
+        "/organizations/{organization_id}/applications/{application_id}/deployment": {
             "get": {
-                "operationId": "organizations_applications_deployments_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/deployments/{environment}": {
-            "get": {
-                "operationId": "organizations_applications_deployments_read",
+                "operationId": "organizations_applications_deployment_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -6214,7 +6142,7 @@
                 ]
             },
             "put": {
-                "operationId": "organizations_applications_deployments_update",
+                "operationId": "organizations_applications_deployment_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -6241,20 +6169,12 @@
                     "schema": {
                         "type": "string"
                     }
-                },
-                {
-                    "name": "environment",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
                 }
             ]
         },
-        "/organizations/{organization_id}/applications/{application_id}/deployments/{environment}/rollback": {
+        "/organizations/{organization_id}/applications/{application_id}/deployment/rollback": {
             "post": {
-                "operationId": "organizations_applications_deployments_rollback_create",
+                "operationId": "organizations_applications_deployment_rollback_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -6276,14 +6196,6 @@
                 },
                 {
                     "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "environment",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -8136,41 +8048,9 @@
                 }
             ]
         },
-        "/organizations/{organization_id}/skills/{skill_id}/deployments": {
+        "/organizations/{organization_id}/skills/{skill_id}/deployment": {
             "get": {
-                "operationId": "organizations_skills_deployments_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "skill_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/skills/{skill_id}/deployments/{environment}": {
-            "get": {
-                "operationId": "organizations_skills_deployments_read",
+                "operationId": "organizations_skills_deployment_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -8182,7 +8062,7 @@
                 ]
             },
             "put": {
-                "operationId": "organizations_skills_deployments_update",
+                "operationId": "organizations_skills_deployment_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -8209,20 +8089,12 @@
                     "schema": {
                         "type": "string"
                     }
-                },
-                {
-                    "name": "environment",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
                 }
             ]
         },
-        "/organizations/{organization_id}/skills/{skill_id}/deployments/{environment}/rollback": {
+        "/organizations/{organization_id}/skills/{skill_id}/deployment/rollback": {
             "post": {
-                "operationId": "organizations_skills_deployments_rollback_create",
+                "operationId": "organizations_skills_deployment_rollback_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -8244,14 +8116,6 @@
                 },
                 {
                     "name": "skill_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "environment",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -9115,33 +8979,9 @@
                 }
             ]
         },
-        "/skills/{skill_id}/deployments": {
+        "/skills/{skill_id}/deployment": {
             "get": {
-                "operationId": "skills_deployments_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "skills"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "skill_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/skills/{skill_id}/deployments/{environment}": {
-            "get": {
-                "operationId": "skills_deployments_read",
+                "operationId": "skills_deployment_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -9153,7 +8993,7 @@
                 ]
             },
             "put": {
-                "operationId": "skills_deployments_update",
+                "operationId": "skills_deployment_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -9172,20 +9012,12 @@
                     "schema": {
                         "type": "string"
                     }
-                },
-                {
-                    "name": "environment",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
                 }
             ]
         },
-        "/skills/{skill_id}/deployments/{environment}/rollback": {
+        "/skills/{skill_id}/deployment/rollback": {
             "post": {
-                "operationId": "skills_deployments_rollback_create",
+                "operationId": "skills_deployment_rollback_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -9199,14 +9031,6 @@
             "parameters": [
                 {
                     "name": "skill_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "environment",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -13435,7 +13259,7 @@
                     "model_config",
                     "limits",
                     "draft_version",
-                    "production_revision_id",
+                    "active_revision_id",
                     "can_edit",
                     "can_run",
                     "created_by_id",
@@ -13518,8 +13342,8 @@
                         "type": "integer",
                         "nullable": true
                     },
-                    "production_revision_id": {
-                        "title": "Production revision id",
+                    "active_revision_id": {
+                        "title": "Active revision id",
                         "type": "string",
                         "format": "uuid",
                         "nullable": true
@@ -13637,16 +13461,6 @@
             "SupervisorDeploy": {
                 "type": "object",
                 "properties": {
-                    "environment": {
-                        "title": "Environment",
-                        "type": "string",
-                        "enum": [
-                            "development",
-                            "staging",
-                            "production"
-                        ],
-                        "default": "production"
-                    },
                     "revision_id": {
                         "title": "Revision id",
                         "type": "string",
@@ -13699,16 +13513,6 @@
                         "title": "Conversation id",
                         "type": "integer",
                         "minimum": 1
-                    },
-                    "environment": {
-                        "title": "Environment",
-                        "type": "string",
-                        "enum": [
-                            "development",
-                            "staging",
-                            "production"
-                        ],
-                        "default": "production"
                     }
                 }
             },

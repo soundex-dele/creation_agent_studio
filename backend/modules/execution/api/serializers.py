@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from modules.catalog.models import DeploymentEnvironment
 from modules.execution.models import (
     Run,
     RunArtifact,
@@ -161,10 +160,6 @@ class RunCommandSerializer(serializers.ModelSerializer):
 
 
 class StartApplicationRunSerializer(serializers.Serializer):
-    environment = serializers.ChoiceField(
-        choices=DeploymentEnvironment.choices,
-        default=DeploymentEnvironment.PRODUCTION,
-    )
     input = serializers.JSONField()
     priority = serializers.IntegerField(default=0, min_value=-100, max_value=100)
 
@@ -175,10 +170,6 @@ class StartApplicationRunSerializer(serializers.Serializer):
 
 
 class StartAgentRunSerializer(serializers.Serializer):
-    environment = serializers.ChoiceField(
-        choices=DeploymentEnvironment.choices,
-        default=DeploymentEnvironment.PRODUCTION,
-    )
     input = serializers.JSONField()
     priority = serializers.IntegerField(default=0, min_value=-100, max_value=100)
 

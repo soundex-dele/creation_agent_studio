@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from apps.applications.models import Application
 from apps.enterprise.models import Membership
 from apps.workflows.models import Workflow
-from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
+from modules.catalog.models import ApplicationDeployment
 from modules.tenancy.database import tenant_database_context
 from modules.tenancy.permissions import (
     HasPathOrganization,
@@ -287,7 +287,7 @@ class AutomationTargetListView(APIView):
         if target_type == Automation.TargetType.APPLICATION:
             application_ids = ApplicationDeployment.objects.for_organization(
                 organization_id
-            ).filter(environment=DeploymentEnvironment.PRODUCTION).values_list(
+            ).values_list(
                 "application_id", flat=True
             )
             targets = Application.objects.filter(

@@ -15,7 +15,6 @@ from rest_framework.test import APIClient
 from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationRevision,
-    DeploymentEnvironment,
     SkillDeployment,
     SkillRevision,
 )
@@ -145,7 +144,6 @@ def deployed_application(api_actor, api_organization):
     ApplicationDeployment.objects.create(
         organization=api_organization,
         application=application,
-        environment=DeploymentEnvironment.PRODUCTION,
         revision=revision,
         updated_by=api_actor,
     )
@@ -833,7 +831,7 @@ def test_start_application_run_pins_deployed_revision_and_replays(
         f"/api/v1/organizations/{api_organization.id}/applications/"
         f"{deployed_application.id}/runs"
     )
-    body = {"environment": "production", "input": {"files": ["one.mp4"]}}
+    body = {"input": {"files": ["one.mp4"]}}
 
     created = authenticated_client.post(
         url,
@@ -886,7 +884,6 @@ def test_start_application_run_freezes_deployed_skill_revision(
     deployment = SkillDeployment.objects.create(
         organization=api_organization,
         skill=skill,
-        environment=DeploymentEnvironment.PRODUCTION,
         revision=first,
         updated_by=api_actor,
     )
@@ -912,7 +909,7 @@ def test_start_application_run_freezes_deployed_skill_revision(
     )
 
     created = authenticated_client.post(
-        url, {"environment": "production", "input": {}}, format="json",
+        url, {"input": {}}, format="json",
         HTTP_IDEMPOTENCY_KEY="freeze-skill-revision",
     )
     assert created.status_code == 202, created.data
@@ -971,7 +968,7 @@ def test_start_application_run_rejects_undeployed_skill(
     )
 
     response = authenticated_client.post(
-        url, {"environment": "production", "input": {}}, format="json",
+        url, {"input": {}}, format="json",
         HTTP_IDEMPOTENCY_KEY="undeployed-skill",
     )
 

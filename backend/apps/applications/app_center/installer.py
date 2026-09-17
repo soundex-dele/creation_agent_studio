@@ -110,15 +110,14 @@ def sync_package(package: DiscoveredPackage, organization: Organization) -> Sync
         )
         result.revisions_created = int(application.revisions.count() > revision_count)
 
-        if spec.install.initial_deployment == "development":
+        if spec.install.activate:
             deployment = ApplicationDeployment.objects.filter(
-                application=application, environment="development"
+                application=application
             ).first()
             if deployment is None or deployment.revision_id != revision.id:
                 switch_application_deployment(
                     application=application,
                     actor=organization.owner,
-                    environment="development",
                     revision_id=revision.id,
                     expected_version=deployment.version if deployment else 0,
                 )

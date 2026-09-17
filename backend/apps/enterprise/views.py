@@ -276,7 +276,6 @@ class EvaluationSuiteViewSet(TenantModelViewSet):
                 suite,
                 request.user,
                 target_version=str(request.data.get('target_version') or ''),
-                environment=str(request.data.get('environment') or 'staging'),
             )
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=422)

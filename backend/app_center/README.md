@@ -28,6 +28,6 @@ python scripts/sync_app_center.py
 Use `--validate-only` for a read-only validation, or limit synchronization with
 `--package contacts` and `--organization <uuid>`.
 
-The sync command is idempotent. Development deployments follow a changed
-manifest revision; production deployments are never switched automatically.
-Removing a package does not drop its tables or historical catalog records.
+The sync command is idempotent. When a package manifest sets `activate: true`,
+its active deployment follows the latest changed manifest revision. Removing a
+package does not drop its tables or historical catalog records.

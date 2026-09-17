@@ -15,7 +15,6 @@ from modules.catalog.models import (
     AgentDeployment,
     AgentDraft,
     ApplicationDeployment,
-    DeploymentEnvironment,
     SkillDeployment,
 )
 from modules.execution.models import IdempotencyRecord, Run
@@ -35,10 +34,9 @@ CREATE_WORKFLOW_RUN_OPERATION = "workflow.run.create"
 CREATE_SUPERVISOR_RUN_OPERATION = "supervisor.run.create"
 
 
-def _fingerprint(*, application_id, environment, input_data, priority):
+def _fingerprint(*, application_id, input_data, priority):
     document = {
         "application_id": str(application_id),
-        "environment": environment,
         "input": input_data,
         "priority": priority,
     }
@@ -140,7 +138,7 @@ def _skill_policy_keys(bindings):
     return values
 
 
-def freeze_skill_revisions(*, organization_id, environment, content):
+def freeze_skill_revisions(*, organization_id, content):
     """Resolve every Skill binding to one immutable deployed revision."""
 
     dependencies = content.get("dependencies") or {}
@@ -178,13 +176,12 @@ def freeze_skill_revisions(*, organization_id, environment, content):
         .filter(
             skill_id__in=skill_ids,
             skill__is_active=True,
-            environment=environment,
         )
     }
     missing = [str(skill_id) for skill_id in skill_ids if skill_id not in deployments]
     if missing:
         raise DeploymentUnavailable(
-            f"Skills have no {environment} deployment: {', '.join(missing)}"
+            f"Skills have no active deployment: {', '.join(missing)}"
         )
 
     frozen = []
@@ -205,7 +202,6 @@ def freeze_skill_revisions(*, organization_id, environment, content):
                 "skill_slug": deployment.skill.slug,
                 "binding": binding,
                 "deployment_id": str(deployment.id),
-                "deployment_environment": deployment.environment,
                 "deployment_version": deployment.version,
                 "revision_id": str(revision.id),
                 "revision_no": revision.revision_no,
@@ -236,7 +232,6 @@ def _start_once(
     organization_id,
     application_id,
     actor,
-    environment,
     input_data,
     priority,
     idempotency_key,
@@ -261,12 +256,12 @@ def _start_once(
         deployment = (
             ApplicationDeployment.objects.for_organization(organization_id)
             .select_related("revision")
-            .filter(application=application, environment=environment)
+            .filter(application=application)
             .first()
         )
         if deployment is None:
             raise DeploymentUnavailable(
-                f"Application has no {environment} deployment"
+                "Application has no active deployment"
             )
         revision = deployment.revision
         if (
@@ -294,7 +289,6 @@ def _start_once(
         )
         skill_revisions = freeze_skill_revisions(
             organization_id=organization_id,
-            environment=environment,
             content=revision.content,
         )
         governance = _enforce_definition_governance(
@@ -323,7 +317,6 @@ def _start_once(
                 "application_content_hash": revision.content_hash,
                 "application_schema_version": revision.schema_version,
                 "deployment_id": str(deployment.id),
-                "deployment_environment": deployment.environment,
                 "deployment_version": deployment.version,
                 "config_override": deployment.config_override,
                 "effective_config": effective_config,
@@ -348,7 +341,6 @@ def start_application_run(
     organization_id,
     application_id,
     actor,
-    environment,
     input_data,
     priority,
     idempotency_key,
@@ -358,7 +350,6 @@ def start_application_run(
         raise ValueError("Idempotency-Key must contain between 1 and 160 characters")
     fingerprint = _fingerprint(
         application_id=application_id,
-        environment=environment,
         input_data=input_data,
         priority=priority,
     )
@@ -368,7 +359,6 @@ def start_application_run(
                 organization_id=organization_id,
                 application_id=application_id,
                 actor=actor,
-                environment=environment,
                 input_data=input_data,
                 priority=priority,
                 idempotency_key=idempotency_key,
@@ -391,7 +381,6 @@ def start_agent_run(
     organization_id,
     agent_id,
     actor,
-    environment,
     input_data,
     idempotency_key,
     source_type="agent",
@@ -406,7 +395,6 @@ def start_agent_run(
         raise ValueError("Idempotency-Key must contain between 1 and 160 characters")
     fingerprint = hashlib.sha256(json.dumps({
         "agent_id": str(agent_id),
-        "environment": environment,
         # Callers such as Conversation build part of the Run input from
         # server-side history. That derived history can change after the first
         # successful request and must not make an otherwise identical HTTP
@@ -438,7 +426,6 @@ def start_agent_run(
             organization_id
         ).select_related("revision").filter(
             agent=agent,
-            environment=environment,
         ).first()
         draft = None
         if deployment is None and allow_draft:
@@ -446,7 +433,7 @@ def start_agent_run(
                 organization_id
             ).filter(agent=agent).first()
         if deployment is None and draft is None:
-            raise DeploymentUnavailable(f"Agent has no {environment} deployment")
+            raise DeploymentUnavailable("Agent has no active deployment")
         if deployment is not None and (
             agent.organization_id != organization_id
             or deployment.organization_id != organization_id
@@ -518,9 +505,6 @@ def start_agent_run(
                 "agent_draft_id": str(draft.id) if draft is not None else None,
                 "agent_draft_version": draft.version if draft is not None else None,
                 "deployment_id": str(deployment.id) if deployment is not None else None,
-                "deployment_environment": (
-                    deployment.environment if deployment is not None else None
-                ),
                 "deployment_version": (
                     deployment.version if deployment is not None else None
                 ),
@@ -549,7 +533,6 @@ def start_supervisor_run(
     organization_id,
     supervisor_id,
     actor,
-    environment,
     goal,
     context,
     conversation_id,
@@ -563,7 +546,6 @@ def start_supervisor_run(
         raise ValueError("Idempotency-Key must contain between 1 and 160 characters")
     request_document = {
         "supervisor_id": str(supervisor_id),
-        "environment": environment,
         "goal": goal,
         "context": context,
         "conversation_id": conversation_id,
@@ -617,10 +599,9 @@ def start_supervisor_run(
         deployment = AgentDeployment.objects.select_related("revision").filter(
             agent=supervisor,
             organization_id=organization_id,
-            environment=environment,
         ).first()
         if deployment is None:
-            raise DeploymentUnavailable(f"Supervisor has no {environment} deployment")
+            raise DeploymentUnavailable("Supervisor has no active deployment")
         definition = deployment.revision.content
         orchestration = definition.get("orchestration_config") or {}
         limits = {
@@ -660,11 +641,11 @@ def start_supervisor_run(
         team = []
         for member in allowed_agents:
             member_deployment = AgentDeployment.objects.select_related("revision").filter(
-                agent=member, environment=environment
+                agent=member
             ).first()
             if member_deployment is None:
                 raise DeploymentUnavailable(
-                    f"Agent {member.id} has no {environment} deployment"
+                    f"Agent {member.id} has no active deployment"
                 )
             content = member_deployment.revision.content
             team.append({
@@ -682,7 +663,6 @@ def start_supervisor_run(
                     "agent_revision_no": member_deployment.revision.revision_no,
                     "agent_content_hash": member_deployment.revision.content_hash,
                     "deployment_id": str(member_deployment.id),
-                    "deployment_environment": environment,
                     "deployment_version": member_deployment.version,
                     "agent_definition": content,
                     "effective_config": {
@@ -696,10 +676,10 @@ def start_supervisor_run(
         for application in allowed_apps:
             member_deployment = ApplicationDeployment.objects.select_related(
                 "revision"
-            ).filter(application=application, environment=environment).first()
+            ).filter(application=application).first()
             if member_deployment is None:
                 raise DeploymentUnavailable(
-                    f"Application {application.id} has no {environment} deployment"
+                    f"Application {application.id} has no active deployment"
                 )
             revision = member_deployment.revision
             executor_kind, executor_key, max_attempts, retry_safe = _definition_values(
@@ -718,7 +698,6 @@ def start_supervisor_run(
                 "application_revision_no": revision.revision_no,
                 "application_content_hash": revision.content_hash,
                 "deployment_id": str(member_deployment.id),
-                "deployment_environment": environment,
                 "deployment_version": member_deployment.version,
                 "config_override": member_deployment.config_override,
                 "effective_config": _effective_config(
@@ -727,7 +706,6 @@ def start_supervisor_run(
                 "governance": port.governance_snapshot(organization),
                 "skill_revisions": freeze_skill_revisions(
                     organization_id=organization_id,
-                    environment=environment,
                     content=content,
                 ),
                 "content": content,
@@ -855,7 +833,6 @@ def start_workflow_run(
             frozen_step = dict(step)
             frozen_step["skill_revisions"] = freeze_skill_revisions(
                 organization_id=organization.id,
-                environment=DeploymentEnvironment.PRODUCTION,
                 content=content,
             )
             frozen_steps.append(frozen_step)

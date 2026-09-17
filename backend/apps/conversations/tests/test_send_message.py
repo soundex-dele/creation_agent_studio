@@ -53,7 +53,6 @@ class DurableConversationRunTest(TestCase):
         AgentDeployment.objects.create(
             organization=self.organization,
             agent=self.agent,
-            environment="production",
             revision=revision,
             updated_by=self.user,
         )
@@ -139,7 +138,7 @@ class DurableConversationRunTest(TestCase):
         from modules.execution.application.errors import DeploymentUnavailable
 
         start_run.side_effect = DeploymentUnavailable(
-            "Agent has no production deployment"
+            "Agent has no active deployment"
         )
 
         response = self.client.post(

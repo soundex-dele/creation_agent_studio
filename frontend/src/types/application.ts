@@ -66,7 +66,6 @@ export interface BaseApplicationRuntime {
   id: number;
   application_id: number;
   organization_id?: string;
-  environment?: 'development' | 'staging' | 'production';
   application_slug: string;
   application_name: string;
   application_description: string;

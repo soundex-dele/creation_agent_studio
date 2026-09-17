@@ -8,7 +8,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.enterprise.models import AuditLog, Membership
-from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
+from modules.catalog.models import ApplicationDeployment
 from modules.execution.models import Run
 
 from .models import Automation, AutomationInvocation
@@ -70,10 +70,9 @@ def validate_target(automation):
             automation.organization_id
         ).filter(
             application=application,
-            environment=DeploymentEnvironment.PRODUCTION,
         ).first()
         if deployment is None:
-            raise AutomationValidationError("目标应用尚未部署到 Production。")
+            raise AutomationValidationError("目标应用尚未激活部署。")
         return application
 
     if automation.target_type == Automation.TargetType.WORKFLOW:
@@ -183,7 +182,6 @@ def _start_target_run(automation, invocation, payload):
             organization_id=automation.organization_id,
             application_id=automation.application_id,
             actor=automation.created_by,
-            environment=DeploymentEnvironment.PRODUCTION,
             input_data=merged_input,
             priority=0,
             idempotency_key=idempotency_key,

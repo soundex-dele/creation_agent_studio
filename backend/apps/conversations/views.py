@@ -458,7 +458,6 @@ class ConversationViewSet(viewsets.ViewSet):
                 organization_id=organization.id,
                 supervisor_id=agent.id,
                 actor=request.user,
-                environment="production",
                 goal=message,
                 context={
                     "messages": history[:-1],
@@ -504,7 +503,6 @@ class ConversationViewSet(viewsets.ViewSet):
             organization_id=organization.id,
             agent_id=agent.id,
             actor=request.user,
-            environment="production",
             input_data={
                 "message": message,
                 "messages": history,

@@ -12,7 +12,6 @@ from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
-    DeploymentEnvironment,
 )
 
 User = get_user_model()
@@ -302,7 +301,6 @@ class AgentFilterTest(TestCase):
         ApplicationDeployment.objects.create(
             organization=organization,
             application=application,
-            environment=DeploymentEnvironment.PRODUCTION,
             revision=revision,
             updated_by=self.user,
         )
@@ -354,7 +352,6 @@ class AgentFilterTest(TestCase):
         deployment = ApplicationDeployment.objects.create(
             organization=organization,
             application=application,
-            environment=DeploymentEnvironment.DEVELOPMENT,
             revision=current,
             previous_revision=previous,
             updated_by=self.user,

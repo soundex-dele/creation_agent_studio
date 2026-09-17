@@ -160,9 +160,7 @@ def update_skill_draft(*, skill, actor, expected_version, content):
     return SkillDraft.objects.get(pk=draft.pk)
 
 
-def switch_skill_deployment(
-    *, skill, actor, environment, revision_id, expected_version
-):
+def switch_skill_deployment(*, skill, actor, revision_id, expected_version):
     revision = SkillRevision.objects.filter(
         pk=revision_id,
         organization_id=skill.organization_id,
@@ -172,19 +170,17 @@ def switch_skill_deployment(
         raise InvalidDeploymentRevision(
             "The revision does not belong to this skill and organization."
         )
-    if environment == "production":
-        catalog_domain_port().enforce_production_quality_gate(
-            organization_id=skill.organization_id,
-            target_type="skill",
-            target_id=skill.id,
-            revision_id=revision.id,
-        )
+    catalog_domain_port().enforce_deployment_quality_gate(
+        organization_id=skill.organization_id,
+        target_type="skill",
+        target_id=skill.id,
+        revision_id=revision.id,
+    )
     try:
         with transaction.atomic():
             deployment = SkillDeployment.objects.select_for_update().filter(
                 skill=skill,
                 organization_id=skill.organization_id,
-                environment=environment,
             ).first()
             current_version = deployment.version if deployment else 0
             if current_version != expected_version:
@@ -196,7 +192,6 @@ def switch_skill_deployment(
                 return SkillDeployment.objects.create(
                     organization_id=skill.organization_id,
                     skill=skill,
-                    environment=environment,
                     revision=revision,
                     updated_by=actor,
                 )
@@ -215,7 +210,6 @@ def switch_skill_deployment(
         current_version = SkillDeployment.objects.filter(
             skill=skill,
             organization_id=skill.organization_id,
-            environment=environment,
         ).values_list("version", flat=True).first()
         if current_version is not None:
             raise DeploymentVersionConflict(
@@ -225,12 +219,11 @@ def switch_skill_deployment(
         raise
 
 
-def rollback_skill_deployment(*, skill, actor, environment, expected_version):
+def rollback_skill_deployment(*, skill, actor, expected_version):
     with transaction.atomic():
         deployment = SkillDeployment.objects.select_for_update().filter(
             skill=skill,
             organization_id=skill.organization_id,
-            environment=environment,
         ).first()
         if deployment is None or deployment.previous_revision_id is None:
             raise DeploymentRollbackUnavailable(
@@ -289,7 +282,7 @@ def publish_application(*, application, actor, expected_draft_version, release_n
 
 
 def switch_agent_deployment(
-    *, agent, actor, environment, revision_id, expected_version, config_override=None
+    *, agent, actor, revision_id, expected_version, config_override=None
 ):
     revision = AgentRevision.objects.filter(
         pk=revision_id,
@@ -300,19 +293,17 @@ def switch_agent_deployment(
         raise InvalidDeploymentRevision(
             "The revision does not belong to this agent and organization."
         )
-    if environment == "production":
-        catalog_domain_port().enforce_production_quality_gate(
-            organization_id=agent.organization_id,
-            target_type="agent",
-            target_id=agent.id,
-            revision_id=revision.id,
-        )
+    catalog_domain_port().enforce_deployment_quality_gate(
+        organization_id=agent.organization_id,
+        target_type="agent",
+        target_id=agent.id,
+        revision_id=revision.id,
+    )
     config_override = config_override or {}
     with transaction.atomic():
         deployment = AgentDeployment.objects.select_for_update().filter(
             agent=agent,
             organization_id=agent.organization_id,
-            environment=environment,
         ).first()
         current_version = deployment.version if deployment else 0
         if current_version != expected_version:
@@ -324,7 +315,6 @@ def switch_agent_deployment(
             return AgentDeployment.objects.create(
                 organization_id=agent.organization_id,
                 agent=agent,
-                environment=environment,
                 revision=revision,
                 config_override=config_override,
                 updated_by=actor,
@@ -343,12 +333,11 @@ def switch_agent_deployment(
         return deployment
 
 
-def rollback_agent_deployment(*, agent, actor, environment, expected_version):
+def rollback_agent_deployment(*, agent, actor, expected_version):
     with transaction.atomic():
         deployment = AgentDeployment.objects.select_for_update().filter(
             agent=agent,
             organization_id=agent.organization_id,
-            environment=environment,
         ).first()
         if deployment is None or deployment.previous_revision_id is None:
             raise DeploymentRollbackUnavailable(
@@ -401,7 +390,6 @@ def switch_application_deployment(
     *,
     application,
     actor,
-    environment,
     revision_id,
     expected_version,
     config_override=None,
@@ -409,13 +397,12 @@ def switch_application_deployment(
     """Create or switch a deployment using version 0 as the create precondition."""
 
     revision = _deployment_revision(application=application, revision_id=revision_id)
-    if environment == "production":
-        catalog_domain_port().enforce_production_quality_gate(
-            organization_id=application.organization_id,
-            target_type="application",
-            target_id=application.id,
-            revision_id=revision.id,
-        )
+    catalog_domain_port().enforce_deployment_quality_gate(
+        organization_id=application.organization_id,
+        target_type="application",
+        target_id=application.id,
+        revision_id=revision.id,
+    )
     config_override = config_override or {}
 
     try:
@@ -423,7 +410,6 @@ def switch_application_deployment(
             deployment = ApplicationDeployment.objects.filter(
                 application=application,
                 organization_id=application.organization_id,
-                environment=environment,
             ).first()
             if deployment is None:
                 if expected_version != 0:
@@ -433,7 +419,6 @@ def switch_application_deployment(
                 return ApplicationDeployment.objects.create(
                     organization_id=application.organization_id,
                     application=application,
-                    environment=environment,
                     revision=revision,
                     config_override=config_override,
                     updated_by=actor,
@@ -469,7 +454,6 @@ def switch_application_deployment(
         current_version = (
             ApplicationDeployment.objects.filter(
                 application=application,
-                environment=environment,
             )
             .values_list("version", flat=True)
             .first()
@@ -482,7 +466,7 @@ def switch_application_deployment(
 
 
 def rollback_application_deployment(
-    *, application, actor, environment, expected_version
+    *, application, actor, expected_version
 ):
     """Atomically swap the current and previous revisions."""
 
@@ -490,7 +474,6 @@ def rollback_application_deployment(
         deployment = ApplicationDeployment.objects.filter(
             application=application,
             organization_id=application.organization_id,
-            environment=environment,
         ).first()
         if deployment is None:
             raise DeploymentRollbackUnavailable(

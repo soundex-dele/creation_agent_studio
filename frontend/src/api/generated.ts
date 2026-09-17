@@ -127,7 +127,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/agents/{id}/deployments/": {
+    "/agents/{id}/deployment/": {
         parameters: {
             query?: never;
             header?: never;
@@ -137,7 +137,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["agents_deployments"];
+        get: operations["agents_deployment"];
         put?: never;
         post?: never;
         delete?: never;
@@ -328,7 +328,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/applications/{application_id}/deployments": {
+    "/applications/{application_id}/deployment": {
         parameters: {
             query?: never;
             header?: never;
@@ -337,8 +337,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["applications_deployments_list"];
-        put?: never;
+        get: operations["applications_deployment_list"];
+        put: operations["applications_deployment_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -346,38 +346,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/applications/{application_id}/deployments/{environment}": {
+    "/applications/{application_id}/deployment/rollback": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 application_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_deployments_read"];
-        put: operations["applications_deployments_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/deployments/{environment}/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations["applications_deployments_rollback_create"];
+        post: operations["applications_deployment_rollback_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2293,7 +2273,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/organizations/{organization_id}/applications/{application_id}/deployments": {
+    "/organizations/{organization_id}/applications/{application_id}/deployment": {
         parameters: {
             query?: never;
             header?: never;
@@ -2303,8 +2283,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["organizations_applications_deployments_list"];
-        put?: never;
+        get: operations["organizations_applications_deployment_list"];
+        put: operations["organizations_applications_deployment_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2312,40 +2292,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/organizations/{organization_id}/applications/{application_id}/deployments/{environment}": {
+    "/organizations/{organization_id}/applications/{application_id}/deployment/rollback": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 application_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_deployments_read"];
-        put: operations["organizations_applications_deployments_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/deployments/{environment}/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations["organizations_applications_deployments_rollback_create"];
+        post: operations["organizations_applications_deployment_rollback_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3112,7 +3071,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/organizations/{organization_id}/skills/{skill_id}/deployments": {
+    "/organizations/{organization_id}/skills/{skill_id}/deployment": {
         parameters: {
             query?: never;
             header?: never;
@@ -3122,8 +3081,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["organizations_skills_deployments_list"];
-        put?: never;
+        get: operations["organizations_skills_deployment_list"];
+        put: operations["organizations_skills_deployment_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3131,40 +3090,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/organizations/{organization_id}/skills/{skill_id}/deployments/{environment}": {
+    "/organizations/{organization_id}/skills/{skill_id}/deployment/rollback": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 skill_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_skills_deployments_read"];
-        put: operations["organizations_skills_deployments_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/skills/{skill_id}/deployments/{environment}/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations["organizations_skills_deployments_rollback_create"];
+        post: operations["organizations_skills_deployment_rollback_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3551,7 +3489,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/skills/{skill_id}/deployments": {
+    "/skills/{skill_id}/deployment": {
         parameters: {
             query?: never;
             header?: never;
@@ -3560,8 +3498,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["skills_deployments_list"];
-        put?: never;
+        get: operations["skills_deployment_list"];
+        put: operations["skills_deployment_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3569,38 +3507,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/skills/{skill_id}/deployments/{environment}": {
+    "/skills/{skill_id}/deployment/rollback": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 skill_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        get: operations["skills_deployments_read"];
-        put: operations["skills_deployments_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/skills/{skill_id}/deployments/{environment}/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations["skills_deployments_rollback_create"];
+        post: operations["skills_deployment_rollback_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5335,10 +5253,10 @@ export interface components {
             /** Draft version */
             draft_version: number | null;
             /**
-             * Production revision id
+             * Active revision id
              * Format: uuid
              */
-            production_revision_id: string | null;
+            active_revision_id: string | null;
             /** Can edit */
             can_edit: boolean;
             /** Can run */
@@ -5397,12 +5315,6 @@ export interface components {
         };
         SupervisorDeploy: {
             /**
-             * Environment
-             * @default production
-             * @enum {string}
-             */
-            environment: "development" | "staging" | "production";
-            /**
              * Revision id
              * Format: uuid
              */
@@ -5431,12 +5343,6 @@ export interface components {
             context: Record<string, never>;
             /** Conversation id */
             conversation_id: number;
-            /**
-             * Environment
-             * @default production
-             * @enum {string}
-             */
-            environment: "development" | "staging" | "production";
         };
         RunArtifact: {
             /**
@@ -6485,7 +6391,7 @@ export interface operations {
             };
         };
     };
-    agents_deployments: {
+    agents_deployment: {
         parameters: {
             query?: never;
             header?: never;
@@ -6822,7 +6728,7 @@ export interface operations {
             };
         };
     };
-    applications_deployments_list: {
+    applications_deployment_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -6841,13 +6747,12 @@ export interface operations {
             };
         };
     };
-    applications_deployments_read: {
+    applications_deployment_update: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -6861,33 +6766,12 @@ export interface operations {
             };
         };
     };
-    applications_deployments_update: {
+    applications_deployment_rollback_create: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 application_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_deployments_rollback_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -10756,7 +10640,7 @@ export interface operations {
             };
         };
     };
-    organizations_applications_deployments_list: {
+    organizations_applications_deployment_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -10776,14 +10660,13 @@ export interface operations {
             };
         };
     };
-    organizations_applications_deployments_read: {
+    organizations_applications_deployment_update: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -10797,35 +10680,13 @@ export interface operations {
             };
         };
     };
-    organizations_applications_deployments_update: {
+    organizations_applications_deployment_rollback_create: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 application_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_deployments_rollback_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -12040,7 +11901,7 @@ export interface operations {
             };
         };
     };
-    organizations_skills_deployments_list: {
+    organizations_skills_deployment_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -12060,14 +11921,13 @@ export interface operations {
             };
         };
     };
-    organizations_skills_deployments_read: {
+    organizations_skills_deployment_update: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -12081,35 +11941,13 @@ export interface operations {
             };
         };
     };
-    organizations_skills_deployments_update: {
+    organizations_skills_deployment_rollback_create: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organization_id: string;
                 skill_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_skills_deployments_rollback_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -12733,7 +12571,7 @@ export interface operations {
             };
         };
     };
-    skills_deployments_list: {
+    skills_deployment_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -12752,13 +12590,12 @@ export interface operations {
             };
         };
     };
-    skills_deployments_read: {
+    skills_deployment_update: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };
@@ -12772,33 +12609,12 @@ export interface operations {
             };
         };
     };
-    skills_deployments_update: {
+    skills_deployment_rollback_create: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 skill_id: string;
-                environment: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    skills_deployments_rollback_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                skill_id: string;
-                environment: string;
             };
             cookie?: never;
         };

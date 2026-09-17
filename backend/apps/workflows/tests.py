@@ -22,7 +22,6 @@ from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationDraft,
     ApplicationRevision,
-    DeploymentEnvironment,
 )
 from modules.catalog.services import canonical_content_hash
 from modules.execution.models import Run
@@ -76,7 +75,6 @@ class WorkflowApiTest(TestCase):
             ApplicationDeployment.objects.create(
                 organization=self.organization,
                 application=application,
-                environment=DeploymentEnvironment.PRODUCTION,
                 revision=revision,
                 updated_by=self.user,
             )
@@ -375,7 +373,7 @@ class WorkflowApiTest(TestCase):
             category=self.applications[0].category,
             name="Draft chat app",
             slug="workflow-draft-chat",
-            description="Chat app without a production deployment",
+            description="Chat app without an active deployment",
             created_by=self.user,
             organization=self.organization,
             kind=Application.Kind.CHAT,

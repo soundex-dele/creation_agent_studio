@@ -19,7 +19,6 @@ from modules.catalog.models import (
     AgentDeployment,
     AgentDraft,
     ApplicationDeployment,
-    DeploymentEnvironment,
 )
 from modules.catalog.services import publish_agent, switch_agent_deployment
 from modules.execution.api.serializers import RunSerializer
@@ -97,7 +96,7 @@ def _visible_supervisors(request, organization_id):
     )
 
 
-def validate_supervisor_team(agent, content, environment=DeploymentEnvironment.PRODUCTION):
+def validate_supervisor_team(agent, content):
     config = content.get('orchestration_config') or {}
     agent_ids = {int(value) for value in config.get('agent_ids') or []}
     application_ids = {int(value) for value in config.get('application_ids') or []}
@@ -120,23 +119,19 @@ def validate_supervisor_team(agent, content, environment=DeploymentEnvironment.P
         raise serializers.ValidationError({'application_ids': '包含不可访问的应用。'})
     missing_agents = agent_ids - set(AgentDeployment.objects.filter(
         agent_id__in=agent_ids,
-        environment=environment,
     ).values_list('agent_id', flat=True))
     missing_apps = application_ids - set(ApplicationDeployment.objects.filter(
         application_id__in=application_ids,
-        environment=environment,
     ).values_list('application_id', flat=True))
     if missing_agents or missing_apps:
         raise serializers.ValidationError({
             'team': {
                 'missing_agent_deployments': sorted(missing_agents),
                 'missing_application_deployments': sorted(missing_apps),
-                'environment': environment,
             }
         })
     unsupported_apps = list(ApplicationDeployment.objects.filter(
         application_id__in=application_ids,
-        environment=environment,
     ).select_related('revision').exclude(
         revision__content__executor_kind__in=('agent', 'media'),
     ).values_list('application_id', flat=True))
@@ -216,7 +211,7 @@ class SupervisorReadSerializer(serializers.Serializer):
     model_config = serializers.JSONField()
     limits = serializers.JSONField()
     draft_version = serializers.IntegerField(allow_null=True)
-    production_revision_id = serializers.UUIDField(allow_null=True)
+    active_revision_id = serializers.UUIDField(allow_null=True)
     can_edit = serializers.BooleanField()
     can_run = serializers.BooleanField()
     created_by_id = serializers.IntegerField()
@@ -230,10 +225,6 @@ class SupervisorPublishSerializer(serializers.Serializer):
 
 
 class SupervisorDeploySerializer(serializers.Serializer):
-    environment = serializers.ChoiceField(
-        choices=DeploymentEnvironment.choices,
-        default=DeploymentEnvironment.PRODUCTION,
-    )
     revision_id = serializers.UUIDField(required=False)
     expected_version = serializers.IntegerField(required=False, min_value=0)
     config_override = serializers.JSONField(required=False, default=dict)
@@ -243,10 +234,6 @@ class SupervisorRunStartSerializer(serializers.Serializer):
     goal = serializers.CharField()
     context = serializers.JSONField(required=False, default=dict)
     conversation_id = serializers.IntegerField(min_value=1)
-    environment = serializers.ChoiceField(
-        choices=DeploymentEnvironment.choices,
-        default=DeploymentEnvironment.PRODUCTION,
-    )
 
 
 def _definition(data):
@@ -270,8 +257,8 @@ def _definition(data):
 def _serialize(agent, request):
     content = agent.draft.content if hasattr(agent, 'draft') else {}
     orchestration = content.get('orchestration_config') or {}
-    deployment = agent.deployments.filter(
-        environment=DeploymentEnvironment.PRODUCTION
+    deployment = AgentDeployment.objects.filter(
+        agent=agent
     ).select_related('revision').first()
     return {
         'id': agent.id,
@@ -288,7 +275,7 @@ def _serialize(agent, request):
         'model_config': content.get('model_config') or {},
         'limits': {**DEFAULT_LIMITS, **(orchestration.get('limits') or {})},
         'draft_version': agent.draft.version if hasattr(agent, 'draft') else None,
-        'production_revision_id': str(deployment.revision_id) if deployment else None,
+        'active_revision_id': str(deployment.revision_id) if deployment else None,
         'can_edit': _can_edit(request, agent),
         'can_run': _can_run(request, agent),
         'created_by_id': agent.created_by_id,
@@ -469,20 +456,18 @@ class SupervisorDeployView(APIView):
         input_serializer = SupervisorDeploySerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
         data = input_serializer.validated_data
-        environment = data['environment']
         revision_id = data.get('revision_id')
         revision = agent.revisions.filter(pk=revision_id).first() if revision_id else (
             agent.revisions.order_by('-revision_no').first()
         )
         if revision is None:
             return Response({'detail': '请先发布分身版本。'}, status=409)
-        validate_supervisor_team(agent, revision.content, environment)
-        current = agent.deployments.filter(environment=environment).first()
+        validate_supervisor_team(agent, revision.content)
+        current = AgentDeployment.objects.filter(agent=agent).first()
         try:
             deployment = switch_agent_deployment(
                 agent=agent,
                 actor=request.user,
-                environment=environment,
                 revision_id=revision.id,
                 expected_version=int(data.get(
                     'expected_version', current.version if current else 0
@@ -497,7 +482,6 @@ class SupervisorDeployView(APIView):
             return Response({'detail': str(exc)}, status=409)
         return Response({
             'id': str(deployment.id),
-            'environment': deployment.environment,
             'revision_id': str(deployment.revision_id),
             'version': deployment.version,
         })
@@ -539,7 +523,6 @@ class SupervisorRunView(APIView):
                 organization_id=organization_id,
                 supervisor_id=agent.id,
                 actor=request.user,
-                environment=data['environment'],
                 goal=goal,
                 context=data.get('context') or {},
                 conversation_id=conversation.id,

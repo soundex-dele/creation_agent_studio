@@ -120,4 +120,4 @@ spec:
   backend:
     definition_factory: app_center.gzh_design.provision.prepare_definition
   database: {mode: none}
-  install: {scope: per-organization, initial_deployment: development}
+  install: {scope: per-organization, activate: true}

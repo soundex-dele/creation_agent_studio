@@ -172,7 +172,7 @@ def evaluate_value(actual, expected, evaluator):
 
 
 @transaction.atomic
-def start_evaluation(suite, actor, target_version="", environment="staging"):
+def start_evaluation(suite, actor, target_version=""):
     """Create a durable Evaluation Run pinned to an immutable target revision."""
 
     from django.conf import settings
@@ -182,7 +182,6 @@ def start_evaluation(suite, actor, target_version="", environment="staging"):
     from modules.catalog.models import (
         AgentRevision,
         ApplicationRevision,
-        DeploymentEnvironment,
     )
     from modules.execution.application.errors import DeploymentUnavailable
     from modules.execution.application.runs import create_run
@@ -190,8 +189,6 @@ def start_evaluation(suite, actor, target_version="", environment="staging"):
     from modules.execution.models import Run
 
     target_type = str(suite.target_type or "").lower()
-    if environment not in DeploymentEnvironment.values:
-        raise ValueError("environment must be development, staging, or production")
     revision_id = None
     if target_version:
         try:
@@ -274,7 +271,6 @@ def start_evaluation(suite, actor, target_version="", environment="staging"):
     try:
         definition_snapshot["skill_revisions"] = freeze_skill_revisions(
             organization_id=suite.organization_id,
-            environment=environment,
             content=revision.content,
         )
     except DeploymentUnavailable as exc:
@@ -310,7 +306,6 @@ def start_evaluation(suite, actor, target_version="", environment="staging"):
             "target_type": target_type,
             "target_id": str(suite.target_id),
             "target_version": str(revision.id),
-            "target_environment": environment,
             "evaluators": suite.evaluators,
             "quality_gate": suite.quality_gate,
             "cases": cases,
@@ -445,7 +440,6 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
                 organization_id=trigger.organization_id,
                 agent_id=agent.id,
                 actor=user,
-                environment='production',
                 input_data=payload,
                 idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
             )
@@ -460,7 +454,6 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
                 organization_id=trigger.organization_id,
                 application_id=application.id,
                 actor=user,
-                environment='production',
                 input_data=payload,
                 priority=0,
                 idempotency_key=f'automation:{trigger.id}:{occurrence_key}',

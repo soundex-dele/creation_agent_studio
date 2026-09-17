@@ -48,4 +48,4 @@ spec:
     mode: none
   install:
     scope: per-organization
-    initial_deployment: development
+    activate: true

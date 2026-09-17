@@ -118,7 +118,6 @@ class ApplicationDeploymentSerializer(serializers.ModelSerializer):
             "id",
             "organization_id",
             "application_id",
-            "environment",
             "revision_id",
             "previous_revision_id",
             "config_override",
@@ -178,7 +177,7 @@ class SkillDeploymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = SkillDeployment
         fields = (
-            "id", "organization_id", "skill_id", "environment", "revision_id",
+            "id", "organization_id", "skill_id", "revision_id",
             "previous_revision_id", "version", "updated_by_id", "updated_at",
         )
 

@@ -73,7 +73,7 @@ class InstallManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     scope: Literal["per-organization"] = "per-organization"
-    initial_deployment: Literal["none", "development"] = "development"
+    activate: bool = True
 
 
 class FrontendManifest(BaseModel):

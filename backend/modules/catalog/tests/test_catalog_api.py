@@ -250,7 +250,7 @@ def test_deployment_switch_and_rollback_are_versioned(
     )
     second_revision = ApplicationRevision.objects.get(pk=second_response.data["id"])
     deployment_url = _application_url(
-        catalog_api_organization, application, "/deployments/development"
+        catalog_api_organization, application, "/deployment"
     )
 
     created = catalog_api_client.put(
@@ -278,7 +278,6 @@ def test_deployment_switch_and_rollback_are_versioned(
     )
     database_version_after_rollback = ApplicationDeployment.objects.get(
         application=application,
-        environment="development",
     ).version
     stale = catalog_api_client.put(
         deployment_url,
@@ -319,7 +318,7 @@ def test_deployment_rejects_revision_from_another_application(
 
     response = catalog_api_client.put(
         _application_url(
-            catalog_api_organization, application, "/deployments/development"
+            catalog_api_organization, application, "/deployment"
         ),
         {
             "revision_id": other_revision_response.data["id"],
@@ -333,7 +332,7 @@ def test_deployment_rejects_revision_from_another_application(
 
 
 @pytest.mark.django_db
-def test_production_deployment_requires_admin_role(
+def test_deployment_requires_admin_role(
     catalog_api_client, catalog_api_owner, catalog_api_organization
 ):
     application, _ = _create_application(
@@ -351,7 +350,7 @@ def test_production_deployment_requires_admin_role(
     developer_client = APIClient()
     developer_client.force_authenticate(developer)
     url = _application_url(
-        catalog_api_organization, application, "/deployments/production"
+        catalog_api_organization, application, "/deployment"
     )
     payload = {"revision_id": revision_response.data["id"], "expected_version": 0}
 
@@ -359,7 +358,7 @@ def test_production_deployment_requires_admin_role(
     accepted = catalog_api_client.put(url, payload, format="json")
 
     assert denied.status_code == 403
-    assert denied.data["code"] == "production_deployment_requires_admin"
+    assert denied.data["code"] == "deployment_requires_admin"
     assert accepted.status_code == 201
 
 
@@ -375,7 +374,7 @@ def test_runtime_descriptor_resolves_one_immutable_deployment(
     )
     deployed = catalog_api_client.put(
         _application_url(
-            catalog_api_organization, application, "/deployments/development"
+            catalog_api_organization, application, "/deployment"
         ),
         {"revision_id": revision.data["id"], "expected_version": 0},
         format="json",
@@ -384,7 +383,6 @@ def test_runtime_descriptor_resolves_one_immutable_deployment(
 
     runtime = catalog_api_client.get(
         _application_url(catalog_api_organization, application, "/runtime"),
-        {"environment": "development"},
     )
 
     assert runtime.status_code == 200
@@ -539,7 +537,7 @@ def test_skill_deployment_switch_conflict_and_rollback(
     assert update.status_code == 200
     second = _publish_skill(catalog_api_client, catalog_api_organization, skill, 2)
     deployment_url = _skill_url(
-        catalog_api_organization, skill, "/deployments/development"
+        catalog_api_organization, skill, "/deployment"
     )
 
     created = catalog_api_client.put(
@@ -573,12 +571,12 @@ def test_skill_deployment_switch_conflict_and_rollback(
 
 
 @pytest.mark.django_db
-def test_skill_production_mutation_requires_admin_but_read_does_not(
+def test_skill_deployment_mutation_requires_admin_but_read_does_not(
     catalog_api_client, catalog_api_organization
 ):
     skill = _create_skill(catalog_api_client, catalog_api_organization)
     revision = _publish_skill(catalog_api_client, catalog_api_organization, skill, 1)
-    url = _skill_url(catalog_api_organization, skill, "/deployments/production")
+    url = _skill_url(catalog_api_organization, skill, "/deployment")
     payload = {"revision_id": revision.data["id"], "expected_version": 0}
     assert catalog_api_client.put(url, payload, format="json").status_code == 201
 
@@ -598,11 +596,11 @@ def test_skill_production_mutation_requires_admin_but_read_does_not(
         format="json",
     )
     assert denied.status_code == 403
-    assert denied.data["code"] == "production_deployment_requires_admin"
+    assert denied.data["code"] == "deployment_requires_admin"
 
 
 @pytest.mark.django_db
-def test_skill_production_deployment_requires_matching_passed_quality_gate(
+def test_skill_deployment_requires_matching_passed_quality_gate(
     catalog_api_client, catalog_api_owner, catalog_api_organization
 ):
     skill = _create_skill(catalog_api_client, catalog_api_organization)
@@ -614,7 +612,7 @@ def test_skill_production_deployment_requires_matching_passed_quality_gate(
         target_id=str(skill.id),
         quality_gate={"minimum_score": 0.9},
     )
-    url = _skill_url(catalog_api_organization, skill, "/deployments/production")
+    url = _skill_url(catalog_api_organization, skill, "/deployment")
     payload = {"revision_id": revision.data["id"], "expected_version": 0}
 
     blocked = catalog_api_client.put(url, payload, format="json")

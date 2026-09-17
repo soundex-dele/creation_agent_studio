@@ -70,7 +70,7 @@ const DelegatesPage = () => {
                 <small>{item.agent_ids.length} 个智能体 · {item.application_ids.length} 个应用</small>
               </div>
               <div className="delegate-card-actions">
-                {item.can_run && item.production_revision_id && (
+                {item.can_run && item.active_revision_id && (
                   <Button type="primary" icon={<SendOutlined />} onClick={() => void start(item)}>交代任务</Button>
                 )}
                 {item.can_edit && <Button icon={<EditOutlined />} onClick={() => navigate(`/delegates/${item.id}`)}>配置</Button>}

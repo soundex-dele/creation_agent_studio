@@ -150,17 +150,10 @@ class ChatApplicationRevision(models.Model):
         db_table = "chat_application_revisions"
 
 
-class DeploymentEnvironment(models.TextChoices):
-    DEVELOPMENT = "development", "Development"
-    STAGING = "staging", "Staging"
-    PRODUCTION = "production", "Production"
-
-
 class AgentDeployment(TenantOwnedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     agent = models.ForeignKey(
         "agents.Agent", on_delete=models.CASCADE, related_name="deployments")
-    environment = models.CharField(max_length=20, choices=DeploymentEnvironment.choices)
     revision = models.ForeignKey(AgentRevision, on_delete=models.PROTECT, related_name="deployments")
     previous_revision = models.ForeignKey(
         AgentRevision,
@@ -178,8 +171,8 @@ class AgentDeployment(TenantOwnedModel):
         db_table = "agent_deployments"
         constraints = [
             models.UniqueConstraint(
-                fields=("agent", "environment"),
-                name="unique_agent_deployment_environment",
+                fields=("agent",),
+                name="unique_agent_deployment",
             )
         ]
 
@@ -189,7 +182,6 @@ class SkillDeployment(TenantOwnedModel):
     skill = models.ForeignKey(
         "applications.Skill", on_delete=models.CASCADE, related_name="deployments"
     )
-    environment = models.CharField(max_length=20, choices=DeploymentEnvironment.choices)
     revision = models.ForeignKey(
         SkillRevision, on_delete=models.PROTECT, related_name="deployments"
     )
@@ -210,8 +202,8 @@ class SkillDeployment(TenantOwnedModel):
         db_table = "skill_deployments"
         constraints = [
             models.UniqueConstraint(
-                fields=("skill", "environment"),
-                name="unique_skill_deployment_environment",
+                fields=("skill",),
+                name="unique_skill_deployment",
             )
         ]
 
@@ -223,7 +215,6 @@ class ApplicationDeployment(TenantOwnedModel):
         on_delete=models.CASCADE,
         related_name="deployments",
     )
-    environment = models.CharField(max_length=20, choices=DeploymentEnvironment.choices)
     revision = models.ForeignKey(
         ApplicationRevision,
         on_delete=models.PROTECT,
@@ -245,7 +236,7 @@ class ApplicationDeployment(TenantOwnedModel):
         db_table = "application_deployments"
         constraints = [
             models.UniqueConstraint(
-                fields=("application", "environment"),
-                name="unique_application_deployment_environment",
+                fields=("application",),
+                name="unique_application_deployment",
             )
         ]

@@ -188,4 +188,4 @@ spec:
   backend:
     definition_factory: app_center.html_cover_generator.provision.prepare_definition
   database: {mode: none}
-  install: {scope: per-organization, initial_deployment: development}
+  install: {scope: per-organization, activate: true}

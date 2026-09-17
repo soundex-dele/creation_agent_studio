@@ -18,7 +18,7 @@ from apps.applications.runtime_skills import resolve_runtime_skills, resolve_ski
 from apps.enterprise.models import Membership
 from apps.enterprise.permissions import OrganizationRolePermission, resolve_organization
 from apps.projects.services.workspace_paths import workflow_working_directory
-from modules.catalog.models import ApplicationDeployment, DeploymentEnvironment
+from modules.catalog.models import ApplicationDeployment
 from modules.catalog.services import canonical_content_hash
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import IdempotencyKeyReused
@@ -145,11 +145,10 @@ def build_workflow_step_snapshots(workflow):
                 workflow.organization_id
             ).select_related("revision").filter(
                 application=step.application,
-                environment=DeploymentEnvironment.PRODUCTION,
             ).first()
             if deployment is None:
                 raise ValueError(
-                    f"步骤“{step.name or step.application.name}”没有 production 部署。"
+                    f"步骤“{step.name or step.application.name}”没有激活部署。"
                 )
             runtime = {
                 "application_revision_id": str(deployment.revision_id),

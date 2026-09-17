@@ -20,7 +20,7 @@ export interface Delegate {
   model_config: Record<string, unknown>;
   limits: DelegateLimits;
   draft_version: number;
-  production_revision_id: string | null;
+  active_revision_id: string | null;
   can_edit: boolean;
   can_run: boolean;
   created_by_id: number;

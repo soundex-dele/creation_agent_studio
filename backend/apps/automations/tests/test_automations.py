@@ -14,7 +14,6 @@ from apps.enterprise.models import Membership
 from modules.catalog.models import (
     ApplicationDeployment,
     ApplicationRevision,
-    DeploymentEnvironment,
 )
 from modules.execution.models import Run
 
@@ -54,7 +53,6 @@ def application(owner, organization):
     ApplicationDeployment.objects.create(
         organization=organization,
         application=app,
-        environment=DeploymentEnvironment.PRODUCTION,
         revision=revision,
         updated_by=owner,
     )

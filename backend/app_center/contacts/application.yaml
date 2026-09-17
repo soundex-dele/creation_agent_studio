@@ -48,4 +48,4 @@ spec:
     tenant_scoped: true
   install:
     scope: per-organization
-    initial_deployment: development
+    activate: true

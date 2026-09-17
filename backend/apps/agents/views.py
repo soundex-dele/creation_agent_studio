@@ -13,7 +13,7 @@ from modules.catalog.errors import (
     InvalidDeploymentRevision, QualityGateNotPassed,
 )
 from modules.catalog.models import (
-    AgentDeployment, AgentDraft, AgentRevision, DeploymentEnvironment,
+    AgentDeployment, AgentDraft, AgentRevision,
 )
 from modules.catalog.services import (
     publish_agent, rollback_agent_deployment, switch_agent_deployment,
@@ -167,11 +167,14 @@ class AgentViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Insufficient role in the agent organization.')
 
     @action(detail=True, methods=['get'])
-    def deployments(self, request, pk=None):
+    def deployment(self, request, pk=None):
         agent = self.get_object()
         from apps.enterprise.models import Membership
         self.require_agent_role(request, agent, tuple(dict(Membership.Role.choices)))
-        return Response(AgentDeploymentSerializer(agent.deployments.all(), many=True).data)
+        deployment = AgentDeployment.objects.filter(agent=agent).first()
+        return Response(
+            AgentDeploymentSerializer(deployment).data if deployment else None
+        )
 
     @action(detail=True, methods=['get', 'post'])
     def versions(self, request, pk=None):
@@ -222,14 +225,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         from apps.enterprise.models import Membership
         self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.OPERATOR))
-        environment = request.data.get('environment', 'development')
-        if environment not in dict(DeploymentEnvironment.choices):
-            return Response({'environment': 'Invalid deployment environment.'}, status=400)
-        if environment == DeploymentEnvironment.PRODUCTION:
-            self.require_agent_role(request, agent, (
-                Membership.Role.OWNER, Membership.Role.ADMIN,
-            ))
+            Membership.Role.OWNER, Membership.Role.ADMIN))
         revision_id = request.data.get('revision_id') or request.data.get('version_id')
         if not revision_id:
             revision_id = AgentRevision.objects.filter(
@@ -237,14 +233,13 @@ class AgentViewSet(viewsets.ModelViewSet):
         if not revision_id:
             return Response({'detail': 'Publish an Agent revision first.'}, status=409)
         current = AgentDeployment.objects.filter(
-            agent=agent, environment=environment).first()
+            agent=agent).first()
         expected_version = request.data.get(
             'expected_version', current.version if current else 0)
         try:
             deployment = switch_agent_deployment(
                 agent=agent,
                 actor=request.user,
-                environment=environment,
                 revision_id=revision_id,
                 expected_version=int(expected_version),
                 config_override=(request.data.get('config_override')
@@ -261,22 +256,15 @@ class AgentViewSet(viewsets.ModelViewSet):
         from apps.enterprise.models import Membership
         self.require_agent_role(request, agent, (
             Membership.Role.OWNER, Membership.Role.ADMIN,
-            Membership.Role.OPERATOR,
         ))
-        environment = request.data.get('environment', 'development')
-        if environment == DeploymentEnvironment.PRODUCTION:
-            self.require_agent_role(request, agent, (
-                Membership.Role.OWNER, Membership.Role.ADMIN,
-            ))
         current = AgentDeployment.objects.filter(
-            agent=agent, environment=environment).first()
+            agent=agent).first()
         expected_version = request.data.get(
             'expected_version', current.version if current else 0)
         try:
             deployment = rollback_agent_deployment(
                 agent=agent,
                 actor=request.user,
-                environment=environment,
                 expected_version=int(expected_version),
             )
         except (DeploymentRollbackUnavailable, DeploymentVersionConflict) as exc:
@@ -321,7 +309,6 @@ class AgentViewSet(viewsets.ModelViewSet):
                 organization_id=organization.id,
                 agent_id=agent.id,
                 actor=request.user,
-                environment=request.data.get('environment', 'production'),
                 input_data=serializer.validated_data['input_data'],
                 idempotency_key=idempotency_key,
             )

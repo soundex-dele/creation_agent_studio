@@ -44,7 +44,7 @@ def test_catalog_does_not_implicitly_export_product_entities():
 
 @pytest.mark.django_db
 @override_settings(SINGLE_TENANT_MODE=True)
-def test_seeded_general_agent_has_a_production_deployment():
+def test_seeded_general_agent_has_an_active_deployment():
     migration = import_module(
         "modules.catalog.migrations.0004_deploy_seeded_general_agent"
     )
@@ -54,7 +54,6 @@ def test_seeded_general_agent_has_a_production_deployment():
     draft = AgentDraft.objects.get(agent=agent)
     deployment = AgentDeployment.objects.select_related("revision").get(
         agent=agent,
-        environment="production",
     )
 
     assert deployment.organization_id == agent.organization_id
@@ -95,7 +94,6 @@ def test_product_agent_uses_one_draft_revision_and_deployment(unified_context):
     deployed = client.post(
         f"/api/v1/agents/{agent.id}/deploy/",
         {
-            "environment": "development",
             "revision_id": str(revision.id),
             "expected_version": 0,
         },

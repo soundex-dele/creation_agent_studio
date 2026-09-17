@@ -230,7 +230,7 @@ class AgentDeploymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentDeployment
         fields = [
-            'id', 'environment', 'revision_id', 'previous_revision_id',
+            'id', 'revision_id', 'previous_revision_id',
             'config_override', 'version', 'updated_by_id', 'updated_at',
         ]
         read_only_fields = fields
