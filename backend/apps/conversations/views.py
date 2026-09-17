@@ -455,6 +455,10 @@ class ConversationViewSet(viewsets.ViewSet):
             | Q(
                 source_type="supervisor",
                 definition_snapshot__conversation_id=str(conversation.id),
+            )
+            | Q(
+                source_type="supervisor_task",
+                definition_snapshot__conversation_id=str(conversation.id),
             ),
             status__in=(
                 Run.Status.QUEUED,
@@ -653,6 +657,10 @@ class ConversationViewSet(viewsets.ViewSet):
                 Q(source_type="conversation", source_id=str(conversation.id))
                 | Q(
                     source_type="supervisor",
+                    definition_snapshot__conversation_id=str(conversation.id),
+                )
+                | Q(
+                    source_type="supervisor_task",
                     definition_snapshot__conversation_id=str(conversation.id),
                 ),
                 status__in=(

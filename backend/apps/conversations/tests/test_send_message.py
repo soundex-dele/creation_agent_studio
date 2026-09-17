@@ -582,6 +582,69 @@ class DurableConversationRunTest(TestCase):
             [(3, "assistant"), (4, "user")],
         )
 
+    def test_supervisor_plan_is_projected_as_readable_conversation_content(self):
+        run = Run.objects.create(
+            organization=self.organization,
+            owner=self.user,
+            executor_kind=Run.ExecutorKind.WORKFLOW,
+            executor_key="supervisor",
+            source_type="supervisor",
+            source_id="99",
+            definition_snapshot={
+                "conversation_id": str(self.conversation.id),
+                "team": [{
+                    "target_type": "agent",
+                    "target_id": self.agent.id,
+                    "name": self.agent.name,
+                }],
+            },
+        )
+        required = RunEvent.objects.create(
+            organization=self.organization,
+            run=run,
+            sequence=2,
+            type="input.required",
+            payload={
+                "input_request_id": "plan-2",
+                "input_kind": "plan_approval",
+                "plan_version": 2,
+                "plan": {
+                    "plan_version": 2,
+                    "objective": "发布市场报告",
+                    "assumptions": ["公开资料可用"],
+                    "tasks": [{
+                        "key": "research",
+                        "title": "资料调研",
+                        "target_type": "agent",
+                        "target_id": self.agent.id,
+                        "instructions": "收集市场数据",
+                        "depends_on": [],
+                        "expected_output": "调研摘要",
+                    }],
+                    "delivery_criteria": ["包含来源"],
+                    "budget": {
+                        "max_tasks": 12,
+                        "max_replans": 3,
+                        "max_parallelism": 3,
+                    },
+                },
+            },
+        )
+
+        message = project_input_required(run.id, required)
+        Message.objects.filter(pk=message.pk).update(content="请审核执行计划 v2。")
+        repaired = project_input_required(run.id, required)
+
+        self.assertIn("## 执行计划 v2", repaired.content)
+        self.assertIn("**目标**：发布市场报告", repaired.content)
+        self.assertIn(
+            f"1. **资料调研** · {self.agent.name}（智能体 #{self.agent.id}）",
+            repaired.content,
+        )
+        self.assertIn("- 依赖：无", repaired.content)
+        self.assertIn("**交付标准**", repaired.content)
+        self.assertIn("**执行预算**：最大任务 12", repaired.content)
+
     def test_detail_repairs_a_missing_terminal_message(self):
         response = self.client.post(
             f"/api/v1/conversations/{self.conversation.id}/send_message/",

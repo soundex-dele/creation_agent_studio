@@ -91,6 +91,10 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
                 source_type='workflow_step',
                 definition_snapshot__conversation_id=str(obj.id),
             )
+            | Q(
+                source_type='supervisor_task',
+                definition_snapshot__conversation_id=str(obj.id),
+            )
         ).select_related('current_attempt').order_by('-created_at')
 
     def get_active_run(self, obj):

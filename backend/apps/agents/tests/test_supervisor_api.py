@@ -8,7 +8,7 @@ from modules.execution.application.runs import create_run
 from modules.execution.models import Run
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_supervisor_create_defaults_to_private_and_is_hidden_from_other_members():
     owner = get_user_model().objects.create_user(username="delegate-owner")
     teammate = get_user_model().objects.create_user(username="delegate-viewer")
@@ -67,7 +67,7 @@ def test_supervisor_create_defaults_to_private_and_is_hidden_from_other_members(
     assert detail.status_code == 404
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_organization_shared_supervisor_is_visible_to_members():
     owner = get_user_model().objects.create_user(username="shared-owner")
     teammate = get_user_model().objects.create_user(username="shared-viewer")
@@ -103,3 +103,99 @@ def test_organization_shared_supervisor_is_visible_to_members():
     assert visible.status_code == 200
     assert [item["slug"] for item in visible.json()] == ["shared-lead"]
     assert visible.json()[0]["can_edit"] is False
+
+
+@pytest.mark.django_db
+def test_deleted_supervisor_slug_can_be_reused():
+    owner = get_user_model().objects.create_user(username="delegate-recreate-owner")
+    organization = owner.owned_organizations.get()
+    category = AgentCategory.objects.create(
+        name="Worker Recreate",
+        slug="worker-recreate",
+    )
+    worker = Agent.objects.create(
+        category=category,
+        name="Worker",
+        slug="recreate-worker",
+        description="Executes tasks",
+        created_by=owner,
+        organization=organization,
+        is_public=False,
+    )
+    url = f"/api/v1/organizations/{organization.id}/delegates"
+    payload = {
+        "name": "Reusable Lead",
+        "slug": "reusable-lead",
+        "role_prompt": "Plan and coordinate.",
+        "agent_ids": [worker.id],
+    }
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    created = client.post(url, payload, format="json")
+    assert created.status_code == 201, created.data
+    original_id = created.data["id"]
+    create_run(
+        organization=organization,
+        owner=owner,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="supervisor",
+        source_type="supervisor",
+        source_id=str(original_id),
+        definition_snapshot={},
+        input_data={"goal": "retain audit history"},
+    )
+
+    deleted = client.delete(f"{url}/{original_id}")
+    assert deleted.status_code == 204
+    assert Agent.objects.filter(pk=original_id, is_active=False).exists()
+
+    recreated = client.post(url, payload, format="json")
+    assert recreated.status_code == 201, recreated.data
+    assert recreated.data["id"] != original_id
+    assert Agent.objects.filter(
+        organization=organization,
+        slug="reusable-lead",
+        is_active=True,
+    ).count() == 1
+
+
+@pytest.mark.django_db
+def test_supervisor_publish_names_team_members_without_deployments():
+    owner = get_user_model().objects.create_user(username="delegate-validation-owner")
+    organization = owner.owned_organizations.get()
+    category = AgentCategory.objects.create(
+        name="Worker Validation",
+        slug="worker-validation",
+    )
+    worker = Agent.objects.create(
+        category=category,
+        name="Content Expert",
+        slug="content-expert-validation",
+        description="Creates content",
+        created_by=owner,
+        organization=organization,
+        is_public=False,
+    )
+    url = f"/api/v1/organizations/{organization.id}/delegates"
+    client = APIClient()
+    client.force_authenticate(owner)
+    created = client.post(url, {
+        "name": "Validation Lead",
+        "slug": "validation-lead",
+        "role_prompt": "Plan and coordinate.",
+        "agent_ids": [worker.id],
+    }, format="json")
+    assert created.status_code == 201, created.data
+
+    published = client.post(
+        f"{url}/{created.data['id']}/publish",
+        {"expected_draft_version": created.data["draft_version"]},
+        format="json",
+    )
+
+    assert published.status_code == 400, published.data
+    assert published.data["team"] == (
+        f"以下智能体尚未部署：Content Expert（ID {worker.id}）。"
+        "请先在“企业管理 → 智能体发布”中激活版本"
+    )

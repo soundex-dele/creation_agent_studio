@@ -124,12 +124,30 @@ def validate_supervisor_team(agent, content):
         application_id__in=application_ids,
     ).values_list('application_id', flat=True))
     if missing_agents or missing_apps:
-        raise serializers.ValidationError({
-            'team': {
-                'missing_agent_deployments': sorted(missing_agents),
-                'missing_application_deployments': sorted(missing_apps),
-            }
-        })
+        messages = []
+        if missing_agents:
+            agent_labels = [
+                f'{name}（ID {agent_id}）'
+                for agent_id, name in Agent.objects.filter(
+                    id__in=missing_agents,
+                ).order_by('id').values_list('id', 'name')
+            ]
+            messages.append(
+                '以下智能体尚未部署：'
+                f'{"、".join(agent_labels)}。请先在“企业管理 → 智能体发布”中激活版本'
+            )
+        if missing_apps:
+            application_labels = [
+                f'{name}（ID {application_id}）'
+                for application_id, name in Application.objects.filter(
+                    id__in=missing_apps,
+                ).order_by('id').values_list('id', 'name')
+            ]
+            messages.append(
+                '以下应用尚未部署：'
+                f'{"、".join(application_labels)}。请先发布并部署应用'
+            )
+        raise serializers.ValidationError({'team': '；'.join(messages)})
     unsupported_apps = list(ApplicationDeployment.objects.filter(
         application_id__in=application_ids,
     ).select_related('revision').exclude(
@@ -311,7 +329,11 @@ class SupervisorListCreateView(APIView):
         serializer = SupervisorWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        if Agent.objects.filter(organization_id=organization_id, slug=data['slug']).exists():
+        if Agent.objects.filter(
+            organization_id=organization_id,
+            slug=data['slug'],
+            is_active=True,
+        ).exists():
             return Response({'slug': '当前组织中已存在该标识。'}, status=400)
         category, _ = AgentCategory.objects.get_or_create(
             slug='supervisor',
@@ -372,7 +394,9 @@ class SupervisorDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         duplicate = Agent.objects.filter(
-            organization_id=organization_id, slug=data['slug']
+            organization_id=organization_id,
+            slug=data['slug'],
+            is_active=True,
         ).exclude(pk=agent.pk).exists()
         if duplicate:
             return Response({'slug': '当前组织中已存在该标识。'}, status=400)

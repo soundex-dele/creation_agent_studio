@@ -57,10 +57,15 @@ class Agent(models.Model):
         db_table = 'agents'
         constraints = [
             models.UniqueConstraint(
-                fields=['organization', 'slug'], name='unique_agent_slug_per_org'),
+                fields=['organization', 'slug'],
+                condition=models.Q(is_active=True),
+                name='unique_agent_slug_per_org',
+            ),
             models.UniqueConstraint(
-                fields=['slug'], condition=models.Q(organization__isnull=True),
-                name='unique_global_agent_slug'),
+                fields=['slug'],
+                condition=models.Q(organization__isnull=True, is_active=True),
+                name='unique_global_agent_slug',
+            ),
         ]
 
     def __str__(self):

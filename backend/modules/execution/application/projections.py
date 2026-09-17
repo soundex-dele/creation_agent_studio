@@ -97,9 +97,74 @@ def _normalized_questions(payload):
     }]
 
 
-def _question_content(payload):
+def _plan_content(payload, run):
+    plan = payload.get("plan") or {}
+    version = payload.get("plan_version") or plan.get("plan_version") or ""
+    lines = [f"## 执行计划 v{version}"]
+    objective = str(plan.get("objective") or "").strip()
+    if objective:
+        lines.extend(("", f"**目标**：{objective}"))
+    assumptions = [str(value).strip() for value in plan.get("assumptions") or []]
+    assumptions = [value for value in assumptions if value]
+    if assumptions:
+        lines.extend(("", "**前提假设**"))
+        lines.extend(f"- {value}" for value in assumptions)
+    tasks = [value for value in plan.get("tasks") or [] if isinstance(value, dict)]
+    team = {
+        (str(item.get("target_type") or ""), str(item.get("target_id") or "")): item
+        for item in (run.definition_snapshot or {}).get("team") or []
+        if isinstance(item, dict)
+    }
+    task_titles = {
+        str(task.get("key") or ""): str(task.get("title") or task.get("key") or "")
+        for task in tasks
+    }
+    if tasks:
+        lines.extend(("", "**执行任务**"))
+        for index, task in enumerate(tasks, start=1):
+            target_type = str(task.get("target_type") or "")
+            target_id = str(task.get("target_id") or "")
+            member = team.get((target_type, target_id), {})
+            target_kind = "智能体" if target_type == "agent" else "应用"
+            target_name = str(member.get("name") or f"{target_kind} #{target_id}")
+            title = str(task.get("title") or task.get("key") or f"任务 {index}")
+            lines.append(
+                f"{index}. **{title}** · {target_name}（{target_kind} #{target_id}）"
+            )
+            instructions = str(task.get("instructions") or "").strip()
+            if instructions:
+                lines.append(f"   - 任务说明：{instructions}")
+            dependencies = [
+                task_titles.get(str(key), str(key))
+                for key in task.get("depends_on") or []
+            ]
+            lines.append(f"   - 依赖：{'、'.join(dependencies) if dependencies else '无'}")
+            expected_output = str(task.get("expected_output") or "").strip()
+            if expected_output:
+                lines.append(f"   - 预期输出：{expected_output}")
+    criteria = [str(value).strip() for value in plan.get("delivery_criteria") or []]
+    criteria = [value for value in criteria if value]
+    if criteria:
+        lines.extend(("", "**交付标准**"))
+        lines.extend(f"- {value}" for value in criteria)
+    budget = plan.get("budget") or {}
+    budget_items = [
+        ("最大任务", budget.get("max_tasks")),
+        ("最大重规划", budget.get("max_replans")),
+        ("最大并行", budget.get("max_parallelism")),
+    ]
+    budget_text = " · ".join(
+        f"{label} {value}" for label, value in budget_items if value is not None
+    )
+    if budget_text:
+        lines.extend(("", f"**执行预算**：{budget_text}"))
+    lines.extend(("", "请确认该计划，或提交修改意见。"))
+    return "\n".join(lines)
+
+
+def _question_content(payload, run):
     if payload.get("plan") and payload.get("plan_version"):
-        return f"请审核执行计划 v{payload['plan_version']}。"
+        return _plan_content(payload, run)
     parts = []
     questions = _normalized_questions(payload)
     for index, question in enumerate(questions):
@@ -161,6 +226,8 @@ def _conversation_id_for_run(run):
         return run.source_id
     if run.source_type == "workflow_step":
         return (run.definition_snapshot or {}).get("conversation_id")
+    if run.source_type == "supervisor_task":
+        return (run.definition_snapshot or {}).get("conversation_id")
     if run.source_type == "supervisor":
         return (run.definition_snapshot or {}).get("conversation_id")
     return None
@@ -194,7 +261,7 @@ def project_input_required(run_id, event):
         output = _output_segment(
             run, after_sequence=start, through_sequence=event.sequence,
         )
-        question = _question_content(payload)
+        question = _question_content(payload, run)
         content = "\n\n".join(value for value in (output, question) if value)
         tool_calls = _project_tool_calls(
             run, after_sequence=start, through_sequence=event.sequence,
@@ -210,7 +277,7 @@ def project_input_required(run_id, event):
         }
         if tool_calls:
             metadata["agent"] = {"tool_calls": tool_calls}
-        message, _ = Message.objects.get_or_create(
+        message, created = Message.objects.get_or_create(
             run=run,
             run_event_sequence=event.sequence,
             defaults={
@@ -220,6 +287,10 @@ def project_input_required(run_id, event):
                 "metadata": metadata,
             },
         )
+        if not created and (message.content != content or message.metadata != metadata):
+            message.content = content
+            message.metadata = metadata
+            message.save(update_fields=("content", "metadata"))
         Message.objects.filter(pk=message.pk).update(created_at=event.created_at)
         message.created_at = event.created_at
         return message
@@ -285,7 +356,8 @@ def project_terminal_run(run_id, output):
         conversation = _conversation_for_run(run, Conversation)
         if conversation is None:
             return
-        if run.source_type == "workflow_step":
+        if run.source_type in {"workflow_step", "supervisor_task"}:
+            snapshot = run.definition_snapshot or {}
             user_message, _ = Message.objects.get_or_create(
                 conversation=conversation,
                 run=run,
@@ -295,8 +367,18 @@ def project_terminal_run(run_id, output):
                     "content": str((run.input or {}).get("message") or ""),
                     "metadata": {
                         "run_id": str(run.id),
-                        "workflow_step_key": run.node_key,
                         "automated": True,
+                        **(
+                            {"workflow_step_key": run.node_key}
+                            if run.source_type == "workflow_step"
+                            else {
+                                "supervisor_root_run_id": str(run.parent_id),
+                                "supervisor_task_key": (
+                                    snapshot.get("supervisor_task_key")
+                                    or run.node_key
+                                ),
+                            }
+                        ),
                     },
                 },
             )
@@ -374,6 +456,10 @@ def repair_conversation_messages(conversation):
         Q(source_type="conversation", source_id=str(conversation.id))
         | Q(
             source_type="supervisor",
+            definition_snapshot__conversation_id=str(conversation.id),
+        )
+        | Q(
+            source_type="supervisor_task",
             definition_snapshot__conversation_id=str(conversation.id),
         ),
         owner_id=conversation.user_id,

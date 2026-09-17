@@ -5,8 +5,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.agents.models import Agent, AgentCategory
+from apps.conversations.models import Conversation, Message
+from apps.conversations.serializers import ConversationDetailSerializer
 from modules.execution.application.commands import submit_run_command
 from modules.execution.application.errors import CommandNotAllowed
+from modules.execution.application.projections import project_terminal_run
 from modules.execution.application.runs import create_run
 from modules.execution.models import Run, RunCommand, RunEvent
 from modules.execution.runtime import supervisor
@@ -78,6 +82,135 @@ def test_supervisor_plan_rejects_unsafe_graphs(mutation, match):
 def test_supervisor_plan_enforces_task_budget():
     with pytest.raises(RuntimeError, match="max_tasks"):
         validate_supervisor_plan(_plan(), _snapshot(max_tasks=1), version=1)
+
+
+@pytest.mark.django_db
+def test_agent_supervisor_task_creates_one_recoverable_conversation():
+    actor = get_user_model().objects.create_user(username="supervisor-child-owner")
+    organization = actor.owned_organizations.get()
+    category = AgentCategory.objects.create(
+        name="Supervisor Child Worker",
+        slug="supervisor-child-worker",
+    )
+    worker = Agent.objects.create(
+        category=category,
+        name="Research Agent",
+        slug="supervisor-research-agent",
+        description="Researches",
+        created_by=actor,
+        organization=organization,
+        is_public=False,
+    )
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="supervisor",
+        source_type="supervisor",
+        source_id="99",
+        definition_snapshot={"conversation_id": "123"},
+        input_data={"goal": "Research", "working_directory": "C:/workspace"},
+    )
+    member = {
+        "target_type": "agent",
+        "target_id": worker.id,
+        "executor_kind": Run.ExecutorKind.AGENT,
+        "executor_key": "agent-completion",
+        "max_attempts": 3,
+        "retry_safe": True,
+        "definition_snapshot": {"agent_id": str(worker.id)},
+    }
+    task = {
+        "key": "research",
+        "title": "市场调研",
+        "target_type": "agent",
+        "target_id": worker.id,
+        "instructions": "调研目标市场",
+        "expected_output": "调研结论",
+        "input": {},
+    }
+    snapshot = {"supervisor_name": "研究分身", "team": [member]}
+
+    child, created = supervisor._create_task_run(
+        root, snapshot, {"plan_version": 1}, task, {}
+    )
+    replay, replay_created = supervisor._create_task_run(
+        root, snapshot, {"plan_version": 1}, task, {}
+    )
+
+    assert created is True
+    assert replay_created is False
+    assert replay.id == child.id
+    conversation_id = child.definition_snapshot["conversation_id"]
+    conversation = Conversation.objects.get(pk=conversation_id)
+    assert conversation.agent_id == worker.id
+    assert conversation.title == "研究分身 · 市场调研"
+    assert conversation.working_directory == "C:/workspace"
+    assert Conversation.objects.filter(pk=conversation_id).count() == 1
+    assert ConversationDetailSerializer(conversation).data["active_run"]["id"] == str(
+        child.id
+    )
+    assert list(conversation.messages.values_list("role", "content")) == [
+        ("user", "调研目标市场")
+    ]
+
+    project_terminal_run(child.id, {"result": "市场调研已完成"})
+
+    assert list(
+        Message.objects.filter(conversation=conversation)
+        .order_by("created_at", "id")
+        .values_list("role", "content")
+    ) == [
+        ("user", "调研目标市场"),
+        ("assistant", "市场调研已完成"),
+    ]
+
+
+@pytest.mark.django_db
+def test_application_supervisor_task_does_not_create_conversation():
+    actor = get_user_model().objects.create_user(username="supervisor-app-child-owner")
+    organization = actor.owned_organizations.get()
+    root = create_run(
+        organization=organization,
+        owner=actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="supervisor",
+        source_type="supervisor",
+        source_id="99",
+        definition_snapshot={},
+        input_data={"goal": "Render"},
+    )
+    member = {
+        "target_type": "application",
+        "target_id": 22,
+        "executor_kind": Run.ExecutorKind.AGENT,
+        "executor_key": "agent-completion",
+        "max_attempts": 1,
+        "retry_safe": True,
+        "input_schema": {},
+        "definition_snapshot": {"application_id": "22"},
+    }
+    task = {
+        "key": "render",
+        "title": "制作",
+        "target_type": "application",
+        "target_id": 22,
+        "instructions": "制作成品",
+        "expected_output": "成品",
+        "input": {},
+    }
+
+    child, created = supervisor._create_task_run(
+        root,
+        {"supervisor_name": "制作分身", "team": [member]},
+        {"plan_version": 1},
+        task,
+        {},
+    )
+
+    assert created is True
+    assert "conversation_id" not in child.definition_snapshot
+    assert Conversation.objects.count() == 0
 
 
 def test_supervisor_first_attempt_proposes_plan_and_suspends(monkeypatch):

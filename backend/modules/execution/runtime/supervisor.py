@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+from django.db import transaction
 from jsonschema.validators import validator_for
 from django.utils import timezone
 
@@ -194,55 +195,102 @@ def _task_node_key(plan_version, task_key):
     return f"v{plan_version}:{task_key}"
 
 
+def _create_agent_task_conversation(root, snapshot, task, member, working_directory):
+    if member["target_type"] != "agent":
+        return None
+    from apps.conversations.models import Conversation
+
+    supervisor_name = str(snapshot.get("supervisor_name") or "AI 分身")
+    return Conversation.objects.create(
+        user=root.owner,
+        organization=root.organization,
+        title=f"{supervisor_name} · {task['title']}"[:200],
+        agent_id=member["target_id"],
+        process_id=f"supervisor:{task['key']}"[:64],
+        working_directory=str(working_directory or ""),
+    )
+
+
 def _create_task_run(root, snapshot, plan, task, dependency_results):
     team = _team_index(snapshot)
     member = team[(task["target_type"], task["target_id"])]
     node_key = _task_node_key(plan["plan_version"], task["key"])
-    existing = root.child_runs.filter(node_key=node_key).first()
-    if existing is not None:
-        return existing, False
-    child_input = {
-        **dict(task.get("input") or {}),
-        "dependency_outputs": dependency_results,
-        "supervisor_task": {
-            "title": task["title"],
-            "instructions": task["instructions"],
-            "expected_output": task["expected_output"],
-        },
-    }
-    if member["target_type"] == "agent" or member["executor_kind"] == "agent":
-        child_input["message"] = task["instructions"]
-    if member["target_type"] == "application":
-        schema = member.get("input_schema") or {}
-        validator_type = validator_for(schema)
-        validator_type.check_schema(schema)
-        validator_type(schema).validate(dict(task.get("input") or {}))
-    if (root.input or {}).get("working_directory"):
-        child_input["working_directory"] = root.input["working_directory"]
-    definition_snapshot = {
-        **dict(member["definition_snapshot"]),
-        "supervisor_task_key": task["key"],
-        "supervisor_task_title": task["title"],
-        "supervisor_plan_version": plan["plan_version"],
-        "supervisor_target_type": member["target_type"],
-        "supervisor_target_id": str(member["target_id"]),
-    }
-    child = create_run(
-        organization=root.organization,
-        owner=root.owner,
-        parent=root,
-        node_key=node_key,
-        executor_kind=member["executor_kind"],
-        executor_key=member["executor_key"],
-        source_type="supervisor_task",
-        source_id=f"{member['target_type']}:{member['target_id']}",
-        definition_snapshot=definition_snapshot,
-        input_data=child_input,
-        priority=root.priority,
-        max_attempts=int(member.get("max_attempts") or 1),
-        retry_safe=bool(member.get("retry_safe", True)),
-    )
-    return child, True
+    with transaction.atomic():
+        locked_root = Run.objects.select_for_update().select_related(
+            "owner", "organization"
+        ).get(pk=root.pk)
+        existing = locked_root.child_runs.filter(node_key=node_key).first()
+        if existing is not None:
+            return existing, False
+        child_input = {
+            **dict(task.get("input") or {}),
+            "dependency_outputs": dependency_results,
+            "supervisor_task": {
+                "title": task["title"],
+                "instructions": task["instructions"],
+                "expected_output": task["expected_output"],
+            },
+        }
+        if member["target_type"] == "agent" or member["executor_kind"] == "agent":
+            child_input["message"] = task["instructions"]
+        if member["target_type"] == "application":
+            schema = member.get("input_schema") or {}
+            validator_type = validator_for(schema)
+            validator_type.check_schema(schema)
+            validator_type(schema).validate(dict(task.get("input") or {}))
+        if (locked_root.input or {}).get("working_directory"):
+            child_input["working_directory"] = locked_root.input["working_directory"]
+        conversation = _create_agent_task_conversation(
+            locked_root,
+            snapshot,
+            task,
+            member,
+            child_input.get("working_directory"),
+        )
+        definition_snapshot = {
+            **dict(member["definition_snapshot"]),
+            "supervisor_task_key": task["key"],
+            "supervisor_task_title": task["title"],
+            "supervisor_plan_version": plan["plan_version"],
+            "supervisor_target_type": member["target_type"],
+            "supervisor_target_id": str(member["target_id"]),
+            "supervisor_root_conversation_id": (
+                (locked_root.definition_snapshot or {}).get("conversation_id")
+            ),
+        }
+        if conversation is not None:
+            definition_snapshot["conversation_id"] = str(conversation.id)
+        child = create_run(
+            organization=locked_root.organization,
+            owner=locked_root.owner,
+            parent=locked_root,
+            node_key=node_key,
+            executor_kind=member["executor_kind"],
+            executor_key=member["executor_key"],
+            source_type="supervisor_task",
+            source_id=f"{member['target_type']}:{member['target_id']}",
+            definition_snapshot=definition_snapshot,
+            input_data=child_input,
+            priority=locked_root.priority,
+            max_attempts=int(member.get("max_attempts") or 1),
+            retry_safe=bool(member.get("retry_safe", True)),
+        )
+        if conversation is not None:
+            from apps.conversations.models import Message
+
+            Message.objects.create(
+                conversation=conversation,
+                run=child,
+                role="user",
+                content=task["instructions"] or task["title"],
+                metadata={
+                    "run_id": str(child.id),
+                    "supervisor_root_run_id": str(locked_root.id),
+                    "supervisor_task_key": task["key"],
+                    "automated": True,
+                },
+            )
+        return child, True
 
 
 def _results_for_plan(root, plan):
