@@ -144,18 +144,39 @@ def _submit_run_command_once(
                 and run.pending_input_expires_at <= now
             ):
                 raise InputRequestExpired("The current input request has expired")
-            allowed_types = (
-                {RunCommand.Type.ANSWER}
-                if run.pending_input_kind == Run.InputKind.ANSWER
-                else {
+            if run.pending_input_kind == Run.InputKind.ANSWER:
+                allowed_types = {RunCommand.Type.ANSWER}
+            elif run.pending_input_kind == Run.InputKind.PLAN_APPROVAL:
+                allowed_types = {
+                    RunCommand.Type.APPROVE_PLAN,
+                    RunCommand.Type.REVISE_PLAN,
+                }
+            else:
+                allowed_types = {
                     RunCommand.Type.GRANT_PERMISSION,
                     RunCommand.Type.DENY_PERMISSION,
                 }
-            )
             if command_type not in allowed_types:
                 raise CommandNotAllowed(
                     f"Command {command_type} is invalid for {run.pending_input_kind} input"
                 )
+            if command_type in (
+                RunCommand.Type.APPROVE_PLAN,
+                RunCommand.Type.REVISE_PLAN,
+            ):
+                latest_plan = run.events.filter(
+                    type="supervisor.plan.proposed"
+                ).order_by("-sequence").values_list("payload", flat=True).first()
+                expected_plan_version = (latest_plan or {}).get("plan_version")
+                if payload.get("plan_version") != expected_plan_version:
+                    raise CommandNotAllowed(
+                        "Command does not reference the current supervisor plan"
+                    )
+                if (
+                    command_type == RunCommand.Type.REVISE_PLAN
+                    and not str(payload.get("feedback") or "").strip()
+                ):
+                    raise CommandNotAllowed("Plan revision feedback is required")
 
         idempotency_record = IdempotencyRecord.objects.create(
             organization_id=run.organization_id,

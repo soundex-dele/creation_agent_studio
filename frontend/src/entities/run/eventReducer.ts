@@ -161,6 +161,45 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
       };
       break;
     }
+    case 'supervisor.plan.proposed':
+    case 'supervisor.plan.approved':
+    case 'supervisor.plan.revised':
+    case 'supervisor.replan.applied': {
+      next.tools = {
+        ...next.tools,
+        'supervisor:plan': {
+          ...next.tools['supervisor:plan'],
+          ...event.payload,
+          event_type: event.type,
+        },
+      };
+      break;
+    }
+    case 'supervisor.task.started':
+    case 'supervisor.task.completed':
+    case 'supervisor.task.failed':
+    case 'supervisor.task.output.delta':
+    case 'supervisor.task.output.snapshot': {
+      const key = String(event.payload.task_key ?? event.sequence);
+      const id = `supervisor:${key}`;
+      const previous = next.tools[id] || {};
+      const update: Record<string, unknown> = {
+        ...previous, ...event.payload, event_type: event.type,
+      };
+      if (event.type === 'supervisor.task.output.delta') {
+        update.stream_output = String(previous.stream_output ?? '') + String(event.payload.text ?? '');
+      } else if (event.type === 'supervisor.task.output.snapshot') {
+        update.stream_output = outputText(event.payload);
+      }
+      next.tools = {
+        ...next.tools,
+        [id]: update,
+      };
+      break;
+    }
+    case 'supervisor.final':
+      next.output = outputText(event.payload);
+      break;
   }
   return next;
 }

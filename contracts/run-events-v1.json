@@ -12,17 +12,23 @@
     {"sequence": 8, "type": "output.snapshot", "payload": {"result": "final"}},
     {"sequence": 9, "type": "artifact.created", "payload": {"artifact_id": "artifact-1"}},
     {"sequence": 10, "type": "workflow.step.completed", "payload": {"workflow_step_key": "compose", "output": {"ok": true}}},
-    {"sequence": 11, "type": "run.succeeded", "payload": {}}
+    {"sequence": 11, "type": "supervisor.plan.proposed", "payload": {"plan_version": 1, "objective": "deliver", "tasks": [{"key": "research"}]}},
+    {"sequence": 12, "type": "supervisor.task.started", "payload": {"task_key": "research", "child_run_id": "child-1"}},
+    {"sequence": 13, "type": "supervisor.task.completed", "payload": {"task_key": "research", "output": {"summary": "ready"}}},
+    {"sequence": 14, "type": "supervisor.final", "payload": {"result": "delivered"}},
+    {"sequence": 15, "type": "run.succeeded", "payload": {}}
   ],
   "projection": {
     "runId": "run-contract",
-    "nextSequence": 12,
+    "nextSequence": 16,
     "status": "succeeded",
-    "output": "final",
+    "output": "delivered",
     "progress": null,
     "tools": {
       "call-1": {"tool_call_id": "call-1", "name": "search", "result": "ok", "event_type": "tool.completed"},
-      "workflow:compose": {"workflow_step_key": "compose", "output": {"ok": true}, "event_type": "workflow.step.completed"}
+      "workflow:compose": {"workflow_step_key": "compose", "output": {"ok": true}, "event_type": "workflow.step.completed"},
+      "supervisor:plan": {"plan_version": 1, "objective": "deliver", "tasks": [{"key": "research"}], "event_type": "supervisor.plan.proposed"},
+      "supervisor:research": {"task_key": "research", "child_run_id": "child-1", "output": {"summary": "ready"}, "event_type": "supervisor.task.completed"}
     },
     "pendingInput": null,
     "artifactIds": ["artifact-1"]

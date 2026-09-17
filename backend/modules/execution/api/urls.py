@@ -8,6 +8,7 @@ from .views import (
     OrganizationRunEventSnapshotView,
     OrganizationRunAttemptsView,
     OrganizationRunCommandsView,
+    OrganizationRunChildrenView,
     OrganizationRunEventsView,
     OrganizationRunStreamView,
     OrganizationRunView,
@@ -32,6 +33,11 @@ urlpatterns = [
         name="application-runs",
     ),
     path("runs/<uuid:run_id>", OrganizationRunView.as_view(), name="run-detail"),
+    path(
+        "runs/<uuid:run_id>/children",
+        OrganizationRunChildrenView.as_view(),
+        name="run-children",
+    ),
     path(
         "runs/<uuid:run_id>/open-workspace",
         OrganizationRunWorkspaceView.as_view(),

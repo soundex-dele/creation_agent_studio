@@ -83,6 +83,10 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         run = Run.objects.for_organization(obj.organization_id).filter(
             Q(source_type='conversation', source_id=str(obj.id))
             | Q(
+                source_type='supervisor',
+                definition_snapshot__conversation_id=str(obj.id),
+            )
+            | Q(
                 source_type='workflow_step',
                 definition_snapshot__conversation_id=str(obj.id),
             ),

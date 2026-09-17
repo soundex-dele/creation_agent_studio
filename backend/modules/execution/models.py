@@ -38,6 +38,7 @@ class Run(TenantOwnedModel):
     class InputKind(models.TextChoices):
         ANSWER = "answer", "Answer"
         PERMISSION = "permission", "Permission"
+        PLAN_APPROVAL = "plan_approval", "Plan approval"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(
@@ -113,7 +114,7 @@ class Run(TenantOwnedModel):
                     models.Q(
                         status="waiting_input",
                         pending_input_request_id__isnull=False,
-                        pending_input_kind__in=("answer", "permission"),
+                        pending_input_kind__in=("answer", "permission", "plan_approval"),
                         pending_input_expires_at__isnull=False,
                     )
                     | (
@@ -301,6 +302,8 @@ class RunCommand(TenantOwnedModel):
         ANSWER = "answer", "Answer"
         GRANT_PERMISSION = "grant_permission", "Grant permission"
         DENY_PERMISSION = "deny_permission", "Deny permission"
+        APPROVE_PLAN = "approve_plan", "Approve plan"
+        REVISE_PLAN = "revise_plan", "Revise plan"
         CANCEL = "cancel", "Cancel"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

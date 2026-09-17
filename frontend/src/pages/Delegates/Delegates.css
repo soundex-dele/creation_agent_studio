@@ -1,0 +1,22 @@
+.delegates-page, .delegate-editor { max-width: 1180px; margin: 0 auto; }
+.delegates-heading, .delegate-board-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.delegates-heading h1, .delegate-board-heading h2 { margin: 0; }
+.delegates-heading p { color: var(--color-text-sec); }
+.delegate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.delegate-card { display: grid; grid-template-columns: 56px 1fr; gap: 16px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card); }
+.delegate-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; font-size: 28px; background: color-mix(in srgb, var(--color-primary) 14%, transparent); }
+.delegate-card-title { display: flex; justify-content: space-between; gap: 12px; }
+.delegate-card-copy p { min-height: 42px; color: var(--color-text-sec); }
+.delegate-card-copy small { color: var(--color-text-dim); }
+.delegate-card-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+.delegate-editor .ant-card { margin-bottom: 16px; }
+.delegate-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.delegate-task-page { height: calc(100vh - var(--header-height, 64px)); display: grid; grid-template-columns: minmax(360px, 1fr) minmax(420px, 0.9fr); background: var(--color-bg); }
+.delegate-chat-pane, .delegate-board-pane { min-height: 0; padding: 20px; display: flex; flex-direction: column; }
+.delegate-chat-pane { border-right: 1px solid var(--color-border); }
+.delegate-chat-pane header { display: flex; align-items: center; justify-content: space-between; }
+.delegate-message-list { flex: 1; overflow: auto; padding: 16px 0; }
+.delegate-message { max-width: 88%; margin: 10px 0; padding: 12px 14px; border-radius: 14px; background: var(--color-bg-card); border: 1px solid var(--color-border); }
+.delegate-message--user { margin-left: auto; background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-card)); }
+.delegate-board-pane { gap: 12px; overflow: auto; }
+@media (max-width: 900px) { .delegate-task-page { grid-template-columns: 1fr; height: auto; } .delegate-chat-pane { min-height: 70vh; border-right: none; border-bottom: 1px solid var(--color-border); } .delegate-form-grid { grid-template-columns: 1fr; } }

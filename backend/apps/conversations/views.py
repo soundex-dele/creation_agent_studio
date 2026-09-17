@@ -11,7 +11,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.agents.models import Agent
+from apps.agents.models import Agent, SupervisorProfile
 from apps.agents.runtime import get_agent_definition
 from apps.applications.models import Application, Skill
 from apps.applications.runtime_skills import (
@@ -39,7 +39,9 @@ from modules.execution.application.errors import (
 )
 from modules.execution.application.start_runs import (
     CREATE_AGENT_RUN_OPERATION,
+    CREATE_SUPERVISOR_RUN_OPERATION,
     start_agent_run,
+    start_supervisor_run,
 )
 from modules.execution.models import IdempotencyRecord, Run
 
@@ -74,6 +76,27 @@ def resolve_agent(agent_id, organization, *, use_default=False):
     if selected is None:
         raise ValidationError({"agent_id": "该智能体不存在或当前用户无权使用。"})
     return selected
+
+
+def ensure_supervisor_access(agent, user):
+    if not agent or agent.kind != Agent.Kind.SUPERVISOR:
+        return
+    profile = getattr(agent, 'supervisor_profile', None)
+    if profile is None:
+        raise ValidationError({'agent_id': 'AI 分身配置不完整。'})
+    if (
+        profile.visibility == SupervisorProfile.Visibility.PRIVATE
+        and agent.created_by_id != user.id
+        and not user.is_superuser
+    ):
+        from apps.enterprise.models import Membership
+        if not Membership.objects.filter(
+            organization=agent.organization,
+            user=user,
+            is_active=True,
+            role__in=(Membership.Role.OWNER, Membership.Role.ADMIN),
+        ).exists():
+            raise ValidationError({'agent_id': '该 AI 分身为私有。'})
 
 
 def resolve_conversation_agent(conversation, requested_agent_id):
@@ -220,6 +243,7 @@ class ConversationViewSet(viewsets.ViewSet):
             )
         else:
             agent = resolve_agent(requested_agent_id, organization)
+        ensure_supervisor_access(agent, request.user)
 
         project = None
         if data.get("project_id"):
@@ -393,18 +417,27 @@ class ConversationViewSet(viewsets.ViewSet):
             conversation, requested_agent_id)
         selection_changed = conversation.agent_id != getattr(
             selected_agent, "id", None)
+        ensure_supervisor_access(agent, request.user)
+        operation = (
+            CREATE_SUPERVISOR_RUN_OPERATION
+            if agent.kind == Agent.Kind.SUPERVISOR
+            else CREATE_AGENT_RUN_OPERATION
+        )
         is_idempotent_replay = IdempotencyRecord.objects.for_organization(
             organization.id
         ).filter(
             actor=request.user,
-            operation=CREATE_AGENT_RUN_OPERATION,
+            operation=operation,
             key=idempotency_key,
         ).exists()
         if not is_idempotent_replay and Run.objects.for_organization(
             organization.id
         ).filter(
-            source_type="conversation",
-            source_id=str(conversation.id),
+            Q(source_type="conversation", source_id=str(conversation.id))
+            | Q(
+                source_type="supervisor",
+                definition_snapshot__conversation_id=str(conversation.id),
+            ),
             status__in=(
                 Run.Status.QUEUED,
                 Run.Status.RUNNING,
@@ -420,6 +453,33 @@ class ConversationViewSet(viewsets.ViewSet):
         history.append({"role": "user", "content": message})
         working_directory = conversation_working_directory(conversation)
         validate_requested_skill_names(conversation, requested_skill_names)
+        if agent.kind == Agent.Kind.SUPERVISOR:
+            run, replayed = start_supervisor_run(
+                organization_id=organization.id,
+                supervisor_id=agent.id,
+                actor=request.user,
+                environment="production",
+                goal=message,
+                context={
+                    "messages": history[:-1],
+                    "working_directory": working_directory,
+                },
+                conversation_id=conversation.id,
+                idempotency_key=idempotency_key,
+            )
+            if not replayed:
+                if not conversation.title:
+                    conversation.title = message[:50]
+                conversation.save(update_fields=["title", "updated_at"])
+                Message.objects.create(
+                    conversation=conversation,
+                    run=run,
+                    role="user",
+                    content=message,
+                    metadata={"supervisor": True},
+                )
+            return run, replayed
+
         definition = get_agent_definition(agent)
         adapter = resolve_skill_adapter(
             (definition.get("model_config") or {}).get("adapter")

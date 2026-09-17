@@ -7,6 +7,8 @@ from django.db.models.deletion import ProtectedError
 from django.http import FileResponse, StreamingHttpResponse
 from django.urls import reverse
 from django.utils import timezone
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -144,6 +146,52 @@ def _workflow_conversation_ids(run_ids):
     return conversation_ids
 
 
+def _run_tree_ids(organization_id, root_id):
+    values = [root_id]
+    frontier = [root_id]
+    while frontier:
+        frontier = list(
+            Run.objects.for_organization(organization_id)
+            .filter(parent_id__in=frontier)
+            .values_list("id", flat=True)
+        )
+        values.extend(frontier)
+    return values
+
+
+def _can_access_run(request, run):
+    root = run
+    while root.parent_id:
+        root = Run.objects.get(pk=root.parent_id)
+    if root.source_type != "supervisor":
+        return True
+    if request.user.is_superuser or root.owner_id == request.user.id:
+        return True
+    from apps.agents.models import Agent, SupervisorProfile
+
+    supervisor = Agent.objects.select_related("supervisor_profile").filter(
+        pk=root.source_id,
+        organization_id=root.organization_id,
+        kind=Agent.Kind.SUPERVISOR,
+    ).first()
+    if supervisor is None:
+        return False
+    if supervisor.created_by_id == request.user.id:
+        return True
+    membership = Membership.objects.filter(
+        organization_id=root.organization_id,
+        user=request.user,
+        is_active=True,
+    ).first()
+    if membership and membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN):
+        return True
+    return bool(
+        membership
+        and supervisor.supervisor_profile.visibility
+        == SupervisorProfile.Visibility.ORGANIZATION
+    )
+
+
 class OrganizationRunView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
@@ -154,7 +202,7 @@ class OrganizationRunView(ProblemDetailsAPIView):
             .filter(pk=run_id)
             .first()
         )
-        if run is None:
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -350,7 +398,7 @@ class OrganizationRunsView(ProblemDetailsAPIView):
 
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
     allowed_source_types = {
-        "application", "agent", "conversation", "workflow", "evaluation"
+        "application", "agent", "conversation", "workflow", "evaluation", "supervisor"
     }
 
     def get(self, request, organization_id):
@@ -367,12 +415,13 @@ class OrganizationRunsView(ProblemDetailsAPIView):
                     title="Invalid Run source type",
                     detail=(
                         "source_type must be application, agent, conversation, "
-                        "workflow, or evaluation."
+                        "workflow, evaluation, or supervisor."
                     ),
                 )
             runs = runs.filter(source_type=source_type)
+        visible = [run for run in runs[:200] if _can_access_run(request, run)][:100]
         return Response(RunSerializer(
-            runs[:100], many=True, context={"request": request}
+            visible, many=True, context={"request": request}
         ).data)
 
 
@@ -393,7 +442,7 @@ class OrganizationRunEventsView(ProblemDetailsAPIView):
             )
 
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
-        if run is None:
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -436,7 +485,8 @@ class OrganizationRunAttemptsView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
     def get(self, request, organization_id, run_id):
-        if not Run.objects.for_organization(organization_id).filter(pk=run_id).exists():
+        run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -458,8 +508,16 @@ class OrganizationRunAttemptsView(ProblemDetailsAPIView):
 class OrganizationRunArtifactsView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
 
+    @swagger_auto_schema(manual_parameters=[openapi.Parameter(
+        'include_descendants',
+        openapi.IN_QUERY,
+        description='Include artifacts produced by descendant Runs.',
+        type=openapi.TYPE_BOOLEAN,
+        required=False,
+    )], responses={200: RunArtifactSerializer(many=True)})
     def get(self, request, organization_id, run_id):
-        if not Run.objects.for_organization(organization_id).filter(pk=run_id).exists():
+        run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -467,14 +525,39 @@ class OrganizationRunArtifactsView(ProblemDetailsAPIView):
                 title="Run not found",
                 detail="The requested run does not exist or is not accessible.",
             )
+        run_ids = (
+            _run_tree_ids(organization_id, run_id)
+            if request.query_params.get("include_descendants") == "true"
+            else [run_id]
+        )
         artifacts = RunArtifact.objects.for_organization(organization_id).filter(
-            run_id=run_id
+            run_id__in=run_ids
         )
         paginator = RunArtifactCursorPagination()
         page = paginator.paginate_queryset(artifacts, request, view=self)
         return paginator.get_paginated_response(
             RunArtifactSerializer(page, many=True).data
         )
+
+
+class OrganizationRunChildrenView(ProblemDetailsAPIView):
+    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+
+    @swagger_auto_schema(responses={200: RunSerializer(many=True)})
+    def get(self, request, organization_id, run_id):
+        root = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
+        if root is None or not _can_access_run(request, root):
+            return _problem(
+                request,
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="run_not_found",
+                title="Run not found",
+                detail="The requested run does not exist or is not accessible.",
+            )
+        children = Run.objects.for_organization(organization_id).filter(
+            parent_id__in=_run_tree_ids(organization_id, root.id)
+        ).select_related("current_attempt").order_by("created_at", "id")
+        return Response(RunSerializer(children, many=True, context={"request": request}).data)
 
 
 class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
@@ -485,7 +568,7 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
             pk=artifact_id,
             run_id=run_id,
         ).first()
-        if artifact is None:
+        if artifact is None or not _can_access_run(request, artifact.run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -596,7 +679,7 @@ class OrganizationRunEventSnapshotView(ProblemDetailsAPIView):
         snapshot = RunEventSnapshot.objects.for_organization(
             organization_id
         ).filter(run_id=run_id).first()
-        if snapshot is None:
+        if snapshot is None or not _can_access_run(request, snapshot.run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -613,7 +696,7 @@ class OrganizationRunStreamView(ProblemDetailsAPIView):
 
     def get(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
-        if run is None:
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -662,10 +745,15 @@ class OrganizationRunCommandsView(ProblemDetailsAPIView):
     permission_classes = (IsAuthenticated, HasPathOrganizationRole)
     minimum_role = Membership.Role.OPERATOR
 
+    @swagger_auto_schema(
+        request_body=SubmitRunCommandSerializer,
+        responses={202: RunCommandSerializer},
+    )
     def post(self, request, organization_id, run_id):
         serializer = SubmitRunCommandSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if not Run.objects.for_organization(organization_id).filter(pk=run_id).exists():
+        run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,

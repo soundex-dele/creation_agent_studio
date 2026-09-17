@@ -2,6 +2,7 @@
 import json
 
 from django.db import transaction
+from django.db.models import Q
 
 from modules.execution.models import Run
 
@@ -97,6 +98,8 @@ def _normalized_questions(payload):
 
 
 def _question_content(payload):
+    if payload.get("plan") and payload.get("plan_version"):
+        return f"请审核执行计划 v{payload['plan_version']}。"
     parts = []
     questions = _normalized_questions(payload)
     for index, question in enumerate(questions):
@@ -157,6 +160,8 @@ def _conversation_id_for_run(run):
     if run.source_type == "conversation" and run.source_id:
         return run.source_id
     if run.source_type == "workflow_step":
+        return (run.definition_snapshot or {}).get("conversation_id")
+    if run.source_type == "supervisor":
         return (run.definition_snapshot or {}).get("conversation_id")
     return None
 
@@ -237,7 +242,11 @@ def project_input_accepted(run_id, event, command):
             payload__input_request_id=str(command.input_request_id),
         ).order_by("-sequence").first()
         request_payload = required.payload if required else {}
-        if command.type == "grant_permission":
+        if command.type == "approve_plan":
+            content = f"已批准执行计划 v{(command.payload or {}).get('plan_version', '')}"
+        elif command.type == "revise_plan":
+            content = str((command.payload or {}).get("feedback") or "请修改计划")
+        elif command.type == "grant_permission":
             content = "允许"
         elif command.type == "deny_permission":
             content = "拒绝"
@@ -362,8 +371,11 @@ def repair_conversation_messages(conversation):
     from modules.execution.models import RunCommand
 
     runs = Run.objects.for_organization(conversation.organization_id).filter(
-        source_type="conversation",
-        source_id=str(conversation.id),
+        Q(source_type="conversation", source_id=str(conversation.id))
+        | Q(
+            source_type="supervisor",
+            definition_snapshot__conversation_id=str(conversation.id),
+        ),
         owner_id=conversation.user_id,
     ).order_by("created_at")
     for run in runs:

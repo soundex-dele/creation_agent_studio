@@ -12,6 +12,8 @@ def restore_creator_role(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [("users", "0002_alter_user_api_key_userapikey")]
 
     operations = [

@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, OperationalError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from jsonschema import SchemaError, ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
@@ -31,6 +32,7 @@ from .runs import create_run
 CREATE_APPLICATION_RUN_OPERATION = "application.run.create"
 CREATE_AGENT_RUN_OPERATION = "agent.run.create"
 CREATE_WORKFLOW_RUN_OPERATION = "workflow.run.create"
+CREATE_SUPERVISOR_RUN_OPERATION = "supervisor.run.create"
 
 
 def _fingerprint(*, application_id, environment, input_data, priority):
@@ -533,6 +535,272 @@ def start_agent_run(
             input_data=guarded_input,
             priority=priority,
             max_attempts=3,
+            retry_safe=True,
+        )
+        record.status = IdempotencyRecord.Status.COMPLETED
+        record.response_status = 202
+        record.response_body = {"run_id": str(run.id)}
+        record.save(update_fields=("status", "response_status", "response_body"))
+    return run, False
+
+
+def start_supervisor_run(
+    *,
+    organization_id,
+    supervisor_id,
+    actor,
+    environment,
+    goal,
+    context,
+    conversation_id,
+    idempotency_key,
+):
+    """Freeze a supervisor and its allow-listed team into one durable root Run."""
+    from apps.agents.models import Agent
+    from apps.applications.models import Application
+
+    if not idempotency_key or len(idempotency_key) > 160:
+        raise ValueError("Idempotency-Key must contain between 1 and 160 characters")
+    request_document = {
+        "supervisor_id": str(supervisor_id),
+        "environment": environment,
+        "goal": goal,
+        "context": context,
+        "conversation_id": conversation_id,
+    }
+    fingerprint = hashlib.sha256(json.dumps(
+        request_document,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+    replay = _load_replay(
+        organization_id=organization_id,
+        actor_id=actor.id,
+        operation=CREATE_SUPERVISOR_RUN_OPERATION,
+        key=idempotency_key,
+        fingerprint=fingerprint,
+    )
+    if replay is not None:
+        return replay, True
+
+    with transaction.atomic():
+        port = execution_domain_port()
+        organization = port.organization(organization_id)
+        if conversation_id and Run.objects.for_organization(organization_id).filter(
+            owner=actor,
+            source_type="supervisor",
+            definition_snapshot__conversation_id=str(conversation_id),
+            status__in=(
+                Run.Status.QUEUED,
+                Run.Status.RUNNING,
+                Run.Status.WAITING_INPUT,
+                Run.Status.WAITING_CHILDREN,
+                Run.Status.CANCELLING,
+            ),
+        ).exists():
+            raise InvalidExecutionDefinition(
+                "The supervisor conversation already has an active Run"
+            )
+        supervisor = Agent.objects.select_for_update().filter(
+            pk=supervisor_id,
+            organization_id=organization_id,
+            kind=Agent.Kind.SUPERVISOR,
+            is_active=True,
+        ).first()
+        if supervisor is None:
+            raise DeploymentUnavailable("Supervisor is not available")
+        if "supervisor" not in getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
+            Run.ExecutorKind.WORKFLOW, {}
+        ):
+            raise InvalidExecutionDefinition("Supervisor executor is not registered")
+        deployment = AgentDeployment.objects.select_related("revision").filter(
+            agent=supervisor,
+            organization_id=organization_id,
+            environment=environment,
+        ).first()
+        if deployment is None:
+            raise DeploymentUnavailable(f"Supervisor has no {environment} deployment")
+        definition = deployment.revision.content
+        orchestration = definition.get("orchestration_config") or {}
+        limits = {
+            "max_tasks": 12,
+            "max_replans": 3,
+            "max_parallelism": 3,
+            "timeout_seconds": 1800,
+            **dict(orchestration.get("limits") or {}),
+        }
+        if not 1 <= int(limits["max_tasks"]) <= 12:
+            raise InvalidExecutionDefinition("Supervisor max_tasks exceeds policy")
+        if not 0 <= int(limits["max_replans"]) <= 3:
+            raise InvalidExecutionDefinition("Supervisor max_replans exceeds policy")
+        if not 1 <= int(limits["max_parallelism"]) <= 3:
+            raise InvalidExecutionDefinition("Supervisor max_parallelism exceeds policy")
+
+        agent_ids = {int(value) for value in orchestration.get("agent_ids") or []}
+        application_ids = {
+            int(value) for value in orchestration.get("application_ids") or []
+        }
+        allowed_agents = Agent.objects.filter(
+            Q(organization_id=organization_id) | Q(organization__isnull=True, is_public=True),
+            id__in=agent_ids,
+            kind=Agent.Kind.STANDARD,
+            is_active=True,
+        )
+        allowed_apps = Application.objects.filter(
+            Q(organization_id=organization_id) | Q(organization__isnull=True, is_public=True),
+            id__in=application_ids,
+            is_active=True,
+        )
+        if set(allowed_agents.values_list("id", flat=True)) != agent_ids:
+            raise InvalidExecutionDefinition("Supervisor team contains unavailable agents")
+        if set(allowed_apps.values_list("id", flat=True)) != application_ids:
+            raise InvalidExecutionDefinition("Supervisor team contains unavailable applications")
+
+        team = []
+        for member in allowed_agents:
+            member_deployment = AgentDeployment.objects.select_related("revision").filter(
+                agent=member, environment=environment
+            ).first()
+            if member_deployment is None:
+                raise DeploymentUnavailable(
+                    f"Agent {member.id} has no {environment} deployment"
+                )
+            content = member_deployment.revision.content
+            team.append({
+                "target_type": "agent",
+                "target_id": member.id,
+                "name": member.name,
+                "description": member.description,
+                "executor_kind": Run.ExecutorKind.AGENT,
+                "executor_key": "agent-completion",
+                "max_attempts": 3,
+                "retry_safe": True,
+                "definition_snapshot": {
+                    "agent_id": str(member.id),
+                    "agent_revision_id": str(member_deployment.revision_id),
+                    "agent_revision_no": member_deployment.revision.revision_no,
+                    "agent_content_hash": member_deployment.revision.content_hash,
+                    "deployment_id": str(member_deployment.id),
+                    "deployment_environment": environment,
+                    "deployment_version": member_deployment.version,
+                    "agent_definition": content,
+                    "effective_config": {
+                        **dict(content.get("model_config") or {}),
+                        **dict(member_deployment.config_override or {}),
+                    },
+                    "governance": port.governance_snapshot(organization),
+                    "skill_revisions": [],
+                },
+            })
+        for application in allowed_apps:
+            member_deployment = ApplicationDeployment.objects.select_related(
+                "revision"
+            ).filter(application=application, environment=environment).first()
+            if member_deployment is None:
+                raise DeploymentUnavailable(
+                    f"Application {application.id} has no {environment} deployment"
+                )
+            revision = member_deployment.revision
+            executor_kind, executor_key, max_attempts, retry_safe = _definition_values(
+                revision
+            )
+            if executor_kind not in (
+                Run.ExecutorKind.AGENT, Run.ExecutorKind.MEDIA
+            ):
+                raise InvalidExecutionDefinition(
+                    "Supervisor applications must use an agent or media executor"
+                )
+            content = revision.content
+            application_snapshot = {
+                "application_id": str(application.id),
+                "application_revision_id": str(revision.id),
+                "application_revision_no": revision.revision_no,
+                "application_content_hash": revision.content_hash,
+                "deployment_id": str(member_deployment.id),
+                "deployment_environment": environment,
+                "deployment_version": member_deployment.version,
+                "config_override": member_deployment.config_override,
+                "effective_config": _effective_config(
+                    content, member_deployment.config_override
+                ),
+                "governance": port.governance_snapshot(organization),
+                "skill_revisions": freeze_skill_revisions(
+                    organization_id=organization_id,
+                    environment=environment,
+                    content=content,
+                ),
+                "content": content,
+            }
+            default_agents = [
+                value
+                for value in (content.get("dependencies") or {}).get("agents", [])
+                if value.get("is_default")
+            ]
+            if default_agents:
+                application_snapshot["agent_definition"] = (
+                    default_agents[0].get("definition") or {}
+                )
+            team.append({
+                "target_type": "application",
+                "target_id": application.id,
+                "name": application.name,
+                "description": application.description,
+                "input_schema": content.get("input_schema") or {},
+                "executor_kind": executor_kind,
+                "executor_key": executor_key,
+                "max_attempts": max_attempts,
+                "retry_safe": retry_safe,
+                "definition_snapshot": application_snapshot,
+            })
+        if not team:
+            raise InvalidExecutionDefinition("Supervisor team cannot be empty")
+        port.enforce_quota(organization)
+        effective_config = {
+            **dict(definition.get("model_config") or {}),
+            **dict(deployment.config_override or {}),
+        }
+        governance = _enforce_definition_governance(
+            organization, definition, effective_config
+        )
+        guarded_input = port.apply_input_guardrails(organization, {
+            "goal": goal,
+            "context": context,
+            "conversation_id": conversation_id,
+            "working_directory": str(
+                (context or {}).get("working_directory") or ""
+            ),
+        })
+        record = IdempotencyRecord.objects.create(
+            organization=organization,
+            actor=actor,
+            operation=CREATE_SUPERVISOR_RUN_OPERATION,
+            key=idempotency_key,
+            request_fingerprint=fingerprint,
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+        run = create_run(
+            organization=organization,
+            owner=actor,
+            executor_kind=Run.ExecutorKind.WORKFLOW,
+            executor_key="supervisor",
+            source_type="supervisor",
+            source_id=str(supervisor.id),
+            definition_snapshot={
+                "supervisor_id": str(supervisor.id),
+                "supervisor_name": supervisor.name,
+                "supervisor_revision_id": str(deployment.revision_id),
+                "supervisor_content_hash": deployment.revision.content_hash,
+                "supervisor_definition": definition,
+                "effective_config": effective_config,
+                "team": team,
+                "limits": limits,
+                "governance": governance,
+                "conversation_id": str(conversation_id) if conversation_id else None,
+                "durable_children": True,
+            },
+            input_data=guarded_input,
+            max_attempts=50,
             retry_safe=True,
         )
         record.status = IdempotencyRecord.Status.COMPLETED

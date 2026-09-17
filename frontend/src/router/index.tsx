@@ -30,6 +30,9 @@ const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 const KnowledgePage = lazy(() => import('@/pages/Knowledge/KnowledgePage'));
+const DelegatesPage = lazy(() => import('@/pages/Delegates/DelegatesPage'));
+const DelegateEditorPage = lazy(() => import('@/pages/Delegates/DelegateEditorPage'));
+const DelegateTaskPage = lazy(() => import('@/pages/Delegates/DelegateTaskPage'));
 const AutomationsPage = lazy(() => import('@/pages/Automations/AutomationsPage'));
 const AutomationEditorPage = lazy(() => import('@/pages/Automations/AutomationEditorPage'));
 const AutomationDetailPage = lazy(() => import('@/pages/Automations/AutomationDetailPage'));
@@ -73,6 +76,22 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     index: true,
+  },
+  {
+    path: '/delegates',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<DelegatesPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/delegates/new',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<DelegateEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/delegates/:id',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<DelegateEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/delegates/:id/tasks/:conversationId',
+    element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<DelegateTaskPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/chat',

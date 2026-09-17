@@ -48,6 +48,8 @@ def _claim_locked_run(run, *, worker_id, worker_pool, lease_seconds):
                 RunCommand.Type.ANSWER,
                 RunCommand.Type.GRANT_PERMISSION,
                 RunCommand.Type.DENY_PERMISSION,
+                RunCommand.Type.APPROVE_PLAN,
+                RunCommand.Type.REVISE_PLAN,
             ),
         )
         .order_by("-created_at", "-id")

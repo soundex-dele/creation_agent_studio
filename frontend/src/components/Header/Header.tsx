@@ -10,6 +10,7 @@ const navItems = [
   { key: '/', label: '🏠 首页' },
   { key: '/chat', label: '💬 对话' },
   { key: '/agents', label: '🤖 智能体' },
+  { key: '/delegates', label: '🧭 AI 分身' },
   { key: '/skills', label: '⚡ 技能' },
   { key: '/apps', label: '🧩 应用' },
   { key: '/workflows', label: '🔀 工作流' },

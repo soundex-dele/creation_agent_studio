@@ -41,7 +41,9 @@ class AgentCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
 
 class AgentViewSet(viewsets.ModelViewSet):
-    queryset = Agent.objects.filter(is_public=True).select_related('category')
+    queryset = Agent.objects.filter(
+        is_public=True, kind=Agent.Kind.STANDARD,
+    ).select_related('category')
     filter_backends = [SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'description']
     filterset_class = AgentFilter
@@ -59,7 +61,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Agent.objects.select_related('category', 'created_by', 'draft')
+        queryset = Agent.objects.filter(kind=Agent.Kind.STANDARD).select_related(
+            'category', 'created_by', 'draft'
+        )
         if not self.request.user.is_authenticated:
             return queryset.filter(is_public=True)
         from apps.enterprise.models import Membership
@@ -86,7 +90,11 @@ class AgentViewSet(viewsets.ModelViewSet):
                 Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.DEVELOPER):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Developer role is required to create an agent.')
-        serializer.save(created_by=self.request.user, organization=organization)
+        serializer.save(
+            created_by=self.request.user,
+            organization=organization,
+            kind=Agent.Kind.STANDARD,
+        )
 
     def perform_update(self, serializer):
         from apps.enterprise.models import Membership

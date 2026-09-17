@@ -190,25 +190,39 @@ def mirror_child_output_event(*, child_run_id, organization_id, event_type, payl
         child = Run.objects.select_related("parent").get(pk=child_run_id)
         if str(child.organization_id) != str(organization_id):
             raise OrganizationMismatch("Run belongs to another organization")
-        if child.parent_id is None or child.source_type != "workflow_step":
+        if child.parent_id is None or child.source_type not in {
+            "workflow_step", "supervisor_task"
+        }:
             return None
         parent = Run.objects.select_for_update().get(pk=child.parent_id)
         snapshot = child.definition_snapshot or {}
         parent.version += 1
         parent.next_event_sequence += 1
         parent.save(update_fields=("version", "next_event_sequence"))
+        is_supervisor = child.source_type == "supervisor_task"
         event = RunEvent.objects.create(
             organization_id=parent.organization_id,
             run=parent,
             sequence=parent.next_event_sequence,
-            type=f"workflow.step.{event_type}",
-            payload={
+            type=(
+                f"supervisor.task.{event_type}"
+                if is_supervisor else f"workflow.step.{event_type}"
+            ),
+            payload=({
+                "task_key": snapshot.get("supervisor_task_key") or child.node_key,
+                "task_title": snapshot.get("supervisor_task_title") or child.node_key,
+                "plan_version": snapshot.get("supervisor_plan_version"),
+                "target_type": snapshot.get("supervisor_target_type"),
+                "target_id": snapshot.get("supervisor_target_id"),
+                "child_run_id": str(child.id),
+                **dict(payload or {}),
+            } if is_supervisor else {
                 "workflow_step_id": snapshot.get("workflow_step_id") or child.source_id,
                 "workflow_step_key": snapshot.get("workflow_step_key") or child.node_key,
                 "workflow_step_name": snapshot.get("workflow_step_name") or child.node_key,
                 "child_run_id": str(child.id),
                 **dict(payload or {}),
-            },
+            }),
         )
         transaction.on_commit(
             lambda: _publish_event_notification(parent.id, event.sequence)

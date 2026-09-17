@@ -56,6 +56,14 @@ ADAPTER_EVENT_TYPES = {
     "workflow.step.completed",
     "workflow.step.failed",
     "workflow.step.skipped",
+    "supervisor.plan.proposed",
+    "supervisor.plan.approved",
+    "supervisor.plan.revised",
+    "supervisor.task.started",
+    "supervisor.task.completed",
+    "supervisor.task.failed",
+    "supervisor.replan.applied",
+    "supervisor.final",
 }
 logger = logging.getLogger(__name__)
 
@@ -504,7 +512,7 @@ class ExecutionCoordinator:
             )
             if (
                 active.claimed.run.parent_id
-                and active.claimed.run.source_type == "workflow_step"
+                and active.claimed.run.source_type in {"workflow_step", "supervisor_task"}
                 and message["type"] in {"output.delta", "output.snapshot"}
             ):
                 mirror_child_output_event(

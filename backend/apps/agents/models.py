@@ -24,6 +24,10 @@ class AgentCategory(models.Model):
 
 class Agent(models.Model):
     """Stable agent identity and catalog metadata."""
+    class Kind(models.TextChoices):
+        STANDARD = 'standard', '标准智能体'
+        SUPERVISOR = 'supervisor', 'AI 分身'
+
     category = models.ForeignKey(
         AgentCategory,
         on_delete=models.CASCADE,
@@ -33,6 +37,9 @@ class Agent(models.Model):
     slug = models.SlugField(max_length=100)
     description = models.TextField()
     icon = models.CharField(max_length=50, blank=True)
+    kind = models.CharField(
+        max_length=20, choices=Kind.choices, default=Kind.STANDARD, db_index=True,
+    )
     is_public = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -58,3 +65,32 @@ class Agent(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class SupervisorProfile(models.Model):
+    """Stable sharing metadata for an Agent-backed supervisor."""
+
+    class Visibility(models.TextChoices):
+        PRIVATE = 'private', '仅自己'
+        ORGANIZATION = 'organization', '组织共享'
+
+    agent = models.OneToOneField(
+        Agent,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name='supervisor_profile',
+    )
+    visibility = models.CharField(
+        max_length=20,
+        choices=Visibility.choices,
+        default=Visibility.PRIVATE,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'supervisor_profiles'
+
+    def __str__(self):
+        return f'{self.agent.name} ({self.visibility})'

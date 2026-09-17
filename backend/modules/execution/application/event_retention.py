@@ -136,6 +136,33 @@ def apply_projection_event(projection, event):
             "stream_output": stream_output,
             "output_event_type": event.type,
         }
+    elif event.type in {
+        "supervisor.plan.proposed",
+        "supervisor.plan.approved",
+        "supervisor.plan.revised",
+        "supervisor.replan.applied",
+    }:
+        tools = next_projection.setdefault("tools", {})
+        tools["supervisor:plan"] = {
+            **tools.get("supervisor:plan", {}),
+            **payload,
+            "event_type": event.type,
+        }
+    elif event.type.startswith("supervisor.task."):
+        key = str(payload.get("task_key") or event.sequence)
+        tool_id = f"supervisor:{key}"
+        tools = next_projection.setdefault("tools", {})
+        tools[tool_id] = {
+            **tools.get(tool_id, {}),
+            **payload,
+            "event_type": event.type,
+        }
+    elif event.type == "supervisor.final":
+        value = payload.get("result", "")
+        next_projection["output"] = (
+            value if isinstance(value, str)
+            else json.dumps(value, ensure_ascii=False, indent=2)
+        )
     return next_projection
 
 
