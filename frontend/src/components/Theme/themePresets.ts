@@ -1,4 +1,4 @@
-export type ThemeId = 'light' | 'dark' | 'midnight' | 'ocean' | 'forest' | 'violet' | 'sage' | 'lavender';
+export type ThemeId = 'light' | 'ink' | 'dark' | 'midnight' | 'ocean' | 'forest' | 'violet' | 'sage' | 'lavender';
 
 export interface ThemeColors {
   bgVoid: string;
@@ -39,6 +39,20 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
       shadowSm: '0 1px 2px rgba(15, 23, 42, 0.05)',
       shadowMd: '0 4px 12px rgba(15, 23, 42, 0.08)',
       shadowLg: '0 12px 28px rgba(15, 23, 42, 0.12)',
+    },
+  },
+  {
+    id: 'ink',
+    name: '纸墨',
+    description: '清晰克制的黑白工作区',
+    mode: 'light',
+    colors: {
+      bgVoid: '#F5F5F5', bgSurface: '#FAFAFA', bgCard: '#FFFFFF', bgElevated: '#E7E7E9',
+      border: '#D1D1D6', borderLit: '#76767F', text: '#18181B', textSecondary: '#4B4B52',
+      textDim: '#5F5F66', primary: '#18181B', primaryHover: '#3F3F46', onPrimary: '#FFFFFF',
+      shadowSm: '0 1px 2px rgba(9, 9, 11, 0.06)',
+      shadowMd: '0 5px 16px rgba(9, 9, 11, 0.09)',
+      shadowLg: '0 16px 36px rgba(9, 9, 11, 0.13)',
     },
   },
   {
@@ -145,7 +159,7 @@ export const THEME_PRESET_MAP = Object.fromEntries(
   THEME_PRESETS.map((preset) => [preset.id, preset]),
 ) as Record<ThemeId, ThemePreset>;
 
-const SELECTABLE_THEME_IDS: readonly ThemeId[] = ['light', 'dark', 'midnight', 'sage', 'lavender'];
+const SELECTABLE_THEME_IDS: readonly ThemeId[] = ['light', 'ink', 'dark', 'midnight', 'sage', 'lavender'];
 
 // Keep experimental palettes available without exposing them in user-facing
 // selectors. Explicit ids prevent array ordering from changing the rollout.

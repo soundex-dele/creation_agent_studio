@@ -28,25 +28,52 @@
 
 .header-nav {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   justify-content: center;
 }
 
 .header-nav-item {
-  padding: 8px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
   font-size: 14px;
   font-weight: 500;
+  font-family: inherit;
+  line-height: 1.2;
   color: var(--color-text-sec);
+  background: transparent;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   transition: color 0.2s, background 0.2s;
   position: relative;
   user-select: none;
+  white-space: nowrap;
+}
+
+.header-nav-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 0;
+}
+
+.header-nav-emoji {
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .header-nav-item:hover {
   color: var(--color-text);
   background: var(--color-bg-card);
+}
+
+.header-nav-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .header-nav-item.active {

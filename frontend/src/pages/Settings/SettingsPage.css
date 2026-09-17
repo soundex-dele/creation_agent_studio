@@ -44,6 +44,21 @@
 .settings-theme-selected { display: inline-flex; align-items: center; gap: 3px; color: var(--color-primary); font-size: 10px; white-space: nowrap; }
 .settings-theme-copy small { margin-top: 3px; overflow: hidden; color: var(--color-text-sec); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-theme-mode { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--color-text-dim); font-size: 10px; }
+.settings-icon-config { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.settings-icon-config-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.settings-icon-config-heading strong { color: var(--color-text); }
+.settings-icon-config-heading p { margin: 4px 0 0; color: var(--color-text-sec); }
+.settings-icon-mode-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.settings-icon-mode-row > strong { color: var(--color-text); font-size: 13px; }
+.settings-icon-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.settings-icon-detail-heading > strong { color: var(--color-text-sec); font-size: 12px; }
+.settings-icon-mode-note { padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-bg-elevated); color: var(--color-text-sec); line-height: 1.6; }
+.settings-icon-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.settings-icon-row { display: grid; grid-template-columns: minmax(88px, 1fr) minmax(132px, 160px); align-items: center; gap: 12px; min-width: 0; }
+.settings-icon-row-label, .settings-icon-select-option { display: inline-flex; align-items: center; gap: 8px; }
+.settings-icon-row-label { min-width: 0; color: var(--color-text); font-weight: 500; }
+.settings-icon-row-label .anticon, .settings-icon-select-option .anticon { color: currentColor; font-size: 15px; }
+.settings-icon-row .ant-select { width: 100%; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .settings-row--top { align-items: flex-start; }
 .settings-row strong { color: var(--color-text); }
@@ -52,10 +67,17 @@
 .settings-reset-card { margin-top: 20px; }
 @media (max-width: 820px) {
   .settings-grid { grid-template-columns: 1fr; }
+  .settings-icon-grid { grid-template-columns: 1fr; }
   .settings-row { align-items: flex-start; flex-direction: column; }
 }
 @media (max-width: 520px) {
   .settings-theme-grid { grid-template-columns: 1fr 1fr; }
+  .settings-icon-config-heading { flex-direction: column; }
+  .settings-icon-mode-row { align-items: flex-start; flex-direction: column; }
+  .settings-icon-mode-row .ant-segmented { width: 100%; }
+  .settings-icon-mode-row .ant-segmented-group { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .settings-icon-detail-heading { align-items: flex-start; flex-direction: column; }
+  .settings-icon-row { grid-template-columns: minmax(80px, 1fr) minmax(128px, 1.4fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   .settings-theme-option { transition: none; }

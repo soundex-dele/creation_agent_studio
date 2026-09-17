@@ -1,20 +1,37 @@
 import { useEffect, type CSSProperties } from 'react';
 import {
-  Alert, Button, Card, Descriptions, Popconfirm, Select, Space, Switch,
+  Alert, Button, Card, Descriptions, Popconfirm, Segmented, Select, Space, Switch,
   Tag, Typography, message,
 } from 'antd';
 import {
   BgColorsOutlined, CheckOutlined, KeyOutlined, MessageOutlined, MoonOutlined, ReloadOutlined,
   SafetyCertificateOutlined, TeamOutlined, UserOutlined,
-  BulbOutlined,
+  BulbOutlined, UndoOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@/stores/useThemeStore';
-import { usePreferencesStore } from '@/stores/usePreferencesStore';
+import {
+  usePreferencesStore,
+  type NavigationIconMode,
+} from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { SELECTABLE_THEME_PRESETS } from '@/components/Theme/themePresets';
+import {
+  DEFAULT_NAVIGATION_ICONS,
+  HEADER_NAV_ITEMS,
+  NAVIGATION_ICON_OPTIONS,
+} from '@/components/Header/headerNavigation';
+import { getNavigationIconComponent } from '@/components/Header/navigationIconComponents';
 import './SettingsPage.css';
+
+const navigationIconSelectOptions = NAVIGATION_ICON_OPTIONS.map((option) => {
+  const Icon = getNavigationIconComponent(option.id);
+  return {
+    value: option.id,
+    label: <span className="settings-icon-select-option"><Icon aria-hidden="true" />{option.label}</span>,
+  };
+});
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -22,7 +39,9 @@ export default function SettingsPage() {
   const { theme, setTheme } = useThemeStore();
   const {
     sendShortcut, defaultPermissionMode, setSendShortcut,
-    setDefaultPermissionMode, reset: resetPreferences,
+    navigationIconMode, navigationIcons, setDefaultPermissionMode,
+    setNavigationIconMode, setNavigationIcon,
+    resetNavigationIcons, reset: resetPreferences,
   } = usePreferencesStore();
   const {
     organizations, currentOrganizationId, singleTenantMode,
@@ -89,6 +108,65 @@ export default function SettingsPage() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="settings-icon-config">
+            <div className="settings-icon-config-heading">
+              <div>
+                <strong>顶部导航图标</strong>
+                <p>选择导航图标的显示方式，线稿模式还可逐项自定义。</p>
+              </div>
+            </div>
+            <div className="settings-icon-mode-row">
+              <strong>显示模式</strong>
+              <Segmented
+                value={navigationIconMode}
+                aria-label="顶部导航图标显示模式"
+                options={[
+                  { value: 'outline', label: '黑白线稿' },
+                  { value: 'emoji', label: 'Emoji' },
+                  { value: 'hidden', label: '隐藏图标' },
+                ]}
+                onChange={(value) => setNavigationIconMode(value as NavigationIconMode)}
+              />
+            </div>
+
+            {navigationIconMode === 'outline' ? (
+              <>
+                <div className="settings-icon-detail-heading">
+                  <strong>线稿图标映射</strong>
+                  <Button size="small" icon={<UndoOutlined />} onClick={resetNavigationIcons}>
+                    恢复默认图标
+                  </Button>
+                </div>
+                <div className="settings-icon-grid">
+                  {HEADER_NAV_ITEMS.map((item) => {
+                    const iconId = navigationIcons[item.id] ?? DEFAULT_NAVIGATION_ICONS[item.id];
+                    const Icon = getNavigationIconComponent(iconId);
+                    return (
+                      <div className="settings-icon-row" key={item.id}>
+                        <span className="settings-icon-row-label">
+                          <Icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </span>
+                        <Select
+                          value={iconId}
+                          aria-label={`设置${item.label}图标`}
+                          options={navigationIconSelectOptions}
+                          onChange={(value) => setNavigationIcon(item.id, value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="settings-icon-mode-note">
+                {navigationIconMode === 'emoji'
+                  ? '导航将使用对应的 Emoji 图标，文字标签保持不变。'
+                  : '导航将只显示文字标签，为顶部栏腾出更多空间。'}
+              </div>
+            )}
           </div>
         </Card>
 
@@ -164,7 +242,7 @@ export default function SettingsPage() {
       <Card className="settings-reset-card" title="重置偏好">
         <div className="settings-row">
           <div><strong>恢复默认设置</strong><p>只重置当前浏览器中的主题和对话偏好，不会删除账号或业务数据。</p></div>
-          <Popconfirm title="恢复默认设置？" description="主题和对话偏好将被重置。" onConfirm={reset}>
+          <Popconfirm title="恢复默认设置？" description="主题、导航图标和对话偏好将被重置。" onConfirm={reset}>
             <Button icon={<ReloadOutlined />}>恢复默认</Button>
           </Popconfirm>
         </div>

@@ -1,28 +1,24 @@
 import React from 'react';
 import { Dropdown, Avatar } from 'antd';
-import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
+import {
+  LogoutOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { ThemeToggle } from '@/components/Theme';
+import { HEADER_NAV_ITEMS } from './headerNavigation';
+import { getNavigationIconComponent } from './navigationIconComponents';
 import './Header.css';
-
-const navItems = [
-  { key: '/', label: '🏠 首页' },
-  { key: '/chat', label: '💬 对话' },
-  { key: '/agents', label: '🤖 智能体' },
-  { key: '/delegates', label: '🧭 AI 分身' },
-  { key: '/skills', label: '⚡ 技能' },
-  { key: '/apps', label: '🧩 应用' },
-  { key: '/workflows', label: '🔀 工作流' },
-  { key: '/knowledge', label: '📚 知识库' },
-  { key: '/automations', label: '⏱️ 自动化' },
-  { key: '/enterprise', label: '🏢 控制台' },
-];
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated } = useAuthStore();
+  const navigationIconMode = usePreferencesStore((state) => state.navigationIconMode);
+  const navigationIcons = usePreferencesStore((state) => state.navigationIcons);
 
   const handleLogout = async () => {
     await logout();
@@ -63,18 +59,32 @@ const Header: React.FC = () => {
       </div>
 
       {/* Center: Nav */}
-      <nav className="header-nav">
-        {navItems.map((item) => (
-          <div
-            key={item.key}
-            className={`header-nav-item ${
-              activePath === item.key || (item.key !== '/' && activePath.startsWith(item.key))
-                ? 'active' : ''}`}
-            onClick={() => navigate(item.key)}
-          >
-            {item.label}
-          </div>
-        ))}
+      <nav className="header-nav" aria-label="主导航">
+        {HEADER_NAV_ITEMS.map((item) => {
+          const active = activePath === item.path
+            || (item.path !== '/' && activePath.startsWith(item.path));
+          const Icon = getNavigationIconComponent(
+            navigationIcons[item.id] ?? item.defaultIcon,
+          );
+
+          return (
+            <button
+              type="button"
+              key={item.id}
+              className={`header-nav-item${active ? ' active' : ''}`}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => navigate(item.path)}
+            >
+              {navigationIconMode === 'outline' && (
+                <Icon className="header-nav-icon" aria-hidden="true" />
+              )}
+              {navigationIconMode === 'emoji' && (
+                <span className="header-nav-emoji" aria-hidden="true">{item.emoji}</span>
+              )}
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* Right: User */}
