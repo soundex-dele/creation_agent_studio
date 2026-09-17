@@ -20,6 +20,8 @@ export default {
         },
         primary: {
           DEFAULT: 'var(--color-primary)',
+          hover: 'var(--color-primary-hover)',
+          foreground: 'var(--color-on-primary)',
         },
       },
       fontFamily: {
@@ -60,8 +62,8 @@ export default {
           '100%': { opacity: '1', transform: 'translateX(0)' },
         },
         glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(232, 168, 56, 0.1)' },
-          '50%': { boxShadow: '0 0 40px rgba(232, 168, 56, 0.3)' },
+          '0%, 100%': { boxShadow: '0 0 20px color-mix(in srgb, var(--color-primary) 10%, transparent)' },
+          '50%': { boxShadow: '0 0 40px color-mix(in srgb, var(--color-primary) 30%, transparent)' },
         },
         typingDot: {
           '0%, 60%, 100%': { opacity: '0.3', transform: 'translateY(0)' },

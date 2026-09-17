@@ -76,7 +76,7 @@ body {
 
 ::selection {
   background: var(--color-primary);
-  color: var(--color-bg-void);
+  color: var(--color-on-primary);
 }
 
 a {
@@ -85,7 +85,7 @@ a {
 }
 
 a:hover {
-  color: #F0C060;
+  color: var(--color-primary-hover);
 }
 
 /* Shared page heading and toolbar primitives. These must stay in the eagerly

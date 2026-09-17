@@ -39,9 +39,14 @@ describe('theme presets', () => {
     }
   });
 
-  it('exposes only the established light and dark themes', () => {
-    expect(SELECTABLE_THEME_PRESETS.map((preset) => preset.id)).toEqual(['light', 'dark']);
+  it('exposes the established themes and released color themes', () => {
+    expect(SELECTABLE_THEME_PRESETS.map((preset) => preset.id)).toEqual([
+      'light', 'dark', 'midnight', 'sage', 'lavender',
+    ]);
     expect(isSelectableThemeId('light')).toBe(true);
+    expect(isSelectableThemeId('midnight')).toBe(true);
+    expect(isSelectableThemeId('sage')).toBe(true);
+    expect(isSelectableThemeId('lavender')).toBe(true);
     expect(isSelectableThemeId('ocean')).toBe(false);
   });
 
@@ -52,6 +57,21 @@ describe('theme presets', () => {
       expect(contrastRatio(colors.textSecondary, colors.bgCard), preset.name).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(colors.primary, colors.bgCard), preset.name).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(colors.onPrimary, colors.primary), preset.name).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors.onPrimary, colors.primaryHover), preset.name).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('keeps released color-theme text roles readable across their surfaces', () => {
+    for (const themeId of ['midnight', 'sage', 'lavender'] as const) {
+      const { colors } = getThemePreset(themeId);
+      const surfaces = [colors.bgVoid, colors.bgSurface, colors.bgCard, colors.bgElevated];
+      const textRoles = [colors.text, colors.textSecondary, colors.textDim, colors.primary];
+
+      for (const foreground of textRoles) {
+        for (const background of surfaces) {
+          expect(contrastRatio(foreground, background), themeId).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 });

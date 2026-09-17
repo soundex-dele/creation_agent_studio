@@ -141,7 +141,7 @@ const MessageList: React.FC<MessageListProps> = ({
             backgroundColor: isUser
               ? 'var(--color-primary)'
               : 'var(--color-bg-elevated)',
-            color: isUser ? '#fff' : 'var(--color-primary)',
+            color: isUser ? 'var(--color-on-primary)' : 'var(--color-primary)',
           }}
         />
 

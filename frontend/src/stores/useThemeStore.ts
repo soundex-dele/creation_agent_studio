@@ -30,6 +30,8 @@ export function applyThemeToDOM(theme: ThemeMode): void {
   root.style.setProperty('--color-text-sec', preset.colors.textSecondary);
   root.style.setProperty('--color-text-dim', preset.colors.textDim);
   root.style.setProperty('--color-primary', preset.colors.primary);
+  root.style.setProperty('--color-primary-hover', preset.colors.primaryHover);
+  root.style.setProperty('--color-on-primary', preset.colors.onPrimary);
   root.style.setProperty('--shadow-sm', preset.colors.shadowSm);
   root.style.setProperty('--shadow-md', preset.colors.shadowMd);
   root.style.setProperty('--shadow-lg', preset.colors.shadowLg);

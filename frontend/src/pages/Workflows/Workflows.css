@@ -53,7 +53,7 @@
 .workflow-app-picker-copy small { display: -webkit-box; color: var(--color-text-sec); line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .workflow-step-list { display: flex; flex-direction: column; gap: 10px; }
 .workflow-editor-step .ant-card-body { display: flex; align-items: center; gap: 12px; }
-.workflow-step-index { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: white; }
+.workflow-step-index { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); }
 .workflow-step-icon { font-size: 26px; }
 .workflow-step-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .workflow-step-mapping { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); }

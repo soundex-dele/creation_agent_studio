@@ -136,7 +136,7 @@
   height: 36px;
   border-radius: var(--border-radius-sm);
   background: var(--color-primary);
-  color: var(--color-bg-void);
+  color: var(--color-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,7 +148,7 @@
 }
 
 .chat-send-btn:hover {
-  background: #F0B84D;
+  background: var(--color-primary-hover);
   transform: scale(1.05);
 }
 

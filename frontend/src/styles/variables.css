@@ -14,6 +14,8 @@
   --color-text-sec: #6B7280;
   --color-text-dim: #9CA3AF;
   --color-primary: #D97706;
+  --color-primary-hover: #B45309;
+  --color-on-primary: #FFFFFF;
 
   --color-success: #52c41a;
   --color-warning: #faad14;
@@ -54,6 +56,8 @@
   --color-text-sec: #9898A8;
   --color-text-dim: #5C5C6E;
   --color-primary: #E8A838;
+  --color-primary-hover: #F0C060;
+  --color-on-primary: #241700;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
