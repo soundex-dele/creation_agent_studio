@@ -72,6 +72,10 @@ def test_all_worker_pool_builds_one_coordinator_per_pool(monkeypatch, tmp_path):
         coordinator.kwargs["worker_pool"]
         for coordinator in _FakeCoordinator.created
     ] == list(Run.ExecutorKind.values)
+    assert Run.ExecutorKind.KNOWLEDGE in [
+        coordinator.kwargs["worker_pool"]
+        for coordinator in _FakeCoordinator.created
+    ]
     assert _FakeSupervisor.created[0].ran_once is True
     assert _FakeSupervisor.created[0].stopped is True
 

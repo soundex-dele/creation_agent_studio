@@ -12,6 +12,7 @@ from apps.knowledge.execution import execute_knowledge_answer, execute_knowledge
 from apps.knowledge.index_backend import replace_document_index
 from apps.knowledge.models import KnowledgeBase, KnowledgeChunk, KnowledgeDocument
 from apps.knowledge.retrieval import chunk_sections, search
+from modules.execution.infrastructure.coordinator import ADAPTER_EVENT_TYPES
 
 
 pytestmark = pytest.mark.django_db
@@ -138,16 +139,18 @@ def test_developer_upload_creates_durable_index_run(tmp_path, settings):
     assert document.indexing_run.executor_kind == "knowledge"
     assert document.indexing_run.executor_key == "knowledge-index"
     run = document.indexing_run
+    sink = Sink()
     output = execute_knowledge_index({
         "run_id": str(run.id),
         "organization_id": str(organization.id),
         "owner_id": owner.id,
         "definition_snapshot": run.definition_snapshot,
         "input": run.input,
-    }, Sink())
+    }, sink)
     document.refresh_from_db()
     assert document.status == KnowledgeDocument.Status.READY
     assert output["chunk_count"] == 1
+    assert {event_type for event_type, _payload in sink.events} <= ADAPTER_EVENT_TYPES
     mode, results = search(
         organization_id=organization.id,
         query="帮助文档",

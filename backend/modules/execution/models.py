@@ -24,6 +24,7 @@ class Run(TenantOwnedModel):
         MEDIA = "media", "Media"
         WORKFLOW = "workflow", "Workflow"
         EVALUATION = "evaluation", "Evaluation"
+        KNOWLEDGE = "knowledge", "Knowledge"
 
     class Status(models.TextChoices):
         QUEUED = "queued", "Queued"

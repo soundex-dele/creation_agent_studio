@@ -38,7 +38,9 @@ def execute_knowledge_index(run_payload, sink):
             "status", "error", "error_code", "metadata", "updated_at",
         ])
     started = time.perf_counter()
-    sink.emit("knowledge.index.progress", {"stage": "extracting", "progress": 10})
+    sink.emit("progress.updated", {
+        "stage": "extracting", "progress": 10, "current": 10, "total": 100,
+    })
     try:
         if document.source_object_key:
             with get_artifact_storage().open(document.source_object_key) as handle:
@@ -53,8 +55,9 @@ def execute_knowledge_index(run_payload, sink):
         )
         if not chunks:
             raise DocumentExtractionError("no_extractable_text", "No extractable text was found.")
-        sink.emit("knowledge.index.progress", {
-            "stage": "embedding", "progress": 45, "chunk_count": len(chunks),
+        sink.emit("progress.updated", {
+            "stage": "embedding", "progress": 45, "current": 45, "total": 100,
+            "chunk_count": len(chunks),
         })
         document.metadata = {
             **document.metadata,
@@ -149,7 +152,9 @@ def execute_knowledge_index(run_payload, sink):
             "usage": embedding_usage,
             "model": embedding_model_used,
         }
-        sink.emit("knowledge.index.progress", {"stage": "complete", "progress": 100})
+        sink.emit("progress.updated", {
+            "stage": "complete", "progress": 100, "current": 100, "total": 100,
+        })
         sink.emit("output.snapshot", output)
         return output
     except Exception as exc:
