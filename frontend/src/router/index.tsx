@@ -29,6 +29,9 @@ const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'))
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
+const AutomationsPage = lazy(() => import('@/pages/Automations/AutomationsPage'));
+const AutomationEditorPage = lazy(() => import('@/pages/Automations/AutomationEditorPage'));
+const AutomationDetailPage = lazy(() => import('@/pages/Automations/AutomationDetailPage'));
 
 const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
@@ -255,6 +258,22 @@ const router = createBrowserRouter([
         </MainLayout>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/automations',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<AutomationsPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/automations/new',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<AutomationEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/automations/:id/edit',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<AutomationEditorPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/automations/:id',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<AutomationDetailPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/enterprise',

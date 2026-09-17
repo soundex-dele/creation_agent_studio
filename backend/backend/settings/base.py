@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'apps.marketplace',
     'apps.enterprise',
     'apps.workflows',
+    'apps.automations',
     *discover_django_apps(APP_CENTER_ROOT),
 
     # Versioning, tenancy helpers and durable execution extend the product apps.

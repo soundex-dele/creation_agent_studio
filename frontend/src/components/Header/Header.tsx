@@ -13,6 +13,7 @@ const navItems = [
   { key: '/skills', label: '⚡ 技能' },
   { key: '/apps', label: '🧩 应用' },
   { key: '/workflows', label: '🔀 工作流' },
+  { key: '/automations', label: '⏱️ 自动化' },
   { key: '/enterprise', label: '🏢 控制台' },
 ];
 

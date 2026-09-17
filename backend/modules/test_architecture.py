@@ -24,6 +24,7 @@ ALLOWED_DOMAIN_IMPORTS = {
     },
     "modules/tenancy/single_tenant_urls.py": {
         "apps.applications.app_center.urls",
+        "apps.automations.urls",
         "apps.enterprise.tenancy",
     },
 }

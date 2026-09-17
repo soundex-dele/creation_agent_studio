@@ -125,6 +125,20 @@ SINGLE_TENANT_DEFAULT_ROLE=viewer
 薄入口）和提交命令都必须携带幂等键。运行事件是可重放事实，前端通过
 sequence 游标恢复，不维护第二套运行状态。
 
+## 自动化
+
+顶部“自动化”模块支持按指定时区执行单次或五段 Cron 计划，也可以生成带
+Bearer 密钥的 Webhook。自动化只能运行 Production 应用或自动工作流，每次
+触发都会创建一条可审计的 Invocation，并关联到统一 Durable Run。Webhook
+密钥只在创建或轮换时显示一次；同一个外部 `Idempotency-Key` 可安全重放。
+
+调度器仍使用已有启动命令：
+
+```powershell
+cd backend
+venv\Scripts\python.exe manage.py run_automation_scheduler
+```
+
 ## Compose 部署
 
 复制并配置 `backend/.env`，必须设置：

@@ -389,18 +389,6 @@ class Connector(TimeStampedModel):
         db_table = 'connectors'
 
 
-class AutomationTrigger(TimeStampedModel):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE,
-                                     related_name='automation_triggers')
-    name = models.CharField(max_length=160)
-    trigger_type = models.CharField(max_length=30, default='webhook')
-    target_type = models.CharField(max_length=30)
-    target_id = models.CharField(max_length=160)
-    schedule = models.CharField(max_length=120, blank=True)
-    event_name = models.CharField(max_length=160, blank=True)
-    input_mapping = models.JSONField(default=dict, blank=True)
-    is_active = models.BooleanField(default=True)
-    last_triggered_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'automation_triggers'
+# Compatibility import for legacy enterprise API clients. The registered model
+# and database ownership now live in the dedicated automations application.
+from apps.automations.models import Automation as AutomationTrigger  # noqa: E402

@@ -46,6 +46,7 @@ urlpatterns += [
     path('api/v1/projects/', include('apps.projects.urls')),
     path('api/v1/marketplace/', include('apps.marketplace.urls')),
     path('api/v1/enterprise/', include('apps.enterprise.urls')),
+    path('api/v1/hooks/', include('apps.automations.public_urls')),
     path('api/v1/workflows/', include('apps.workflows.urls')),
     path('api/v1/', include('modules.tenancy.single_tenant_urls')),
     path(
@@ -55,6 +56,10 @@ urlpatterns += [
     path(
         'api/v1/organizations/<uuid:organization_id>/',
         include('modules.execution.api.urls', namespace='execution-v1'),
+    ),
+    path(
+        'api/v1/organizations/<uuid:organization_id>/',
+        include('apps.automations.urls'),
     ),
     path(
         'api/v1/organizations/<uuid:organization_id>/',
