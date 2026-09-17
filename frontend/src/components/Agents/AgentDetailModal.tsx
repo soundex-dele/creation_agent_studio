@@ -62,7 +62,7 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
       const conversation = await createConversation(agent.name, agentId);
       message.success('对话已创建');
       onClose();
-      navigate(`/?conversation=${conversation.id}`);
+      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
     } catch (error: any) {
       message.error(error.message || '创建对话失败');
     } finally {
