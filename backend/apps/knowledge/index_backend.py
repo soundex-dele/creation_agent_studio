@@ -152,10 +152,15 @@ def replace_document_index(document, chunks):
 
 def delete_document_index(document_id):
     load_sqlite_vec()
-    placeholder = "?" if connection.vendor == "sqlite" else "%s"
     with connection.cursor() as cursor:
-        cursor.execute(f"DELETE FROM knowledge_vector_index WHERE document_id = {placeholder}", [document_id])
-        cursor.execute(f"DELETE FROM knowledge_lexical_index WHERE document_id = {placeholder}", [document_id])
+        cursor.execute(
+            "DELETE FROM knowledge_vector_index WHERE document_id = %s",
+            [document_id],
+        )
+        cursor.execute(
+            "DELETE FROM knowledge_lexical_index WHERE document_id = %s",
+            [document_id],
+        )
 
 
 def vector_candidates(organization_id, knowledge_base_ids, query_embedding, limit=50):
@@ -163,11 +168,11 @@ def vector_candidates(organization_id, knowledge_base_ids, query_embedding, limi
         return []
     if connection.vendor == "sqlite":
         load_sqlite_vec()
-        placeholders = ",".join("?" for _ in knowledge_base_ids)
+        placeholders = ",".join("%s" for _ in knowledge_base_ids)
         params = [json.dumps(query_embedding), limit, str(organization_id), *knowledge_base_ids]
         sql = f"""
             SELECT rowid, distance FROM knowledge_vector_index
-            WHERE embedding MATCH ? AND k = ? AND organization_id = ?
+            WHERE embedding MATCH %s AND k = %s AND organization_id = %s
               AND knowledge_base_id IN ({placeholders})
             ORDER BY distance
         """
@@ -191,15 +196,15 @@ def lexical_candidates(organization_id, knowledge_base_ids, terms, limit=50):
         return []
     if connection.vendor == "sqlite":
         load_sqlite_vec()
-        placeholders = ",".join("?" for _ in knowledge_base_ids)
+        placeholders = ",".join("%s" for _ in knowledge_base_ids)
         match = " OR ".join(f'"{term}"' for term in terms)
         with connection.cursor() as cursor:
             cursor.execute(f"""
                 SELECT chunk_id, -bm25(knowledge_lexical_index) AS score
                 FROM knowledge_lexical_index
-                WHERE knowledge_lexical_index MATCH ? AND organization_id = ?
+                WHERE knowledge_lexical_index MATCH %s AND organization_id = %s
                   AND knowledge_base_id IN ({placeholders})
-                ORDER BY bm25(knowledge_lexical_index) LIMIT ?
+                ORDER BY bm25(knowledge_lexical_index) LIMIT %s
             """, [match, str(organization_id), *knowledge_base_ids, limit])
             return [(int(row[0]), float(row[1])) for row in cursor.fetchall()]
     if connection.vendor == "postgresql":

@@ -78,6 +78,7 @@ def test_docx_extraction_and_pdf_safety_rejections():
 
 def test_viewer_can_search_but_cannot_upload(tmp_path, settings):
     settings.ARTIFACT_ROOT = tmp_path
+    settings.DEBUG = True
     owner = get_user_model().objects.create_user(username="knowledge-owner")
     viewer = get_user_model().objects.create_user(username="knowledge-viewer")
     organization = owner.organization_memberships.get().organization
