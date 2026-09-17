@@ -18,6 +18,7 @@
 .home-guide p { margin: 6px 0 0; color: var(--color-text-dim); font-size: 13px; }
 
 @media (max-width: 760px) {
-  .home-page { padding: 32px 24px; }
+  .home-page { padding: 32px 20px; overflow-y: auto; }
+  .home-actions { align-items: stretch; flex-direction: column; }
   .home-guide { grid-template-columns: 1fr; margin-top: 52px; }
 }

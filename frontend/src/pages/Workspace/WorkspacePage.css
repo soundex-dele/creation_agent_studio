@@ -156,6 +156,10 @@
   background: var(--color-bg-card);
 }
 
+.ws-mobile-tools {
+  display: none;
+}
+
 .ws-center-proc {
   display: flex;
   align-items: center;
@@ -213,4 +217,59 @@
   .ws-sidebar {
     display: none;
   }
+
+  .ws-center-head {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+
+  .ws-center-head > .ws-back-btn {
+    width: 44px;
+    height: 44px !important;
+    padding: 0 !important;
+  }
+
+  .ws-center-proc {
+    overflow: hidden;
+  }
+
+  .ws-center-proc > div:last-child {
+    min-width: 0;
+  }
+
+  .ws-center-proc-name,
+  .ws-center-proc-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-mobile-tools {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ws-mobile-tools .ant-btn {
+    min-height: 44px;
+  }
+
+  .ws-process-item {
+    min-height: 52px;
+  }
+}
+
+.ws-mobile-drawer .ant-drawer-body {
+  padding: 0;
+}
+
+.ws-mobile-drawer .ws-sidebar,
+.ws-mobile-drawer .ws-asset-panel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }

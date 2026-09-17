@@ -7,6 +7,17 @@ import ConversationHistory from '../ConversationHistory/ConversationHistory';
 import HomeApplicationsSidebar from './HomeApplicationsSidebar';
 import './Sidebar.css';
 
+export const hasSidebarContent = (path: string) => (
+  path === '/'
+  || path === ''
+  || path.startsWith('/chat')
+  || path.startsWith('/agents')
+  || path.startsWith('/applications')
+  || path.startsWith('/apps')
+  || path.startsWith('/templates')
+  || path.startsWith('/workspace')
+);
+
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();

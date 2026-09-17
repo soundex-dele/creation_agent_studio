@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Button, Drawer } from 'antd';
+import { FolderOpenOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { ChatContainer } from '@/components/Chat';
 import WorkspaceFilesPanel from '@/components/Workspace/WorkspaceFilesPanel';
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles';
 import { useConversationStore } from '@/stores/useConversationStore';
+import useMediaQuery from '@/hooks/useMediaQuery';
 
 const ChatPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [filesOpen, setFilesOpen] = useState(false);
   const conversationId = searchParams.get('conversation') || null;
   const streamingMessageId = useConversationStore((state) => state.streamingMessageId);
   const {
@@ -27,6 +32,8 @@ const ChatPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [conversationId, streamingMessageId, refreshWorkspaceFiles]);
 
+  useEffect(() => setFilesOpen(false), [conversationId]);
+
   return (
     <div className="chat-application-layout">
       <div className="chat-application-main">
@@ -36,7 +43,7 @@ const ChatPage: React.FC = () => {
           onConversationCreated={(id) => setSearchParams({ conversation: id }, { replace: true })}
         />
       </div>
-      {workspaceFileCount > 0 && (
+      {workspaceFileCount > 0 && !isMobile && (
         <WorkspaceFilesPanel
           workingDirectory={workingDirectory}
           entries={workspaceEntries}
@@ -45,6 +52,35 @@ const ChatPage: React.FC = () => {
           onRefresh={() => void refreshWorkspaceFiles()}
           onReadFile={readWorkspaceFile}
         />
+      )}
+      {workspaceFileCount > 0 && isMobile && (
+        <>
+          <Button
+            className="chat-files-mobile-trigger"
+            icon={<FolderOpenOutlined />}
+            aria-expanded={filesOpen}
+            onClick={() => setFilesOpen(true)}
+          >
+            文件
+          </Button>
+          <Drawer
+            title="会话文件"
+            placement="right"
+            width="min(92vw, 380px)"
+            open={filesOpen}
+            onClose={() => setFilesOpen(false)}
+            rootClassName="chat-files-drawer"
+          >
+            <WorkspaceFilesPanel
+              workingDirectory={workingDirectory}
+              entries={workspaceEntries}
+              truncated={workspaceListingTruncated}
+              isRefreshing={isRefreshingWorkspace}
+              onRefresh={() => void refreshWorkspaceFiles()}
+              onReadFile={readWorkspaceFile}
+            />
+          </Drawer>
+        </>
       )}
     </div>
   );

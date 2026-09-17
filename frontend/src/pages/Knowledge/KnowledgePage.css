@@ -17,3 +17,11 @@
 .knowledge-citations { margin-top: 12px; }
 .knowledge-citations .ant-list-item-meta-description { white-space: pre-wrap; }
 @media (max-width: 900px) { .knowledge-layout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .knowledge-header,
+  .knowledge-title,
+  .knowledge-toolbar { align-items: stretch; flex-direction: column; }
+  .knowledge-main { min-height: 0; }
+  .knowledge-title .ant-space,
+  .knowledge-toolbar .ant-space { width: 100%; flex-wrap: wrap; }
+}

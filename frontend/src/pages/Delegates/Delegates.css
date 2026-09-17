@@ -33,4 +33,4 @@
 .delegate-composer textarea.ant-input { min-height: 40px; padding-block: 8px; line-height: 22px; }
 .delegate-composer .ant-btn { flex: 0 0 auto; min-width: 88px; height: 40px; }
 .delegate-board-pane { gap: 12px; overflow: auto; }
-@media (max-width: 900px) { .delegate-task-page { grid-template-columns: 1fr; height: auto; } .delegate-chat-pane { min-height: 70vh; border-right: none; border-bottom: 1px solid var(--color-border); } .delegate-form-grid { grid-template-columns: 1fr; } .delegate-composer { align-items: stretch; flex-direction: column; } .delegate-composer .ant-btn { width: 100%; } }
+@media (max-width: 900px) { .delegate-grid { grid-template-columns: minmax(0, 1fr); } .delegate-task-page { grid-template-columns: 1fr; height: auto; } .delegate-chat-pane { min-height: 70vh; border-right: none; border-bottom: 1px solid var(--color-border); } .delegate-form-grid { grid-template-columns: 1fr; } .delegate-composer { align-items: stretch; flex-direction: column; } .delegate-composer .ant-btn { width: 100%; } }

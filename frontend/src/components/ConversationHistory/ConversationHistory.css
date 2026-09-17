@@ -60,7 +60,7 @@
 .conversation-item {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 11px;
   padding: 9px 10px;
   border-radius: var(--border-radius-md);
@@ -92,7 +92,7 @@
   font-weight: 600;
   font-family: var(--font-display);
   line-height: 1;
-  margin-top: 1px;
+  margin-top: 0;
   user-select: none;
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Empty, Spin, message } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Button, Drawer, Empty, Spin, message } from 'antd';
+import { ArrowLeftOutlined, FolderOpenOutlined, MenuOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useConversationStore } from '@/stores/useConversationStore';
@@ -31,6 +31,8 @@ const WorkspacePage: React.FC = () => {
   const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
   const [convMap, setConvMap] = useState<Record<string, string>>({});
   const [seeding, setSeeding] = useState(false);
+  const [processDrawerOpen, setProcessDrawerOpen] = useState(false);
+  const [assetDrawerOpen, setAssetDrawerOpen] = useState(false);
   const creatingRef = useRef<Set<string>>(new Set());
   // Marks a conversation that was just seeded via sendMessageStream, so the
   // activeConvId fetch effect skips it (avoids clobbering the streamed placeholder).
@@ -162,6 +164,11 @@ const WorkspacePage: React.FC = () => {
 
   const activeProcess = processes.find((p) => p.id === activeProcessId) || null;
 
+  const handleProcessSelect = (processId: string) => {
+    setActiveProcessId(processId);
+    setProcessDrawerOpen(false);
+  };
+
   const startedMap: Record<string, boolean> = {};
   processes.forEach((p) => {
     startedMap[p.id] = !!convMap[p.id];
@@ -199,7 +206,7 @@ const WorkspacePage: React.FC = () => {
           processes={processes}
           activeProcessId={activeProcessId}
           startedMap={startedMap}
-          onSelect={setActiveProcessId}
+          onSelect={handleProcessSelect}
           onBack={() => navigate('/apps')}
         />
 
@@ -211,6 +218,7 @@ const WorkspacePage: React.FC = () => {
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/templates')}
               className="ws-back-btn"
+              aria-label="返回模板列表"
             />
             <div className="ws-center-proc">
               {activeProcess && <span className="ws-center-proc-icon">{activeProcess.icon || '✨'}</span>}
@@ -223,12 +231,55 @@ const WorkspacePage: React.FC = () => {
                 )}
               </div>
             </div>
+            <div className="ws-mobile-tools" aria-label="工作台面板">
+              <Button
+                icon={<MenuOutlined />}
+                onClick={() => setProcessDrawerOpen(true)}
+              >
+                流程
+              </Button>
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={() => setAssetDrawerOpen(true)}
+              >
+                文件
+              </Button>
+            </div>
           </header>
           <div className="ws-center-content">{renderCenter()}</div>
         </section>
 
         <AssetPanel assets={project.assets || []} />
       </div>
+
+      <Drawer
+        title="任务流程"
+        placement="left"
+        width="min(88vw, 360px)"
+        open={processDrawerOpen}
+        onClose={() => setProcessDrawerOpen(false)}
+        rootClassName="ws-mobile-drawer"
+      >
+        <ProcessSidebar
+          project={project}
+          processes={processes}
+          activeProcessId={activeProcessId}
+          startedMap={startedMap}
+          onSelect={handleProcessSelect}
+          onBack={() => navigate('/apps')}
+        />
+      </Drawer>
+
+      <Drawer
+        title="工作空间文件"
+        placement="right"
+        width="min(92vw, 380px)"
+        open={assetDrawerOpen}
+        onClose={() => setAssetDrawerOpen(false)}
+        rootClassName="ws-mobile-drawer"
+      >
+        <AssetPanel assets={project.assets || []} />
+      </Drawer>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Dropdown, Avatar } from 'antd';
 import {
   LogoutOutlined,
+  MenuOutlined,
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -13,7 +14,17 @@ import { HEADER_NAV_ITEMS } from './headerNavigation';
 import { getNavigationIconComponent } from './navigationIconComponents';
 import './Header.css';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  mobileMenuOpen?: boolean;
+  onMobileMenuClick?: () => void;
+  showMobileMenu?: boolean;
+}
+
+const Header: React.FC<HeaderProps> = ({
+  mobileMenuOpen = false,
+  onMobileMenuClick,
+  showMobileMenu = false,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -53,10 +64,22 @@ const Header: React.FC = () => {
 
   return (
     <header className="app-header">
+      <button
+        type="button"
+        className={`header-mobile-menu${showMobileMenu ? '' : ' header-mobile-menu--placeholder'}`}
+        aria-label="打开当前页面导航"
+        aria-expanded={showMobileMenu ? mobileMenuOpen : undefined}
+        aria-hidden={showMobileMenu ? undefined : true}
+        tabIndex={showMobileMenu ? 0 : -1}
+        onClick={showMobileMenu ? onMobileMenuClick : undefined}
+      >
+        <MenuOutlined aria-hidden="true" />
+      </button>
+
       {/* Left: Logo */}
-      <div className="header-logo" onClick={() => navigate('/')}>
+      <button type="button" className="header-logo" onClick={() => navigate('/')}>
         Agent <span>Studio</span>
-      </div>
+      </button>
 
       {/* Center: Nav */}
       <nav className="header-nav" aria-label="主导航">
@@ -92,7 +115,7 @@ const Header: React.FC = () => {
         <ThemeToggle />
         {isAuthenticated && (
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div className="header-user">
+            <button type="button" className="header-user" aria-label="打开用户菜单">
               <div className="header-avatar">
                 {user?.avatar ? (
                   <Avatar size={32} src={user.avatar} />
@@ -101,7 +124,7 @@ const Header: React.FC = () => {
                 )}
               </div>
               <span className="header-username">{user?.username || 'User'}</span>
-            </div>
+            </button>
           </Dropdown>
         )}
       </div>

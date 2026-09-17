@@ -181,3 +181,40 @@
   cursor: pointer;
   font: inherit;
 }
+
+@media (max-width: 767px) {
+  .chat-workspace-toolbar {
+    top: 10px;
+    right: 12px;
+  }
+
+  .chat-workspace-toolbar .ant-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-messages {
+    padding: 24px 16px;
+  }
+
+  .chat-empty {
+    padding: 24px 16px;
+  }
+
+  .chat-empty h3 {
+    font-size: 19px;
+    text-align: center;
+  }
+
+  .chat-suggestion {
+    min-height: 44px;
+  }
+
+  .chat-input-area {
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .agent-question-card {
+    margin-left: 0;
+  }
+}

@@ -7,7 +7,7 @@ interface ChatLayoutProps {
 
 const ChatLayout: React.FC<ChatLayoutProps> = ({ children }) => {
   return (
-    <div className="flex h-screen flex-col bg-void">
+    <div className="chat-layout flex h-screen flex-col bg-void">
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-hidden bg-void">
