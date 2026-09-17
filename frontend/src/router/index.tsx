@@ -29,6 +29,7 @@ const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'))
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
+const KnowledgePage = lazy(() => import('@/pages/Knowledge/KnowledgePage'));
 const AutomationsPage = lazy(() => import('@/pages/Automations/AutomationsPage'));
 const AutomationEditorPage = lazy(() => import('@/pages/Automations/AutomationEditorPage'));
 const AutomationDetailPage = lazy(() => import('@/pages/Automations/AutomationDetailPage'));
@@ -206,6 +207,16 @@ const router = createBrowserRouter([
         <ApplicationShell fullBleed>
           {page(<WeMDPage />)}
         </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/knowledge',
+    element: (
+      <ProtectedRoute>
+        <MainLayout hideSidebar>
+          {page(<KnowledgePage />)}
+        </MainLayout>
       </ProtectedRoute>
     ),
   },

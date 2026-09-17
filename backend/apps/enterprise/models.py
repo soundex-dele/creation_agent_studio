@@ -270,62 +270,6 @@ class TraceSpan(models.Model):
         ordering = ['started_at']
 
 
-class KnowledgeBase(TimeStampedModel):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE,
-                                     related_name='knowledge_bases')
-    name = models.CharField(max_length=160)
-    description = models.TextField(blank=True)
-    embedding_provider = models.CharField(max_length=100, blank=True)
-    embedding_model = models.CharField(max_length=160, blank=True)
-    chunk_size = models.PositiveIntegerField(default=800)
-    chunk_overlap = models.PositiveIntegerField(default=100)
-    access_policy = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        db_table = 'knowledge_bases'
-        constraints = [models.UniqueConstraint(
-            fields=['organization', 'name'], name='unique_org_knowledge_base')]
-
-
-class KnowledgeDocument(TimeStampedModel):
-    class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        INDEXING = 'indexing', 'Indexing'
-        READY = 'ready', 'Ready'
-        FAILED = 'failed', 'Failed'
-
-    knowledge_base = models.ForeignKey(KnowledgeBase, on_delete=models.CASCADE,
-                                       related_name='documents')
-    title = models.CharField(max_length=300)
-    source_type = models.CharField(max_length=30, default='text')
-    source_uri = models.CharField(max_length=1000, blank=True)
-    content = models.TextField(blank=True)
-    checksum = models.CharField(max_length=64, blank=True, db_index=True)
-    status = models.CharField(max_length=20, choices=Status.choices,
-                              default=Status.PENDING)
-    metadata = models.JSONField(default=dict, blank=True)
-    error = models.TextField(blank=True)
-
-    class Meta:
-        db_table = 'knowledge_documents'
-
-
-class KnowledgeChunk(models.Model):
-    document = models.ForeignKey(KnowledgeDocument, on_delete=models.CASCADE,
-                                 related_name='chunks')
-    position = models.PositiveIntegerField()
-    content = models.TextField()
-    token_count = models.PositiveIntegerField(default=0)
-    embedding = models.JSONField(default=list, blank=True)
-    metadata = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        db_table = 'knowledge_chunks'
-        ordering = ['position']
-        constraints = [models.UniqueConstraint(
-            fields=['document', 'position'], name='unique_document_chunk_position')]
-
-
 class EvaluationSuite(TimeStampedModel):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE,
                                      related_name='evaluation_suites')

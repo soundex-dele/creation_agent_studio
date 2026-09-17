@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     'apps.projects',
     'apps.marketplace',
     'apps.enterprise',
+    'apps.knowledge',
     'apps.workflows',
     'apps.automations',
     *discover_django_apps(APP_CENTER_ROOT),
@@ -200,7 +201,11 @@ EXECUTION_CHILD_ADAPTERS = config(
         '"workflow":{"workflow-dag":'
         '"modules.execution.runtime.builtin:execute_workflow"},'
         '"evaluation":{"evaluation-suite":'
-        '"apps.enterprise.execution:execute_evaluation"}}'
+        '"apps.enterprise.execution:execute_evaluation"},'
+        '"knowledge":{"knowledge-index":'
+        '"apps.knowledge.execution:execute_knowledge_index",'
+        '"knowledge-answer":'
+        '"apps.knowledge.execution:execute_knowledge_answer"}}'
     ),
     cast=json.loads,
 )
@@ -212,6 +217,8 @@ for _executor_kind, _entries in discover_executor_adapters(APP_CENTER_ROOT).item
                 f'Conflicting execution adapter {_executor_kind}/{_executor_key}'
             )
         _target_entries[_executor_key] = _entrypoint
+KNOWLEDGE_EMBEDDING_DIMENSIONS = config(
+    'KNOWLEDGE_EMBEDDING_DIMENSIONS', default=1024, cast=int)
 EXECUTION_DOMAIN_PORT = config(
     'EXECUTION_DOMAIN_PORT',
     default='apps.enterprise.execution_port.DjangoExecutionDomainPort',

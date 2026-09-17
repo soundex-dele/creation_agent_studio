@@ -11,6 +11,7 @@ from apps.enterprise.tenancy import (
 from modules.catalog.api.urls import urlpatterns as catalog_patterns
 from modules.execution.api.urls import urlpatterns as execution_patterns
 from apps.applications.app_center.urls import urlpatterns as application_patterns
+from apps.knowledge.urls import urlpatterns as knowledge_patterns
 from apps.automations.urls import urlpatterns as automation_patterns
 
 
@@ -41,6 +42,7 @@ urlpatterns = [
     )
     for index, pattern in enumerate([
         *catalog_patterns, *execution_patterns, *application_patterns,
+        *knowledge_patterns,
         *automation_patterns,
     ])
 ]

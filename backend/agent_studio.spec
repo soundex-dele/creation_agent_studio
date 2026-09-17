@@ -60,6 +60,7 @@ datas += collect_data_files("rest_framework", include_py_files=False)
 datas += collect_data_files("drf_yasg", include_py_files=False)
 datas += collect_data_files("allauth", include_py_files=False)
 datas += collect_data_files("autobahn", include_py_files=False)
+datas += collect_data_files("sqlite_vec", include_py_files=False)
 
 binaries = []
 ffmpeg_dir = os.environ.get("FFMPEG_DIR", "").strip()

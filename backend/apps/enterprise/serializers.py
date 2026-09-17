@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     AuditLog, AutomationTrigger, Connector, EvaluationCase, EvaluationRun,
-    EvaluationSuite, KnowledgeBase, KnowledgeChunk, KnowledgeDocument,
+    EvaluationSuite,
     GovernancePolicy, IdentityProvider, Membership, Organization, ProviderConfig, QuotaPolicy, RunTrace,
     SecretReference, TraceSpan, UsageRecord,
 )
@@ -110,31 +110,6 @@ class RunTraceSerializer(serializers.ModelSerializer):
         model = RunTrace
         exclude = ['organization']
         read_only_fields = ['id', 'user', 'request_id', 'created_at', 'spans']
-
-
-class KnowledgeChunkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = KnowledgeChunk
-        fields = ['id', 'position', 'content', 'token_count', 'metadata']
-
-
-class KnowledgeDocumentSerializer(serializers.ModelSerializer):
-    chunks = KnowledgeChunkSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = KnowledgeDocument
-        exclude = ['knowledge_base']
-        read_only_fields = ['id', 'checksum', 'status', 'error', 'created_at',
-                            'updated_at', 'chunks']
-
-
-class KnowledgeBaseSerializer(serializers.ModelSerializer):
-    document_count = serializers.IntegerField(source='documents.count', read_only=True)
-
-    class Meta:
-        model = KnowledgeBase
-        exclude = ['organization']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'document_count']
 
 
 class EvaluationCaseSerializer(serializers.ModelSerializer):

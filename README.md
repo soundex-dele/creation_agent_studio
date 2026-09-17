@@ -23,6 +23,7 @@ the submodule and is compiled directly into the main frontend bundle.
 - `backend/modules/catalog`：Agent、Skill、Application 的 Draft、不可变 Revision、Deployment。
 - `backend/modules/execution`：Run、全局领取队列、Attempt、Lease、Event、Command、Artifact、幂等记录。
 - `backend/apps`：Agent、Application、Conversation、Workflow、Enterprise 等产品域。
+- `backend/apps/knowledge`：组织知识库、文档提取、原生混合索引和有据问答。
 - `frontend/src/entities/run`：唯一 Run 事件投影。
 - `frontend/src/features/run-stream`：Run 流连接与页面级状态编排。
 - `frontend/src/api/generated.ts`：由后端 OpenAPI 契约机械生成的接口类型。
@@ -30,6 +31,8 @@ the submodule and is compiled directly into the main frontend bundle.
 - `frontend/src/services/runStream.ts`：唯一流式事件客户端。
 
 Workflow 使用唯一的 `workflow-dag` 执行器，支持显式依赖、条件分支、节点级重试和有界并行。等待子 Run 时根 Attempt 进入 `waiting_children` 并释放 Worker，由子 Run 终态事件重新入队。交互请求通过同一 durable checkpoint / `RunCommand` 机制暂停与恢复。
+
+知识库索引与问答使用 `knowledge` 执行池。PostgreSQL 部署使用 pgvector/HNSW 与全文索引，SQLite 桌面版使用 sqlite-vec/FTS5；嵌入供应商不可用时仍可进行词法检索。支持 PDF、DOCX、Markdown、TXT 和粘贴文本，扫描版 PDF 需要在外部完成 OCR。
 
 ## 本地启动
 
@@ -61,7 +64,7 @@ source .venv/bin/activate
 python manage.py run_execution_coordinator --worker-pool all
 ```
 
-也可以把 `all` 替换为 `agent`、`media`、`workflow` 或 `evaluation`，只启动
+也可以把 `all` 替换为 `agent`、`media`、`workflow`、`evaluation` 或 `knowledge`，只启动
 一个执行池。PostgreSQL 环境仍可按执行池分别启动多个 coordinator 进程。
 
 前端：

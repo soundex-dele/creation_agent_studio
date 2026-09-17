@@ -2,7 +2,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AuditLogViewSet, AutomationTriggerViewSet, ConnectorViewSet,
-    EvaluationSuiteViewSet, GovernancePolicyViewSet, IdentityProviderViewSet, KnowledgeBaseViewSet, OrganizationViewSet,
+    EvaluationSuiteViewSet, GovernancePolicyViewSet, IdentityProviderViewSet, OrganizationViewSet,
     ProviderConfigViewSet, QuotaViewSet, RunTraceViewSet,
     SecretReferenceViewSet, UsageViewSet,
     DeploymentContextView, PublicIdentityDiscoveryView, ScimUserDetailView,
@@ -18,7 +18,6 @@ router.register('identity-providers', IdentityProviderViewSet, basename='identit
 router.register('governance', GovernancePolicyViewSet, basename='governance')
 router.register('connectors', ConnectorViewSet, basename='connectors')
 router.register('automations', AutomationTriggerViewSet, basename='automations')
-router.register('knowledge-bases', KnowledgeBaseViewSet, basename='knowledge-bases')
 router.register('evaluations', EvaluationSuiteViewSet, basename='evaluations')
 router.register('audit-logs', AuditLogViewSet, basename='audit-logs')
 router.register('traces', RunTraceViewSet, basename='traces')

@@ -66,6 +66,10 @@ urlpatterns += [
         include('apps.applications.app_center.urls'),
     ),
 
+    path(
+        'api/v1/organizations/<uuid:organization_id>/',
+        include('apps.knowledge.urls'),
+    ),
 ]
 
 # Serve media files in development

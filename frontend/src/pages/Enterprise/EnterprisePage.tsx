@@ -36,10 +36,6 @@ const sections: Record<string, { title: string; endpoint: string; fields?: Field
     { name: 'name', label: '名称', required: true }, { name: 'backend', label: '后端', kind: 'select', initialValue: 'environment', options: [{ value: 'environment', label: '环境变量' }] },
     { name: 'reference', label: '引用名称', required: true }, { name: 'description', label: '说明', kind: 'textarea' },
   ] },
-  knowledge: { title: '知识库', endpoint: '/enterprise/knowledge-bases/', fields: [
-    { name: 'name', label: '名称', required: true }, { name: 'description', label: '描述', kind: 'textarea' },
-    { name: 'chunk_size', label: '分块大小', kind: 'number', initialValue: 800 }, { name: 'chunk_overlap', label: '重叠字符', kind: 'number', initialValue: 100 },
-  ] },
   evaluations: { title: '评测', endpoint: '/enterprise/evaluations/', fields: [
     { name: 'name', label: '名称', required: true }, { name: 'target_type', label: '目标类型', kind: 'select', initialValue: 'agent', options: [{ value: 'agent' }, { value: 'application' }] },
     { name: 'target_id', label: '目标 ID' }, { name: 'evaluators', label: '评测器（JSON）', kind: 'json', initialValue: '[{"type":"exact"}]' },
@@ -116,7 +112,6 @@ export default function EnterprisePage() {
       {!section.readOnly && <Button size="small" onClick={() => openEdit(row)}>编辑</Button>}
       {active === 'connectors' && <Button size="small" onClick={() => invoke(row)}>测试</Button>}
       {active === 'automations' && <Button size="small" onClick={() => trigger(row)}>触发</Button>}
-      {active === 'knowledge' && <Button size="small" onClick={() => manageKnowledge(row)}>文档</Button>}
       {active === 'evaluations' && <Button size="small" onClick={() => manageEvaluation(row)}>用例</Button>}
       {!section.readOnly && <Popconfirm title="确认删除该资源？" onConfirm={() => remove(row)}><Button danger size="small">删除</Button></Popconfirm>}
     </Space> });
@@ -142,14 +137,6 @@ export default function EnterprisePage() {
   const invoke = async (row: Row) => { const result = await api.post(`${section.endpoint}${row.id}/invoke/`, { ping: new Date().toISOString() }); Modal.info({ title: '连接器响应', width: 720, content: <pre>{JSON.stringify(result, null, 2)}</pre> }); };
   const trigger = async (row: Row) => { const result = await api.post<{ id: string }>(`${section.endpoint}${row.id}/trigger/`, {}); message.success(`已触发，Trace: ${result.id}`); };
 
-  const manageKnowledge = async (row: Row) => {
-    const documents = await api.get<Row[]>(`${section.endpoint}${row.id}/documents/`);
-    let title = ''; let content = '';
-    Modal.confirm({ title: `${row.name} · 文档`, width: 860, okText: '新增并索引', content: <div className="enterprise-dialog-stack">
-      <Alert type="info" showIcon message={`已有 ${documents.length} 个文档`} description={documents.map(d => `${d.title}（${d.status}）`).join('、') || '暂无文档'} />
-      <Input placeholder="文档标题" onChange={e => { title = e.target.value; }} /><Input.TextArea rows={8} placeholder="粘贴文档正文" onChange={e => { content = e.target.value; }} />
-    </div>, onOk: async () => { if (!title || !content) throw new Error('请填写标题与正文'); await api.post(`${section.endpoint}${row.id}/documents/`, { title, content, source_type: 'text' }); message.success('文档已索引'); } });
-  };
   const manageEvaluation = async (row: Row) => {
     const cases = await api.get<Row[]>(`${section.endpoint}${row.id}/cases/`);
     let name = ''; let input = '{}'; let expected = '{"value":""}';

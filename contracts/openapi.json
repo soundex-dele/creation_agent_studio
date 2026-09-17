@@ -3075,281 +3075,6 @@
                 }
             ]
         },
-        "/enterprise/knowledge-bases/": {
-            "get": {
-                "operationId": "enterprise_knowledge-bases_list",
-                "description": "",
-                "parameters": [
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "A search term.",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "ordering",
-                        "in": "query",
-                        "description": "Which field to use when ordering the results.",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "A page number within the paginated result set.",
-                        "required": false,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "required": [
-                                        "count",
-                                        "results"
-                                    ],
-                                    "type": "object",
-                                    "properties": {
-                                        "count": {
-                                            "type": "integer"
-                                        },
-                                        "next": {
-                                            "type": "string",
-                                            "format": "uri",
-                                            "nullable": true
-                                        },
-                                        "previous": {
-                                            "type": "string",
-                                            "format": "uri",
-                                            "nullable": true
-                                        },
-                                        "results": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/KnowledgeBase"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "post": {
-                "operationId": "enterprise_knowledge-bases_create",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/KnowledgeBase"
-                },
-                "responses": {
-                    "201": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "parameters": []
-        },
-        "/enterprise/knowledge-bases/{id}/": {
-            "get": {
-                "operationId": "enterprise_knowledge-bases_read",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "put": {
-                "operationId": "enterprise_knowledge-bases_update",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/KnowledgeBase"
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "patch": {
-                "operationId": "enterprise_knowledge-bases_partial_update",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/KnowledgeBase"
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "delete": {
-                "operationId": "enterprise_knowledge-bases_delete",
-                "description": "",
-                "responses": {
-                    "204": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "description": "A unique integer value identifying this knowledge base.",
-                    "required": true,
-                    "schema": {
-                        "type": "integer"
-                    }
-                }
-            ]
-        },
-        "/enterprise/knowledge-bases/{id}/documents/": {
-            "get": {
-                "operationId": "enterprise_knowledge-bases_documents_read",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "post": {
-                "operationId": "enterprise_knowledge-bases_documents_create",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/KnowledgeBase"
-                },
-                "responses": {
-                    "201": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "description": "A unique integer value identifying this knowledge base.",
-                    "required": true,
-                    "schema": {
-                        "type": "integer"
-                    }
-                }
-            ]
-        },
-        "/enterprise/knowledge-bases/{id}/search/": {
-            "post": {
-                "operationId": "enterprise_knowledge-bases_search",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/KnowledgeBase"
-                },
-                "responses": {
-                    "201": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/KnowledgeBase"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "enterprise"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "description": "A unique integer value identifying this knowledge base.",
-                    "required": true,
-                    "schema": {
-                        "type": "integer"
-                    }
-                }
-            ]
-        },
         "/enterprise/organizations/": {
             "get": {
                 "operationId": "enterprise_organizations_list",
@@ -7799,6 +7524,775 @@
                     }
                 }
             ]
+        },
+        "/knowledge-answer-runs/": {
+            "post": {
+                "operationId": "knowledge-answer-runs_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Unique key for replay-safe answer Run creation",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeAnswerRunInput"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeAnswerAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-answer-runs"
+                ]
+            },
+            "parameters": []
+        },
+        "/knowledge-bases/": {
+            "get": {
+                "operationId": "knowledge-bases_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/KnowledgeBaseSummary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "post": {
+                "operationId": "knowledge-bases_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeBaseDetail"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": []
+        },
+        "/knowledge-bases/{id}/": {
+            "get": {
+                "operationId": "knowledge-bases_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "patch": {
+                "operationId": "knowledge-bases_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeBaseDetail"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "delete": {
+                "operationId": "knowledge-bases_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/knowledge-bases/{id}/documents/": {
+            "get": {
+                "operationId": "knowledge-bases_documents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/KnowledgeDocument"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "post": {
+                "operationId": "knowledge-bases_documents_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeDocumentCreate"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeIndexAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/knowledge-bases/{id}/documents/{document_id}/": {
+            "get": {
+                "operationId": "knowledge-bases_documents_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeDocument"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "delete": {
+                "operationId": "knowledge-bases_documents_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/knowledge-bases/{id}/documents/{document_id}/content/": {
+            "get": {
+                "operationId": "knowledge-bases_documents_content_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/knowledge-bases/{id}/documents/{document_id}/reindex/": {
+            "post": {
+                "operationId": "knowledge-bases_documents_reindex_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeIndexAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-bases"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/knowledge-search/": {
+            "post": {
+                "operationId": "knowledge-search_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeSearchRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeSearchResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "knowledge-search"
+                ]
+            },
+            "parameters": []
+        },
+        "/organizations/{organization_id}/knowledge-answer-runs/": {
+            "post": {
+                "operationId": "organizations_knowledge-answer-runs_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Unique key for replay-safe answer Run creation",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeAnswerRunInput"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeAnswerAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/": {
+            "get": {
+                "operationId": "organizations_knowledge-bases_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/KnowledgeBaseSummary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_knowledge-bases_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeBaseDetail"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/{id}/": {
+            "get": {
+                "operationId": "organizations_knowledge-bases_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_knowledge-bases_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeBaseDetail"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_knowledge-bases_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/{id}/documents/": {
+            "get": {
+                "operationId": "organizations_knowledge-bases_documents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/KnowledgeDocument"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_knowledge-bases_documents_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeDocumentCreate"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeIndexAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/{id}/documents/{document_id}/": {
+            "get": {
+                "operationId": "organizations_knowledge-bases_documents_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeDocument"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_knowledge-bases_documents_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/{id}/documents/{document_id}/content/": {
+            "get": {
+                "operationId": "organizations_knowledge-bases_documents_content_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-bases/{id}/documents/{document_id}/reindex/": {
+            "post": {
+                "operationId": "organizations_knowledge-bases_documents_reindex_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeIndexAccepted"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "document_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/knowledge-search/": {
+            "post": {
+                "operationId": "organizations_knowledge-search_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/KnowledgeSearchRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KnowledgeSearchResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
         }
     },
     "servers": [
@@ -7863,16 +8357,6 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/UpdateTemplate"
-                        }
-                    }
-                },
-                "required": true
-            },
-            "KnowledgeBase": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/KnowledgeBase"
                         }
                     }
                 },
@@ -7993,6 +8477,46 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ProjectDetail"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "KnowledgeSearchRequest": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/KnowledgeSearchRequest"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "KnowledgeAnswerRunInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/KnowledgeAnswerRunInput"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "KnowledgeBaseDetail": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/KnowledgeBaseDetail"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "KnowledgeDocumentCreate": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/KnowledgeDocumentCreate"
                         }
                     }
                 },
@@ -9152,72 +9676,6 @@
                     "is_active": {
                         "title": "Is active",
                         "type": "boolean"
-                    }
-                }
-            },
-            "KnowledgeBase": {
-                "required": [
-                    "name"
-                ],
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "title": "ID",
-                        "type": "integer",
-                        "readOnly": true
-                    },
-                    "document_count": {
-                        "title": "Document count",
-                        "type": "integer",
-                        "readOnly": true
-                    },
-                    "created_at": {
-                        "title": "Created at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    },
-                    "updated_at": {
-                        "title": "Updated at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    },
-                    "name": {
-                        "title": "Name",
-                        "type": "string",
-                        "maxLength": 160,
-                        "minLength": 1
-                    },
-                    "description": {
-                        "title": "Description",
-                        "type": "string"
-                    },
-                    "embedding_provider": {
-                        "title": "Embedding provider",
-                        "type": "string",
-                        "maxLength": 100
-                    },
-                    "embedding_model": {
-                        "title": "Embedding model",
-                        "type": "string",
-                        "maxLength": 160
-                    },
-                    "chunk_size": {
-                        "title": "Chunk size",
-                        "type": "integer",
-                        "maximum": 9223372036854776000,
-                        "minimum": 0
-                    },
-                    "chunk_overlap": {
-                        "title": "Chunk overlap",
-                        "type": "integer",
-                        "maximum": 9223372036854776000,
-                        "minimum": 0
-                    },
-                    "access_policy": {
-                        "title": "Access policy",
-                        "type": "object"
                     }
                 }
             },
@@ -11002,7 +11460,767 @@
                         "readOnly": true
                     }
                 }
+            },
+            "KnowledgeAnswerRunInput": {
+                "required": [
+                    "query"
+                ],
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "title": "Query",
+                        "type": "string",
+                        "maxLength": 4000,
+                        "minLength": 1
+                    },
+                    "knowledge_base_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "default": [],
+                        "maxItems": 50
+                    },
+                    "limit": {
+                        "title": "Limit",
+                        "type": "integer",
+                        "default": 10,
+                        "maximum": 50,
+                        "minimum": 1
+                    }
+                }
+            },
+            "KnowledgeCitation": {
+                "required": [
+                    "chunk_id",
+                    "document_id",
+                    "knowledge_base_id",
+                    "knowledge_base_name",
+                    "title",
+                    "snippet",
+                    "score",
+                    "page_number",
+                    "section_path",
+                    "citation",
+                    "label"
+                ],
+                "type": "object",
+                "properties": {
+                    "chunk_id": {
+                        "title": "Chunk id",
+                        "type": "integer"
+                    },
+                    "document_id": {
+                        "title": "Document id",
+                        "type": "integer"
+                    },
+                    "knowledge_base_id": {
+                        "title": "Knowledge base id",
+                        "type": "integer"
+                    },
+                    "knowledge_base_name": {
+                        "title": "Knowledge base name",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "snippet": {
+                        "title": "Snippet",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "number"
+                    },
+                    "page_number": {
+                        "title": "Page number",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "section_path": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "citation": {
+                        "title": "Citation",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "label": {
+                        "title": "Label",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "KnowledgeAnswerOutput": {
+                "required": [
+                    "answer",
+                    "citations",
+                    "retrieval_mode",
+                    "model",
+                    "usage"
+                ],
+                "type": "object",
+                "properties": {
+                    "answer": {
+                        "title": "Answer",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "citations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/KnowledgeCitation"
+                        }
+                    },
+                    "retrieval_mode": {
+                        "title": "Retrieval mode",
+                        "type": "string",
+                        "enum": [
+                            "hybrid",
+                            "vector",
+                            "lexical"
+                        ]
+                    },
+                    "model": {
+                        "title": "Model",
+                        "type": "string"
+                    },
+                    "usage": {
+                        "title": "Usage",
+                        "type": "object"
+                    }
+                },
+                "nullable": true
+            },
+            "KnowledgeAnswerAccepted": {
+                "required": [
+                    "run",
+                    "run_url",
+                    "stream_url",
+                    "output"
+                ],
+                "type": "object",
+                "properties": {
+                    "run": {
+                        "$ref": "#/components/schemas/Run"
+                    },
+                    "run_url": {
+                        "title": "Run url",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "stream_url": {
+                        "title": "Stream url",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "output": {
+                        "$ref": "#/components/schemas/KnowledgeAnswerOutput"
+                    }
+                }
+            },
+            "KnowledgeBaseSummary": {
+                "required": [
+                    "name"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "ID",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "maxLength": 160,
+                        "minLength": 1
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "title": "Is active",
+                        "type": "boolean"
+                    },
+                    "document_count": {
+                        "title": "Document count",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "KnowledgeBaseDetail": {
+                "required": [
+                    "name"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "ID",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "maxLength": 160,
+                        "minLength": 1
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "embedding_provider": {
+                        "title": "Embedding provider",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "embedding_model": {
+                        "title": "Embedding model",
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "answer_provider": {
+                        "title": "Answer provider",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "answer_model": {
+                        "title": "Answer model",
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "chunk_size": {
+                        "title": "Chunk size",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "chunk_overlap": {
+                        "title": "Chunk overlap",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "is_active": {
+                        "title": "Is active",
+                        "type": "boolean"
+                    },
+                    "document_count": {
+                        "title": "Document count",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "KnowledgeDocument": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "ID",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "knowledge_base_id": {
+                        "title": "Knowledge base id",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "source_type": {
+                        "title": "Source type",
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "upload"
+                        ],
+                        "readOnly": true
+                    },
+                    "original_filename": {
+                        "title": "Original filename",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "mime_type": {
+                        "title": "Mime type",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "byte_size": {
+                        "title": "Byte size",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "checksum": {
+                        "title": "Checksum",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "indexing",
+                            "ready",
+                            "failed"
+                        ],
+                        "readOnly": true
+                    },
+                    "active_revision": {
+                        "title": "Active revision",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "indexing_run_id": {
+                        "title": "Indexing run id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "type": "object",
+                        "readOnly": true
+                    },
+                    "error_code": {
+                        "title": "Error code",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "error": {
+                        "title": "Error",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "indexed_at": {
+                        "title": "Indexed at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "KnowledgeDocumentCreate": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 300,
+                        "minLength": 1
+                    },
+                    "file": {
+                        "title": "File",
+                        "type": "string",
+                        "readOnly": true,
+                        "format": "uri"
+                    },
+                    "text": {
+                        "title": "Text",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "KnowledgeIndexAccepted": {
+                "required": [
+                    "document",
+                    "run",
+                    "run_url",
+                    "stream_url"
+                ],
+                "type": "object",
+                "properties": {
+                    "document": {
+                        "$ref": "#/components/schemas/KnowledgeDocument"
+                    },
+                    "run": {
+                        "$ref": "#/components/schemas/Run"
+                    },
+                    "run_url": {
+                        "title": "Run url",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "stream_url": {
+                        "title": "Stream url",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "KnowledgeSearchRequest": {
+                "required": [
+                    "query"
+                ],
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "title": "Query",
+                        "type": "string",
+                        "maxLength": 4000,
+                        "minLength": 1
+                    },
+                    "knowledge_base_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "default": [],
+                        "maxItems": 50
+                    },
+                    "limit": {
+                        "title": "Limit",
+                        "type": "integer",
+                        "default": 10,
+                        "maximum": 50,
+                        "minimum": 1
+                    }
+                }
+            },
+            "KnowledgeSearchResult": {
+                "required": [
+                    "chunk_id",
+                    "document_id",
+                    "knowledge_base_id",
+                    "knowledge_base_name",
+                    "title",
+                    "snippet",
+                    "score",
+                    "page_number",
+                    "section_path",
+                    "citation"
+                ],
+                "type": "object",
+                "properties": {
+                    "chunk_id": {
+                        "title": "Chunk id",
+                        "type": "integer"
+                    },
+                    "document_id": {
+                        "title": "Document id",
+                        "type": "integer"
+                    },
+                    "knowledge_base_id": {
+                        "title": "Knowledge base id",
+                        "type": "integer"
+                    },
+                    "knowledge_base_name": {
+                        "title": "Knowledge base name",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "snippet": {
+                        "title": "Snippet",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "number"
+                    },
+                    "page_number": {
+                        "title": "Page number",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "section_path": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "citation": {
+                        "title": "Citation",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "KnowledgeSearchResponse": {
+                "required": [
+                    "query",
+                    "retrieval_mode",
+                    "results"
+                ],
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "title": "Query",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "retrieval_mode": {
+                        "title": "Retrieval mode",
+                        "type": "string",
+                        "enum": [
+                            "hybrid",
+                            "vector",
+                            "lexical"
+                        ]
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/KnowledgeSearchResult"
+                        }
+                    }
+                }
+            },
+            "Run": {
+                "required": [
+                    "executor_kind",
+                    "source_type"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "organization_id": {
+                        "title": "Organization id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "owner_id": {
+                        "title": "Owner id",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "parent_id": {
+                        "title": "Parent id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "node_key": {
+                        "title": "Node key",
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "executor_kind": {
+                        "title": "Executor kind",
+                        "type": "string",
+                        "enum": [
+                            "agent",
+                            "media",
+                            "workflow",
+                            "evaluation"
+                        ]
+                    },
+                    "executor_key": {
+                        "title": "Executor key",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "source_type": {
+                        "title": "Source type",
+                        "type": "string",
+                        "maxLength": 80,
+                        "minLength": 1
+                    },
+                    "source_id": {
+                        "title": "Source id",
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "running",
+                            "waiting_input",
+                            "waiting_children",
+                            "cancelling",
+                            "succeeded",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "priority": {
+                        "title": "Priority",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": -9223372036854776000
+                    },
+                    "attempt_count": {
+                        "title": "Attempt count",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "max_attempts": {
+                        "title": "Max attempts",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "next_event_sequence": {
+                        "title": "Next event sequence",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "retry_safe": {
+                        "title": "Retry safe",
+                        "type": "boolean"
+                    },
+                    "definition_snapshot": {
+                        "title": "Definition snapshot",
+                        "type": "object"
+                    },
+                    "input": {
+                        "title": "Input",
+                        "type": "object"
+                    },
+                    "output_summary": {
+                        "title": "Output summary",
+                        "type": "object"
+                    },
+                    "current_attempt_id": {
+                        "title": "Current attempt id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "pending_input_request_id": {
+                        "title": "Pending input request id",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "pending_input_kind": {
+                        "title": "Pending input kind",
+                        "type": "string",
+                        "enum": [
+                            "answer",
+                            "permission"
+                        ]
+                    },
+                    "pending_input_expires_at": {
+                        "title": "Pending input expires at",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "error_code": {
+                        "title": "Error code",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "error_message": {
+                        "title": "Error message",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "started_at": {
+                        "title": "Started at",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "finished_at": {
+                        "title": "Finished at",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "can_delete": {
+                        "title": "Can delete",
+                        "type": "string",
+                        "readOnly": true
+                    }
+                }
             }
-        }
+        },
+        "responses": {},
+        "parameters": {}
     }
 }

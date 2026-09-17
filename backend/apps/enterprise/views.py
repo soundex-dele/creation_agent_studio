@@ -11,18 +11,18 @@ from rest_framework.views import APIView
 
 from .models import (
     AuditLog, AutomationTrigger, Connector, EvaluationCase, EvaluationRun,
-    EvaluationSuite, GovernancePolicy, IdentityProvider, KnowledgeBase, KnowledgeDocument, Membership, Organization,
+    EvaluationSuite, GovernancePolicy, IdentityProvider, Membership, Organization,
     ProviderConfig, QuotaPolicy, RunTrace, SecretReference, UsageRecord,
 )
 from .permissions import OrganizationRolePermission, resolve_organization
 from .serializers import (
     AuditLogSerializer, AutomationTriggerSerializer, ConnectorSerializer,
     EvaluationCaseSerializer, EvaluationRunSerializer, EvaluationSuiteSerializer,
-    GovernancePolicySerializer, IdentityProviderSerializer, KnowledgeBaseSerializer, KnowledgeDocumentSerializer, MembershipSerializer,
+    GovernancePolicySerializer, IdentityProviderSerializer, MembershipSerializer,
     OrganizationSerializer, ProviderConfigSerializer, QuotaPolicySerializer,
     RunTraceSerializer, SecretReferenceSerializer, UsageRecordSerializer,
 )
-from .services import dispatch_automation, index_document, search_knowledge, start_evaluation
+from .services import dispatch_automation, start_evaluation
 from .tenancy import (
     get_single_tenant_organization,
     provision_single_tenant_user,
@@ -252,32 +252,6 @@ class AutomationTriggerViewSet(TenantModelViewSet):
             trigger, request.user,
             request.data if isinstance(request.data, dict) else {})
         return Response(RunTraceSerializer(trace).data, status=202)
-
-
-class KnowledgeBaseViewSet(TenantModelViewSet):
-    queryset = KnowledgeBase.objects.all()
-    serializer_class = KnowledgeBaseSerializer
-
-    @action(detail=True, methods=['get', 'post'])
-    def documents(self, request, pk=None):
-        knowledge_base = self.get_object()
-        if request.method == 'GET':
-            return Response(KnowledgeDocumentSerializer(
-                knowledge_base.documents.all(), many=True).data)
-        serializer = KnowledgeDocumentSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        document = serializer.save(knowledge_base=knowledge_base)
-        index_document(document)
-        return Response(KnowledgeDocumentSerializer(document).data, status=201)
-
-    @action(detail=True, methods=['post'])
-    def search(self, request, pk=None):
-        knowledge_base = self.get_object()
-        query = str(request.data.get('query') or '').strip()
-        if not query:
-            return Response({'query': 'This field is required.'}, status=400)
-        limit = min(50, max(1, int(request.data.get('limit', 10))))
-        return Response({'results': search_knowledge(knowledge_base, query, limit)})
 
 
 class EvaluationSuiteViewSet(TenantModelViewSet):

@@ -26,6 +26,7 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.applications.app_center.urls",
         "apps.automations.urls",
         "apps.enterprise.tenancy",
+        "apps.knowledge.urls",
     },
 }
 

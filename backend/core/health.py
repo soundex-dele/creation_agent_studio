@@ -18,6 +18,11 @@ def readiness(request):
     except Exception:
         pass
     try:
+        from apps.knowledge.index_backend import native_index_health
+        checks['knowledge_index'] = native_index_health()
+    except Exception:
+        checks['knowledge_index'] = False
+    try:
         cache.set('readiness-check', 'ok', 5)
         checks['redis'] = cache.get('readiness-check') == 'ok'
     except Exception:

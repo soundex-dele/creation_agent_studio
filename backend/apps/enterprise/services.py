@@ -16,50 +16,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import Throttled
 
-from .models import KnowledgeChunk, KnowledgeDocument, QuotaPolicy, RunTrace, UsageRecord
-
-
-def chunk_text(content: str, size: int, overlap: int):
-    """Deterministic character chunking fallback; replace embeddings independently."""
-    size = max(100, size)
-    overlap = max(0, min(overlap, size - 1))
-    start = 0
-    while start < len(content):
-        end = min(len(content), start + size)
-        yield content[start:end]
-        if end == len(content):
-            break
-        start = end - overlap
-
-
-@transaction.atomic
-def index_document(document: KnowledgeDocument):
-    content = document.content or ''
-    document.status = KnowledgeDocument.Status.INDEXING
-    document.checksum = hashlib.sha256(content.encode('utf-8')).hexdigest()
-    document.error = ''
-    document.save(update_fields=['status', 'checksum', 'error', 'updated_at'])
-    document.chunks.all().delete()
-    try:
-        chunks = [KnowledgeChunk(
-            document=document,
-            position=index,
-            content=value,
-            token_count=max(1, math.ceil(len(value) / 4)),
-        ) for index, value in enumerate(chunk_text(
-            content,
-            document.knowledge_base.chunk_size,
-            document.knowledge_base.chunk_overlap,
-        ))]
-        KnowledgeChunk.objects.bulk_create(chunks)
-        document.status = KnowledgeDocument.Status.READY
-        document.save(update_fields=['status', 'updated_at'])
-    except Exception as exc:
-        document.status = KnowledgeDocument.Status.FAILED
-        document.error = str(exc)
-        document.save(update_fields=['status', 'error', 'updated_at'])
-        raise
-    return document
+from .models import QuotaPolicy, RunTrace, UsageRecord
 
 
 def enforce_quota(organization):
@@ -199,38 +156,6 @@ def resolve_provider(organization, model=''):
         'model': model or (provider.available_models[0]
                            if provider.available_models else ''),
     }
-
-
-def search_knowledge(knowledge_base, query, limit=10):
-    """Portable ranked lexical retrieval with citations.
-
-    PostgreSQL deployments can later swap this function for pgvector without
-    changing the API or permission boundary.
-    """
-    terms = {term.lower() for term in re.findall(r'[\w\u4e00-\u9fff]+', query)
-             if term.strip()}
-    results = []
-    chunks = KnowledgeChunk.objects.filter(
-        document__knowledge_base=knowledge_base,
-        document__status=KnowledgeDocument.Status.READY,
-    ).select_related('document')
-    for chunk in chunks.iterator():
-        lowered = chunk.content.lower()
-        matched = sum(lowered.count(term) for term in terms)
-        if not matched:
-            continue
-        coverage = sum(1 for term in terms if term in lowered) / max(1, len(terms))
-        score = matched + coverage
-        results.append({
-            'chunk_id': chunk.id,
-            'document_id': chunk.document_id,
-            'title': chunk.document.title,
-            'content': chunk.content,
-            'score': round(score, 4),
-            'citation': f'{chunk.document.title}#chunk-{chunk.position}',
-            'metadata': chunk.metadata,
-        })
-    return sorted(results, key=lambda item: item['score'], reverse=True)[:limit]
 
 
 def evaluate_value(actual, expected, evaluator):
