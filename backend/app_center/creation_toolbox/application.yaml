@@ -1,0 +1,59 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: creation-toolbox
+  version: 1.0.0
+  name: 创作工具箱
+  description: 面向短视频创作者的工程、素材、录音、文案与分镜脚本一站式工作台。
+  category:
+    slug: creative
+    name: 内容创作
+    description: 文章、视频与新媒体内容生产工具
+    icon: edit
+    order: 1
+  icon: "创"
+  color: "#EC4899"
+  tags: [短视频, 素材管理, 录音, 文案, 分镜脚本]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: creation-toolbox
+    executor_protocol_version: 1
+    renderer_key: creation-toolbox
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+      storage: managed
+      transcription_language: zh-CN
+    dependencies:
+      agents: []
+      skills: []
+  backend:
+    django_app: app_center.creation_toolbox.backend.apps.CreationToolboxConfig
+    install_hook: app_center.creation_toolbox.backend.install.install
+    urlconf: app_center.creation_toolbox.backend.urls
+  database:
+    mode: django-migrations
+    schema_version: 1
+    tenant_scoped: true
+  install:
+    scope: per-organization
+    activate: true
+  frontends:
+    - id: web
+      type: react
+      renderer_key: creation-toolbox
+      directory: react
+      platforms: [web]
+

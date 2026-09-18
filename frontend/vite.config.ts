@@ -121,6 +121,7 @@ export default defineConfig({
       '@creation-master': process.env.VITE_EXCLUDE_CREATION_MASTER === 'true'
         ? path.resolve(__dirname, './src/stubs/creation-master')
         : path.resolve(__dirname, '../backend/app_center/creation_master/react/src'),
+      '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
       '@newmedia-workbench': path.resolve(__dirname, '../backend/app_center/newmedia_workbench/react/src'),
       'lucide-react': path.resolve(__dirname, './node_modules/lucide-react/dist/esm/lucide-react.js'),
     },

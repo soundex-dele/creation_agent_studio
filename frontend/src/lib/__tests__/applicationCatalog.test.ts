@@ -11,6 +11,12 @@ describe('application renderer registry', () => {
     })).toBe('/applications/15/creation-master?entry=apps');
   });
 
+  it('opens Creation Toolbox with its registered React renderer', () => {
+    expect(applicationPath({
+      id: 'creation-toolbox', applicationId: 18, kind: 'custom', rendererKey: 'creation-toolbox',
+    })).toBe('/applications/18/creation-toolbox?entry=apps');
+  });
+
   it('opens WeMD in its isolated editor runtime', () => {
     expect(applicationPath({
       id: 'wemd', applicationId: 16, kind: 'custom', rendererKey: 'wemd',

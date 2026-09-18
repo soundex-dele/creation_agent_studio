@@ -20,6 +20,9 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'creation-master': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-master`, entry,
   ),
+  'creation-toolbox': (app, entry) => withEntry(
+    `/applications/${app.applicationId}/creation-toolbox`, entry,
+  ),
   'newmedia-workbench': (app, entry) => withEntry(
     `/applications/${app.applicationId}/newmedia-workbench`, entry,
   ),

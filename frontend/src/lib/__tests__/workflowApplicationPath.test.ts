@@ -37,6 +37,12 @@ describe('workflow application path', () => {
     );
   });
 
+  it('opens Creation Toolbox with its dedicated renderer inside the workflow', () => {
+    expect(workflowApplicationPath(step('creation-toolbox'))).toBe(
+      '/applications/6/creation-toolbox?embedded=1',
+    );
+  });
+
   it('opens 学之有道 with its dedicated renderer', () => {
     expect(workflowApplicationPath(step('study-with-method'))).toBe(
       '/applications/6/study-with-method?embedded=1',

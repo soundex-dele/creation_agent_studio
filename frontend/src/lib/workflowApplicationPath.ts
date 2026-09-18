@@ -42,5 +42,10 @@ export function workflowApplicationPath(
       embeddedQuery ? `?${embeddedQuery}` : ''
     }`;
   }
+  if (application.renderer_key === 'creation-toolbox') {
+    return `/applications/${applicationId}/creation-toolbox${
+      embeddedQuery ? `?${embeddedQuery}` : ''
+    }`;
+  }
   return `/applications/${applicationId}/run${embeddedQuery ? `?${embeddedQuery}` : ''}`;
 }

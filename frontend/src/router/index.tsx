@@ -27,6 +27,7 @@ const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWithMethodPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
+const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchPage'));
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
@@ -227,6 +228,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ApplicationShell fullBleed>
           {page(<CreationMasterPage />)}
+        </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/creation-toolbox',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>
+          {page(<CreationToolboxPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),
