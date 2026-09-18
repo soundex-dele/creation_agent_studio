@@ -41,6 +41,8 @@ interface ChatContainerProps {
   draftRequest?: { id: number; text: string } | null;
   projectId?: number;
   defaultAgent?: ComposerAgent | null;
+  composerMode?: 'default' | 'study';
+  inputAccessory?: React.ReactNode;
 }
 
 const defaultSuggestions: ChatSuggestion[] = [
@@ -62,6 +64,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   draftRequest,
   projectId,
   defaultAgent = null,
+  composerMode = 'default',
+  inputAccessory,
 }) => {
   const { user } = useAuthStore();
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
@@ -306,6 +310,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </>
       )}
 
+      {inputAccessory && (
+        <div className="chat-input-accessory">{inputAccessory}</div>
+      )}
       <div className="chat-input-area">
         <div className="chat-input-wrapper">
           <MessageInput
@@ -317,6 +324,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               conversationId || projectId || creationContext?.applicationId
               || creationContext?.workflowStepRunId
             )}
+            mode={composerMode}
             disabled={
               !user || isLoading || isCreatingConversation || isStreaming
               || (!conversationId && !createOnFirstSend)

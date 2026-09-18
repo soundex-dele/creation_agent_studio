@@ -1,5 +1,7 @@
-export type StudySubject = 'math';
-export type GradeStage = 'high_2';
+export type StudySubject =
+  | 'chinese' | 'math' | 'english' | 'physics' | 'chemistry'
+  | 'biology' | 'politics' | 'history' | 'geography';
+export type GradeStage = 'high_1' | 'high_2' | 'high_3';
 
 export interface SubjectEnrollment {
   id: string;
@@ -10,6 +12,9 @@ export interface SubjectEnrollment {
   curriculum_version: string;
   current_chapter: string;
   weak_topics: string[];
+  latest_score: string | null;
+  target_score: string | null;
+  setup_completed: boolean;
   is_active: boolean;
 }
 
@@ -18,11 +23,16 @@ export interface StudyProfile {
   student_name: string;
   display_name: string;
   region: string;
+  primary_subject: StudySubject;
+  grade_stage: GradeStage;
   daily_minutes: number;
   latest_score: string | null;
   target_score: string | null;
   onboarding_completed: boolean;
+  focus_subjects: StudySubject[];
+  last_tutor_subject: StudySubject | '';
   enrollment: SubjectEnrollment;
+  enrollments: SubjectEnrollment[];
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +65,7 @@ export interface StudyAttempt {
 export interface StudyProblem {
   id: string;
   conversation_id: number | null;
+  source_attachment_id: string | null;
   subject: StudySubject;
   grade_stage: GradeStage;
   source_image_url: string;
@@ -113,11 +124,14 @@ export interface StudyReview {
 
 export interface StudyMastery {
   id: string;
+  subject: StudySubject;
+  grade_stage: GradeStage;
   knowledge_point_code: string;
   knowledge_point_name: string;
   score: number;
   attempts_count: number;
   correct_count: number;
+  updated_at: string;
 }
 
 export interface WeeklyReport {
@@ -175,6 +189,7 @@ export type StudyDashboard =
   | {
       mode: 'student';
       profile: StudyProfile;
+      enrollments: SubjectEnrollment[];
       today: string;
       tasks: StudyTask[];
       due_reviews: StudyReview[];
@@ -182,19 +197,67 @@ export type StudyDashboard =
       mistake_count: number;
       masteries: StudyMastery[];
       latest_report: WeeklyReport | null;
+      stats_by_subject: Array<{
+        subject: StudySubject;
+        subject_label: string;
+        task_count: number;
+        completed_count: number;
+        mistake_count: number;
+      }>;
     };
 
 export interface StudyProfileInput {
   display_name?: string;
   region?: string;
   daily_minutes: number;
-  latest_score?: number | null;
-  target_score?: number | null;
-  subject: StudySubject;
+  subjects: StudySubject[];
+  focus_subjects: StudySubject[];
   grade_stage: GradeStage;
-  curriculum_version: string;
-  current_chapter: string;
-  weak_topics: string[];
+  curriculum_version?: string;
+  current_chapter?: string;
+  weak_topics?: string[];
+}
+
+export interface StudyCatalogSubject {
+  value: StudySubject;
+  label: string;
+  icon: string;
+  color: string;
+  chapters: string[];
+  curriculum_versions: string[];
+}
+
+export interface StudyCatalog {
+  grades: Array<{ value: GradeStage; label: string }>;
+  subjects: StudyCatalogSubject[];
+}
+
+export interface StudyTutor {
+  id: number;
+  name: string;
+  description: string;
+  subject: StudySubject;
+  subject_label: string;
+}
+
+export interface StudyTutorSession {
+  id: string;
+  title: string;
+  subject: StudySubject;
+  updated_at: string;
+  agent?: { id: number; name: string; description: string };
+}
+
+export interface StudyTutorSessionCreateResult {
+  conversation: StudyTutorSession | null;
+  subject: StudySubject;
+  problem?: StudyProblem | null;
+  run_id?: string | null;
+}
+
+export interface StudyReportSummary {
+  overall_metrics: WeeklyReport['metrics'];
+  subjects: WeeklyReport[];
 }
 
 export interface TutorHint {

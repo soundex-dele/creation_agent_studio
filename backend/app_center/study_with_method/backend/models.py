@@ -11,11 +11,21 @@ from modules.tenancy.models import TenantOwnedModel
 
 
 class Subject(models.TextChoices):
+    CHINESE = "chinese", "语文"
     MATH = "math", "数学"
+    ENGLISH = "english", "英语"
+    PHYSICS = "physics", "物理"
+    CHEMISTRY = "chemistry", "化学"
+    BIOLOGY = "biology", "生物"
+    POLITICS = "politics", "思想政治"
+    HISTORY = "history", "历史"
+    GEOGRAPHY = "geography", "地理"
 
 
 class GradeStage(models.TextChoices):
+    HIGH_1 = "high_1", "高一"
     HIGH_2 = "high_2", "高二"
+    HIGH_3 = "high_3", "高三"
 
 
 def study_problem_upload_path(instance, filename):
@@ -27,7 +37,7 @@ def study_problem_upload_path(instance, filename):
 
 
 def default_enabled_subjects():
-    return [Subject.MATH]
+    return list(Subject.values)
 
 
 class StudyWorkspace(TenantOwnedModel):
@@ -64,6 +74,10 @@ class StudyProfile(TenantOwnedModel):
         max_length=32, choices=GradeStage.choices, default=GradeStage.HIGH_2, db_index=True
     )
     daily_minutes = models.PositiveSmallIntegerField(default=45)
+    focus_subjects = models.JSONField(default=list, blank=True)
+    last_tutor_subject = models.CharField(
+        max_length=32, choices=Subject.choices, blank=True, default=""
+    )
     latest_score = models.DecimalField(
         max_digits=5, decimal_places=1, null=True, blank=True
     )
@@ -92,9 +106,15 @@ class SubjectEnrollment(TenantOwnedModel):
     grade_stage = models.CharField(
         max_length=32, choices=GradeStage.choices, db_index=True
     )
-    curriculum_version = models.CharField(max_length=120)
-    current_chapter = models.CharField(max_length=160)
+    curriculum_version = models.CharField(max_length=120, blank=True, default="")
+    current_chapter = models.CharField(max_length=160, blank=True, default="")
     weak_topics = models.JSONField(default=list, blank=True)
+    latest_score = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True
+    )
+    target_score = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -123,7 +143,7 @@ class CurriculumNode(models.Model):
     curriculum_version = models.CharField(max_length=120, db_index=True)
     # Dotted, subject-namespaced identifiers are deliberate (for example
     # ``math.function.monotonicity``); SlugField rejects dots in forms.
-    code = models.CharField(max_length=180, unique=True)
+    code = models.CharField(max_length=180)
     name = models.CharField(max_length=160)
     node_type = models.CharField(max_length=32, choices=NodeType.choices)
     parent = models.ForeignKey(
@@ -135,6 +155,12 @@ class CurriculumNode(models.Model):
     class Meta:
         db_table = "study_curriculum_nodes"
         ordering = ("subject", "curriculum_version", "order", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("subject", "grade_stage", "curriculum_version", "code"),
+                name="unique_study_curriculum_node",
+            )
+        ]
 
 
 class StudyTask(TenantOwnedModel):
@@ -202,6 +228,13 @@ class Problem(TenantOwnedModel):
         on_delete=models.SET_NULL,
         related_name="study_problems",
     )
+    source_attachment = models.ForeignKey(
+        "conversations.MessageAttachment",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="study_problems",
+    )
     subject = models.CharField(max_length=32, choices=Subject.choices, db_index=True)
     grade_stage = models.CharField(max_length=32, choices=GradeStage.choices)
     knowledge_point = models.ForeignKey(
@@ -258,9 +291,12 @@ class MistakeRecord(TenantOwnedModel):
     class Cause(models.TextChoices):
         CONCEPT = "concept", "概念不清"
         FORMULA = "formula", "公式遗忘"
+        MEMORY = "memory", "记忆不牢"
         READING = "reading", "审题错误"
         CALCULATION = "calculation", "计算错误"
         METHOD = "method", "方法选择"
+        EXPRESSION = "expression", "表达不规范"
+        EXPERIMENT = "experiment", "实验分析"
         CARELESS = "careless", "粗心"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

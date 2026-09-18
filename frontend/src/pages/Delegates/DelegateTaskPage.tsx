@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, CheckOutlined, ReloadOutlined, SendOutlined } from '
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useRunStream } from '@/features/run-stream';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import type { SupervisorPlan } from '@/types/delegate';
@@ -69,7 +70,7 @@ const DelegateTaskPage = () => {
     try {
       const next = await api.post<RunResource>(`/conversations/${conversationId}/send_message/`, {
         content: goal.trim(),
-      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
+      }, { headers: { 'Idempotency-Key': createIdempotencyKey('delegate') } });
       setRun(next); setGoal(''); await refreshConversation();
     } catch (error: any) { message.error(error?.response?.data?.detail || '任务提交失败'); }
     finally { setSubmitting(false); }
@@ -81,7 +82,7 @@ const DelegateTaskPage = () => {
     try {
       await api.post(`/organizations/${organizationId}/runs/${run.id}/commands`, {
         type,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: createIdempotencyKey('delegate-command'),
         input_request_id: run.pending_input_request_id,
         expected_run_version: run.version,
         payload: { plan_version: plan.plan_version, feedback },
@@ -97,7 +98,7 @@ const DelegateTaskPage = () => {
     try {
       await api.post(`/organizations/${organizationId}/runs/${run.id}/commands`, {
         type,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: createIdempotencyKey('delegate-command'),
         input_request_id: run.pending_input_request_id,
         expected_run_version: run.version,
         payload: type === 'answer' ? { text: feedback } : {},

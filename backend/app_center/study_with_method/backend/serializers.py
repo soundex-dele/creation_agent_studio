@@ -21,24 +21,28 @@ from .strategies import get_subject_strategy
 class EnrollmentSerializer(serializers.ModelSerializer):
     subject_label = serializers.CharField(source="get_subject_display", read_only=True)
     grade_stage_label = serializers.CharField(source="get_grade_stage_display", read_only=True)
+    setup_completed = serializers.SerializerMethodField()
 
     class Meta:
         model = SubjectEnrollment
         fields = (
             "id", "subject", "subject_label", "grade_stage", "grade_stage_label",
-            "curriculum_version", "current_chapter", "weak_topics", "is_active",
+            "curriculum_version", "current_chapter", "weak_topics",
+            "latest_score", "target_score", "setup_completed", "is_active",
         )
         read_only_fields = ("id", "subject_label", "grade_stage_label")
 
     def validate_subject(self, value):
         get_subject_strategy(value)
-        if value != Subject.MATH:
-            raise serializers.ValidationError("首版只开放数学。")
         return value
+
+    def get_setup_completed(self, obj):
+        return bool(obj.curriculum_version and obj.current_chapter)
 
 
 class ProfileSerializer(serializers.ModelSerializer):
     enrollment = serializers.SerializerMethodField()
+    enrollments = serializers.SerializerMethodField()
     student_name = serializers.CharField(source="student.username", read_only=True)
 
     class Meta:
@@ -46,13 +50,21 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = (
             "id", "student_name", "display_name", "region", "daily_minutes",
             "primary_subject", "grade_stage", "latest_score", "target_score",
-            "onboarding_completed", "enrollment",
+            "onboarding_completed", "focus_subjects", "last_tutor_subject",
+            "enrollment", "enrollments",
             "created_at", "updated_at",
         )
 
     def get_enrollment(self, obj):
-        enrollment = obj.enrollments.filter(is_active=True).first()
+        enrollment = obj.enrollments.filter(
+            subject=obj.primary_subject, is_active=True
+        ).first() or obj.enrollments.filter(is_active=True).first()
         return EnrollmentSerializer(enrollment).data if enrollment else None
+
+    def get_enrollments(self, obj):
+        return EnrollmentSerializer(
+            obj.enrollments.filter(is_active=True), many=True
+        ).data
 
 
 class ProfileInputSerializer(serializers.Serializer):
@@ -67,12 +79,23 @@ class ProfileInputSerializer(serializers.Serializer):
         max_digits=5, decimal_places=1, min_value=0, max_value=150,
         required=False, allow_null=True,
     )
-    subject = serializers.ChoiceField(choices=Subject.choices, default=Subject.MATH)
+    subject = serializers.ChoiceField(choices=Subject.choices, required=False)
+    subjects = serializers.ListField(
+        child=serializers.ChoiceField(choices=Subject.choices),
+        min_length=1,
+        required=False,
+    )
+    focus_subjects = serializers.ListField(
+        child=serializers.ChoiceField(choices=Subject.choices),
+        min_length=1,
+        max_length=3,
+        required=False,
+    )
     grade_stage = serializers.ChoiceField(
         choices=GradeStage.choices, default=GradeStage.HIGH_2
     )
-    curriculum_version = serializers.CharField(max_length=120)
-    current_chapter = serializers.CharField(max_length=160)
+    curriculum_version = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    current_chapter = serializers.CharField(max_length=160, required=False, allow_blank=True)
     weak_topics = serializers.ListField(
         child=serializers.CharField(max_length=160), required=False, default=list
     )
@@ -82,8 +105,17 @@ class ProfileInputSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        if attrs["subject"] != Subject.MATH or attrs["grade_stage"] != GradeStage.HIGH_2:
-            raise serializers.ValidationError("首版只开放高二数学。")
+        subjects = list(dict.fromkeys(
+            attrs.get("subjects") or [attrs.get("subject", Subject.MATH)]
+        ))
+        focus_subjects = list(dict.fromkeys(
+            attrs.get("focus_subjects") or subjects[:1]
+        ))
+        if not set(focus_subjects).issubset(subjects):
+            raise serializers.ValidationError({"focus_subjects": "重点科必须来自已选学科。"})
+        attrs["subjects"] = subjects
+        attrs["focus_subjects"] = focus_subjects
+        attrs["subject"] = subjects[0]
         if (
             attrs.get("latest_score") is not None
             and attrs.get("target_score") is not None
@@ -130,7 +162,7 @@ class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
         fields = (
-            "id", "conversation_id", "subject", "grade_stage", "source_image_url", "original_text",
+            "id", "conversation_id", "source_attachment_id", "subject", "grade_stage", "source_image_url", "original_text",
             "confirmed_text", "source", "status", "max_hint_level", "analysis",
             "knowledge_point_code", "knowledge_point_name", "latest_run_id", "attempts",
             "created_at", "updated_at",
@@ -151,7 +183,7 @@ class ProblemInputSerializer(serializers.Serializer):
         choices=GradeStage.choices, default=GradeStage.HIGH_2
     )
     problem_text = serializers.CharField(required=False, allow_blank=True)
-    source_image = serializers.FileField(required=False, allow_null=True)
+    source_image = serializers.ImageField(required=False, allow_null=True)
     source = serializers.ChoiceField(
         choices=("camera", "upload", "manual"), default="camera"
     )
@@ -171,8 +203,6 @@ class ProblemInputSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        if attrs["subject"] != Subject.MATH or attrs["grade_stage"] != GradeStage.HIGH_2:
-            raise serializers.ValidationError("首版只开放高二数学。")
         if not attrs.get("problem_text", "").strip() and not attrs.get("source_image"):
             raise serializers.ValidationError("请拍摄题目或手动输入题目内容。")
         return attrs
@@ -184,7 +214,7 @@ class ManualMistakeInputSerializer(serializers.Serializer):
         choices=GradeStage.choices, default=GradeStage.HIGH_2
     )
     problem_text = serializers.CharField(required=False, allow_blank=True)
-    source_image = serializers.FileField(required=False, allow_null=True)
+    source_image = serializers.ImageField(required=False, allow_null=True)
     knowledge_summary = serializers.CharField(
         max_length=500, required=False, allow_blank=True
     )
@@ -220,8 +250,6 @@ class ManualMistakeInputSerializer(serializers.Serializer):
         return list(dict.fromkeys(item.strip() for item in value if item.strip()))
 
     def validate(self, attrs):
-        if attrs["subject"] != Subject.MATH or attrs["grade_stage"] != GradeStage.HIGH_2:
-            raise serializers.ValidationError("首版只开放高二数学。")
         if not attrs.get("problem_text", "").strip() and not attrs.get("source_image"):
             raise serializers.ValidationError("请上传题目图片或输入题目文字。")
         strategy = get_subject_strategy(attrs["subject"])

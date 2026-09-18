@@ -7,8 +7,12 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
+import remarkMath from 'remark-math';
 import type { AgentToolCall } from '@/entities/run';
+import { normalizeMarkdownMath } from '@/lib/markdownMath';
 import type { MessageAttachment } from '@/stores/useConversationStore';
+import 'katex/dist/katex.min.css';
 import './MessageList.css';
 
 const { Text } = Typography;
@@ -215,7 +219,12 @@ const MessageList: React.FC<MessageListProps> = ({
                   {message.content}
                 </span>
               ) : (
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {normalizeMarkdownMath(message.content)}
+                </ReactMarkdown>
               ))}
             </div>
           </div>

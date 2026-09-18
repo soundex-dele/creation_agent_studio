@@ -1,16 +1,22 @@
 from dataclasses import dataclass
+from io import BytesIO
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
+from apps.agents.high_school_tutors import TUTOR_DEFINITION_BY_SUBJECT
 from apps.applications.models import Application, ApplicationCategory
-from apps.conversations.models import Conversation, Message
+from apps.conversations.models import Conversation, Message, MessageAttachment
 from apps.enterprise.models import Membership, Organization
+from modules.catalog.models import AgentDeployment, AgentRevision
+from modules.catalog.services import canonical_content_hash
 from modules.execution.application.projections import project_terminal_run
 from modules.execution.models import Run
 
@@ -22,6 +28,7 @@ from ..models import (
     Problem,
     ReviewSchedule,
     StudyProfile,
+    StudyTask,
     StudyWorkspace,
     Subject,
     WeeklyReport,
@@ -64,7 +71,7 @@ def study_context(db):
     workspace = StudyWorkspace.objects.create(
         organization=organization,
         application=application,
-        enabled_subjects=[Subject.MATH],
+        enabled_subjects=list(Subject.values),
     )
     _seed_curriculum()
     return {
@@ -109,6 +116,51 @@ def create_profile(context):
     )
 
 
+def deploy_subject_tutor(context, subject=Subject.MATH):
+    definition = TUTOR_DEFINITION_BY_SUBJECT[subject]
+    category, _ = AgentCategory.objects.get_or_create(
+        slug="high-school-education",
+        defaults={"name": "高中课程辅导"},
+    )
+    agent = Agent.objects.create(
+        organization=context["organization"],
+        category=category,
+        name=definition.name,
+        slug=definition.slug,
+        description=definition.description,
+        created_by=context["student"],
+        is_public=False,
+    )
+    content = {
+        "system_prompt": definition.system_prompt,
+        "model_config": {"adapter": "codex"},
+    }
+    revision = AgentRevision.objects.create(
+        organization=context["organization"],
+        agent=agent,
+        revision_no=1,
+        content=content,
+        content_hash=canonical_content_hash(content),
+        created_by=context["student"],
+    )
+    AgentDeployment.objects.create(
+        organization=context["organization"],
+        agent=agent,
+        revision=revision,
+        updated_by=context["student"],
+    )
+    return agent
+
+
+def image_file(name="question.png", image_format="PNG"):
+    from PIL import Image
+
+    data = BytesIO()
+    Image.new("RGB", (12, 8), color=(244, 242, 233)).save(data, format=image_format)
+    content_type = "image/jpeg" if image_format == "JPEG" else "image/png"
+    return SimpleUploadedFile(name, data.getvalue(), content_type=content_type)
+
+
 @pytest.mark.django_db
 def test_onboarding_generates_math_plan_for_viewer(study_context):
     response = create_profile(study_context)
@@ -116,28 +168,243 @@ def test_onboarding_generates_math_plan_for_viewer(study_context):
     assert response.status_code == 200, response.data
     assert response.data["enrollment"]["subject"] == "math"
     profile = StudyProfile.objects.get(student=study_context["student"])
-    assert profile.tasks.count() == 15
+    assert profile.tasks.count() == 7
     dashboard = client(study_context["student"]).get(f"{root(study_context)}/dashboard")
     assert dashboard.status_code == 200
     assert dashboard.data["mode"] == "student"
-    assert len(dashboard.data["tasks"]) == 2
+    assert len(dashboard.data["tasks"]) == 1
 
 
 @pytest.mark.django_db
-def test_unavailable_subject_is_rejected(study_context):
+def test_physics_and_high_one_profile_is_supported(study_context):
     response = client(study_context["student"]).put(
         f"{root(study_context)}/profile",
         {
             "daily_minutes": 45,
             "subject": "physics",
-            "grade_stage": "high_2",
+            "grade_stage": "high_1",
             "curriculum_version": "通用版",
             "current_chapter": "运动",
         },
         format="json",
     )
+    assert response.status_code == 200, response.data
+    assert response.data["grade_stage"] == GradeStage.HIGH_1
+    assert response.data["enrollments"][0]["subject"] == Subject.PHYSICS
+    assert response.data["enrollments"][0]["current_chapter"] == "运动"
+
+
+@pytest.mark.django_db
+def test_catalog_lists_three_grades_and_nine_subjects(study_context):
+    response = client(study_context["student"]).get(f"{root(study_context)}/catalog")
+
+    assert response.status_code == 200, response.data
+    assert [item["value"] for item in response.data["grades"]] == list(
+        GradeStage.values
+    )
+    assert [item["value"] for item in response.data["subjects"]] == list(
+        Subject.values
+    )
+    assert all(item["chapters"] for item in response.data["subjects"])
+    assert all(item["color"].startswith("#") for item in response.data["subjects"])
+
+
+@pytest.mark.django_db
+def test_multi_subject_profile_uses_focus_weighting_and_daily_budget(study_context):
+    response = client(study_context["student"]).put(
+        f"{root(study_context)}/profile",
+        {
+            "grade_stage": GradeStage.HIGH_1,
+            "subjects": [Subject.MATH, Subject.PHYSICS, Subject.ENGLISH],
+            "focus_subjects": [Subject.MATH, Subject.PHYSICS],
+            "daily_minutes": 45,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200, response.data
+    assert response.data["focus_subjects"] == [Subject.MATH, Subject.PHYSICS]
+    assert {item["subject"] for item in response.data["enrollments"]} == {
+        Subject.MATH, Subject.PHYSICS, Subject.ENGLISH,
+    }
+    assert all(not item["setup_completed"] for item in response.data["enrollments"])
+
+    profile = StudyProfile.objects.get(student=study_context["student"])
+    tasks = list(profile.tasks.order_by("scheduled_for", "created_at"))
+    assert {task.subject for task in tasks} == {
+        Subject.MATH, Subject.PHYSICS, Subject.ENGLISH,
+    }
+    per_day = {}
+    for task in tasks:
+        per_day.setdefault(task.scheduled_for, []).append(task)
+    assert len(per_day) == 7
+    assert all(len({task.subject for task in day}) <= 2 for day in per_day.values())
+    assert all(sum(task.duration_minutes for task in day) <= 45 for day in per_day.values())
+    counts = {
+        subject: sum(task.subject == subject for task in tasks)
+        for subject in (Subject.MATH, Subject.PHYSICS, Subject.ENGLISH)
+    }
+    assert counts[Subject.MATH] > counts[Subject.ENGLISH]
+    assert counts[Subject.PHYSICS] > counts[Subject.ENGLISH]
+
+    completed = tasks[0]
+    completed.status = StudyTask.Status.COMPLETED
+    completed.completed_at = timezone.now()
+    completed.save(update_fields=("status", "completed_at", "updated_at"))
+    changed = client(study_context["student"]).put(
+        f"{root(study_context)}/profile",
+        {
+            "grade_stage": GradeStage.HIGH_1,
+            "subjects": [Subject.MATH, Subject.ENGLISH],
+            "focus_subjects": [Subject.ENGLISH],
+            "daily_minutes": 30,
+        },
+        format="json",
+    )
+    assert changed.status_code == 200, changed.data
+    assert StudyTask.objects.filter(pk=completed.pk, status=StudyTask.Status.COMPLETED).exists()
+    profile.refresh_from_db()
+    assert not profile.enrollments.get(subject=Subject.PHYSICS).is_active
+
+
+@pytest.mark.django_db
+def test_progressive_enrollment_rejects_invalid_scores_without_saving(study_context):
+    assert client(study_context["student"]).put(
+        f"{root(study_context)}/profile",
+        {
+            "grade_stage": GradeStage.HIGH_2,
+            "subjects": [Subject.MATH, Subject.PHYSICS],
+            "focus_subjects": [Subject.MATH],
+            "daily_minutes": 60,
+        },
+        format="json",
+    ).status_code == 200
+    student = client(study_context["student"])
+    updated = student.patch(
+        f"{root(study_context)}/enrollments/{Subject.PHYSICS}",
+        {
+            "curriculum_version": "人教版",
+            "current_chapter": "运动和力",
+            "weak_topics": ["受力分析"],
+            "latest_score": 82,
+            "target_score": 105,
+        },
+        format="json",
+    )
+    assert updated.status_code == 200, updated.data
+    assert updated.data["setup_completed"] is True
+
+    rejected = student.patch(
+        f"{root(study_context)}/enrollments/{Subject.PHYSICS}",
+        {"latest_score": 110, "target_score": 90},
+        format="json",
+    )
+    assert rejected.status_code == 400
+    enrollment = StudyProfile.objects.get(
+        student=study_context["student"]
+    ).enrollments.get(subject=Subject.PHYSICS, is_active=True)
+    assert float(enrollment.latest_score) == 82
+    assert float(enrollment.target_score) == 105
+
+
+@pytest.mark.django_db
+def test_tutor_selector_and_sessions_only_use_deployed_standard_tutors(study_context):
+    assert create_profile(study_context).status_code == 200
+    tutor = deploy_subject_tutor(study_context, Subject.MATH)
+    unrelated = Agent.objects.create(
+        organization=study_context["organization"],
+        category=tutor.category,
+        name="其他智能体",
+        slug="not-a-school-tutor",
+        description="不应出现在学科老师列表",
+        created_by=study_context["student"],
+        is_public=False,
+    )
+    student = client(study_context["student"])
+
+    tutors = student.get(f"{root(study_context)}/tutors")
+    assert tutors.status_code == 200, tutors.data
+    assert [item["id"] for item in tutors.data] == [tutor.id]
+
+    created = student.post(
+        f"{root(study_context)}/tutor-sessions",
+        {"mode": "chat", "subject": Subject.MATH, "agent_id": tutor.id},
+        format="json",
+    )
+    assert created.status_code == 201, created.data
+    conversation = Conversation.objects.get(pk=created.data["conversation"]["id"])
+    assert conversation.agent == tutor
+    assert conversation.agent_locked is True
+
+    switched = student.post(
+        f"/api/v1/conversations/{conversation.id}/send_message/",
+        {"content": "换一个老师", "agent_id": unrelated.id},
+        format="json",
+        HTTP_X_ORGANIZATION_ID=str(study_context["organization"].id),
+        HTTP_IDEMPOTENCY_KEY="locked-study-tutor",
+    )
+    assert switched.status_code == 400
+    assert "固定老师" in str(switched.data["agent_id"])
+
+    history = student.get(f"{root(study_context)}/tutor-sessions")
+    assert history.status_code == 200
+    assert history.data[0]["id"] == conversation.id
+    assert history.data[0]["subject"] == Subject.MATH
+
+
+@pytest.mark.django_db
+def test_photo_tutor_rejects_unreadable_or_unsupported_images(study_context):
+    assert create_profile(study_context).status_code == 200
+    tutor = deploy_subject_tutor(study_context, Subject.MATH)
+    response = client(study_context["student"]).post(
+        f"{root(study_context)}/tutor-sessions",
+        {
+            "mode": "photo",
+            "subject": Subject.MATH,
+            "agent_id": tutor.id,
+            "source_image": SimpleUploadedFile(
+                "broken.png", b"not-an-image", content_type="image/png"
+            ),
+        },
+        format="multipart",
+    )
+
     assert response.status_code == 400
-    assert not StudyProfile.objects.exists()
+    assert not Problem.objects.filter(profile__student=study_context["student"]).exists()
+
+
+@pytest.mark.django_db
+def test_photo_tutor_atomically_links_problem_message_attachment_and_run(study_context):
+    assert create_profile(study_context).status_code == 200
+    tutor = deploy_subject_tutor(study_context, Subject.MATH)
+    with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+        response = client(study_context["student"]).post(
+            f"{root(study_context)}/tutor-sessions",
+            {
+                "mode": "photo",
+                "subject": Subject.MATH,
+                "agent_id": tutor.id,
+                "source_image": image_file(),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == 201, response.data
+        problem = Problem.objects.get(pk=response.data["problem"]["id"])
+        attachment = MessageAttachment.objects.get(
+            message__conversation_id=response.data["conversation"]["id"]
+        )
+        assert problem.source_attachment == attachment
+        assert problem.source_image.name == attachment.file.name
+        assert attachment.message.role == "user"
+        run = Run.objects.get(pk=response.data["run_id"])
+        assert run.input["attachments"] == [{
+            "id": str(attachment.id),
+            "name": attachment.original_name,
+            "content_type": attachment.content_type,
+            "byte_size": attachment.byte_size,
+            "path": attachment.file.path,
+        }]
 
 
 @pytest.mark.django_db
@@ -237,11 +504,7 @@ def test_manual_mistake_import_accepts_text_image_and_learning_details(study_con
     assert text_mistake.problem.attempts.get().is_correct is False
     assert ReviewSchedule.objects.filter(mistake=text_mistake).exists()
 
-    image = SimpleUploadedFile(
-        "question.png",
-        b"not-decoded-by-the-api",
-        content_type="image/png",
-    )
+    image = image_file()
     image_response = student.post(
         f"{root(study_context)}/mistakes",
         {
@@ -335,13 +598,14 @@ def test_tutor_runs_are_recorded_in_one_problem_conversation(study_context):
     assert conversation.user == study_context["student"]
     assert conversation.organization == study_context["organization"]
     assert conversation.agent == agent
-    assert conversation.title.startswith("学之有道 ·")
-    assert conversation.process_id == f"study-problem:{problem.id}"
+    assert conversation.title.startswith("数学 ·")
+    assert conversation.process_id == f"study-tutor:{problem.id}"
+    assert conversation.agent_locked is True
     assert problem.latest_run_id == created_runs[1].id
     assert list(Message.objects.filter(conversation=conversation).values_list(
         "role", "content",
     )) == [
-        ("user", "请识别并分析这道数学题：\n求函数 f(x)=x² 的单调区间。"),
+        ("user", "请分析这道数学题：\n求函数 f(x)=x² 的单调区间。"),
         ("assistant", "辅导结果 1"),
         ("user", "我的思路：我想先看图像。\n请给我第 2 级提示。"),
         ("assistant", "辅导结果 2"),
@@ -383,6 +647,39 @@ def test_guardian_can_only_read_reports(study_context):
     assert client(study_context["outsider"]).get(
         f"{root(study_context)}/dashboard"
     ).status_code == 403
+
+
+@pytest.mark.django_db
+def test_weekly_report_returns_overall_metrics_and_subject_cards(study_context):
+    profile_response = client(study_context["student"]).put(
+        f"{root(study_context)}/profile",
+        {
+            "grade_stage": GradeStage.HIGH_3,
+            "subjects": [Subject.MATH, Subject.ENGLISH],
+            "focus_subjects": [Subject.MATH],
+            "daily_minutes": 60,
+        },
+        format="json",
+    )
+    assert profile_response.status_code == 200, profile_response.data
+
+    response = client(study_context["student"]).post(
+        f"{root(study_context)}/reports", {}, format="json"
+    )
+
+    assert response.status_code == 201, response.data
+    assert set(response.data) == {"overall_metrics", "subjects"}
+    assert {item["subject"] for item in response.data["subjects"]} == {
+        Subject.MATH, Subject.ENGLISH,
+    }
+    assert response.data["overall_metrics"]["task_total"] == sum(
+        item["metrics"]["task_total"] for item in response.data["subjects"]
+    )
+    fetched = client(study_context["student"]).get(
+        f"{root(study_context)}/reports?aggregate=1"
+    )
+    assert fetched.status_code == 200
+    assert len(fetched.data["subjects"]) == 2
 
 
 @pytest.mark.django_db

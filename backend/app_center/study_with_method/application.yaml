@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: study-with-method
-  version: 1.0.0
+  version: 2.0.0
   name: 学之有道
-  description: 贴合校内进度的个性化学习闭环，从每日计划、分步辅导到错题复习与家长周报。
+  description: 覆盖高中九科的个性化学习闭环，从每日计划、拍照与对话辅导到错题复习和家长周报。
   category:
     slug: education
     name: 学习成长
@@ -13,7 +13,7 @@ metadata:
     order: 8
   icon: "🧭"
   color: "#326B5B"
-  tags: [高中学习, 数学, 错题本, 复习计划]
+  tags: [高中学习, 九科学习, 拍照辅导, 错题本, 复习计划]
   developer: Agent Studio
 spec:
   application_kind: custom
@@ -22,9 +22,9 @@ spec:
     kind: custom
     executor_kind: media
     executor_key: study-with-method
-    executor_protocol_version: 1
+    executor_protocol_version: 2
     renderer_key: study-with-method
-    renderer_schema_version: 1
+    renderer_schema_version: 2
     retry_policy:
       max_attempts: 3
       retry_safe: true
@@ -37,7 +37,7 @@ spec:
           enum: [analyze, hint, solution, variant]
         subject:
           type: string
-          enum: [math]
+          enum: [chinese, math, english, physics, chemistry, biology, politics, history, geography]
         grade_stage:
           type: string
         problem:
@@ -62,9 +62,9 @@ spec:
         variant_problem: {type: string}
     default_config:
       launch_mode: dedicated
-      enabled_subjects: [math]
+      enabled_subjects: [chinese, math, english, physics, chemistry, biology, politics, history, geography]
       tutoring_policy: hints_before_solution
-      response_schema_version: 1
+      response_schema_version: 2
     dependencies:
       agents: []
       skills: []
@@ -75,7 +75,7 @@ spec:
     executor_entrypoint: app_center.study_with_method.runtime.execute_study_with_method
   database:
     mode: django-migrations
-    schema_version: 1
+    schema_version: 2
     tenant_scoped: true
   install:
     scope: per-organization

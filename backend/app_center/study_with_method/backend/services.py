@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+from itertools import cycle
 from pathlib import Path
 
 from django.db import IntegrityError, transaction
@@ -11,7 +12,9 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from apps.agents.models import Agent
+from apps.agents.high_school_tutors import TUTOR_DEFINITION_BY_SUBJECT
 from apps.conversations.models import Conversation, Message
+from apps.conversations.services import attach_existing_image
 from modules.execution.application.start_runs import start_agent_run
 
 from .models import (
@@ -42,6 +45,61 @@ def monday_for(value):
 
 def active_enrollment(profile: StudyProfile, subject=Subject.MATH):
     return profile.enrollments.filter(subject=subject, is_active=True).first()
+
+
+def generate_multi_subject_week_plan(profile: StudyProfile, *, replace_pending=False):
+    """Build a bounded, deterministic seven-day plan across active subjects."""
+
+    today = timezone.localdate()
+    week_end = today + timedelta(days=7)
+    if replace_pending:
+        profile.tasks.filter(
+            status=StudyTask.Status.PENDING,
+            scheduled_for__gte=today,
+        ).delete()
+    elif profile.tasks.filter(
+        scheduled_for__gte=today,
+        scheduled_for__lt=week_end,
+    ).exists():
+        return []
+
+    enrollments = list(profile.enrollments.filter(is_active=True).order_by("created_at"))
+    if not enrollments:
+        return []
+    by_subject = {item.subject: item for item in enrollments}
+    focus = [item for item in profile.focus_subjects if item in by_subject]
+    weighted = focus + focus + [item.subject for item in enrollments if item.subject not in focus]
+    if not weighted:
+        weighted = list(by_subject)
+    selector = cycle(weighted)
+    slots_per_day = 1 if profile.daily_minutes < 30 or len(enrollments) == 1 else 2
+    duration = max(10, min(30, profile.daily_minutes // slots_per_day))
+    created = []
+    for offset in range(7):
+        day_subjects = []
+        attempts = 0
+        while len(day_subjects) < min(slots_per_day, len(enrollments)) and attempts < len(weighted) * 3:
+            candidate = next(selector)
+            attempts += 1
+            if candidate not in day_subjects:
+                day_subjects.append(candidate)
+        for subject in day_subjects:
+            enrollment = by_subject[subject]
+            label = enrollment.get_subject_display()
+            chapter = enrollment.current_chapter or f"{label}基础巩固"
+            task, was_created = StudyTask.objects.get_or_create(
+                organization=profile.organization,
+                profile=profile,
+                subject=subject,
+                grade_stage=enrollment.grade_stage,
+                scheduled_for=today + timedelta(days=offset),
+                task_type=StudyTask.Type.SCHOOL_SYNC,
+                title=f"同步巩固：{chapter}",
+                defaults={"duration_minutes": duration},
+            )
+            if was_created:
+                created.append(task)
+    return created
 
 
 def generate_week_plan(profile: StudyProfile, enrollment: SubjectEnrollment):
@@ -314,12 +372,22 @@ def submit_weekly_quiz(quiz: WeeklyQuiz, answers: list[dict]):
     return quiz
 
 
-def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought="", hint_level=1):
-    agent = Agent.objects.filter(
+def start_tutor_run(
+    *, problem: Problem, actor, operation: str, student_thought="", hint_level=1,
+    agent_id=None,
+):
+    tutor_definition = TUTOR_DEFINITION_BY_SUBJECT.get(problem.subject)
+    tutor_slug = tutor_definition.slug if tutor_definition else TUTOR_AGENT_SLUG
+    agent_query = Agent.objects.filter(
         organization=problem.organization,
-        slug=TUTOR_AGENT_SLUG,
         is_active=True,
-    ).first()
+    )
+    agent = agent_query.filter(pk=agent_id).first() if agent_id else (
+        agent_query.filter(slug=tutor_slug).first()
+        or agent_query.filter(slug=TUTOR_AGENT_SLUG).first()
+    )
+    if agent and agent_id and agent.slug != tutor_slug:
+        return None
     if agent is None:
         return None
     prompt = problem.confirmed_text or problem.original_text
@@ -342,8 +410,8 @@ def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought=
     )
     operation_messages = {
         "analyze": (
-            f"请识别并分析这道数学题：\n{prompt}"
-            if prompt else "请识别并分析我上传的这道数学题。"
+            f"请分析这道{problem.get_subject_display()}题：\n{prompt}"
+            if prompt else f"请查看并辅导我上传的这道{problem.get_subject_display()}题，先引导我思考。"
         ),
         "hint": (
             f"我的思路：{student_thought.strip()}\n请给我第 {hint_level} 级提示。"
@@ -360,13 +428,14 @@ def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought=
         ).get(pk=problem.pk)
         conversation = locked_problem.conversation
         if conversation is None:
-            title_source = " ".join(prompt.split())[:48] if prompt else "图片题目"
+            title_source = " ".join(prompt.split())[:48] if prompt else f"{problem.get_subject_display()}图片题目"
             conversation = Conversation.objects.create(
                 user=actor,
                 organization=problem.organization,
-                title=f"学之有道 · {title_source}",
+                title=f"{problem.get_subject_display()} · {title_source}",
                 agent=agent,
-                process_id=f"study-problem:{problem.id}",
+                process_id=f"study-tutor:{problem.id}",
+                agent_locked=True,
             )
             locked_problem.conversation = conversation
 
@@ -374,6 +443,27 @@ def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought=
             conversation.messages.order_by("created_at", "id").values("role", "content")
         )[-99:]
         history.append({"role": "user", "content": message})
+        user_message = Message.objects.create(
+            conversation=conversation,
+            role="user",
+            content=visible_message,
+            metadata={
+                "study_with_method": {
+                    "problem_id": str(problem.id),
+                    "operation": operation,
+                    "hint_level": hint_level,
+                },
+            },
+        )
+        runtime_attachments = []
+        if locked_problem.source_image and locked_problem.source_attachment_id is None:
+            attachment, runtime_attachment = attach_existing_image(
+                message=user_message,
+                conversation=conversation,
+                image_field=locked_problem.source_image,
+            )
+            locked_problem.source_attachment = attachment
+            runtime_attachments.append(runtime_attachment)
         run, replayed = start_agent_run(
             organization_id=problem.organization_id,
             agent_id=agent.id,
@@ -381,6 +471,7 @@ def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought=
             input_data={
                 "message": message,
                 "messages": history,
+                "attachments": runtime_attachments,
                 **({"working_directory": image_directory} if image_directory else {}),
                 **({
                     "agent_thread": {
@@ -395,30 +486,25 @@ def start_tutor_run(*, problem: Problem, actor, operation: str, student_thought=
             allow_draft=True,
         )
         if not replayed:
-            Message.objects.create(
-                conversation=conversation,
-                role="user",
-                content=visible_message,
-                metadata={
-                    "run_id": str(run.id),
-                    "study_with_method": {
-                        "problem_id": str(problem.id),
-                        "operation": operation,
-                        "hint_level": hint_level,
-                    },
-                },
-            )
+            user_message.metadata = {
+                **user_message.metadata,
+                "run_id": str(run.id),
+            }
+            user_message.save(update_fields=("metadata",))
             conversation.save(update_fields=("updated_at",))
         locked_problem.latest_run_id = run.id
         locked_problem.save(update_fields=(
-            "conversation", "latest_run_id", "updated_at",
+            "conversation", "source_attachment", "latest_run_id", "updated_at",
         ))
         problem.conversation_id = conversation.id
         problem.latest_run_id = run.id
     return run
 
 
-def resolve_curriculum_node(subject: str, code: str | None):
+def resolve_curriculum_node(subject: str, code: str | None, grade_stage: str | None = None):
     if not code:
         return None
-    return CurriculumNode.objects.filter(subject=subject, code=code).first()
+    nodes = CurriculumNode.objects.filter(subject=subject, code=code)
+    if grade_stage:
+        nodes = nodes.filter(grade_stage=grade_stage)
+    return nodes.first()

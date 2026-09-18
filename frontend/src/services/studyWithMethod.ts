@@ -4,12 +4,20 @@ import type {
   GuardianLink,
   ManualStudyMistakeInput,
   StudyDashboard,
+  StudyCatalog,
   StudyMistake,
   StudyProblem,
   StudyProfile,
   StudyProfileInput,
   StudyReview,
   StudyTask,
+  StudySubject,
+  GradeStage,
+  SubjectEnrollment,
+  StudyTutor,
+  StudyTutorSession,
+  StudyTutorSessionCreateResult,
+  StudyReportSummary,
   TutorHint,
   TutorRun,
   WeeklyReport,
@@ -24,11 +32,48 @@ function studyRoot(organizationId: string, applicationId: string) {
 export const loadStudyDashboard = (organizationId: string, applicationId: string) =>
   api.get<StudyDashboard>(`${studyRoot(organizationId, applicationId)}/dashboard`);
 
+export const loadStudyCatalog = (organizationId: string, applicationId: string) =>
+  api.get<StudyCatalog>(`${studyRoot(organizationId, applicationId)}/catalog`);
+
 export const saveStudyProfile = (
   organizationId: string,
   applicationId: string,
   input: StudyProfileInput,
 ) => api.put<StudyProfile>(`${studyRoot(organizationId, applicationId)}/profile`, input);
+
+export const updateStudyEnrollment = (
+  organizationId: string,
+  applicationId: string,
+  subject: StudySubject,
+  input: Partial<Pick<SubjectEnrollment,
+    'curriculum_version' | 'current_chapter' | 'weak_topics' | 'latest_score' | 'target_score'>>,
+) => api.patch<SubjectEnrollment>(
+  `${studyRoot(organizationId, applicationId)}/enrollments/${subject}`,
+  input,
+);
+
+export const listStudyTutors = (organizationId: string, applicationId: string) =>
+  api.get<StudyTutor[]>(`${studyRoot(organizationId, applicationId)}/tutors`);
+
+export const listTutorSessions = (organizationId: string, applicationId: string) =>
+  api.get<StudyTutorSession[]>(`${studyRoot(organizationId, applicationId)}/tutor-sessions`);
+
+export const createTutorSession = (
+  organizationId: string,
+  applicationId: string,
+  input: { mode: 'photo' | 'chat'; subject: StudySubject; agentId: number; image?: Blob },
+) => {
+  const data = new FormData();
+  data.set('mode', input.mode);
+  data.set('subject', input.subject);
+  data.set('agent_id', String(input.agentId));
+  if (input.image) data.set('source_image', input.image, 'study-question.jpg');
+  return api.post<StudyTutorSessionCreateResult>(
+    `${studyRoot(organizationId, applicationId)}/tutor-sessions`,
+    data,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+};
 
 export const updateStudyTask = (
   organizationId: string,
@@ -47,10 +92,12 @@ export const createStudyProblem = (
   organizationId: string,
   applicationId: string,
   input: { problemText: string; image?: Blob; source: 'camera' | 'upload' | 'manual' },
+  subject: StudySubject = 'math',
+  gradeStage: GradeStage = 'high_2',
 ) => {
   const data = new FormData();
-  data.set('subject', 'math');
-  data.set('grade_stage', 'high_2');
+  data.set('subject', subject);
+  data.set('grade_stage', gradeStage);
   data.set('problem_text', input.problemText);
   data.set('source', input.source);
   if (input.image) data.set('source_image', input.image, 'math-problem.jpg');
@@ -105,17 +152,23 @@ export const requestVariantProblem = (
   `${studyRoot(organizationId, applicationId)}/problems/${problemId}/variant`,
 );
 
-export const listStudyMistakes = (organizationId: string, applicationId: string) =>
-  api.get<StudyMistake[]>(`${studyRoot(organizationId, applicationId)}/mistakes`);
+export const listStudyMistakes = (
+  organizationId: string, applicationId: string, subject?: StudySubject,
+) => api.get<StudyMistake[]>(
+  `${studyRoot(organizationId, applicationId)}/mistakes`,
+  subject ? { subject } : undefined,
+);
 
 export const importStudyMistake = (
   organizationId: string,
   applicationId: string,
   input: ManualStudyMistakeInput,
+  subject: StudySubject = 'math',
+  gradeStage: GradeStage = 'high_2',
 ) => {
   const data = new FormData();
-  data.set('subject', 'math');
-  data.set('grade_stage', 'high_2');
+  data.set('subject', subject);
+  data.set('grade_stage', gradeStage);
   data.set('problem_text', input.problemText);
   data.set('knowledge_summary', input.knowledgeSummary);
   data.set('cause', input.cause);
@@ -146,8 +199,17 @@ export const updateStudyMistake = (
   input,
 );
 
-export const listStudyReviews = (organizationId: string, applicationId: string) =>
-  api.get<StudyReview[]>(`${studyRoot(organizationId, applicationId)}/reviews`);
+export const listStudyReviews = (
+  organizationId: string,
+  applicationId: string,
+  options?: { subject?: StudySubject; dueOnly?: boolean },
+) => api.get<StudyReview[]>(
+  `${studyRoot(organizationId, applicationId)}/reviews`,
+  {
+    ...(options?.subject ? { subject: options.subject } : {}),
+    ...(options?.dueOnly === false ? { due: 0 } : {}),
+  },
+);
 
 export const completeStudyReview = (
   organizationId: string,
@@ -163,13 +225,21 @@ export const listWeeklyReports = (organizationId: string, applicationId: string)
   api.get<WeeklyReport[]>(`${studyRoot(organizationId, applicationId)}/reports`);
 
 export const generateWeeklyReport = (organizationId: string, applicationId: string) =>
-  api.post<WeeklyReport>(`${studyRoot(organizationId, applicationId)}/reports`, { subject: 'math' });
+  api.post<StudyReportSummary>(`${studyRoot(organizationId, applicationId)}/reports`, {});
 
-export const listWeeklyQuizzes = (organizationId: string, applicationId: string) =>
-  api.get<WeeklyQuiz[]>(`${studyRoot(organizationId, applicationId)}/quizzes`);
+export const getWeeklyReportSummary = (organizationId: string, applicationId: string) =>
+  api.get<StudyReportSummary>(`${studyRoot(organizationId, applicationId)}/reports`, { aggregate: 1 });
 
-export const generateWeeklyQuiz = (organizationId: string, applicationId: string) =>
-  api.post<WeeklyQuiz>(`${studyRoot(organizationId, applicationId)}/quizzes`, { subject: 'math' });
+export const listWeeklyQuizzes = (
+  organizationId: string, applicationId: string, subject?: StudySubject,
+) => api.get<WeeklyQuiz[]>(
+  `${studyRoot(organizationId, applicationId)}/quizzes`,
+  subject ? { subject } : undefined,
+);
+
+export const generateWeeklyQuiz = (
+  organizationId: string, applicationId: string, subject: StudySubject = 'math',
+) => api.post<WeeklyQuiz>(`${studyRoot(organizationId, applicationId)}/quizzes`, { subject });
 
 export const submitWeeklyQuiz = (
   organizationId: string,

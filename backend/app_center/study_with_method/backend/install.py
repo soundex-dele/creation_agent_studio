@@ -1,10 +1,12 @@
 """Idempotent application installation and high-school math seed data."""
 
 from apps.agents.models import Agent, AgentCategory
+from apps.agents.high_school_tutors import TUTOR_DEFINITIONS
 from modules.catalog.models import AgentDraft, AgentDeployment
 from modules.catalog.services import publish_agent, switch_agent_deployment
 
 from .models import CurriculumNode, GradeStage, StudyWorkspace, Subject
+from .catalog import SUBJECT_CATALOG
 from .services import TUTOR_AGENT_SLUG
 
 
@@ -43,11 +45,11 @@ def _seed_curriculum():
     for code, name, node_type, parent_code, order in MATH_NODES:
         parent = created.get(parent_code) or CurriculumNode.objects.filter(code=parent_code).first()
         node, _ = CurriculumNode.objects.update_or_create(
+            subject=Subject.MATH,
+            grade_stage=GradeStage.HIGH_2,
+            curriculum_version="通用高中数学",
             code=code,
             defaults={
-                "subject": Subject.MATH,
-                "grade_stage": GradeStage.HIGH_2,
-                "curriculum_version": "通用高中数学",
                 "name": name,
                 "node_type": node_type,
                 "parent": parent,
@@ -55,6 +57,46 @@ def _seed_curriculum():
             },
         )
         created[code] = node
+
+    for subject, config in SUBJECT_CATALOG.items():
+        for grade_stage in GradeStage.values:
+            parent, _ = CurriculumNode.objects.update_or_create(
+                subject=subject,
+                grade_stage=grade_stage,
+                curriculum_version="通用高中课程",
+                code=f"{subject}.module",
+                defaults={
+                    "name": config["label"],
+                    "node_type": CurriculumNode.NodeType.MODULE,
+                    "parent": None,
+                    "order": 1,
+                },
+            )
+            CurriculumNode.objects.update_or_create(
+                subject=subject,
+                grade_stage=grade_stage,
+                curriculum_version="通用高中课程",
+                code=f"{subject}.general",
+                defaults={
+                    "name": f"{config['label']}综合",
+                    "node_type": CurriculumNode.NodeType.KNOWLEDGE_POINT,
+                    "parent": parent,
+                    "order": 2,
+                },
+            )
+            for order, chapter in enumerate(config["chapters"], start=10):
+                CurriculumNode.objects.update_or_create(
+                    subject=subject,
+                    grade_stage=grade_stage,
+                    curriculum_version="通用高中课程",
+                    code=f"{subject}.chapter.{order}",
+                    defaults={
+                        "name": chapter,
+                        "node_type": CurriculumNode.NodeType.CHAPTER,
+                        "parent": parent,
+                        "order": order,
+                    },
+                )
 
 
 def _provision_tutor(organization):
@@ -115,10 +157,71 @@ def _provision_tutor(organization):
         )
 
 
+def _provision_subject_tutors(organization):
+    category, _ = AgentCategory.objects.update_or_create(
+        slug="high-school-education",
+        defaults={
+            "name": "高中课程辅导",
+            "description": "面向高一至高三的学科答疑、方法指导与复习辅导",
+            "icon": "",
+            "order": 8,
+        },
+    )
+    for definition in TUTOR_DEFINITIONS:
+        agent, _ = Agent.objects.update_or_create(
+            organization=organization,
+            slug=definition.slug,
+            defaults={
+                "name": definition.name,
+                "description": definition.description,
+                "icon": "",
+                "category": category,
+                "created_by": organization.owner,
+                "is_public": False,
+                "is_active": True,
+            },
+        )
+        content = {
+            "version": "2.0.0",
+            "system_prompt": definition.system_prompt,
+            "model_config": {"adapter": "codex"},
+            "tool_config": [],
+            "knowledge_config": [],
+            "guardrail_config": {},
+            "workflow_config": {},
+            "skill_bindings": [],
+        }
+        draft, created = AgentDraft.objects.get_or_create(
+            organization=organization,
+            agent=agent,
+            defaults={"updated_by": organization.owner, "content": content},
+        )
+        if not created and draft.content != content:
+            draft.content = content
+            draft.version += 1
+            draft.updated_by = organization.owner
+            draft.save(update_fields=("content", "version", "updated_by", "updated_at"))
+        revision = publish_agent(
+            agent=agent,
+            actor=organization.owner,
+            expected_draft_version=draft.version,
+            release_notes=f"{definition.name}学习策略 v2",
+        )
+        deployment = AgentDeployment.objects.filter(agent=agent).first()
+        if deployment is None or deployment.revision_id != revision.id:
+            switch_agent_deployment(
+                agent=agent,
+                actor=organization.owner,
+                revision_id=revision.id,
+                expected_version=deployment.version if deployment else 0,
+            )
+
+
 def install(*, organization, application):
     StudyWorkspace.objects.update_or_create(
         application=application,
-        defaults={"organization": organization, "enabled_subjects": [Subject.MATH]},
+        defaults={"organization": organization, "enabled_subjects": list(Subject.values)},
     )
     _seed_curriculum()
     _provision_tutor(organization)
+    _provision_subject_tutors(organization)

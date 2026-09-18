@@ -68,6 +68,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Conversation
         fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
+                  'agent_locked',
                   'application_id',
                   'working_directory',
                   'created_at', 'updated_at',
@@ -97,6 +98,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Conversation
         fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
+                  'agent_locked',
                   'application_id',
                   'working_directory',
                   'skills', 'created_at', 'updated_at',

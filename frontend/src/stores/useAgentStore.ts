@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 
@@ -84,7 +85,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     try {
       const response = await api.post<RunResource>(`/agents/${agentId}/execute/`, {
         input_data: inputData,
-      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
+      }, { headers: { 'Idempotency-Key': createIdempotencyKey('agent') } });
       return response;
     } catch (error) {
       console.error('Failed to execute agent:', error);

@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 
 import { useRunStream } from '@/features/run-stream';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -26,9 +27,6 @@ const roleLevel: Record<string, number> = {
 const statusColor: Record<string, string> = {
   pending: 'default', indexing: 'processing', ready: 'success', failed: 'error',
 };
-
-const uniqueKey = () => globalThis.crypto?.randomUUID?.()
-  ?? `knowledge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export default function KnowledgePage() {
   const {
@@ -163,7 +161,7 @@ export default function KnowledgePage() {
     try {
       const result = await api.post<{ run: { id: string }; stream_url: string }>(`${root}/knowledge-answer-runs/`, {
         query: query.trim(), knowledge_base_ids: selectedId ? [selectedId] : [], limit: 10,
-      }, { headers: { 'Idempotency-Key': uniqueKey() } });
+      }, { headers: { 'Idempotency-Key': createIdempotencyKey('knowledge') } });
       setAnswerRunId(result.run.id);
       if (!searchResult || searchResult.query !== query.trim()) await runSearch();
     } finally { setSearching(false); }

@@ -6,8 +6,12 @@ from . import views
 app_name = "study_with_method"
 
 urlpatterns = [
+    path("applications/<int:application_id>/study/catalog", views.CatalogView.as_view(), name="catalog"),
     path("applications/<int:application_id>/study/dashboard", views.DashboardView.as_view(), name="dashboard"),
     path("applications/<int:application_id>/study/profile", views.ProfileView.as_view(), name="profile"),
+    path("applications/<int:application_id>/study/enrollments/<str:subject>", views.EnrollmentDetailView.as_view(), name="enrollment-detail"),
+    path("applications/<int:application_id>/study/tutors", views.TutorListView.as_view(), name="tutors"),
+    path("applications/<int:application_id>/study/tutor-sessions", views.TutorSessionListView.as_view(), name="tutor-sessions"),
     path("applications/<int:application_id>/study/tasks", views.TaskListView.as_view(), name="tasks"),
     path("applications/<int:application_id>/study/tasks/<uuid:task_id>", views.TaskDetailView.as_view(), name="task-detail"),
     path("applications/<int:application_id>/study/problems", views.ProblemListView.as_view(), name="problems"),

@@ -10,6 +10,7 @@ import {
   type RunEventEnvelope,
   type RunEventState,
 } from '@/entities/run';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
@@ -495,7 +496,7 @@ export const useConversationStore = create<ConversationState>()(
               {
                 headers: {
                   'Content-Type': 'multipart/form-data',
-                  'Idempotency-Key': crypto.randomUUID(),
+                  'Idempotency-Key': createIdempotencyKey('chat'),
                 },
                 timeout: 120000,
               },
@@ -509,7 +510,7 @@ export const useConversationStore = create<ConversationState>()(
           return api.post<RunResource>(
             `/conversations/${conversationId}/send_message/`,
             payload,
-            { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+            { headers: { 'Idempotency-Key': createIdempotencyKey('chat') } },
           );
         },
 
@@ -710,7 +711,7 @@ export const useConversationStore = create<ConversationState>()(
               `${tenantApiRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`,
               {
                 type,
-                idempotency_key: crypto.randomUUID(),
+                idempotency_key: createIdempotencyKey('chat-command'),
                 input_request_id: activeRun.pending_input_request_id,
                 payload: answer,
               },
@@ -732,7 +733,7 @@ export const useConversationStore = create<ConversationState>()(
           set({ agentActivity: '正在取消…', error: null });
           await api.post(
             `${tenantApiRoot(run.organization_id)}/runs/${run.id}/commands`,
-            { type: 'cancel', idempotency_key: crypto.randomUUID(), payload: {} },
+            { type: 'cancel', idempotency_key: createIdempotencyKey('chat-command'), payload: {} },
           );
         },
 

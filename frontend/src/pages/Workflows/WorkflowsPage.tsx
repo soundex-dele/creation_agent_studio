@@ -5,6 +5,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import type { GuidedPrompt, GuidedQuestion, Workflow } from '@/types';
 import type { RunResource } from '@/services/applicationRuntime';
@@ -69,7 +70,7 @@ const WorkflowsPage = () => {
       const run = await api.post<{ id: string }>(
         `/workflows/${workflow.id}/start/`,
         { input },
-        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+        { headers: { 'Idempotency-Key': createIdempotencyKey('workflow') } },
       );
       setRunWorkflow(null);
       setRunPrompt(null);

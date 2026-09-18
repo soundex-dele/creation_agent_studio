@@ -1,8 +1,6 @@
 """Conversation resources backed exclusively by the durable Run plane."""
-import hashlib
 import logging
 import time
-import uuid
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import OperationalError, transaction
@@ -52,7 +50,6 @@ from .models import (
     Conversation,
     ConversationSkillBinding,
     Message,
-    MessageAttachment,
 )
 from .serializers import (
     ConversationDetailSerializer,
@@ -60,6 +57,7 @@ from .serializers import (
     CreateConversationSerializer,
     SendMessageSerializer,
 )
+from .services import prepare_image_specs, persist_message_attachments
 
 
 GENERAL_AGENT_SLUG = "general"
@@ -69,69 +67,6 @@ logger = logging.getLogger(__name__)
 
 class ConversationRunActive(Exception):
     pass
-
-
-def prepare_image_specs(images):
-    """Read stable image metadata once before transaction retries begin."""
-
-    specs = []
-    for image in images or ():
-        image.seek(0)
-        checksum = hashlib.sha256()
-        for chunk in image.chunks():
-            checksum.update(chunk)
-        image.seek(0)
-        dimensions = getattr(getattr(image, 'image', None), 'size', (None, None))
-        specs.append({
-            'id': uuid.uuid4(),
-            'file': image,
-            'original_name': str(image.name or 'image')[:255],
-            'content_type': str(image.content_type),
-            'byte_size': image.size,
-            'width': dimensions[0],
-            'height': dimensions[1],
-            'checksum_sha256': checksum.hexdigest(),
-        })
-    return specs
-
-
-def persist_message_attachments(
-    *, message, conversation, specs, saved_storage_names,
-):
-    """Persist validated uploads and return JSON-safe Codex attachment input."""
-
-    runtime_attachments = []
-    for spec in specs:
-        attachment = MessageAttachment(
-            id=spec['id'],
-            organization=conversation.organization,
-            conversation=conversation,
-            message=message,
-            original_name=spec['original_name'],
-            content_type=spec['content_type'],
-            byte_size=spec['byte_size'],
-            width=spec['width'],
-            height=spec['height'],
-            checksum_sha256=spec['checksum_sha256'],
-        )
-        spec['file'].seek(0)
-        attachment.file.save(spec['original_name'], spec['file'], save=False)
-        saved_storage_names.append(attachment.file.name)
-        attachment.save()
-        try:
-            local_path = attachment.file.path
-        except NotImplementedError as exc:
-            raise ValidationError({
-                'images': 'Codex 图片输入要求使用可访问的本地文件存储。',
-            }) from exc
-        runtime_attachments.append({
-            'id': str(attachment.id),
-            'name': attachment.original_name,
-            'content_type': attachment.content_type,
-            'byte_size': attachment.byte_size,
-            'path': str(local_path),
-        })
-    return runtime_attachments
 
 
 def resolve_agent(agent_id, organization, *, use_default=False):
@@ -179,6 +114,10 @@ def resolve_conversation_agent(conversation, requested_agent_id):
                 None, conversation.organization, use_default=True),
             conversation.agent,
         )
+    if conversation.agent_locked:
+        requested_id = None if requested_agent_id is None else int(requested_agent_id)
+        if requested_id != conversation.agent_id:
+            raise ValidationError({"agent_id": "该辅导会话已固定老师，请新建会话后更换。"})
     if requested_agent_id is None:
         return (
             resolve_agent(None, conversation.organization, use_default=True),

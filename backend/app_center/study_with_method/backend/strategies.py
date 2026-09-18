@@ -97,3 +97,43 @@ class MathStrategy:
 
 
 register_subject_strategy(MathStrategy())
+
+
+@dataclass(frozen=True)
+class GeneralSubjectStrategy:
+    subject: str
+    label: str
+    version: int = 1
+
+    def detect_topic(self, problem: str) -> str:
+        return f"{self.subject}.general"
+
+    def hint(self, problem: str, level: int, student_thought: str = "") -> dict:
+        level = max(1, min(int(level), 4))
+        prompts = {
+            1: f"先找出这道{self.label}题的任务、材料和限制条件，说说你最确定的一点。",
+            2: "把已知信息与要回答的问题对应起来，选择最相关的概念或方法。",
+            3: "按“依据—推理—结论”的顺序完成关键步骤，并检查是否回应了题目。",
+            4: "现在可以查看完整讲解；看完后请用自己的话复述关键方法。",
+        }
+        prefix = "我会沿着你的思路继续。" if student_thought.strip() else "不用急着写完整答案。"
+        return {
+            "subject": self.subject,
+            "strategy_version": self.version,
+            "knowledge_point": self.detect_topic(problem),
+            "hint_level": level,
+            "hint": f"{prefix}{prompts[level]}",
+            "solution_revealed": level == 4,
+        }
+
+    def normalize_answer(self, answer: str) -> str:
+        return "".join(answer.split()).replace("，", ",").casefold()
+
+    @property
+    def mistake_causes(self) -> tuple[str, ...]:
+        return tuple(value for value, _label in MistakeRecord.Cause.choices)
+
+
+for _subject, _label in Subject.choices:
+    if _subject != Subject.MATH:
+        register_subject_strategy(GeneralSubjectStrategy(_subject, _label))

@@ -46,6 +46,7 @@ class Conversation(models.Model):
     )
     # Template process id (e.g. "cover", "copy") identifying the flow within the workspace.
     process_id = models.CharField(max_length=64, blank=True, default='')
+    agent_locked = models.BooleanField(default=False)
     working_directory = models.CharField(max_length=1000, blank=True, default='')
     agent_thread_provider = models.CharField(max_length=32, blank=True, default='')
     agent_thread_id = models.CharField(max_length=255, blank=True, default='')

@@ -60,6 +60,8 @@
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.2",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
     "sass": "^1.100.0",
     "swagger2openapi": "^7.0.8",
     "tiny-oss": "^0.5.1",

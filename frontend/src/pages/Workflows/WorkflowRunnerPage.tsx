@@ -7,6 +7,7 @@ import { ArrowLeftOutlined, ExportOutlined, FolderOpenOutlined } from '@ant-desi
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useRunStream } from '@/features/run-stream';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -46,7 +47,7 @@ const WorkflowRunnerPage = () => {
     try {
       await api.post(`${tenantApiRoot(organizationId)}/runs/${runId}/commands`, {
         type: 'cancel',
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: createIdempotencyKey('workflow-command'),
         payload: { reason: 'user_requested' },
       });
     } catch (reason: any) {
@@ -77,7 +78,7 @@ const WorkflowRunnerPage = () => {
       const nextRun = await api.post<{ id: string }>(
         `/workflows/${run.source_id}/retry-step/`,
         { run_id: runId, step_key: stepKey },
-        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+        { headers: { 'Idempotency-Key': createIdempotencyKey('workflow-retry') } },
       );
       navigate(`/runs/${nextRun.id}`);
     } catch (reason: any) {
@@ -124,6 +125,7 @@ const WorkflowRunnerPage = () => {
           <Tag color={projection.connected ? 'processing' : 'default'}>{status}</Tag>
           <Tooltip title="打开目录">
             <Button
+              className="workflow-open-workspace"
               type="text"
               shape="circle"
               icon={<FolderOpenOutlined />}

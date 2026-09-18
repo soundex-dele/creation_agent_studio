@@ -47,6 +47,7 @@ interface MessageInputProps {
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
   workspaceLocked?: boolean;
+  mode?: 'default' | 'study';
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -57,6 +58,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = '输入消息...',
   currentAgent = null,
   workspaceLocked = false,
+  mode = 'default',
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -88,12 +90,13 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   useEffect(() => {
+    if (mode === 'study') return;
     void loadProjects();
     void loadAgents();
     api.get<{ skills: SkillOption[] }>('/conversations/composer-options/')
       .then((response) => setSkills(response.skills || []))
       .catch(() => setSkills([]));
-  }, [loadAgents, loadProjects]);
+  }, [loadAgents, loadProjects, mode]);
 
   useEffect(() => {
     setSelectedAgent(currentAgent);
@@ -249,7 +252,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className={`chat-input-box ${isFocused ? 'chat-input-box--focused' : ''}`}>
+    <div className={`chat-input-box chat-input-box--${mode} ${isFocused ? 'chat-input-box--focused' : ''}`}>
       <div className="chat-input-main">
         <textarea
           ref={textareaRef}
@@ -264,9 +267,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
           className="chat-input-textarea"
         />
         <button
+          type="button"
           className="chat-send-btn"
           onClick={() => void handleSend()}
           disabled={(!content.trim() && selectedImages.length === 0) || disabled || isSubmitting}
+          aria-label="发送消息"
         >
           <SendOutlined />
         </button>
@@ -295,7 +300,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           {selectedAgent && (
             <span className="chat-composer-chip">
               <RobotOutlined /> {selectedAgent.name}
-              <button onClick={() => setSelectedAgent(null)} aria-label="移除 Agent"><CloseOutlined /></button>
+              {mode === 'default' && <button type="button" onClick={() => setSelectedAgent(null)} aria-label="移除 Agent"><CloseOutlined /></button>}
             </span>
           )}
           {selectedSkills.map((skillName) => {
@@ -313,7 +318,28 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
-      <div className="chat-composer-toolbar">
+      {mode === 'study' ? (
+        <div className="chat-composer-toolbar chat-composer-toolbar--study">
+          <button
+            type="button"
+            className="chat-composer-action"
+            disabled={disabled}
+            onClick={() => imageInputRef.current?.click()}
+          >
+            <PictureOutlined /><span>添加题图</span>
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              handleImageSelection(event.target.files);
+              event.target.value = '';
+            }}
+          />
+        </div>
+      ) : <div className="chat-composer-toolbar">
         <Dropdown
           trigger={['click']}
           menu={{
@@ -374,6 +400,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           }}
         />
       </div>
+      }
       <FolderPickerModal
         open={folderPickerOpen}
         onClose={() => setFolderPickerOpen(false)}

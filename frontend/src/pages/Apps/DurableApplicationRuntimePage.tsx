@@ -31,6 +31,7 @@ import {
 } from '@/components/Applications/ApplicationRuntimeContext';
 import { useRunStream } from '@/features/run-stream';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import {
   loadApplicationRuntime,
   type ApplicationRuntimeDescriptor,
@@ -222,7 +223,7 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
     setStarting(true);
     setArtifacts([]);
     try {
-      setRun(await runtime.startRun(input, crypto.randomUUID()));
+      setRun(await runtime.startRun(input, createIdempotencyKey('application')));
     } catch (error) {
       message.error(error instanceof Error ? error.message : '启动失败');
     } finally {
@@ -234,7 +235,7 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
     if (!run) return;
     await runtime.sendCommand(run.id, {
       type: 'cancel',
-      idempotency_key: crypto.randomUUID(),
+      idempotency_key: createIdempotencyKey('application-command'),
       payload: { reason: 'user_requested' },
     });
   };

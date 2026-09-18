@@ -93,6 +93,17 @@
 }
 
 /* Input area */
+.chat-input-accessory {
+  width: 100%;
+  max-width: 848px;
+  margin: 0 auto;
+  padding: 8px 24px 0;
+}
+
+.chat-input-accessory + .chat-input-area {
+  padding-top: 8px;
+}
+
 .chat-input-area {
   position: relative;
   /* Balanced vertical padding: lift the box off the bottom and even out
@@ -184,13 +195,7 @@
 
 @media (max-width: 767px) {
   .chat-workspace-toolbar {
-    top: 10px;
-    right: 12px;
-  }
-
-  .chat-workspace-toolbar .ant-btn {
-    width: 44px;
-    height: 44px;
+    display: none;
   }
 
   .chat-messages {
@@ -212,6 +217,10 @@
 
   .chat-input-area {
     padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .chat-input-accessory {
+    padding: 8px 12px 0;
   }
 
   .agent-question-card {

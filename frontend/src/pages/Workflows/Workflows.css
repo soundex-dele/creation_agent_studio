@@ -106,3 +106,8 @@
   .workflow-run-header { min-height: 58px; height: auto; padding: 8px 12px; }
   .workflow-run-header > button span:last-child { display: none; }
 }
+@media (max-width: 767px) {
+  .workflow-open-workspace {
+    display: none !important;
+  }
+}

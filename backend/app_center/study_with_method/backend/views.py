@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -11,6 +13,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.tenancy.permissions import HasPathOrganization
+from apps.agents.high_school_tutors import TUTOR_DEFINITION_BY_SUBJECT
+from apps.agents.models import Agent
+from apps.conversations.models import Conversation
+from apps.conversations.serializers import ConversationListSerializer
+from modules.catalog.models import AgentDeployment
 
 from .models import (
     GuardianLink,
@@ -29,6 +36,7 @@ from .models import (
 from .serializers import (
     AttemptInputSerializer,
     AttemptSerializer,
+    EnrollmentSerializer,
     GuardianLinkSerializer,
     ManualMistakeInputSerializer,
     MasterySerializer,
@@ -49,6 +57,7 @@ from .services import (
     build_weekly_quiz,
     complete_review,
     generate_week_plan,
+    generate_multi_subject_week_plan,
     record_attempt,
     reschedule_overdue_tasks,
     resolve_curriculum_node,
@@ -56,6 +65,7 @@ from .services import (
     submit_weekly_quiz,
 )
 from .strategies import get_subject_strategy
+from .catalog import catalog_payload
 
 
 class StudyAPIView(APIView):
@@ -85,6 +95,212 @@ class StudyAPIView(APIView):
         return profile, None
 
 
+class CatalogView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        if self.workspace(organization_id, application_id) is None:
+            return Response({"detail": "应用尚未安装。"}, status=404)
+        return Response(catalog_payload())
+
+
+class EnrollmentDetailView(StudyAPIView):
+    def patch(self, request, organization_id, application_id, subject):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        if subject not in Subject.values:
+            return Response({"subject": "未知学科。"}, status=404)
+        enrollment = profile.enrollments.filter(subject=subject, is_active=True).first()
+        if enrollment is None:
+            return Response({"detail": "未启用该学科。"}, status=404)
+        allowed = {
+            "curriculum_version", "current_chapter", "weak_topics",
+            "latest_score", "target_score",
+        }
+        serializer = EnrollmentSerializer(enrollment, data={
+            key: value for key, value in request.data.items() if key in allowed
+        }, partial=True)
+        serializer.is_valid(raise_exception=True)
+        latest_score = serializer.validated_data.get(
+            "latest_score", enrollment.latest_score
+        )
+        target_score = serializer.validated_data.get(
+            "target_score", enrollment.target_score
+        )
+        if (
+            latest_score is not None
+            and target_score is not None
+            and target_score < latest_score
+        ):
+            return Response({"target_score": "目标分数不能低于最近成绩。"}, status=400)
+        updated = serializer.save()
+        generate_multi_subject_week_plan(profile, replace_pending=True)
+        return Response(EnrollmentSerializer(updated).data)
+
+
+def _available_tutors(organization_id):
+    deployment_agent_ids = AgentDeployment.objects.filter(
+        organization_id=organization_id
+    ).values_list("agent_id", flat=True)
+    agents = Agent.objects.filter(
+        organization_id=organization_id,
+        is_active=True,
+        id__in=deployment_agent_ids,
+        slug__in=[item.slug for item in TUTOR_DEFINITION_BY_SUBJECT.values()],
+    )
+    by_slug = {agent.slug: agent for agent in agents}
+    return [
+        (subject, by_slug[definition.slug])
+        for subject, definition in TUTOR_DEFINITION_BY_SUBJECT.items()
+        if definition.slug in by_slug
+    ]
+
+
+class TutorListView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        if self.workspace(organization_id, application_id) is None:
+            return Response({"detail": "应用尚未安装。"}, status=404)
+        return Response([
+            {
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "subject": subject,
+                "subject_label": dict(Subject.choices)[subject],
+            }
+            for subject, agent in _available_tutors(organization_id)
+        ])
+
+
+class TutorSessionListView(StudyAPIView):
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        conversations = Conversation.objects.filter(
+            organization_id=organization_id,
+            user=request.user,
+            process_id__startswith="study-tutor:",
+        ).select_related("agent")[:20]
+        subject_by_slug = {
+            definition.slug: subject
+            for subject, definition in TUTOR_DEFINITION_BY_SUBJECT.items()
+        }
+        return Response([
+            {
+                **ConversationListSerializer(item, context={"request": request}).data,
+                "subject": subject_by_slug.get(item.agent.slug if item.agent else "", ""),
+            }
+            for item in conversations
+        ])
+
+    def post(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        subject = str(request.data.get("subject") or "")
+        mode = str(request.data.get("mode") or "chat")
+        if subject not in Subject.values:
+            return Response({"subject": "请选择辅导学科。"}, status=400)
+        if not profile.enrollments.filter(subject=subject, is_active=True).exists():
+            return Response({"subject": "请先在学习档案中启用该学科。"}, status=400)
+        definition = TUTOR_DEFINITION_BY_SUBJECT[subject]
+        try:
+            requested_agent_id = int(request.data.get("agent_id") or 0)
+        except (TypeError, ValueError):
+            requested_agent_id = 0
+        tutor = next((
+            agent for tutor_subject, agent in _available_tutors(organization_id)
+            if tutor_subject == subject and (not requested_agent_id or agent.id == requested_agent_id)
+        ), None)
+        if tutor is None or tutor.slug != definition.slug:
+            return Response({"agent_id": "该学科老师尚未部署。"}, status=409)
+
+        profile.last_tutor_subject = subject
+        profile.save(update_fields=("last_tutor_subject", "updated_at"))
+        if mode == "chat":
+            conversation = Conversation.objects.create(
+                user=request.user,
+                organization=request.organization,
+                title=f"{dict(Subject.choices)[subject]}辅导",
+                agent=tutor,
+                process_id=f"study-tutor:{uuid.uuid4()}",
+                agent_locked=True,
+            )
+            return Response({
+                "conversation": ConversationListSerializer(
+                    conversation, context={"request": request}
+                ).data,
+                "subject": subject,
+                "problem": None,
+                "run_id": None,
+            }, status=201)
+
+        if mode != "photo":
+            return Response({"mode": "辅导方式必须是 photo 或 chat。"}, status=400)
+        serializer = ProblemInputSerializer(data={
+            "subject": subject,
+            "grade_stage": profile.grade_stage,
+            "source_image": request.data.get("source_image"),
+            "source": "camera",
+        })
+        serializer.is_valid(raise_exception=True)
+        problem = Problem.objects.create(
+            organization=request.organization,
+            profile=profile,
+            subject=subject,
+            grade_stage=profile.grade_stage,
+            source_image=serializer.validated_data["source_image"],
+            source="camera",
+            status=Problem.Status.NEEDS_CONFIRMATION,
+            analysis={"recognition": "conversation"},
+        )
+        try:
+            run = start_tutor_run(
+                problem=problem,
+                actor=request.user,
+                operation="analyze",
+                agent_id=tutor.id,
+            )
+        except Exception as exc:
+            problem.analysis = {**problem.analysis, "run_error": str(exc)}
+            problem.save(update_fields=("analysis", "updated_at"))
+            run = None
+        conversation = Conversation.objects.get(pk=problem.conversation_id) if problem.conversation_id else None
+        return Response({
+            "conversation": ConversationListSerializer(
+                conversation, context={"request": request}
+            ).data if conversation else None,
+            "subject": subject,
+            "problem": ProblemSerializer(problem, context={"request": request}).data,
+            "run_id": str(run.id) if run else None,
+        }, status=201 if conversation else 503)
+
+
+def _report_summary(reports):
+    serialized = WeeklyReportSerializer(list(reports), many=True).data
+    latest_by_subject = {}
+    for report in serialized:
+        latest_by_subject.setdefault(report["subject"], report)
+    subject_reports = list(latest_by_subject.values())
+    metric_names = ("task_total", "task_completed", "planned_minutes", "mistake_count", "due_review_count")
+    overall = {
+        key: sum(int((item.get("metrics") or {}).get(key) or 0) for item in subject_reports)
+        for key in metric_names
+    }
+    overall["completion_rate"] = round(
+        100 * overall["task_completed"] / overall["task_total"]
+    ) if overall["task_total"] else 0
+    rates = [
+        int((item.get("metrics") or {}).get("correct_rate") or 0)
+        for item in subject_reports
+        if (item.get("metrics") or {}).get("attempt_total")
+    ]
+    overall["correct_rate"] = round(sum(rates) / len(rates)) if rates else 0
+    return {"overall_metrics": overall, "subjects": subject_reports}
+
+
 class DashboardView(StudyAPIView):
     def get(self, request, organization_id, application_id):
         workspace = self.workspace(organization_id, application_id)
@@ -110,10 +326,10 @@ class DashboardView(StudyAPIView):
                 "enabled_subjects": workspace.enabled_subjects,
             })
 
-        enrollment = active_enrollment(profile)
-        if enrollment:
+        enrollments = list(profile.enrollments.filter(is_active=True))
+        if enrollments:
             reschedule_overdue_tasks(profile)
-            generate_week_plan(profile, enrollment)
+            generate_multi_subject_week_plan(profile)
         today = timezone.localdate()
         tasks = profile.tasks.filter(scheduled_for=today)
         reviews = profile.review_schedules.filter(next_review_at__lte=timezone.now())
@@ -121,6 +337,7 @@ class DashboardView(StudyAPIView):
         return Response({
             "mode": "student",
             "profile": ProfileSerializer(profile, context={"request": request}).data,
+            "enrollments": EnrollmentSerializer(enrollments, many=True).data,
             "today": str(today),
             "tasks": StudyTaskSerializer(tasks, many=True).data,
             "due_reviews": ReviewSerializer(reviews[:5], many=True, context={"request": request}).data,
@@ -128,6 +345,19 @@ class DashboardView(StudyAPIView):
             "mistake_count": profile.mistakes.count(),
             "masteries": MasterySerializer(profile.masteries.order_by("score")[:5], many=True).data,
             "latest_report": WeeklyReportSerializer(latest_report).data if latest_report else None,
+            "stats_by_subject": [
+                {
+                    "subject": enrollment.subject,
+                    "subject_label": enrollment.get_subject_display(),
+                    "task_count": tasks.filter(subject=enrollment.subject).count(),
+                    "completed_count": tasks.filter(
+                        subject=enrollment.subject,
+                        status=StudyTask.Status.COMPLETED,
+                    ).count(),
+                    "mistake_count": profile.mistakes.filter(subject=enrollment.subject).count(),
+                }
+                for enrollment in enrollments
+            ],
         })
 
 
@@ -145,35 +375,68 @@ class ProfileView(StudyAPIView):
         serializer = ProfileInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        unavailable = [
+            subject for subject in data["subjects"]
+            if subject not in (workspace.enabled_subjects or [])
+        ]
+        if unavailable:
+            return Response(
+                {"subjects": f"当前工作区未开放：{', '.join(unavailable)}。"},
+                status=400,
+            )
         with transaction.atomic():
+            existing_profile = StudyProfile.objects.filter(
+                organization=request.organization,
+                workspace=workspace,
+                student=request.user,
+            ).first()
             profile, _ = StudyProfile.objects.update_or_create(
                 organization=request.organization,
                 workspace=workspace,
                 student=request.user,
                 defaults={
-                    "display_name": data.get("display_name", ""),
-                    "region": data.get("region", ""),
-                    "primary_subject": data["subject"],
+                    "display_name": data.get(
+                        "display_name",
+                        existing_profile.display_name if existing_profile else "",
+                    ),
+                    "region": data.get(
+                        "region", existing_profile.region if existing_profile else ""
+                    ),
+                    "primary_subject": data["subjects"][0],
                     "grade_stage": data["grade_stage"],
                     "daily_minutes": data["daily_minutes"],
-                    "latest_score": data.get("latest_score"),
-                    "target_score": data.get("target_score"),
+                    "focus_subjects": data["focus_subjects"],
+                    "last_tutor_subject": data["subjects"][0],
+                    "latest_score": data.get(
+                        "latest_score",
+                        existing_profile.latest_score if existing_profile else None,
+                    ),
+                    "target_score": data.get(
+                        "target_score",
+                        existing_profile.target_score if existing_profile else None,
+                    ),
                     "onboarding_completed": True,
                 },
             )
-            enrollment, _ = SubjectEnrollment.objects.update_or_create(
-                organization=request.organization,
-                profile=profile,
-                subject=data["subject"],
-                grade_stage=data["grade_stage"],
-                defaults={
-                    "curriculum_version": data["curriculum_version"],
-                    "current_chapter": data["current_chapter"],
-                    "weak_topics": data["weak_topics"],
-                    "is_active": True,
-                },
-            )
-            generate_week_plan(profile, enrollment)
+            profile.enrollments.exclude(
+                subject__in=data["subjects"], grade_stage=data["grade_stage"]
+            ).update(is_active=False)
+            for index, subject in enumerate(data["subjects"]):
+                SubjectEnrollment.objects.update_or_create(
+                    organization=request.organization,
+                    profile=profile,
+                    subject=subject,
+                    grade_stage=data["grade_stage"],
+                    defaults={
+                        "curriculum_version": data.get("curriculum_version", "") if index == 0 else "",
+                        "current_chapter": data.get("current_chapter", "") if index == 0 else "",
+                        "weak_topics": data.get("weak_topics", []) if index == 0 else [],
+                        "latest_score": data.get("latest_score") if index == 0 else None,
+                        "target_score": data.get("target_score") if index == 0 else None,
+                        "is_active": True,
+                    },
+                )
+            generate_multi_subject_week_plan(profile, replace_pending=True)
         return Response(ProfileSerializer(profile, context={"request": request}).data)
 
 
@@ -232,7 +495,9 @@ class ProblemListView(StudyAPIView):
         data = serializer.validated_data
         text = data.get("problem_text", "").strip()
         strategy = get_subject_strategy(data["subject"])
-        knowledge = resolve_curriculum_node(data["subject"], strategy.detect_topic(text)) if text else None
+        knowledge = resolve_curriculum_node(
+            data["subject"], strategy.detect_topic(text), data["grade_stage"]
+        ) if text else None
         problem = Problem.objects.create(
             organization=request.organization,
             profile=profile,
@@ -284,7 +549,9 @@ class ProblemDetailView(StudyAPIView):
         strategy = get_subject_strategy(problem.subject)
         problem.confirmed_text = text
         problem.status = Problem.Status.READY
-        problem.knowledge_point = resolve_curriculum_node(problem.subject, strategy.detect_topic(text))
+        problem.knowledge_point = resolve_curriculum_node(
+            problem.subject, strategy.detect_topic(text), problem.grade_stage
+        )
         problem.analysis = {**problem.analysis, "recognition": "confirmed", "strategy_version": strategy.version}
         problem.save(update_fields=("confirmed_text", "status", "knowledge_point", "analysis", "updated_at"))
         try:
@@ -400,6 +667,9 @@ class MistakeListView(StudyAPIView):
         mistakes = profile.mistakes.select_related(
             "problem", "knowledge_point", "review_schedule"
         ).prefetch_related("problem__attempts")
+        subject = request.query_params.get("subject")
+        if subject:
+            mistakes = mistakes.filter(subject=subject)
         return Response(MistakeSerializer(mistakes[:100], many=True, context={"request": request}).data)
 
     def post(self, request, organization_id, application_id):
@@ -425,6 +695,7 @@ class MistakeListView(StudyAPIView):
             knowledge_point = resolve_curriculum_node(
                 data["subject"],
                 strategy.detect_topic(f"{knowledge_summary}\n{problem_text}".strip()),
+                data["grade_stage"],
             )
 
         with transaction.atomic():
@@ -503,6 +774,9 @@ class ReviewListView(StudyAPIView):
         ).prefetch_related("mistake__problem__attempts")
         if request.query_params.get("due", "1") != "0":
             reviews = reviews.filter(next_review_at__lte=timezone.now())
+        subject = request.query_params.get("subject")
+        if subject:
+            reviews = reviews.filter(subject=subject)
         return Response(ReviewSerializer(reviews[:100], many=True, context={"request": request}).data)
 
 
@@ -535,17 +809,26 @@ class ReportListView(StudyAPIView):
             reports = WeeklyReport.objects.for_organization(organization_id).filter(
                 profile_id__in=profile_ids
             ).select_related("profile")
+        if request.query_params.get("aggregate") == "1":
+            return Response(_report_summary(reports[:52]))
         return Response(WeeklyReportSerializer(reports[:52], many=True).data)
 
     def post(self, request, organization_id, application_id):
         profile, error = self.require_profile(request, organization_id, application_id)
         if error:
             return error
-        enrollment = active_enrollment(profile, request.data.get("subject", Subject.MATH))
-        if enrollment is None:
-            return Response({"detail": "未启用该学科。"}, status=400)
-        report = build_weekly_report(profile, enrollment)
-        return Response(WeeklyReportSerializer(report).data, status=201)
+        subject = request.data.get("subject")
+        if subject:
+            enrollment = active_enrollment(profile, subject)
+            if enrollment is None:
+                return Response({"detail": "未启用该学科。"}, status=400)
+            report = build_weekly_report(profile, enrollment)
+            return Response(WeeklyReportSerializer(report).data, status=201)
+        reports = [
+            build_weekly_report(profile, enrollment)
+            for enrollment in profile.enrollments.filter(is_active=True)
+        ]
+        return Response(_report_summary(reports), status=201)
 
 
 class QuizListView(StudyAPIView):
@@ -553,7 +836,11 @@ class QuizListView(StudyAPIView):
         profile, error = self.require_profile(request, organization_id, application_id)
         if error:
             return error
-        return Response(WeeklyQuizSerializer(profile.weekly_quizzes.all()[:12], many=True).data)
+        quizzes = profile.weekly_quizzes.all()
+        subject = request.query_params.get("subject")
+        if subject:
+            quizzes = quizzes.filter(subject=subject)
+        return Response(WeeklyQuizSerializer(quizzes[:24], many=True).data)
 
     def post(self, request, organization_id, application_id):
         profile, error = self.require_profile(request, organization_id, application_id)
