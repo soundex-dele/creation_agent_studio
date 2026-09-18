@@ -135,14 +135,15 @@ const MessageList: React.FC<MessageListProps> = ({
     return (
       <div
         key={message.id}
-        className={`animate-fade-in mb-4 flex gap-3 ${
+        className={`message-row message-row--${isUser ? 'user' : isSystem ? 'system' : 'assistant'} animate-fade-in mb-4 flex gap-3 ${
           isUser ? 'flex-row-reverse' : 'flex-row'
         }`}
       >
         <Avatar
           icon={isUser ? <UserOutlined /> : <RobotOutlined />}
           size={36}
-          className="flex-shrink-0"
+          className="message-avatar flex-shrink-0"
+          aria-hidden="true"
           style={{
             backgroundColor: isUser
               ? 'var(--color-primary)'

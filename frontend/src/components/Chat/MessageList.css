@@ -323,6 +323,18 @@
 }
 
 @media (max-width: 640px) {
+  .message-row--assistant {
+    gap: 0;
+  }
+
+  .message-row--assistant > .message-avatar {
+    display: none;
+  }
+
+  .message-row--assistant > .message-bubble-column {
+    max-width: 100%;
+  }
+
   .message-image-grid {
     grid-template-columns: minmax(0, 1fr);
   }
