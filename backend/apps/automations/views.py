@@ -20,6 +20,7 @@ from modules.tenancy.permissions import (
     HasPathOrganizationRole,
     ROLE_LEVEL,
 )
+from core.resource_access import accessible_resources
 
 from .models import Automation, AutomationInvocation
 from .serializers import (
@@ -290,11 +291,11 @@ class AutomationTargetListView(APIView):
             ).values_list(
                 "application_id", flat=True
             )
-            targets = Application.objects.filter(
-                Q(organization_id=organization_id) | Q(is_public=True),
+            targets = accessible_resources(Application.objects.filter(
+                Q(organization_id=organization_id) | Q(organization__isnull=True),
                 id__in=application_ids,
                 is_active=True,
-            ).order_by("name")
+            ), request.user).order_by("name")
             return Response([{
                 "type": "application", "id": str(item.id), "name": item.name,
                 "description": item.description,

@@ -31,6 +31,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "kind",
+            "access_scope",
             "is_active",
             "created_at",
             "updated_at",

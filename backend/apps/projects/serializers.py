@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Q
 
 from apps.applications.models import Application
+from core.resource_access import accessible_resources
 from apps.projects.services.workspace_paths import application_working_directory
 from .models import Project, ProjectAsset
 
@@ -67,9 +68,13 @@ class CreateProjectSerializer(serializers.ModelSerializer):
     def validate_application_id(self, value):
         request = self.context['request']
         organization = getattr(request, 'organization', None)
-        application = Application.objects.filter(id=value).filter(
-            Q(is_public=True) | Q(organization=organization) |
-            Q(created_by=request.user)
+        application = accessible_resources(
+            Application.objects.filter(
+                Q(organization=organization) | Q(organization__isnull=True),
+                id=value,
+                is_active=True,
+            ),
+            request.user,
         ).first()
         if application is None:
             raise serializers.ValidationError('应用不存在或无权访问。')

@@ -27,7 +27,7 @@ class DjangoExecutionDomainPort:
 
     def agent_for_update(self, organization_id, agent_id):
         return Agent.objects.select_for_update().filter(
-            Q(organization_id=organization_id) | Q(is_public=True),
+            Q(organization_id=organization_id) | Q(organization__isnull=True),
             pk=agent_id,
             is_active=True,
         ).first()

@@ -34,11 +34,27 @@ from modules.execution.application.errors import (
 from modules.execution.application.start_runs import start_agent_run
 from modules.execution.models import Run
 from .filters import AgentFilter
+from core.permissions import (
+    CanCreateAgent,
+    CanDeleteAgent,
+    CanToggleAgent,
+    CanUpdateAgent,
+    IsAdmin,
+)
+from core.resource_access import (
+    ResourcePermissionSerializer,
+    accessible_resources,
+    is_platform_admin,
+    can_administer_agents,
+    can_delete_agents,
+    can_toggle_agents,
+    can_update_agents,
+)
 
 class AgentCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AgentCategory.objects.all()
     serializer_class = AgentCategorySerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
 class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.filter(
@@ -56,18 +72,31 @@ class AgentViewSet(viewsets.ModelViewSet):
         return AgentListSerializer
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
-            return [AllowAny()]
+        if self.action == 'permissions':
+            return [IsAdmin()]
+        if self.action == 'create':
+            return [CanCreateAgent()]
+        if self.action in ('update', 'partial_update') or (
+            self.action == 'versions' and self.request.method == 'POST'
+        ):
+            return [CanUpdateAgent()]
+        if self.action == 'destroy':
+            return [CanDeleteAgent()]
+        if self.action in ('deploy', 'rollback', 'status'):
+            return [CanToggleAgent()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Agent.objects.filter(
-            kind=Agent.Kind.STANDARD, is_active=True,
-        ).select_related(
+        queryset = Agent.objects.filter(kind=Agent.Kind.STANDARD).select_related(
             'category', 'created_by', 'draft'
         )
-        if not self.request.user.is_authenticated:
-            return queryset.filter(is_public=True)
+        manageable_list = (
+            self.action == 'list'
+            and self.request.query_params.get('manageable') == '1'
+            and can_administer_agents(self.request.user)
+        )
+        if self.action not in ('status', 'destroy') and not manageable_list:
+            queryset = queryset.filter(is_active=True)
         from apps.enterprise.models import Membership
         queryset = queryset.annotate(current_user_org_role=Subquery(
             Membership.objects.filter(
@@ -76,22 +105,52 @@ class AgentViewSet(viewsets.ModelViewSet):
                 is_active=True,
             ).values('role')[:1]
         ))
+        action_capability = {
+            'update': can_update_agents,
+            'partial_update': can_update_agents,
+            'destroy': can_delete_agents,
+            'deploy': can_toggle_agents,
+            'rollback': can_toggle_agents,
+            'status': can_toggle_agents,
+        }.get(self.action)
+        can_read_lifecycle = self.action in ('deployment', 'versions') and (
+            can_update_agents(self.request.user)
+            or can_toggle_agents(self.request.user)
+        )
+        if manageable_list or can_read_lifecycle or (
+            action_capability and action_capability(self.request.user)
+        ):
+            if self.action == 'list':
+                from apps.enterprise.permissions import resolve_organization
+                queryset = queryset.filter(
+                    organization=resolve_organization(self.request),
+                )
+            if is_platform_admin(self.request.user):
+                return queryset
+            return accessible_resources(queryset, self.request.user)
+        queryset = accessible_resources(queryset, self.request.user)
         if self.request.query_params.get('mine') == '1':
             from apps.enterprise.permissions import resolve_organization
             return queryset.filter(organization=resolve_organization(self.request))
-        org_ids = self.request.user.organization_memberships.filter(
-            is_active=True).values_list('organization_id', flat=True)
-        return queryset.filter(Q(is_public=True) | Q(organization_id__in=org_ids)).distinct()
+        return queryset
+
+    @action(detail=True, methods=['get', 'put'], url_path='permissions')
+    def permissions(self, request, pk=None):
+        agent = self.get_object()
+        if request.method == 'GET':
+            return Response(ResourcePermissionSerializer(agent).data)
+        serializer = ResourcePermissionSerializer(agent, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         from apps.enterprise.permissions import resolve_organization
         organization = resolve_organization(self.request)
-        from apps.enterprise.models import Membership
         membership = getattr(self.request, 'organization_membership', None)
-        if not organization or not membership or membership.role not in (
-                Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.DEVELOPER):
+        if not organization or not membership:
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Developer role is required to create an agent.')
+            raise PermissionDenied('需要有效的组织成员资格才能创建智能体。')
         with transaction.atomic():
             agent = serializer.save(
                 created_by=self.request.user,
@@ -107,15 +166,17 @@ class AgentViewSet(viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer):
-        from apps.enterprise.models import Membership
-        self.require_agent_role(self.request, serializer.instance, (
-            Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.DEVELOPER))
+        self.require_agent_capability(
+            self.request, serializer.instance, can_update_agents,
+            '无权修改该组织的智能体。',
+        )
         serializer.save()
 
     def perform_destroy(self, instance):
-        from apps.enterprise.models import Membership
-        self.require_agent_role(self.request, instance, (
-            Membership.Role.OWNER, Membership.Role.ADMIN))
+        self.require_agent_capability(
+            self.request, instance, can_delete_agents,
+            '无权删除该组织的智能体。',
+        )
         from modules.catalog.models import (
             ApplicationDeployment,
             ApplicationDraft,
@@ -169,22 +230,27 @@ class AgentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-    def require_agent_role(self, request, agent, roles):
-        from apps.enterprise.models import Membership
+    def require_agent_capability(self, request, agent, capability, message):
         if request.user.is_superuser:
             return
+        from apps.enterprise.models import Membership
         membership = Membership.objects.filter(
             organization=agent.organization, user=request.user,
-            is_active=True, role__in=roles).first()
-        if membership is None:
+            is_active=True,
+        ).first()
+        if membership is None or not capability(request.user):
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Insufficient role in the agent organization.')
+            raise PermissionDenied(message)
 
     @action(detail=True, methods=['get'])
     def deployment(self, request, pk=None):
         agent = self.get_object()
-        from apps.enterprise.models import Membership
-        self.require_agent_role(request, agent, tuple(dict(Membership.Role.choices)))
+        self.require_agent_capability(
+            request,
+            agent,
+            lambda user: can_update_agents(user) or can_toggle_agents(user),
+            '无权查看该智能体的部署信息。',
+        )
         deployment = AgentDeployment.objects.filter(agent=agent).first()
         return Response(
             AgentDeploymentSerializer(deployment).data if deployment else None
@@ -193,20 +259,19 @@ class AgentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get', 'post'])
     def versions(self, request, pk=None):
         agent = self.get_object()
-        from apps.enterprise.models import Membership
-        self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN,
-            Membership.Role.DEVELOPER, Membership.Role.OPERATOR,
-            Membership.Role.AUDITOR, Membership.Role.VIEWER,
-        ))
+        self.require_agent_capability(
+            request,
+            agent,
+            lambda user: can_update_agents(user) or can_toggle_agents(user),
+            '无权查看该智能体的版本。',
+        )
         if request.method == 'GET':
             return Response(AgentRevisionSerializer(
                 agent.revisions.order_by('-revision_no'), many=True).data)
 
-        self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN,
-            Membership.Role.DEVELOPER,
-        ))
+        self.require_agent_capability(
+            request, agent, can_update_agents, '无权修改该智能体。',
+        )
         draft = AgentDraft.objects.filter(agent=agent).first()
         if draft is None:
             return Response({'detail': 'Agent draft is missing.'}, status=409)
@@ -237,9 +302,9 @@ class AgentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def deploy(self, request, pk=None):
         agent = self.get_object()
-        from apps.enterprise.models import Membership
-        self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN))
+        self.require_agent_capability(
+            request, agent, can_toggle_agents, '无权启用该智能体版本。',
+        )
         revision_id = request.data.get('revision_id') or request.data.get('version_id')
         if not revision_id:
             revision_id = AgentRevision.objects.filter(
@@ -267,10 +332,9 @@ class AgentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def rollback(self, request, pk=None):
         agent = self.get_object()
-        from apps.enterprise.models import Membership
-        self.require_agent_role(request, agent, (
-            Membership.Role.OWNER, Membership.Role.ADMIN,
-        ))
+        self.require_agent_capability(
+            request, agent, can_toggle_agents, '无权切换该智能体版本。',
+        )
         current = AgentDeployment.objects.filter(
             agent=agent).first()
         expected_version = request.data.get(
@@ -284,6 +348,21 @@ class AgentViewSet(viewsets.ModelViewSet):
         except (DeploymentRollbackUnavailable, DeploymentVersionConflict) as exc:
             return Response({'detail': str(exc)}, status=409)
         return Response(AgentDeploymentSerializer(deployment).data)
+
+    @action(detail=True, methods=['patch'], url_path='status')
+    def status(self, request, pk=None):
+        agent = self.get_object()
+        self.require_agent_capability(
+            request, agent, can_toggle_agents, '无权启用或停用该智能体。',
+        )
+        if not isinstance(request.data.get('is_active'), bool):
+            return Response(
+                {'is_active': '必须提供布尔值。'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        agent.is_active = request.data['is_active']
+        agent.save(update_fields=['is_active', 'updated_at'])
+        return Response(AgentListSerializer(agent, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def execute(self, request, pk=None):

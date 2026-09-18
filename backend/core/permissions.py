@@ -3,6 +3,14 @@ Permission classes for the project.
 """
 from rest_framework import permissions
 
+from core.resource_access import (
+    can_create_agents,
+    can_delete_agents,
+    can_toggle_agents,
+    can_toggle_applications,
+    can_update_agents,
+)
+
 
 class IsAdmin(permissions.BasePermission):
     """管理员权限"""
@@ -13,6 +21,31 @@ class IsAdmin(permissions.BasePermission):
             and request.user.is_authenticated
             and (request.user.is_superuser or request.user.role == 'admin')
         )
+
+
+class CanCreateAgent(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return can_create_agents(request.user)
+
+
+class CanUpdateAgent(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return can_update_agents(request.user)
+
+
+class CanDeleteAgent(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return can_delete_agents(request.user)
+
+
+class CanToggleAgent(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return can_toggle_agents(request.user)
+
+
+class CanToggleApplication(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return can_toggle_applications(request.user)
 
 
 class IsProfessionalOrAdmin(permissions.BasePermission):

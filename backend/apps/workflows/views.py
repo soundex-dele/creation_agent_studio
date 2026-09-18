@@ -24,6 +24,7 @@ from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import IdempotencyKeyReused
 from modules.execution.application.start_runs import start_workflow_run
 from modules.execution.models import Run, RunEvent
+from core.resource_access import accessible_resources, can_access_resource
 
 from .models import Workflow
 from .serializers import (
@@ -33,7 +34,7 @@ from .serializers import (
 )
 
 
-def _chat_step_snapshot(step, organization):
+def _chat_step_snapshot(step, organization, actor):
     """Freeze an editable chat application into an executable workflow step.
 
     Chat applications are product-level conversation presets and can be used
@@ -57,11 +58,11 @@ def _chat_step_snapshot(step, organization):
         raise ValueError(
             f"步骤“{step.name or application.name}”没有配置默认智能体。"
         )
-    agent = Agent.objects.filter(
-        Q(organization=organization) | Q(is_public=True),
+    agent = accessible_resources(Agent.objects.filter(
+        Q(organization=organization) | Q(organization__isnull=True),
         pk=binding.get("agent_id"),
         is_active=True,
-    ).select_related("draft").first()
+    ).select_related("draft"), actor).first()
     if agent is None:
         raise ValueError(
             f"步骤“{step.name or application.name}”的默认智能体不可用。"
@@ -129,7 +130,7 @@ def _chat_step_snapshot(step, organization):
     }
 
 
-def build_workflow_step_snapshots(workflow):
+def build_workflow_step_snapshots(workflow, actor):
     """Freeze the current editable workflow into executable step snapshots."""
     steps = list(workflow.steps.select_related(
         "application", "application__draft"
@@ -138,8 +139,12 @@ def build_workflow_step_snapshots(workflow):
         raise ValueError("工作流至少需要一个应用。")
     snapshots = []
     for step in steps:
+        if not can_access_resource(step.application, actor):
+            raise ValueError(
+                f"步骤“{step.name or step.application.name}”的应用当前不可用。"
+            )
         if step.application.kind == Application.Kind.CHAT:
-            runtime = _chat_step_snapshot(step, workflow.organization)
+            runtime = _chat_step_snapshot(step, workflow.organization, actor)
         else:
             deployment = ApplicationDeployment.objects.for_organization(
                 workflow.organization_id
@@ -442,7 +447,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            _steps, snapshots = build_workflow_step_snapshots(workflow)
+            _steps, snapshots = build_workflow_step_snapshots(workflow, request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=409)
         try:
@@ -497,7 +502,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         if not idempotency_key or len(idempotency_key) > 160:
             return Response({"detail": "请提供有效的 Idempotency-Key。"}, status=400)
         try:
-            _steps, snapshots = build_workflow_step_snapshots(workflow)
+            _steps, snapshots = build_workflow_step_snapshots(workflow, request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=409)
         by_key = {step["key"]: step for step in snapshots}

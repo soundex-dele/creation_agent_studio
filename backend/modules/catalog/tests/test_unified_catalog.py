@@ -21,7 +21,9 @@ from apps.agents.serializers import AgentRevisionSerializer
 
 @pytest.fixture
 def unified_context(db):
-    user = get_user_model().objects.create_user(username="unified-owner")
+    user = get_user_model().objects.create_user(
+        username="unified-owner", role="admin"
+    )
     organization = Organization.objects.create(
         name="Unified Organization",
         slug="unified-organization",

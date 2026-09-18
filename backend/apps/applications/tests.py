@@ -31,7 +31,8 @@ class LegacyDefinitionMigrationTest(TestCase):
 
 class ChatApplicationBoundaryTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user('app-owner', password='secret')
+        self.user = User.objects.create_user(
+            'app-owner', password='secret', role=User.Role.ADMIN)
         self.organization = Organization.objects.create(
             name='Studio', slug='studio-test', owner=self.user)
         Membership.objects.create(

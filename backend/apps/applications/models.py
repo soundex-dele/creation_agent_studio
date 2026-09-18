@@ -31,6 +31,11 @@ class Application(models.Model):
         CHAT = 'chat', '聊天应用'
         TASK = 'task', '任务应用'
         CUSTOM = 'custom', '自定义应用'
+
+    class AccessScope(models.TextChoices):
+        ADMIN = 'admin', '仅管理员'
+        RESTRICTED = 'restricted', '指定账号'
+        ORGANIZATION = 'organization', '组织内全部账号'
     category = models.ForeignKey(
         ApplicationCategory,
         on_delete=models.CASCADE,
@@ -47,6 +52,17 @@ class Application(models.Model):
     screenshots = models.JSONField(default=list, blank=True)
     usage_count = models.IntegerField(default=0)
     is_public = models.BooleanField(default=True)
+    access_scope = models.CharField(
+        max_length=20,
+        choices=AccessScope.choices,
+        default=AccessScope.ADMIN,
+        db_index=True,
+    )
+    allowed_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='allowed_applications',
+    )
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(

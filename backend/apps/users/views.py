@@ -72,6 +72,14 @@ class AdminUserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.exclude(username='system').order_by('-created_at')
 
 
+class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+    """Allow platform administrators to delegate account capabilities."""
+
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = User.objects.exclude(username='system')
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     """自定义登录视图"""
     permission_classes = [AllowAny]

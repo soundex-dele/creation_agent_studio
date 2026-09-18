@@ -28,6 +28,11 @@ class Agent(models.Model):
         STANDARD = 'standard', '标准智能体'
         SUPERVISOR = 'supervisor', 'AI 分身'
 
+    class AccessScope(models.TextChoices):
+        ADMIN = 'admin', '仅管理员'
+        RESTRICTED = 'restricted', '指定账号'
+        ORGANIZATION = 'organization', '组织内全部账号'
+
     category = models.ForeignKey(
         AgentCategory,
         on_delete=models.CASCADE,
@@ -41,6 +46,17 @@ class Agent(models.Model):
         max_length=20, choices=Kind.choices, default=Kind.STANDARD, db_index=True,
     )
     is_public = models.BooleanField(default=True)
+    access_scope = models.CharField(
+        max_length=20,
+        choices=AccessScope.choices,
+        default=AccessScope.ADMIN,
+        db_index=True,
+    )
+    allowed_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='allowed_agents',
+    )
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(

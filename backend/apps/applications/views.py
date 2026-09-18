@@ -22,6 +22,8 @@ from .serializers import (
 )
 from .services import compose_guided_prompt
 from .serializers import application_definition
+from core.permissions import IsAdmin
+from core.resource_access import ResourcePermissionSerializer, accessible_resources
 
 
 def _runtime_prefetch(queryset):
@@ -31,12 +33,12 @@ def _runtime_prefetch(queryset):
 class ApplicationCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ApplicationCategory.objects.all()
     serializer_class = ApplicationCategorySerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
 
 class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only discovery surface; Catalog owns all Application writes."""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     filter_backends = [SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'description']
     filterset_class = ApplicationFilter
@@ -44,17 +46,27 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = _runtime_prefetch(Application.objects.filter(is_active=True))
-        if self.request.user.is_authenticated:
-            organization = resolve_organization(self.request, required=False)
-            return queryset.filter(
-                Q(is_public=True) | Q(created_by=self.request.user) |
-                Q(organization=organization))
-        return queryset.filter(is_public=True)
+        return accessible_resources(queryset, self.request.user)
+
+    def get_permissions(self):
+        if self.action == 'permissions':
+            return [IsAdmin()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return ApplicationDetailSerializer
         return ApplicationListSerializer
+
+    @action(detail=True, methods=['get', 'put'], url_path='permissions')
+    def permissions(self, request, *args, **kwargs):
+        application = self.get_object()
+        if request.method == 'GET':
+            return Response(ResourcePermissionSerializer(application).data)
+        serializer = ResourcePermissionSerializer(application, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='compose-prompt')
     def compose_prompt(self, request, *args, **kwargs):

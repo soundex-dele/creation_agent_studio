@@ -7,6 +7,10 @@ from rest_framework import serializers
 from apps.agents.models import Agent
 from modules.catalog.definition import validate_application_definition
 from modules.catalog.models import ApplicationDraft
+from core.resource_access import (
+    accessible_resources,
+    is_platform_admin,
+)
 
 from .models import Application, ApplicationCategory, ChatApplication, Skill
 
@@ -18,10 +22,14 @@ def application_definition(application, *, revision=None):
     return deepcopy(draft.content) if draft is not None else {}
 
 
-def enrich_chat_definition(content):
+def enrich_chat_definition(content, user=None):
     result = deepcopy(content)
     agent_ids = [item.get('agent_id') for item in result.get('agent_bindings', [])]
-    agents = Agent.objects.in_bulk(agent_ids)
+    agent_query = Agent.objects.filter(id__in=agent_ids, is_active=True)
+    if user is not None:
+        agent_query = accessible_resources(agent_query, user)
+    agents = agent_query.in_bulk()
+    visible_bindings = []
     for binding in result.get('agent_bindings', []):
         agent = agents.get(binding.get('agent_id'))
         if agent:
@@ -30,6 +38,8 @@ def enrich_chat_definition(content):
                 'agent_slug': agent.slug,
                 'agent_icon': agent.icon,
             })
+            visible_bindings.append(binding)
+    result['agent_bindings'] = visible_bindings
     skill_ids = [item.get('skill_id') for item in result.get('skill_bindings', [])]
     skills = {str(item.id): item for item in Skill.objects.filter(id__in=skill_ids)}
     for binding in result.get('skill_bindings', []):
@@ -47,7 +57,13 @@ class ApplicationCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'description', 'icon', 'order', 'app_count']
 
     def get_app_count(self, obj):
-        return obj.applications.filter(is_public=True, is_active=True).count()
+        request = self.context.get('request')
+        if request is None:
+            return 0
+        return accessible_resources(
+            obj.applications.filter(is_active=True),
+            request.user,
+        ).count()
 
 
 class SkillSerializer(serializers.ModelSerializer):
@@ -83,7 +99,11 @@ class ApplicationRuntimeSerializer(serializers.ModelSerializer):
         definition = application_definition(
             instance, revision=self.context.get('revision'))
         if instance.kind == Application.Kind.CHAT:
-            definition = enrich_chat_definition(definition)
+            request = self.context.get('request')
+            definition = enrich_chat_definition(
+                definition,
+                request.user if request is not None else None,
+            )
         data.update(definition)
         return data
 
@@ -128,11 +148,14 @@ class ApplicationWriteSerializer(serializers.ModelSerializer):
         organization = resolve_organization(request, required=False)
         agent_ids = {item['agent_id'] for item in definition.get('agent_bindings', [])}
         if agent_ids:
-            access = Q(is_public=True) | Q(created_by=request.user)
-            if organization is not None:
-                access |= Q(organization=organization)
-            allowed = set(Agent.objects.filter(
-                access, id__in=agent_ids).values_list('id', flat=True))
+            allowed = set(accessible_resources(
+                Agent.objects.filter(
+                    Q(organization=organization) | Q(organization__isnull=True),
+                    id__in=agent_ids,
+                    is_active=True,
+                ),
+                request.user,
+            ).values_list('id', flat=True))
             if allowed != agent_ids:
                 raise serializers.ValidationError(
                     {'agent_bindings': '包含无权使用的智能体。'})
@@ -235,16 +258,21 @@ class ApplicationListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
     renderer_key = serializers.SerializerMethodField()
+    can_manage_permissions = serializers.SerializerMethodField()
 
     def get_renderer_key(self, obj):
         return application_definition(obj).get('renderer_key', '')
+
+    def get_can_manage_permissions(self, obj):
+        request = self.context.get('request')
+        return bool(request and is_platform_admin(request.user))
 
     class Meta:
         model = Application
         fields = [
             'id', 'slug', 'name', 'description', 'icon', 'color', 'tags',
             'developer', 'category_name', 'category_slug', 'usage_count', 'kind',
-            'renderer_key',
+            'renderer_key', 'access_scope', 'can_manage_permissions',
         ]
 
 
@@ -253,16 +281,21 @@ class ApplicationDetailSerializer(ApplicationRuntimeSerializer):
     created_by_username = serializers.CharField(
         source='created_by.username', read_only=True)
     can_edit = serializers.SerializerMethodField()
+    can_manage_permissions = serializers.SerializerMethodField()
 
     def get_can_edit(self, obj):
         request = self.context.get('request')
-        return bool(request and request.user.is_authenticated and (
-            request.user.is_superuser or obj.created_by_id == request.user.id))
+        return bool(request and is_platform_admin(request.user))
+
+    def get_can_manage_permissions(self, obj):
+        request = self.context.get('request')
+        return bool(request and is_platform_admin(request.user))
 
     class Meta(ApplicationRuntimeSerializer.Meta):
         fields = ApplicationRuntimeSerializer.Meta.fields + [
             'tags', 'developer', 'screenshots', 'category', 'usage_count',
-            'is_public', 'created_by_username', 'can_edit',
+            'is_public', 'access_scope', 'created_by_username', 'can_edit',
+            'can_manage_permissions',
         ]
 
 

@@ -127,6 +127,7 @@ def deployed_application(api_actor, api_organization):
         name="Batch Transcribe",
         slug="batch-transcribe-runtime",
         description="Batch transcription application",
+        access_scope=Application.AccessScope.ORGANIZATION,
     )
     content = {
         "executor_kind": "media",

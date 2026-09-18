@@ -472,7 +472,7 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
                 organization=trigger.organization,
                 execution_mode=Workflow.ExecutionMode.AUTOMATIC,
             )
-            _steps, snapshots = build_workflow_step_snapshots(workflow)
+            _steps, snapshots = build_workflow_step_snapshots(workflow, user)
             run, _ = start_workflow_run(
                 organization=trigger.organization,
                 workflow_id=workflow.id,

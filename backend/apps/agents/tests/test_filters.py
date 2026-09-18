@@ -20,7 +20,8 @@ User = get_user_model()
 class AgentFilterTest(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.user = User.objects.create_user(
+            username='testuser', password='testpass', role=User.Role.ADMIN)
         self.client.force_authenticate(user=self.user)
 
         self.cat_video = AgentCategory.objects.create(name='视频制作', slug='video', description='视频相关')
@@ -76,6 +77,8 @@ class AgentFilterTest(TestCase):
         self.assertEqual(len(results), 1)
 
     def test_viewer_cannot_create_agent_in_organization(self):
+        self.user.role = User.Role.MEMBER
+        self.user.save(update_fields=['role'])
         owner = User.objects.create_user(username='agent-owner', password='p')
         organization = owner.organization_memberships.get().organization
         Membership.objects.create(organization=organization, user=self.user,

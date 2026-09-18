@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Empty, Popconfirm, Spin, Tag, message } from 'antd';
+import { Button, Empty, Popconfirm, Spin, Switch, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, RightOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '@/services/api';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { Delegate, DelegateInstance } from '@/types/delegate';
 import './Delegates.css';
 
@@ -15,6 +16,8 @@ const instanceTime = (value: string) => new Intl.DateTimeFormat('zh-CN', {
 const DelegatesPage = () => {
   const navigate = useNavigate();
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
+  const user = useAuthStore((state) => state.user);
+  const canCreateAgent = user?.role === 'admin' || Boolean(user?.can_create_agents);
   const [items, setItems] = useState<Delegate[]>([]);
   const [instances, setInstances] = useState<DelegateInstance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +76,22 @@ const DelegatesPage = () => {
     }
   };
 
+  const toggle = async (item: Delegate, isActive: boolean) => {
+    if (!organizationId) return;
+    try {
+      const updated = await api.patch<Delegate>(
+        `/organizations/${organizationId}/delegates/${item.id}/status`,
+        { is_active: isActive },
+      );
+      setItems((current) => current.map((value) => (
+        value.id === updated.id ? updated : value
+      )));
+      message.success(`AI 分身已${isActive ? '启用' : '停用'}`);
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '更新状态失败');
+    }
+  };
+
   const removeInstance = async (instanceId: number) => {
     setDeletingInstanceId(instanceId);
     try {
@@ -90,7 +109,7 @@ const DelegatesPage = () => {
     <div className="delegates-page">
       <div className="delegates-heading">
         <div><h1 className="page-title">AI 分身</h1><p className="page-subtitle">创建代表你的总指挥，规划并调度智能体和应用完成复杂任务。</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/delegates/new')}>新建分身</Button>
+        {canCreateAgent && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/delegates/new')}>新建分身</Button>}
       </div>
       {loading ? <Spin size="large" /> : items.length === 0 ? (
         <Empty description="还没有 AI 分身" />
@@ -105,6 +124,7 @@ const DelegatesPage = () => {
                 <div className="delegate-card-title">
                   <strong>{item.name}</strong>
                   <Tag>{item.visibility === 'private' ? '仅自己' : '组织共享'}</Tag>
+                  <Tag color={item.is_active ? 'green' : 'default'}>{item.is_active ? '已启用' : '已停用'}</Tag>
                 </div>
                 <p>{item.description || '暂无说明'}</p>
                 <small>{item.agent_ids.length} 个智能体 · {item.application_ids.length} 个应用</small>
@@ -154,8 +174,17 @@ const DelegatesPage = () => {
                     onClick={() => void summon(item)}
                   >召唤</Button>
                 )}
+                {item.can_toggle && (
+                  <Switch
+                    checked={item.is_active}
+                    checkedChildren="启用"
+                    unCheckedChildren="停用"
+                    onChange={(checked) => void toggle(item, checked)}
+                    aria-label={`${item.name}启用状态`}
+                  />
+                )}
                 {item.can_edit && <Button icon={<EditOutlined />} onClick={() => navigate(`/delegates/${item.id}`)}>配置</Button>}
-                {item.can_edit && (
+                {item.can_delete && (
                   <Popconfirm title="删除这个 AI 分身？" onConfirm={() => void remove(item.id)}>
                     <Button danger icon={<DeleteOutlined />} />
                   </Popconfirm>

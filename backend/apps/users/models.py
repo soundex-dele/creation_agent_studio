@@ -38,6 +38,13 @@ class User(AbstractUser):
     objects = UserManager()
     avatar = models.URLField(blank=True, help_text='用户头像 URL')
     bio = models.TextField(blank=True, help_text='用户简介')
+    can_view_agents = models.BooleanField(default=False)
+    can_create_agents = models.BooleanField(default=False)
+    can_update_agents = models.BooleanField(default=False)
+    can_delete_agents = models.BooleanField(default=False)
+    can_toggle_agents = models.BooleanField(default=False)
+    can_view_applications = models.BooleanField(default=False)
+    can_toggle_applications = models.BooleanField(default=False)
     api_key = models.CharField(
         max_length=255,
         unique=True,

@@ -252,6 +252,9 @@ def _start_once(
         application = port.application_for_update(organization_id, application_id)
         if application is None:
             raise DeploymentUnavailable("Application is not available")
+        from core.resource_access import can_access_resource
+        if not can_access_resource(application, actor):
+            raise DeploymentUnavailable("Application is not available")
         port.enforce_quota(application.organization)
         deployment = (
             ApplicationDeployment.objects.for_organization(organization_id)
@@ -271,6 +274,27 @@ def _start_once(
             raise InvalidExecutionDefinition(
                 "Deployment revision crosses an application or organization boundary"
             )
+        from apps.agents.models import Agent
+        from core.resource_access import accessible_resources
+        bound_agent_ids = {
+            int(binding["agent_id"])
+            for binding in (revision.content or {}).get("agent_bindings", [])
+            if binding.get("agent_id") is not None
+        }
+        if bound_agent_ids:
+            allowed_agent_ids = set(accessible_resources(
+                Agent.objects.filter(
+                    Q(organization_id=organization_id)
+                    | Q(organization__isnull=True),
+                    id__in=bound_agent_ids,
+                    is_active=True,
+                ),
+                actor,
+            ).values_list("id", flat=True))
+            if allowed_agent_ids != bound_agent_ids:
+                raise InvalidExecutionDefinition(
+                    "Application contains unavailable agents"
+                )
 
         replay = _load_replay(
             organization_id=organization_id,
@@ -421,6 +445,9 @@ def start_agent_run(
         port = execution_domain_port()
         agent = port.agent_for_update(organization_id, agent_id)
         if agent is None:
+            raise DeploymentUnavailable("Agent is not available")
+        from core.resource_access import can_access_resource
+        if not can_access_resource(agent, actor):
             raise DeploymentUnavailable("Agent is not available")
         deployment = AgentDeployment.objects.for_organization(
             organization_id
@@ -592,6 +619,9 @@ def start_supervisor_run(
         ).first()
         if supervisor is None:
             raise DeploymentUnavailable("Supervisor is not available")
+        from core.resource_access import accessible_resources, can_access_resource
+        if not can_access_resource(supervisor, actor):
+            raise DeploymentUnavailable("Supervisor is not available")
         if "supervisor" not in getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
             Run.ExecutorKind.WORKFLOW, {}
         ):
@@ -622,17 +652,15 @@ def start_supervisor_run(
         application_ids = {
             int(value) for value in orchestration.get("application_ids") or []
         }
-        allowed_agents = Agent.objects.filter(
-            Q(organization_id=organization_id) | Q(organization__isnull=True, is_public=True),
+        allowed_agents = accessible_resources(Agent.objects.filter(
             id__in=agent_ids,
             kind=Agent.Kind.STANDARD,
             is_active=True,
-        )
-        allowed_apps = Application.objects.filter(
-            Q(organization_id=organization_id) | Q(organization__isnull=True, is_public=True),
+        ), actor)
+        allowed_apps = accessible_resources(Application.objects.filter(
             id__in=application_ids,
             is_active=True,
-        )
+        ), actor)
         if set(allowed_agents.values_list("id", flat=True)) != agent_ids:
             raise InvalidExecutionDefinition("Supervisor team contains unavailable agents")
         if set(allowed_apps.values_list("id", flat=True)) != application_ids:

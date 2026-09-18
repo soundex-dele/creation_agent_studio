@@ -10,7 +10,14 @@ from modules.execution.models import Run
 
 @pytest.mark.django_db
 def test_supervisor_create_defaults_to_private_and_is_hidden_from_other_members():
-    owner = get_user_model().objects.create_user(username="delegate-owner")
+    owner = get_user_model().objects.create_user(
+        username="delegate-owner",
+        can_view_agents=True,
+        can_create_agents=True,
+        can_update_agents=True,
+        can_delete_agents=True,
+        can_toggle_agents=True,
+    )
     teammate = get_user_model().objects.create_user(username="delegate-viewer")
     organization = owner.owned_organizations.get()
     Membership.objects.create(
@@ -27,6 +34,7 @@ def test_supervisor_create_defaults_to_private_and_is_hidden_from_other_members(
         created_by=owner,
         organization=organization,
         is_public=False,
+        access_scope=Agent.AccessScope.ORGANIZATION,
     )
     url = f"/api/v1/organizations/{organization.id}/delegates"
     client = APIClient()
@@ -69,7 +77,14 @@ def test_supervisor_create_defaults_to_private_and_is_hidden_from_other_members(
 
 @pytest.mark.django_db
 def test_organization_shared_supervisor_is_visible_to_members():
-    owner = get_user_model().objects.create_user(username="shared-owner")
+    owner = get_user_model().objects.create_user(
+        username="shared-owner",
+        can_view_agents=True,
+        can_create_agents=True,
+        can_update_agents=True,
+        can_delete_agents=True,
+        can_toggle_agents=True,
+    )
     teammate = get_user_model().objects.create_user(username="shared-viewer")
     organization = owner.owned_organizations.get()
     Membership.objects.create(
@@ -107,7 +122,14 @@ def test_organization_shared_supervisor_is_visible_to_members():
 
 @pytest.mark.django_db
 def test_deleted_supervisor_slug_can_be_reused():
-    owner = get_user_model().objects.create_user(username="delegate-recreate-owner")
+    owner = get_user_model().objects.create_user(
+        username="delegate-recreate-owner",
+        can_view_agents=True,
+        can_create_agents=True,
+        can_update_agents=True,
+        can_delete_agents=True,
+        can_toggle_agents=True,
+    )
     organization = owner.owned_organizations.get()
     category = AgentCategory.objects.create(
         name="Worker Recreate",
@@ -162,7 +184,14 @@ def test_deleted_supervisor_slug_can_be_reused():
 
 @pytest.mark.django_db
 def test_supervisor_publish_names_team_members_without_deployments():
-    owner = get_user_model().objects.create_user(username="delegate-validation-owner")
+    owner = get_user_model().objects.create_user(
+        username="delegate-validation-owner",
+        can_view_agents=True,
+        can_create_agents=True,
+        can_update_agents=True,
+        can_delete_agents=True,
+        can_toggle_agents=True,
+    )
     organization = owner.owned_organizations.get()
     category = AgentCategory.objects.create(
         name="Worker Validation",
@@ -176,6 +205,7 @@ def test_supervisor_publish_names_team_members_without_deployments():
         created_by=owner,
         organization=organization,
         is_public=False,
+        access_scope=Agent.AccessScope.ORGANIZATION,
     )
     url = f"/api/v1/organizations/{organization.id}/delegates"
     client = APIClient()
@@ -199,3 +229,60 @@ def test_supervisor_publish_names_team_members_without_deployments():
         f"以下智能体尚未部署：Content Expert（ID {worker.id}）。"
         "请先在“企业管理 → 智能体发布”中激活版本"
     )
+
+
+@pytest.mark.django_db
+def test_supervisor_toggle_does_not_grant_update_or_delete():
+    owner = get_user_model().objects.create_user(
+        username="delegate-capability-owner",
+        can_view_agents=True,
+        can_create_agents=True,
+    )
+    operator = get_user_model().objects.create_user(
+        username="delegate-toggle-operator",
+        can_view_agents=True,
+        can_toggle_agents=True,
+    )
+    organization = owner.owned_organizations.get()
+    Membership.objects.create(
+        organization=organization,
+        user=operator,
+        role=Membership.Role.VIEWER,
+    )
+    category = AgentCategory.objects.create(
+        name="Supervisor Capability",
+        slug="supervisor-capability",
+    )
+    delegate = Agent.objects.create(
+        category=category,
+        name="Toggle Only Lead",
+        slug="toggle-only-lead",
+        created_by=owner,
+        organization=organization,
+        kind=Agent.Kind.SUPERVISOR,
+    )
+    SupervisorProfile.objects.create(agent=delegate)
+
+    client = APIClient()
+    client.force_authenticate(operator)
+    url = f"/api/v1/organizations/{organization.id}/delegates/{delegate.id}"
+
+    disabled = client.patch(
+        f"{url}/status", {"is_active": False}, format="json"
+    )
+    assert disabled.status_code == 200, disabled.data
+    assert disabled.data["is_active"] is False
+    assert disabled.data["can_toggle"] is True
+    assert disabled.data["can_edit"] is False
+    assert disabled.data["can_delete"] is False
+
+    assert client.patch(
+        url, {"name": "Forbidden update"}, format="json"
+    ).status_code == 403
+    assert client.delete(url).status_code == 403
+
+    enabled = client.patch(
+        f"{url}/status", {"is_active": True}, format="json"
+    )
+    assert enabled.status_code == 200, enabled.data
+    assert enabled.data["is_active"] is True

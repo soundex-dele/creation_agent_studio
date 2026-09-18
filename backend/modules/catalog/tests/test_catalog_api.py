@@ -19,7 +19,9 @@ from apps.enterprise.models import (
 
 @pytest.fixture
 def catalog_api_owner(db):
-    return get_user_model().objects.create_user(username="catalog-api-owner")
+    return get_user_model().objects.create_user(
+        username="catalog-api-owner", role="admin"
+    )
 
 
 @pytest.fixture
@@ -332,8 +334,8 @@ def test_deployment_rejects_revision_from_another_application(
 
 
 @pytest.mark.django_db
-def test_deployment_requires_admin_role(
-    catalog_api_client, catalog_api_owner, catalog_api_organization
+def test_deployment_remains_admin_only_when_status_capability_is_delegated(
+    catalog_api_client, catalog_api_organization
 ):
     application, _ = _create_application(
         catalog_api_client, catalog_api_organization
@@ -355,11 +357,14 @@ def test_deployment_requires_admin_role(
     payload = {"revision_id": revision_response.data["id"], "expected_version": 0}
 
     denied = developer_client.put(url, payload, format="json")
-    accepted = catalog_api_client.put(url, payload, format="json")
 
     assert denied.status_code == 403
-    assert denied.data["code"] == "deployment_requires_admin"
-    assert accepted.status_code == 201
+    assert denied.data["code"] == "application_update_forbidden"
+
+    developer.can_toggle_applications = True
+    developer.save(update_fields=["can_toggle_applications"])
+    still_denied = developer_client.put(url, payload, format="json")
+    assert still_denied.status_code == 403
 
 
 @pytest.mark.django_db

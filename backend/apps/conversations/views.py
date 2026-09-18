@@ -45,6 +45,7 @@ from modules.execution.application.start_runs import (
     start_supervisor_run,
 )
 from modules.execution.models import IdempotencyRecord, Run
+from core.resource_access import accessible_resources
 
 from .models import (
     Conversation,
@@ -69,10 +70,13 @@ class ConversationRunActive(Exception):
     pass
 
 
-def resolve_agent(agent_id, organization, *, use_default=False):
-    visible = Agent.objects.filter(
-        Q(organization=organization) | Q(is_public=True),
-        is_active=True,
+def resolve_agent(agent_id, organization, user, *, use_default=False):
+    visible = accessible_resources(
+        Agent.objects.filter(
+            Q(organization=organization) | Q(organization__isnull=True),
+            is_active=True,
+        ),
+        user,
     )
     if agent_id is None:
         if use_default:
@@ -109,24 +113,40 @@ def resolve_conversation_agent(conversation, requested_agent_id):
     """Resolve the runtime Agent and the optional persisted composer selection."""
 
     if requested_agent_id is AGENT_SELECTION_UNSET:
-        return (
-            conversation.agent or resolve_agent(
-                None, conversation.organization, use_default=True),
-            conversation.agent,
-        )
+        if conversation.agent_id:
+            selected = accessible_resources(
+                Agent.objects.filter(
+                    Q(organization=conversation.organization)
+                    | Q(organization__isnull=True),
+                    pk=conversation.agent_id,
+                    is_active=True,
+                ),
+                conversation.user,
+            ).first()
+            if selected is None:
+                raise ValidationError({
+                    "agent_id": "该智能体不存在或当前用户无权使用。",
+                })
+            return selected, conversation.agent
+        return resolve_agent(
+            None, conversation.organization, conversation.user, use_default=True), None
     if conversation.agent_locked:
         requested_id = None if requested_agent_id is None else int(requested_agent_id)
         if requested_id != conversation.agent_id:
             raise ValidationError({"agent_id": "该辅导会话已固定老师，请新建会话后更换。"})
     if requested_agent_id is None:
         return (
-            resolve_agent(None, conversation.organization, use_default=True),
+            resolve_agent(
+                None, conversation.organization, conversation.user, use_default=True),
             None,
         )
-    selected = Agent.objects.filter(
-        Q(organization=conversation.organization) | Q(is_public=True),
-        is_active=True,
-        pk=requested_agent_id,
+    selected = accessible_resources(
+        Agent.objects.filter(
+            Q(organization=conversation.organization) | Q(organization__isnull=True),
+            is_active=True,
+            pk=requested_agent_id,
+        ),
+        conversation.user,
     ).first()
     if selected is None:
         raise ValidationError({"agent_id": "该智能体不存在或当前用户无权使用。"})
@@ -238,11 +258,13 @@ class ConversationViewSet(viewsets.ViewSet):
         chat_definition = None
         if data.get("application_id"):
             application = get_object_or_404(
-                Application.objects.select_related(
-                    "chat_application", "draft").filter(
-                    Q(organization=organization)
-                    | Q(organization__isnull=True, is_public=True),
-                    is_active=True,
+                accessible_resources(
+                    Application.objects.select_related(
+                        "chat_application", "draft").filter(
+                            Q(organization=organization) | Q(organization__isnull=True),
+                            is_active=True,
+                        ),
+                    request.user,
                 ),
                 id=data["application_id"],
                 kind=Application.Kind.CHAT,
@@ -263,14 +285,17 @@ class ConversationViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             agent = get_object_or_404(
-                Agent.objects.filter(
-                    Q(organization=organization) | Q(is_public=True),
-                    is_active=True,
+                accessible_resources(
+                    Agent.objects.filter(
+                        Q(organization=organization) | Q(organization__isnull=True),
+                        is_active=True,
+                    ),
+                    request.user,
                 ),
                 id=binding["agent_id"],
             )
         else:
-            agent = resolve_agent(requested_agent_id, organization)
+            agent = resolve_agent(requested_agent_id, organization, request.user)
         ensure_supervisor_access(agent, request.user)
 
         project = None
@@ -459,6 +484,15 @@ class ConversationViewSet(viewsets.ViewSet):
             user_id=conversation.user_id,
         )
         organization = conversation.organization
+        if conversation.application_id and not accessible_resources(
+            Application.objects.filter(
+                Q(organization=organization) | Q(organization__isnull=True),
+                pk=conversation.application_id,
+                is_active=True,
+            ),
+            request.user,
+        ).exists():
+            raise ValidationError({"application_id": "当前用户已无权使用该应用。"})
         agent, selected_agent = resolve_conversation_agent(
             conversation, requested_agent_id)
         selection_changed = conversation.agent_id != getattr(

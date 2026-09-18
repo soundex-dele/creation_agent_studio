@@ -1,7 +1,9 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 
 from apps.applications.models import Application
+from core.resource_access import accessible_resources
 from apps.applications.serializers import ApplicationRuntimeSerializer
 from apps.enterprise.models import Membership
 from .models import Workflow, WorkflowStep
@@ -115,10 +117,13 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
         request = self.context['request']
         organization = getattr(request, 'organization', None)
         requested = {item['application_id'] for item in value}
-        from django.db.models import Q
-        allowed = set(Application.objects.filter(id__in=requested).filter(
-            Q(is_public=True) | Q(organization=organization) |
-            Q(created_by=request.user),
+        allowed = set(accessible_resources(
+            Application.objects.filter(
+                Q(organization=organization) | Q(organization__isnull=True),
+                id__in=requested,
+                is_active=True,
+            ),
+            request.user,
         ).values_list('id', flat=True))
         if requested != allowed:
             raise serializers.ValidationError('包含不可用或未发布的应用版本。')

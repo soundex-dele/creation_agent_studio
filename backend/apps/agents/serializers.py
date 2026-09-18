@@ -4,33 +4,23 @@ from rest_framework import serializers
 
 from .models import Agent, AgentCategory
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
+from core.resource_access import (
+    accessible_resources,
+    can_delete_agents,
+    can_toggle_agents,
+    can_update_agents,
+    is_platform_admin,
+)
 
 
 def _agent_permissions(agent, request):
     if not request or not request.user.is_authenticated:
-        return False, False
-    if request.user.is_superuser:
-        return True, True
-    from apps.enterprise.models import Membership
-    role = getattr(agent, 'current_user_org_role', None)
-    if role is None:
-        role = Membership.objects.filter(
-            organization=agent.organization,
-            user=request.user,
-            is_active=True,
-        ).values_list('role', flat=True).first()
-    if role is None:
-        return False, False
-    can_edit = role in (
-        Membership.Role.OWNER,
-        Membership.Role.ADMIN,
-        Membership.Role.DEVELOPER,
+        return False, False, False
+    return (
+        can_update_agents(request.user),
+        can_delete_agents(request.user),
+        can_toggle_agents(request.user),
     )
-    can_delete = role in (
-        Membership.Role.OWNER,
-        Membership.Role.ADMIN,
-    )
-    return can_edit, can_delete
 
 
 class AgentCategorySerializer(serializers.ModelSerializer):
@@ -41,24 +31,41 @@ class AgentCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'description', 'icon', 'order', 'agent_count']
 
     def get_agent_count(self, obj):
-        return obj.agents.filter(is_public=True).count()
+        request = self.context.get('request')
+        if request is None:
+            return 0
+        return accessible_resources(
+            obj.agents.filter(is_active=True, kind=Agent.Kind.STANDARD),
+            request.user,
+        ).count()
 
 
 class AgentListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     can_edit = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    can_toggle = serializers.SerializerMethodField()
+    can_manage_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Agent
         fields = ['id', 'name', 'slug', 'description', 'icon', 'category_name',
-                  'is_public', 'can_edit', 'can_delete', 'created_at']
+                  'is_public', 'is_active', 'access_scope', 'can_edit', 'can_delete',
+                  'can_toggle',
+                  'can_manage_permissions', 'created_at']
 
     def get_can_edit(self, obj):
         return _agent_permissions(obj, self.context.get('request'))[0]
 
     def get_can_delete(self, obj):
         return _agent_permissions(obj, self.context.get('request'))[1]
+
+    def get_can_toggle(self, obj):
+        return _agent_permissions(obj, self.context.get('request'))[2]
+
+    def get_can_manage_permissions(self, obj):
+        request = self.context.get('request')
+        return bool(request and is_platform_admin(request.user))
 
 
 class AgentDetailSerializer(serializers.ModelSerializer):
@@ -74,6 +81,8 @@ class AgentDetailSerializer(serializers.ModelSerializer):
     workflow_config = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    can_toggle = serializers.SerializerMethodField()
+    can_manage_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Agent
@@ -81,8 +90,10 @@ class AgentDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'description', 'icon', 'category',
             'system_prompt', 'model_config', 'tool_config',
             'knowledge_config', 'guardrail_config', 'workflow_config',
-            'skill_bindings', 'is_public', 'created_by_username',
-            'can_edit', 'can_delete', 'created_at', 'updated_at',
+            'skill_bindings', 'is_public', 'is_active', 'created_by_username',
+            'access_scope', 'can_edit', 'can_delete',
+            'can_toggle',
+            'can_manage_permissions', 'created_at', 'updated_at',
         ]
 
     def get_skill_bindings(self, obj):
@@ -125,6 +136,13 @@ class AgentDetailSerializer(serializers.ModelSerializer):
 
     def get_can_delete(self, obj):
         return _agent_permissions(obj, self.context.get('request'))[1]
+
+    def get_can_toggle(self, obj):
+        return _agent_permissions(obj, self.context.get('request'))[2]
+
+    def get_can_manage_permissions(self, obj):
+        request = self.context.get('request')
+        return bool(request and is_platform_admin(request.user))
 
 
 class AgentWriteSerializer(serializers.ModelSerializer):

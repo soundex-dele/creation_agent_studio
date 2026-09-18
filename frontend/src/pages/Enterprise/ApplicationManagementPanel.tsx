@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Empty, Switch, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Empty, Switch, Table, Tag, Typography, message } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/useAuthStore';
+import ResourcePermissionModal, {
+  type AccessScope,
+} from '@/components/Permissions/ResourcePermissionModal';
 
 interface ManagedApplication {
   id: number;
@@ -10,6 +15,7 @@ interface ManagedApplication {
   description: string;
   kind: 'chat' | 'task' | 'custom';
   is_active: boolean;
+  access_scope: AccessScope;
   updated_at: string;
 }
 
@@ -23,17 +29,24 @@ const kindLabels: Record<ManagedApplication['kind'], string> = {
   custom: '自定义应用',
 };
 
+const accessLabels: Record<AccessScope, string> = {
+  admin: '不额外授权',
+  restricted: '指定账号',
+  organization: '组织全员',
+};
+
 export default function ApplicationManagementPanel({
   organizationId,
-  role,
 }: {
   organizationId: string;
-  role?: string;
 }) {
   const [applications, setApplications] = useState<ManagedApplication[]>([]);
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const canAdmin = role === 'owner' || role === 'admin';
+  const [permissionApplication, setPermissionApplication] = useState<ManagedApplication | null>(null);
+  const currentUser = useAuthStore((state) => state.user);
+  const isPlatformAdmin = currentUser?.role === 'admin';
+  const canToggleApplications = isPlatformAdmin || Boolean(currentUser?.can_toggle_applications);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -95,24 +108,42 @@ export default function ApplicationManagementPanel({
           checked={isActive}
           checkedChildren="启用"
           unCheckedChildren="停用"
-          disabled={!canAdmin || updatingId !== null}
+          disabled={!canToggleApplications || updatingId !== null}
           loading={updatingId === application.id}
           onChange={(checked) => void updateStatus(application, checked)}
           aria-label={`${application.name}启用状态`}
         />
       ),
     },
+    {
+      title: '可见权限',
+      dataIndex: 'access_scope',
+      width: 140,
+      render: (scope: AccessScope) => <Tag>{accessLabels[scope] ?? scope}</Tag>,
+    },
     { title: '更新时间', dataIndex: 'updated_at', width: 190 },
+    {
+      title: '操作',
+      width: 130,
+      render: (_, application) => isPlatformAdmin ? (
+        <Button
+          icon={<LockOutlined aria-hidden="true" />}
+          onClick={() => setPermissionApplication(application)}
+        >
+          权限设置
+        </Button>
+      ) : '—',
+    },
   ];
 
   return (
     <div className="enterprise-subpanel">
-      {!canAdmin && (
+      {!canToggleApplications && (
         <Alert
           type="info"
           showIcon
           message="只读访问"
-          description="只有组织 owner/admin 可启用或停用应用。"
+          description="当前账号未获授权启用或停用应用。"
         />
       )}
       <Alert
@@ -129,6 +160,14 @@ export default function ApplicationManagementPanel({
         scroll={{ x: 860 }}
         pagination={false}
         locale={{ emptyText: <Empty description="暂无应用" /> }}
+      />
+      <ResourcePermissionModal
+        resourceType="application"
+        resourceId={permissionApplication?.slug ?? null}
+        resourceName={permissionApplication?.name ?? ''}
+        open={permissionApplication !== null}
+        onClose={() => setPermissionApplication(null)}
+        onSaved={loadApplications}
       />
     </div>
   );

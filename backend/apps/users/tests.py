@@ -172,6 +172,44 @@ class AdminAccountManagementTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('password_confirm', response.data)
 
+    def test_admin_can_delegate_account_capabilities(self):
+        self.client.force_authenticate(self.administrator)
+
+        response = self.client.patch(
+            f'/api/v1/auth/admin/users/{self.member.id}/',
+            {
+                'can_view_agents': True,
+                'can_create_agents': True,
+                'can_delete_agents': True,
+                'can_view_applications': True,
+                'can_toggle_applications': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.can_view_agents)
+        self.assertTrue(self.member.can_create_agents)
+        self.assertTrue(self.member.can_delete_agents)
+        self.assertTrue(self.member.can_view_applications)
+        self.assertTrue(self.member.can_toggle_applications)
+        self.assertFalse(self.member.can_update_agents)
+        self.assertFalse(self.member.can_toggle_agents)
+
+    def test_non_admin_cannot_delegate_account_capabilities(self):
+        self.client.force_authenticate(self.member)
+
+        response = self.client.patch(
+            f'/api/v1/auth/admin/users/{self.member.id}/',
+            {'can_create_agents': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.member.refresh_from_db()
+        self.assertFalse(self.member.can_create_agents)
+
 
 class ProfileAndApiKeyTest(TestCase):
     def setUp(self):
@@ -196,6 +234,27 @@ class ProfileAndApiKeyTest(TestCase):
         self.assertEqual(updated.data['username'], 'updated-user')
         self.assertEqual(updated.data['email'], 'after@example.com')
         self.assertEqual(updated.data['bio'], '团队成员')
+
+    def test_profile_cannot_grant_its_own_account_capabilities(self):
+        updated = self.client.patch('/api/v1/auth/me/', {
+            'can_view_agents': True,
+            'can_create_agents': True,
+            'can_update_agents': True,
+            'can_delete_agents': True,
+            'can_toggle_agents': True,
+            'can_view_applications': True,
+            'can_toggle_applications': True,
+        }, format='json')
+
+        self.assertEqual(updated.status_code, 200, updated.data)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.can_view_agents)
+        self.assertFalse(self.user.can_create_agents)
+        self.assertFalse(self.user.can_update_agents)
+        self.assertFalse(self.user.can_delete_agents)
+        self.assertFalse(self.user.can_toggle_agents)
+        self.assertFalse(self.user.can_view_applications)
+        self.assertFalse(self.user.can_toggle_applications)
 
     def test_password_change_checks_current_password(self):
         rejected = self.client.put('/api/v1/auth/me/change-password/', {

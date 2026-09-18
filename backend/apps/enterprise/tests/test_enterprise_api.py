@@ -224,7 +224,7 @@ def test_webhook_automation_can_start_workflow(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         'apps.workflows.views.build_workflow_step_snapshots',
-        lambda _workflow: ([], [{'key': 'writer'}]),
+        lambda _workflow, _actor: ([], [{'key': 'writer'}]),
     )
 
     def fake_start_workflow_run(**kwargs):

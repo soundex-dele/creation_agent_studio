@@ -87,7 +87,7 @@ def validate_target(automation):
         ):
             raise AutomationValidationError("目标工作流不存在或不是自动执行模式。")
         try:
-            build_workflow_step_snapshots(workflow)
+            build_workflow_step_snapshots(workflow, automation.created_by)
         except ValueError as exc:
             raise AutomationValidationError(str(exc)) from exc
         return workflow
@@ -193,7 +193,9 @@ def _start_target_run(automation, invocation, payload):
     from modules.execution.application.start_runs import start_workflow_run
 
     workflow = automation.workflow
-    _steps, snapshots = build_workflow_step_snapshots(workflow)
+    _steps, snapshots = build_workflow_step_snapshots(
+        workflow, automation.created_by,
+    )
     run, _ = start_workflow_run(
         organization=automation.organization,
         workflow_id=workflow.id,

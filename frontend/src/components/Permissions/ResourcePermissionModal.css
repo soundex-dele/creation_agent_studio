@@ -1,0 +1,42 @@
+.resource-permission-loading {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+}
+
+.resource-permission-options {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.resource-permission-option.ant-radio-wrapper {
+  align-items: flex-start;
+  min-height: 68px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+}
+
+.resource-permission-option.ant-radio-wrapper-checked {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+
+.resource-permission-title,
+.resource-permission-description {
+  display: block;
+}
+
+.resource-permission-title {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.resource-permission-description {
+  margin-top: 3px;
+  color: var(--color-text-sec);
+  font-size: 12px;
+  line-height: 1.5;
+}

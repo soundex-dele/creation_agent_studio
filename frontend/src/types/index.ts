@@ -39,6 +39,8 @@ export interface AppItem {
   applicationId?: number
   runtime?: import('./application').ApplicationRuntime
   canEdit?: boolean
+  canManagePermissions?: boolean
+  accessScope?: 'admin' | 'restricted' | 'organization'
 }
 
 export * from './application'

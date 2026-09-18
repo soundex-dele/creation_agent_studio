@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from apps.applications.models import Application
 from apps.workflows.models import Workflow
+from core.resource_access import accessible_resources
 
 from .models import Automation, AutomationInvocation
 from .scheduling import ScheduleValidationError, preview_schedule
@@ -77,11 +78,11 @@ class AutomationWriteSerializer(serializers.ModelSerializer):
         target_id = attrs.get("target_id", getattr(instance, "target_id", ""))
         if target_type == Automation.TargetType.APPLICATION:
             try:
-                target = Application.objects.filter(
-                    Q(organization=organization) | Q(is_public=True),
+                target = accessible_resources(Application.objects.filter(
+                    Q(organization=organization) | Q(organization__isnull=True),
                     pk=target_id,
                     is_active=True,
-                ).first()
+                ), self.context["request"].user).first()
             except (TypeError, ValueError):
                 target = None
             if target is None:

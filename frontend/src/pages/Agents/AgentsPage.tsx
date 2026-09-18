@@ -5,6 +5,7 @@ import { useAgentStore } from '@/stores/useAgentStore';
 import AgentDetailModal from '@/components/Agents/AgentDetailModal';
 import AgentEditorModal from '@/components/Agents/AgentEditorModal';
 import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/useAuthStore';
 import './AgentsPage.css';
 
 const { Search } = Input;
@@ -12,6 +13,8 @@ const { Search } = Input;
 const AGENT_ICONS = ['🎬', '✍️', '🎙️', '✂️', '🎨', '🎵', '💡', '🔧'];
 
 const AgentsPage: React.FC = () => {
+  const user = useAuthStore((state) => state.user);
+  const canCreateAgent = user?.role === 'admin' || user?.can_create_agents;
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -68,9 +71,11 @@ const AgentsPage: React.FC = () => {
       </div>
 
       <div className="page-toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
-          新建智能体
-        </Button>
+        {canCreateAgent && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+            新建智能体
+          </Button>
+        )}
         <Search
           placeholder="搜索智能体..."
           prefix={<SearchOutlined className="text-text-dim" />}

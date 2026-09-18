@@ -34,7 +34,18 @@ from modules.catalog.services import (
 )
 from modules.execution.api.base import ProblemDetailsAPIView
 from apps.enterprise.models import Membership
-from modules.tenancy.permissions import HasPathOrganizationRole, ROLE_LEVEL
+from core.resource_access import (
+    accessible_resources,
+    can_access_resource,
+    can_toggle_applications,
+    filter_accessible_agent_bindings,
+    is_platform_admin,
+)
+from modules.tenancy.permissions import (
+    HasPathOrganization,
+    HasPathOrganizationRole,
+    ROLE_LEVEL,
+)
 
 from .pagination import ApplicationCursorPagination, ApplicationRevisionCursorPagination
 from .serializers import (
@@ -75,10 +86,14 @@ def _validation_detail(exc):
     return messages[0] if messages else str(exc)
 
 
-def _application(organization_id, application_id):
-    return Application.objects.for_organization(organization_id).filter(
-        pk=application_id
-    ).first()
+def _application(request, organization_id, application_id, *, manage=False):
+    queryset = Application.objects.for_organization(organization_id).filter(
+        pk=application_id,
+        is_active=True,
+    )
+    if manage and is_platform_admin(request.user):
+        return queryset.first()
+    return accessible_resources(queryset, request.user).first()
 
 
 def _not_found(request):
@@ -117,6 +132,18 @@ def _can_manage_deployment(request):
     ]
 
 
+def _require_application_manager(request):
+    if is_platform_admin(request.user):
+        return None
+    return _problem(
+        request,
+        status_code=status.HTTP_403_FORBIDDEN,
+        code="application_update_forbidden",
+        title="Application update is not allowed",
+        detail="Only platform administrators can modify applications.",
+    )
+
+
 def _require_deployment_admin(request):
     if not _can_manage_deployment(request):
         return _problem(
@@ -130,12 +157,17 @@ def _require_deployment_admin(request):
 
 
 class OrganizationApplicationsView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id):
-        applications = Application.objects.for_organization(organization_id).order_by(
-            "-created_at", "-id"
-        )
+        applications = Application.objects.for_organization(organization_id)
+        if not is_platform_admin(request.user):
+            applications = accessible_resources(
+                applications if can_toggle_applications(request.user)
+                else applications.filter(is_active=True),
+                request.user,
+            )
+        applications = applications.order_by("-created_at", "-id")
         paginator = ApplicationCursorPagination()
         page = paginator.paginate_queryset(applications, request, view=self)
         return paginator.get_paginated_response(
@@ -143,6 +175,14 @@ class OrganizationApplicationsView(ProblemDetailsAPIView):
         )
 
     def post(self, request, organization_id):
+        if not is_platform_admin(request.user):
+            return _problem(
+                request,
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="application_create_forbidden",
+                title="Application creation is not allowed",
+                detail="Only platform administrators can create applications.",
+            )
         serializer = CreateApplicationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -202,10 +242,10 @@ class OrganizationApplicationsView(ProblemDetailsAPIView):
 
 
 class OrganizationApplicationView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        application = _application(request, organization_id, application_id)
         if application is None:
             return _not_found(request)
         body = ApplicationSerializer(application).data
@@ -224,16 +264,13 @@ class OrganizationApplicationView(ProblemDetailsAPIView):
         return Response(body)
 
     def patch(self, request, organization_id, application_id):
-        if not _can_manage_deployment(request):
+        if not can_toggle_applications(request.user):
             return _problem(
                 request,
                 status_code=status.HTTP_403_FORBIDDEN,
                 code="application_status_requires_admin",
-                title="Application status requires administrator",
-                detail=(
-                    "Only organization administrators and owners can enable "
-                    "or disable applications."
-                ),
+                title="Application status access is required",
+                detail="The account cannot enable or disable applications.",
             )
         serializer = UpdateApplicationStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -246,16 +283,18 @@ class OrganizationApplicationView(ProblemDetailsAPIView):
             )
             if application is None:
                 return _not_found(request)
+            if not can_access_resource(application, request.user):
+                return _not_found(request)
             application.is_active = serializer.validated_data["is_active"]
             application.save(update_fields=("is_active", "updated_at"))
         return Response(ApplicationSerializer(application).data)
 
 
 class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        application = _application(request, organization_id, application_id)
         if application is None:
             return _not_found(request)
         deployment = (
@@ -273,6 +312,11 @@ class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
                 detail="The application has no active deployment.",
             )
         revision = deployment.revision
+        definition = revision.content
+        if application.kind == Application.Kind.CHAT:
+            definition = filter_accessible_agent_bindings(
+                definition, request.user, application.organization_id,
+            )
         return Response(
             {
                 "organization_id": str(application.organization_id),
@@ -286,16 +330,18 @@ class OrganizationApplicationRuntimeView(ProblemDetailsAPIView):
                 "revision_no": revision.revision_no,
                 "content_hash": revision.content_hash,
                 "schema_version": revision.schema_version,
-                "definition": revision.content,
+                "definition": definition,
             }
         )
 
 
 class OrganizationApplicationDraftView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         draft = ApplicationDraft.objects.for_organization(organization_id).filter(
@@ -312,7 +358,17 @@ class OrganizationApplicationDraftView(ProblemDetailsAPIView):
         return Response(ApplicationDraftSerializer(draft).data)
 
     def put(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        if not is_platform_admin(request.user):
+            return _problem(
+                request,
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="application_update_forbidden",
+                title="Application update is not allowed",
+                detail="Only platform administrators can modify applications.",
+            )
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         serializer = UpdateApplicationDraftSerializer(data=request.data)
@@ -344,10 +400,12 @@ class OrganizationApplicationDraftView(ProblemDetailsAPIView):
 
 
 class OrganizationApplicationRevisionsView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         revisions = ApplicationRevision.objects.for_organization(
@@ -360,7 +418,17 @@ class OrganizationApplicationRevisionsView(ProblemDetailsAPIView):
         )
 
     def post(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        if not is_platform_admin(request.user):
+            return _problem(
+                request,
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="application_update_forbidden",
+                title="Application update is not allowed",
+                detail="Only platform administrators can modify applications.",
+            )
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         serializer = PublishApplicationSerializer(data=request.data)
@@ -420,10 +488,12 @@ class OrganizationApplicationRevisionsView(ProblemDetailsAPIView):
 
 
 class OrganizationApplicationRevisionView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id, revision_id):
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         revision = ApplicationRevision.objects.for_organization(
@@ -441,10 +511,12 @@ class OrganizationApplicationRevisionView(ProblemDetailsAPIView):
 
 
 class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def get(self, request, organization_id, application_id):
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         deployment = ApplicationDeployment.objects.for_organization(
@@ -461,10 +533,12 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
         return Response(ApplicationDeploymentSerializer(deployment).data)
 
     def put(self, request, organization_id, application_id):
-        permission_problem = _require_deployment_admin(request)
+        permission_problem = _require_application_manager(request)
         if permission_problem is not None:
             return permission_problem
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         serializer = SwitchApplicationDeploymentSerializer(data=request.data)
@@ -513,13 +587,15 @@ class OrganizationApplicationDeploymentView(ProblemDetailsAPIView):
 
 
 class OrganizationApplicationDeploymentRollbackView(ProblemDetailsAPIView):
-    permission_classes = (IsAuthenticated, HasPathOrganizationRole)
+    permission_classes = (IsAuthenticated, HasPathOrganization)
 
     def post(self, request, organization_id, application_id):
-        permission_problem = _require_deployment_admin(request)
+        permission_problem = _require_application_manager(request)
         if permission_problem is not None:
             return permission_problem
-        application = _application(organization_id, application_id)
+        application = _application(
+            request, organization_id, application_id, manage=True,
+        )
         if application is None:
             return _not_found(request)
         serializer = RollbackApplicationDeploymentSerializer(data=request.data)

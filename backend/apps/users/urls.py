@@ -9,6 +9,11 @@ urlpatterns = [
     path('license/login/', views.license_login_view, name='license_login'),
     path('register/', views.RegisterView.as_view(), name='register'),
     path('admin/users/', views.AdminUserListCreateView.as_view(), name='admin_users'),
+    path(
+        'admin/users/<int:pk>/',
+        views.AdminUserDetailView.as_view(),
+        name='admin_user_detail',
+    ),
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('token/refresh/', views.BrowserTokenRefreshView.as_view(), name='token_refresh'),

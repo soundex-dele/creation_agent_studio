@@ -21,7 +21,10 @@ export interface Delegate {
   limits: DelegateLimits;
   draft_version: number;
   active_revision_id: string | null;
+  is_active: boolean;
   can_edit: boolean;
+  can_delete: boolean;
+  can_toggle: boolean;
   can_run: boolean;
   created_by_id: number;
   created_at: string;

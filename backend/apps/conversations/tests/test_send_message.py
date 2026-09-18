@@ -43,6 +43,7 @@ class DurableConversationRunTest(TestCase):
             is_public=False,
             created_by=self.user,
             organization=self.organization,
+            access_scope=Agent.AccessScope.ORGANIZATION,
         )
         definition = {"system_prompt": "You are a test agent."}
         revision = AgentRevision.objects.create(
@@ -428,6 +429,7 @@ class DurableConversationRunTest(TestCase):
             is_public=False,
             created_by=self.user,
             organization=self.organization,
+            access_scope=Agent.AccessScope.ORGANIZATION,
         )
         definition = {"system_prompt": "Use the selected agent instructions."}
         draft = AgentDraft.objects.create(

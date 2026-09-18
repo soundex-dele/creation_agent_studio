@@ -13,8 +13,18 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'avatar', 'bio', 'created_at']
-        read_only_fields = ['id', 'role', 'created_at']
+        fields = [
+            'id', 'username', 'email', 'role', 'avatar', 'bio',
+            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
+            'can_toggle_agents', 'can_toggle_applications',
+            'can_view_applications',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id', 'role', 'can_view_agents', 'can_create_agents', 'can_update_agents',
+            'can_delete_agents', 'can_toggle_agents',
+            'can_view_applications', 'can_toggle_applications', 'created_at',
+        ]
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -22,8 +32,19 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'avatar', 'bio', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'role', 'created_at', 'updated_at']
+        fields = [
+            'id', 'username', 'email', 'role', 'avatar', 'bio',
+            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
+            'can_toggle_agents', 'can_toggle_applications',
+            'can_view_applications',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'role', 'can_view_agents', 'can_create_agents', 'can_update_agents',
+            'can_delete_agents', 'can_toggle_agents',
+            'can_view_applications', 'can_toggle_applications',
+            'created_at', 'updated_at',
+        ]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -63,13 +84,13 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(
         write_only=True,
-        required=True,
+        required=False,
         validators=[validate_password],
         style={'input_type': 'password'},
     )
     password_confirm = serializers.CharField(
         write_only=True,
-        required=True,
+        required=False,
         style={'input_type': 'password'},
     )
 
@@ -77,12 +98,17 @@ class AdminUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'role', 'is_active',
+            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
+            'can_toggle_agents', 'can_toggle_applications',
+            'can_view_applications',
             'password', 'password_confirm', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
     def validate(self, attrs):
-        if attrs['password'] != attrs['password_confirm']:
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({'password': '请输入初始密码。'})
+        if attrs.get('password') != attrs.get('password_confirm'):
             raise serializers.ValidationError({
                 'password_confirm': '两次输入的密码不一致',
             })
@@ -92,6 +118,15 @@ class AdminUserSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
         return User.objects.create_user(password=password, **validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('password_confirm', None)
+        password = validated_data.pop('password', None)
+        instance = super().update(instance, validated_data)
+        if password:
+            instance.set_password(password)
+            instance.save(update_fields=['password', 'updated_at'])
+        return instance
 
 
 class LoginSerializer(serializers.Serializer):

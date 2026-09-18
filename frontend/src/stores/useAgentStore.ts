@@ -20,8 +20,12 @@ export interface Agent {
   icon: string;
   category_name: string;
   is_public: boolean;
+  is_active: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  can_toggle: boolean;
+  can_manage_permissions: boolean;
+  access_scope: 'admin' | 'restricted' | 'organization';
   created_at: string;
 }
 

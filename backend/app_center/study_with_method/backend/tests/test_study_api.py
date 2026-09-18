@@ -67,6 +67,7 @@ def study_context(db):
         description="Study",
         created_by=student,
         kind=Application.Kind.CUSTOM,
+        access_scope=Application.AccessScope.ORGANIZATION,
     )
     workspace = StudyWorkspace.objects.create(
         organization=organization,
@@ -130,6 +131,7 @@ def deploy_subject_tutor(context, subject=Subject.MATH):
         description=definition.description,
         created_by=context["student"],
         is_public=False,
+        access_scope=Agent.AccessScope.ORGANIZATION,
     )
     content = {
         "system_prompt": definition.system_prompt,
