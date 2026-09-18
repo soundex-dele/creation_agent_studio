@@ -78,6 +78,16 @@ npm run dev
 
 浏览器访问 `http://localhost:3030`。Vite 将 `/api` 代理到 `http://localhost:8080`；产品 API 的稳定入口统一为 `/api/v1`。
 
+## Android / iOS 移动端外壳
+
+`mobile` 目录提供 React Native WebView 外壳，Android 和 iOS 共用同一套
+TypeScript 代码，并直接加载已部署的 HTTPS 网页。它包含同源 Cookie 会话、
+导航白名单、离线/错误恢复、原生分享桥接和自定义深链接。
+
+首次运行前请在 `mobile/src/appConfig.ts` 配置正式网页域名，完整的构建、签名
+和联调说明见 [mobile/README.md](mobile/README.md)。Android 可在 Windows 上构建；
+iOS 最终构建和签名必须在安装 Xcode 的 macOS 上完成。
+
 ## 认证地址
 
 页面路由是：
