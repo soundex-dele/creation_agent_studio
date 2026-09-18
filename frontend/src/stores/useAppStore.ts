@@ -8,6 +8,7 @@ interface AppState {
   selectedCategory: string | null;
   searchQuery: string;
   isLoading: boolean;
+  error: string | null;
   /** Load application categories (with app_count) for the sidebar. */
   loadCategories: () => Promise<void>;
   /** Load applications filtered server-side by category + search query. */
@@ -56,6 +57,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedCategory: null,
   searchQuery: '',
   isLoading: false,
+  error: null,
 
   loadCategories: async () => {
     try {
@@ -70,7 +72,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadApps: async (category?: string) => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
       const { searchQuery } = get();
       const params: any = {};
       if (category) params.category = category;
@@ -84,9 +86,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           .some((value) => value.toLocaleLowerCase().includes(query)));
       }
       set({ apps });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load apps:', error);
-      set({ apps: [] });
+      set({
+        apps: [],
+        error: error?.response?.data?.detail || '应用加载失败，请稍后重试',
+      });
     } finally {
       set({ isLoading: false });
     }

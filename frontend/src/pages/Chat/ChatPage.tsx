@@ -40,7 +40,11 @@ const ChatPage: React.FC = () => {
         <ChatContainer
           conversationId={conversationId}
           createOnFirstSend
-          onConversationCreated={(id) => setSearchParams({ conversation: id }, { replace: true })}
+          onConversationCreated={(id) => setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set('conversation', id);
+            return next;
+          }, { replace: true })}
         />
       </div>
       {workspaceFileCount > 0 && !isMobile && (

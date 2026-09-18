@@ -63,6 +63,29 @@ from .serializers import (
 from .streaming import stream_run_events
 
 
+def _run_serializer_context(request, runs):
+    """Bulk-load conversation labels and owning applications for task history."""
+    from apps.conversations.models import Conversation
+
+    conversation_ids = {
+        value
+        for value in (RunSerializer._conversation_id(run) for run in runs)
+        if value
+    }
+    organization_ids = {run.organization_id for run in runs}
+    metadata = {
+        str(item["id"]): {
+            "title": item["title"],
+            "chat_application_id": item["chat_application_id"],
+        }
+        for item in Conversation.objects.filter(
+            id__in=conversation_ids,
+            organization_id__in=organization_ids,
+        ).values("id", "title", "chat_application_id")
+    }
+    return {"request": request, "run_conversation_metadata": metadata}
+
+
 def _problem(request, *, status_code, code, title, detail):
     return Response(
         {
@@ -391,7 +414,7 @@ class OrganizationRunsView(ProblemDetailsAPIView):
 
     def get(self, request, organization_id):
         runs = Run.objects.for_organization(organization_id).select_related(
-            "current_attempt"
+            "current_attempt", "automation_invocation__automation",
         ).order_by("-created_at")
         source_type = request.query_params.get("source_type")
         if source_type:
@@ -409,7 +432,7 @@ class OrganizationRunsView(ProblemDetailsAPIView):
             runs = runs.filter(source_type=source_type)
         visible = [run for run in runs[:200] if _can_access_run(request, run)][:100]
         return Response(RunSerializer(
-            visible, many=True, context={"request": request}
+            visible, many=True, context=_run_serializer_context(request, visible)
         ).data)
 
 
@@ -542,10 +565,14 @@ class OrganizationRunChildrenView(ProblemDetailsAPIView):
                 title="Run not found",
                 detail="The requested run does not exist or is not accessible.",
             )
-        children = Run.objects.for_organization(organization_id).filter(
+        children = list(Run.objects.for_organization(organization_id).filter(
             parent_id__in=_run_tree_ids(organization_id, root.id)
-        ).select_related("current_attempt").order_by("created_at", "id")
-        return Response(RunSerializer(children, many=True, context={"request": request}).data)
+        ).select_related("current_attempt").order_by("created_at", "id"))
+        return Response(RunSerializer(
+            children,
+            many=True,
+            context=_run_serializer_context(request, children),
+        ).data)
 
 
 class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):

@@ -8,6 +8,8 @@ import { tenantApiRoot } from './tenantContext';
 export interface RunResource {
   id: string;
   organization_id: string;
+  parent_id?: string | null;
+  node_key?: string;
   status: string;
   version: number;
   next_event_sequence: number;
@@ -26,6 +28,13 @@ export interface RunResource {
   error_code?: string;
   error_message?: string;
   can_delete?: boolean;
+  task_type?: string;
+  task_title?: string;
+  trigger_type?: string;
+  automation_id?: number | null;
+  workflow_id?: string | null;
+  application_id?: string | null;
+  conversation_id?: string | null;
 }
 
 export interface RunArtifact {

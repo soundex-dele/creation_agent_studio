@@ -6762,6 +6762,20 @@ export interface components {
             finished_at?: string | null;
             /** Can delete */
             readonly can_delete?: string;
+            /** Task type */
+            readonly task_type?: string;
+            /** Task title */
+            readonly task_title?: string;
+            /** Trigger type */
+            readonly trigger_type?: string;
+            /** Automation id */
+            readonly automation_id?: number;
+            /** Workflow id */
+            readonly workflow_id?: string;
+            /** Application id */
+            readonly application_id?: string;
+            /** Conversation id */
+            readonly conversation_id?: string;
         };
         KnowledgeCitation: {
             /** Chunk id */

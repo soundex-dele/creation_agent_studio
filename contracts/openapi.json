@@ -16356,6 +16356,41 @@
                         "title": "Can delete",
                         "type": "string",
                         "readOnly": true
+                    },
+                    "task_type": {
+                        "title": "Task type",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "task_title": {
+                        "title": "Task title",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "trigger_type": {
+                        "title": "Trigger type",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "automation_id": {
+                        "title": "Automation id",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "workflow_id": {
+                        "title": "Workflow id",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "application_id": {
+                        "title": "Application id",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "conversation_id": {
+                        "title": "Conversation id",
+                        "type": "string",
+                        "readOnly": true
                     }
                 }
             },

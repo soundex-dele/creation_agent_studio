@@ -5,6 +5,9 @@ import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { ProtectedRoute, PublicRoute } from './guards';
 
 const HomePage = lazy(() => import('@/pages/Home/HomePage'));
+const TaskCenterPage = lazy(() => import('@/pages/Tasks/TaskCenterPage'));
+const BuildPage = lazy(() => import('@/pages/Hubs/BuildPage'));
+const ResourceLibraryPage = lazy(() => import('@/pages/Hubs/ResourceLibraryPage'));
 const ChatPage = lazy(() => import('@/pages/Chat/ChatPage'));
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage'));
@@ -82,6 +85,18 @@ const router = createBrowserRouter([
     index: true,
   },
   {
+    path: '/tasks',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<TaskCenterPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/build',
+    element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<BuildPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/resources',
+    element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<ResourceLibraryPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
     path: '/delegates',
     element: <ProtectedRoute><MainLayout hideSidebar>{page(<DelegatesPage />)}</MainLayout></ProtectedRoute>,
   },
@@ -111,7 +126,7 @@ const router = createBrowserRouter([
     path: '/agents',
     element: (
       <ProtectedRoute>
-        <MainLayout>
+        <MainLayout hideSidebar>
           {page(<AgentsPage />)}
         </MainLayout>
       </ProtectedRoute>
@@ -121,7 +136,7 @@ const router = createBrowserRouter([
     path: '/agents/:id',
     element: (
       <ProtectedRoute>
-        <MainLayout>
+        <MainLayout hideSidebar>
           {page(<AgentDetailPage />)}
         </MainLayout>
       </ProtectedRoute>
@@ -147,7 +162,7 @@ const router = createBrowserRouter([
     path: '/apps',
     element: (
       <ProtectedRoute>
-        <MainLayout>
+        <MainLayout hideSidebar>
           {page(<AppsPage />)}
         </MainLayout>
       </ProtectedRoute>
@@ -177,7 +192,7 @@ const router = createBrowserRouter([
     path: '/apps/:id',
     element: (
       <ProtectedRoute>
-        <MainLayout>
+        <MainLayout hideSidebar>
           {page(<AppDetailPage />)}
         </MainLayout>
       </ProtectedRoute>

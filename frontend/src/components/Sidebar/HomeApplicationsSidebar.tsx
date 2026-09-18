@@ -4,12 +4,14 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   AppstoreOutlined,
+  MessageOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { AppItem } from '@/types';
 
 interface HomeApplicationPreferences {
   order: string[];
@@ -17,6 +19,16 @@ interface HomeApplicationPreferences {
 }
 
 const EMPTY_PREFERENCES: HomeApplicationPreferences = { order: [], hidden: [] };
+const CONVERSATION_APP_ID = 'platform-conversation';
+const CONVERSATION_APP: AppItem = {
+  id: CONVERSATION_APP_ID,
+  name: '对话',
+  description: '通过持续对话处理日常需求',
+  category: 'chat',
+  icon: '💬',
+  color: '#6d5dfc',
+  tags: ['AI 助手', '多轮对话'],
+};
 
 const HomeApplicationsSidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -45,19 +57,25 @@ const HomeApplicationsSidebar: React.FC = () => {
     }
   }, [storageKey]);
 
+  const allApps = useMemo(() => [CONVERSATION_APP, ...apps], [apps]);
+
   const orderedApps = useMemo(() => {
     const positions = new Map(preferences.order.map((id, index) => [id, index]));
-    return [...apps].sort((left, right) => {
+    return [...allApps].sort((left, right) => {
       const leftPosition = positions.get(left.id) ?? Number.MAX_SAFE_INTEGER;
       const rightPosition = positions.get(right.id) ?? Number.MAX_SAFE_INTEGER;
       return leftPosition - rightPosition;
     });
-  }, [apps, preferences.order]);
+  }, [allApps, preferences.order]);
 
   const visibleApps = orderedApps.filter((app) => !preferences.hidden.includes(app.id));
 
-  const isActiveApplication = (app: (typeof apps)[number]) => {
-    const runtimePath = applicationPath(app, 'home').split('?')[0];
+  const homeApplicationPath = (app: AppItem) => app.id === CONVERSATION_APP_ID
+    ? '/chat?entry=home'
+    : applicationPath(app, 'home');
+
+  const isActiveApplication = (app: AppItem) => {
+    const runtimePath = homeApplicationPath(app).split('?')[0];
     return location.pathname === runtimePath || location.pathname.startsWith(`${runtimePath}/`);
   };
 
@@ -112,9 +130,11 @@ const HomeApplicationsSidebar: React.FC = () => {
               className={`home-app-item ${isActiveApplication(app) ? 'active' : ''}`}
               style={{ '--app-accent': app.color || 'var(--color-primary)' } as CSSProperties}
               aria-current={isActiveApplication(app) ? 'page' : undefined}
-              onClick={() => navigate(applicationPath(app, 'home'))}
+              onClick={() => navigate(homeApplicationPath(app))}
             >
-              <span className="home-app-icon">{app.icon || <AppstoreOutlined />}</span>
+              <span className="home-app-icon">
+                {app.id === CONVERSATION_APP_ID ? <MessageOutlined /> : app.icon || <AppstoreOutlined />}
+              </span>
               <span className="home-app-copy"><strong>{app.name}</strong><small>{app.description}</small></span>
             </button>
           ))}

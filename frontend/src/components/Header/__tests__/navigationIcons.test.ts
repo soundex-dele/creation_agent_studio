@@ -4,6 +4,7 @@ import {
   DEFAULT_NAVIGATION_ICONS,
   HEADER_NAV_ITEMS,
   NAVIGATION_ICON_OPTIONS,
+  isHeaderNavigationItemActive,
 } from '../headerNavigation';
 import { NAVIGATION_ICON_COMPONENTS } from '../navigationIconComponents';
 
@@ -23,13 +24,13 @@ describe('navigation icon preferences', () => {
   });
 
   it('updates one destination without changing the others and can reset', () => {
-    const originalChatIcon = usePreferencesStore.getState().navigationIcons.chat;
+    const originalTasksIcon = usePreferencesStore.getState().navigationIcons.tasks;
 
-    usePreferencesStore.getState().setNavigationIcon('home', 'star');
+    usePreferencesStore.getState().setNavigationIcon('workbench', 'star');
 
     expect(usePreferencesStore.getState().navigationIcons).toMatchObject({
-      home: 'star',
-      chat: originalChatIcon,
+      workbench: 'star',
+      tasks: originalTasksIcon,
     });
 
     usePreferencesStore.getState().resetNavigationIcons();
@@ -47,5 +48,29 @@ describe('navigation icon preferences', () => {
 
     usePreferencesStore.getState().reset();
     expect(usePreferencesStore.getState().navigationIconMode).toBe('outline');
+  });
+
+  it('maps legacy feature routes into the five primary destinations', () => {
+    const item = (id: string) => HEADER_NAV_ITEMS.find((value) => value.id === id)!;
+
+    expect(isHeaderNavigationItemActive(item('workbench'), '/')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('tasks'), '/runs/run-1')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('apps'), '/chat')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('build'), '/automations/new')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('resources'), '/knowledge')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('workbench'), '/apps')).toBe(false);
+  });
+
+  it('keeps workbench active when an application was launched from its sidebar', () => {
+    const item = (id: string) => HEADER_NAV_ITEMS.find((value) => value.id === id)!;
+
+    expect(isHeaderNavigationItemActive(
+      item('workbench'), '/applications/12/chat', '?slug=general-chat&entry=home',
+    )).toBe(true);
+    expect(isHeaderNavigationItemActive(
+      item('apps'), '/applications/12/chat', '?slug=general-chat&entry=home',
+    )).toBe(false);
+    expect(isHeaderNavigationItemActive(item('workbench'), '/chat', '?entry=home')).toBe(true);
+    expect(isHeaderNavigationItemActive(item('apps'), '/chat', '')).toBe(true);
   });
 });

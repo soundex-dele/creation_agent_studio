@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dropdown, Avatar } from 'antd';
 import {
+  BankOutlined,
   LogoutOutlined,
   MenuOutlined,
   SettingOutlined,
@@ -11,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { ThemeToggle } from '@/components/Theme';
-import { HEADER_NAV_ITEMS } from './headerNavigation';
+import { HEADER_NAV_ITEMS, isHeaderNavigationItemActive } from './headerNavigation';
 import { getNavigationIconComponent } from './navigationIconComponents';
 import './Header.css';
 
@@ -50,6 +51,12 @@ const Header: React.FC<HeaderProps> = ({
       label: '设置',
       onClick: () => navigate('/settings'),
     },
+    {
+      key: 'enterprise',
+      icon: <BankOutlined />,
+      label: '系统管理',
+      onClick: () => navigate('/enterprise'),
+    },
     ...(user?.role === 'admin' ? [{
       key: 'account-management',
       icon: <TeamOutlined />,
@@ -66,8 +73,6 @@ const Header: React.FC<HeaderProps> = ({
   ];
 
   const currentPath = location.pathname;
-  const enteredFromHome = new URLSearchParams(location.search).get('entry') === 'home';
-  const activePath = enteredFromHome ? '/' : currentPath;
 
   return (
     <header className="app-header">
@@ -91,8 +96,7 @@ const Header: React.FC<HeaderProps> = ({
       {/* Center: Nav */}
       <nav className="header-nav" aria-label="主导航">
         {HEADER_NAV_ITEMS.map((item) => {
-          const active = activePath === item.path
-            || (item.path !== '/' && activePath.startsWith(item.path));
+          const active = isHeaderNavigationItemActive(item, currentPath, location.search);
           const Icon = getNavigationIconComponent(
             navigationIcons[item.id] ?? item.defaultIcon,
           );

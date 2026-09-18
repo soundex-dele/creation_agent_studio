@@ -1,6 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Button, Empty, Input, Popconfirm, Spin, Tag, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Empty, Input, Popconfirm, Select, Spin, message } from 'antd';
+import {
+  ArrowRightOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
 import { useAgentStore } from '@/stores/useAgentStore';
 import AgentDetailModal from '@/components/Agents/AgentDetailModal';
 import AgentEditorModal from '@/components/Agents/AgentEditorModal';
@@ -10,8 +17,14 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import './AgentsPage.css';
 
 const { Search } = Input;
+type AgentSort = 'recommended' | 'newest' | 'name';
 
 const AGENT_ICONS = ['🎬', '✍️', '🎙️', '✂️', '🎨', '🎵', '💡', '🔧'];
+const visibilityLabels = {
+  private: '仅自己',
+  restricted: '指定成员',
+  organization: '组织可用',
+};
 
 const AgentsPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -24,30 +37,48 @@ const AgentsPage: React.FC = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
   const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
+  const [sort, setSort] = useState<AgentSort>('recommended');
   const {
     agents,
+    categories,
     isLoading,
+    error,
     selectedCategory,
     searchQuery,
     loadAgents,
+    loadCategories,
+    selectCategory,
     setSearchQuery,
   } = useAgentStore();
 
   const isFirstRun = useRef(true);
 
+  useEffect(() => { void loadCategories(); }, [loadCategories]);
+
   useEffect(() => {
-    // First load fires immediately; later category/search changes are debounced.
-    // The isFirstRun guard avoids a second fetch on the initial mount.
     if (isFirstRun.current) {
       isFirstRun.current = false;
-      loadAgents(selectedCategory || undefined);
+      void loadAgents(selectedCategory || undefined);
       return;
     }
-    const timer = setTimeout(() => {
-      loadAgents(selectedCategory || undefined);
+    const timer = window.setTimeout(() => {
+      void loadAgents(selectedCategory || undefined);
     }, 300);
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [selectedCategory, searchQuery, loadAgents]);
+
+  const visibleAgents = useMemo(() => [...agents].sort((left, right) => {
+    if (sort === 'name') return left.name.localeCompare(right.name, 'zh-CN');
+    if (sort === 'newest') {
+      return Date.parse(right.created_at || '') - Date.parse(left.created_at || '');
+    }
+    return 0;
+  }), [agents, sort]);
+
+  const openDetail = (agentId: number) => {
+    setSelectedAgentId(agentId);
+    setModalOpen(true);
+  };
 
   const openEditor = (agentId: number | null) => {
     setEditingAgentId(agentId);
@@ -60,67 +91,115 @@ const AgentsPage: React.FC = () => {
       await api.delete(`/agents/${agentId}/`);
       message.success('智能体已删除');
       await loadAgents(selectedCategory || undefined);
-    } catch (error: any) {
-      message.error(error?.response?.data?.detail || '删除智能体失败');
+      await loadCategories();
+    } catch (reason: any) {
+      message.error(reason?.response?.data?.detail || '删除智能体失败');
     } finally {
       setDeletingAgentId(null);
     }
   };
 
+  const resetFilters = () => {
+    selectCategory(null);
+    setSearchQuery('');
+  };
+
   return (
     <div className="agents-page animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title">智能体市场</h1>
-        <p className="page-subtitle">选择或创建智能体，让 AI 协助你处理不同场景的任务</p>
+      <div className="agents-heading">
+        <div className="page-header">
+          <h1 className="page-title">智能体</h1>
+          <p className="page-subtitle">选择智能体开始协作，或创建适合团队场景的专属智能体</p>
+        </div>
+        <div className="agents-result-summary"><strong>{visibleAgents.length}</strong><span>个可用智能体</span></div>
       </div>
 
-      <div className="page-toolbar">
+      <div className="agents-category-strip" aria-label="智能体分类">
+        <button type="button" className={!selectedCategory ? 'active' : ''} onClick={() => selectCategory(null)}>
+          全部
+        </button>
+        {categories.map((category) => (
+          <button
+            type="button"
+            key={category.slug}
+            className={selectedCategory === category.slug ? 'active' : ''}
+            onClick={() => selectCategory(category.slug)}
+          >
+            {category.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="page-toolbar agents-toolbar">
         {canCreateAgent && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
             新建智能体
           </Button>
         )}
         <Search
-          placeholder="搜索智能体..."
+          placeholder="搜索名称或描述"
           prefix={<SearchOutlined className="text-text-dim" />}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(event) => setSearchQuery(event.target.value)}
           allowClear
-          className="max-w-xs"
+          className="agents-search"
         />
+        <Select<AgentSort>
+          value={sort}
+          onChange={setSort}
+          className="agents-sort"
+          aria-label="智能体排序"
+          options={[
+            { value: 'recommended', label: '推荐排序' },
+            { value: 'newest', label: '最近创建' },
+            { value: 'name', label: '名称排序' },
+          ]}
+        />
+        <Button
+          icon={<ReloadOutlined />}
+          loading={isLoading}
+          onClick={() => void Promise.all([
+            loadAgents(selectedCategory || undefined),
+            loadCategories(),
+          ])}
+        >刷新</Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spin size="large" />
+      {isLoading && agents.length === 0 ? (
+        <div className="agents-state"><Spin size="large" /></div>
+      ) : error ? (
+        <div className="agents-state">
+          <Empty description={<span className="text-text-sec">{error}</span>}>
+            <Button type="primary" onClick={() => void loadAgents(selectedCategory || undefined)}>重新加载</Button>
+          </Empty>
         </div>
-      ) : agents.length === 0 ? (
-        <div className="flex items-center justify-center py-20">
-          <Empty description={<span className="text-text-sec">暂无智能体</span>} />
+      ) : visibleAgents.length === 0 ? (
+        <div className="agents-state">
+          <Empty description={<span className="text-text-sec">暂无匹配智能体</span>}>
+            {(selectedCategory || searchQuery) && <Button onClick={resetFilters}>清除筛选</Button>}
+          </Empty>
         </div>
       ) : (
         <div className="agent-grid">
-          {agents.map((agent, index) => (
-            <div
+          {visibleAgents.map((agent, index) => (
+            <article
               key={agent.id}
               className="agent-card"
-              style={{ animationDelay: `${index * 60}ms` }}
-              onClick={() => { setSelectedAgentId(agent.id); setModalOpen(true); }}
+              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+              onClick={() => openDetail(agent.id)}
+              onKeyDown={(event) => {
+                if (event.currentTarget === event.target && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault();
+                  openDetail(agent.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
-              <div className={`agent-card-icon icon-gradient-${(index % 6) + 1}`}>
-                {agent.icon || AGENT_ICONS[index % AGENT_ICONS.length]}
-              </div>
-              <div className="agent-card-name">{agent.name}</div>
               {(agent.can_edit || agent.can_delete) && (
-                <div className="agent-card-actions" onClick={(event) => event.stopPropagation()}>
+                <div className="agent-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                   {agent.can_edit && (
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EditOutlined />}
-                      aria-label={`编辑 ${agent.name}`}
-                      onClick={() => openEditor(agent.id)}
-                    />
+                    <Button type="text" size="small" icon={<EditOutlined />} aria-label={`编辑 ${agent.name}`} onClick={() => openEditor(agent.id)} />
                   )}
                   {agent.can_delete && (
                     <Popconfirm
@@ -131,24 +210,26 @@ const AgentsPage: React.FC = () => {
                       okButtonProps={{ danger: true }}
                       onConfirm={() => handleDelete(agent.id)}
                     >
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        loading={deletingAgentId === agent.id}
-                        aria-label={`删除 ${agent.name}`}
-                      />
+                      <Button type="text" danger size="small" icon={<DeleteOutlined />} loading={deletingAgentId === agent.id} aria-label={`删除 ${agent.name}`} />
                     </Popconfirm>
                   )}
                 </div>
               )}
-              <div className="agent-card-desc">{agent.description}</div>
-              <div className="agent-card-footer">
-                <Tag className="agent-tag">{agent.category_name}</Tag>
-                <span className="agent-card-meta">⚡ {((agent as any).usage_count || 0).toLocaleString()} 次使用</span>
+              <div className="agent-card-heading">
+                <span className={`agent-card-icon icon-gradient-${(index % 6) + 1}`}>
+                  {agent.icon || AGENT_ICONS[index % AGENT_ICONS.length]}
+                </span>
+                <span className="agent-card-category">{agent.category_name}</span>
               </div>
-            </div>
+              <div className="agent-card-content">
+                <h2 className="agent-card-name">{agent.name}</h2>
+                <p className="agent-card-desc">{agent.description}</p>
+              </div>
+              <div className="agent-card-footer">
+                <span className="agent-card-visibility">{visibilityLabels[agent.visibility] || '可使用'}</span>
+                <span className="agent-card-open">查看详情 <ArrowRightOutlined /></span>
+              </div>
+            </article>
           ))}
         </div>
       )}
@@ -162,7 +243,10 @@ const AgentsPage: React.FC = () => {
         agentId={editingAgentId}
         open={editorOpen}
         onClose={() => { setEditorOpen(false); setEditingAgentId(null); }}
-        onSaved={() => loadAgents(selectedCategory || undefined)}
+        onSaved={() => {
+          void loadAgents(selectedCategory || undefined);
+          void loadCategories();
+        }}
       />
     </div>
   );

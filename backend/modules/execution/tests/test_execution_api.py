@@ -18,7 +18,7 @@ from modules.catalog.models import (
     SkillDeployment,
     SkillRevision,
 )
-from apps.applications.models import Application, Skill
+from apps.applications.models import Application, ChatApplication, Skill
 from apps.conversations.models import Conversation, Message
 from modules.catalog.services import canonical_content_hash
 from django.utils import timezone
@@ -202,6 +202,13 @@ def test_run_list_uses_canonical_history_and_source_filter(
     )
     assert response.status_code == 200
     assert [item["id"] for item in response.data] == [str(api_run.id)]
+    assert response.data[0]["task_type"] == "execution"
+    assert response.data[0]["task_title"] == "执行任务"
+    assert response.data[0]["trigger_type"] == "manual"
+    assert response.data[0]["automation_id"] is None
+    assert response.data[0]["application_id"] == "batch-transcribe"
+    assert response.data[0]["workflow_id"] is None
+    assert response.data[0]["conversation_id"] is None
 
     invalid = authenticated_client.get(
         f"/api/v1/organizations/{api_organization.id}/runs",
@@ -233,7 +240,7 @@ def test_workflow_run_detail_exposes_child_conversations(
         executor_key="agent-completion",
         source_type="workflow_step",
         source_id="step-1",
-        definition_snapshot={"conversation_id": "42"},
+        definition_snapshot={"conversation_id": "42", "application_id": "7"},
         input_data={},
     )
 
@@ -242,6 +249,52 @@ def test_workflow_run_detail_exposes_child_conversations(
     assert response.status_code == 200
     assert response.data["workflow_conversations"] == {"write": "42"}
     assert child.parent_id == root.id
+
+    children = authenticated_client.get(_run_url(api_organization, root, "/children"))
+    assert children.status_code == 200
+    assert children.data[0]["task_type"] == "conversation"
+    assert children.data[0]["application_id"] == "7"
+    assert children.data[0]["conversation_id"] == "42"
+
+
+@pytest.mark.django_db
+def test_conversation_run_exposes_title_application_and_jump_identifiers(
+    authenticated_client, api_actor, api_organization, deployed_application,
+):
+    Application.objects.filter(pk=deployed_application.pk).update(
+        kind=Application.Kind.CHAT,
+    )
+    chat_application = ChatApplication.objects.create(
+        application=deployed_application,
+    )
+    conversation = Conversation.objects.create(
+        user=api_actor,
+        organization=api_organization,
+        chat_application=chat_application,
+        title="选题讨论",
+    )
+    run = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="conversation",
+        source_id=str(conversation.id),
+        definition_snapshot={"agent_name": "通用智能体"},
+        input_data={"message": "开始讨论"},
+    )
+
+    response = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"source_type": "conversation"},
+    )
+
+    assert response.status_code == 200
+    item = next(value for value in response.data if value["id"] == str(run.id))
+    assert item["task_type"] == "conversation"
+    assert item["task_title"] == "选题讨论"
+    assert item["conversation_id"] == str(conversation.id)
+    assert item["application_id"] == str(deployed_application.id)
 
 
 @pytest.mark.django_db

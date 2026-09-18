@@ -11,6 +11,7 @@ vi.mock('@/services/api', () => ({
 describe('useAppStore.loadApp', () => {
   beforeEach(() => {
     vi.mocked(api.get).mockReset();
+    useAppStore.setState({ apps: [], error: null, isLoading: false, searchQuery: '' });
   });
 
   it('shares concurrent requests for the same application', async () => {
@@ -31,5 +32,38 @@ describe('useAppStore.loadApp', () => {
 
     await expect(first).resolves.toMatchObject({ id: 'wechat-article-writer' });
     await expect(second).resolves.toMatchObject({ id: 'wechat-article-writer' });
+  });
+});
+
+describe('useAppStore.loadApps', () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockReset();
+    useAppStore.setState({ apps: [], error: null, isLoading: false, searchQuery: '' });
+  });
+
+  it('exposes a recoverable error and clears it after a successful retry', async () => {
+    vi.mocked(api.get).mockRejectedValueOnce({ response: { data: { detail: '服务暂不可用' } } });
+
+    await useAppStore.getState().loadApps();
+
+    expect(useAppStore.getState()).toMatchObject({
+      apps: [],
+      error: '服务暂不可用',
+      isLoading: false,
+    });
+
+    vi.mocked(api.get).mockResolvedValueOnce([{
+      id: 7,
+      slug: 'writing-assistant',
+      name: '写作助手',
+      description: '帮助完成写作任务',
+      category_slug: 'creative',
+      tags: ['写作'],
+    }]);
+
+    await useAppStore.getState().loadApps();
+
+    expect(useAppStore.getState().error).toBeNull();
+    expect(useAppStore.getState().apps).toHaveLength(1);
   });
 });

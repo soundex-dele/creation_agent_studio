@@ -22,23 +22,51 @@ export const NAVIGATION_ICON_OPTIONS = [
 export type NavigationIconId = typeof NAVIGATION_ICON_OPTIONS[number]['id'];
 
 export const HEADER_NAV_ITEMS = [
-  { id: 'home', path: '/', label: '首页', defaultIcon: 'home', emoji: '🏠' },
-  { id: 'chat', path: '/chat', label: '对话', defaultIcon: 'message', emoji: '💬' },
-  { id: 'agents', path: '/agents', label: '智能体', defaultIcon: 'robot', emoji: '🤖' },
-  { id: 'delegates', path: '/delegates', label: 'AI 分身', defaultIcon: 'compass', emoji: '🧭' },
-  { id: 'skills', path: '/skills', label: '技能', defaultIcon: 'bolt', emoji: '⚡' },
-  { id: 'apps', path: '/apps', label: '应用', defaultIcon: 'apps', emoji: '🧩' },
-  { id: 'workflows', path: '/workflows', label: '工作流', defaultIcon: 'workflow', emoji: '🔀' },
-  { id: 'knowledge', path: '/knowledge', label: '知识库', defaultIcon: 'book', emoji: '📚' },
-  { id: 'automations', path: '/automations', label: '自动化', defaultIcon: 'clock', emoji: '⏱️' },
-  { id: 'enterprise', path: '/enterprise', label: '控制台', defaultIcon: 'building', emoji: '🏢' },
+  {
+    id: 'workbench', path: '/', label: '工作台', defaultIcon: 'home', emoji: '🏠',
+    activePrefixes: ['/'],
+  },
+  {
+    id: 'tasks', path: '/tasks', label: '任务中心', defaultIcon: 'clock', emoji: '✅',
+    activePrefixes: ['/tasks', '/runs'],
+  },
+  {
+    id: 'apps', path: '/apps', label: '应用', defaultIcon: 'apps', emoji: '🧩',
+    activePrefixes: ['/apps', '/applications', '/chat', '/workspace', '/templates'],
+  },
+  {
+    id: 'build', path: '/build', label: '构建', defaultIcon: 'workflow', emoji: '🏗️',
+    activePrefixes: ['/build', '/delegates', '/workflows', '/automations'],
+  },
+  {
+    id: 'resources', path: '/resources', label: '资源库', defaultIcon: 'database', emoji: '🗂️',
+    activePrefixes: ['/resources', '/agents', '/skills', '/knowledge'],
+  },
 ] as const satisfies readonly {
   id: string;
   path: string;
   label: string;
   defaultIcon: NavigationIconId;
   emoji: string;
+  activePrefixes: readonly string[];
 }[];
+
+export const isHeaderNavigationItemActive = (
+  item: (typeof HEADER_NAV_ITEMS)[number],
+  pathname: string,
+  search = '',
+) => {
+  const launchedFromWorkbench = new URLSearchParams(search).get('entry') === 'home'
+    && ['/apps', '/applications', '/chat', '/workspace', '/templates'].some((prefix) => (
+      pathname === prefix || pathname.startsWith(`${prefix}/`)
+    ));
+  if (launchedFromWorkbench) return item.id === 'workbench';
+  return item.activePrefixes.some((prefix) => (
+    prefix === '/'
+      ? pathname === '/'
+      : pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ));
+};
 
 export type HeaderNavigationItemId = typeof HEADER_NAV_ITEMS[number]['id'];
 export type NavigationIconPreferences = Record<HeaderNavigationItemId, NavigationIconId>;

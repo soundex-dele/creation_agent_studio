@@ -3,7 +3,7 @@ import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 
-interface AgentCategory {
+export interface AgentCategory {
   id: number;
   name: string;
   slug: string;
@@ -36,6 +36,7 @@ interface AgentState {
   searchQuery: string;
   executions: RunResource[];
   isLoading: boolean;
+  error: string | null;
   loadCategories: () => Promise<void>;
   loadAgents: (category?: string) => Promise<void>;
   selectCategory: (slug: string | null) => void;
@@ -51,6 +52,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   searchQuery: '',
   executions: [],
   isLoading: false,
+  error: null,
 
   loadCategories: async () => {
     try {
@@ -63,15 +65,19 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   loadAgents: async (category?: string) => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
       const { searchQuery } = get();
       const params: any = {};
       if (category) params.category = category;
       if (searchQuery) params.search = searchQuery;
       const response = await api.get<any>('/agents/', params);
       set({ agents: Array.isArray(response) ? response : response.results ?? [] });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load agents:', error);
+      set({
+        agents: [],
+        error: error?.response?.data?.detail || '智能体加载失败，请稍后重试',
+      });
     } finally {
       set({ isLoading: false });
     }

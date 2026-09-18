@@ -337,6 +337,7 @@ def _start_once(
             source_id=application.id,
             definition_snapshot={
                 "application_id": str(application.id),
+                "application_name": application.name,
                 "application_revision_id": str(revision.id),
                 "application_revision_no": revision.revision_no,
                 "application_content_hash": revision.content_hash,
@@ -521,6 +522,7 @@ def start_agent_run(
             source_id=source_id or agent.id,
             definition_snapshot={
                 "agent_id": str(agent.id),
+                "agent_name": agent.name,
                 "agent_revision_id": (
                     str(deployment.revision_id) if deployment is not None else None
                 ),
