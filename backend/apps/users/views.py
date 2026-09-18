@@ -18,9 +18,11 @@ from .serializers import (
     UserSerializer,
     UserDetailSerializer,
     RegisterSerializer,
+    AdminUserSerializer,
     LoginSerializer,
     ChangePasswordSerializer
 )
+from core.permissions import IsAdmin
 from .models import User
 from .models import UserAPIKey
 from .session import clear_refresh_cookie, refresh_cookie_name, set_refresh_cookie
@@ -47,11 +49,12 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
+    throttle_scope = 'registration'
 
     def create(self, request, *args, **kwargs):
-        if settings.LICENSE_AUTH_ENABLED:
+        if settings.LICENSE_AUTH_ENABLED or not settings.REGISTRATION_ENABLED:
             return Response(
-                {'detail': '当前版本使用许可证登录，无需注册账户'},
+                {'detail': '当前部署未开放自主注册，请联系管理员。'},
                 status=status.HTTP_403_FORBIDDEN,
             )
         serializer = self.get_serializer(data=request.data)
@@ -61,10 +64,19 @@ class RegisterView(generics.CreateAPIView):
         return _session_response(user, response_status=status.HTTP_201_CREATED)
 
 
+class AdminUserListCreateView(generics.ListCreateAPIView):
+    """List and provision accounts without reopening public registration."""
+
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = User.objects.exclude(username='system').order_by('-created_at')
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     """自定义登录视图"""
     permission_classes = [AllowAny]
     serializer_class = LoginSerializer
+    throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
         if settings.LICENSE_AUTH_ENABLED:
@@ -106,7 +118,7 @@ def auth_mode_view(request):
                 pass
     return Response({
         'mode': 'license' if enabled else 'account',
-        'registration_enabled': not enabled,
+        'registration_enabled': bool(settings.REGISTRATION_ENABLED and not enabled),
         'machine_code': machine_code() if enabled else None,
         'license_installed': installed,
         'product': settings.LICENSE_PRODUCT_ID if enabled else None,
@@ -173,6 +185,7 @@ class BrowserTokenRefreshView(TokenRefreshView):
     """Rotate the browser refresh token without exposing it to JavaScript."""
 
     permission_classes = [AllowAny]
+    throttle_scope = 'token_refresh'
 
     def post(self, request, *args, **kwargs):
         if settings.LICENSE_AUTH_ENABLED:

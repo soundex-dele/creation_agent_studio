@@ -13,7 +13,16 @@ class UserAdmin(BaseUserAdmin):
     """
     Admin interface for User model.
     """
-    list_display = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active']
-    list_filter = ['is_staff', 'is_active', 'is_superuser']
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Agent Studio', {'fields': ('role', 'avatar', 'bio')}),
+    )
+    add_fieldsets = BaseUserAdmin.add_fieldsets + (
+        ('Agent Studio', {'fields': ('email', 'role')}),
+    )
+    list_display = [
+        'username', 'email', 'role', 'first_name', 'last_name',
+        'is_staff', 'is_active',
+    ]
+    list_filter = ['role', 'is_staff', 'is_active', 'is_superuser']
     search_fields = ['username', 'email', 'first_name', 'last_name']
     ordering = ['username']

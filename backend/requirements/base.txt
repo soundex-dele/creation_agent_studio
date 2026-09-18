@@ -1,22 +1,17 @@
 Django~=5.2.0
-djangorestframework~=3.16.0
+setuptools>=83,<85
+djangorestframework>=3.17.2,<3.19
 django-cors-headers~=4.7.0
-dj-rest-auth==5.0.2
-django-allauth==0.61.1
-# Keep a universal macOS wheel available; newer source-only resolution requires
-# a working Rust registry and makes fresh venv setup unnecessarily brittle.
-cryptography==46.0.3
-# Autobahn accepts cbor2>=5.2; this release still ships a Python 3.11 macOS
-# wheel and avoids requiring a Rust toolchain during environment bootstrap.
-cbor2==5.7.1
+cryptography>=50,<51
+cbor2>=5.9,<6
 psycopg[binary]==3.2.10
 redis==5.0.1
 python-decouple==3.8
 PyYAML==6.0.3
-drf-yasg==1.21.7
+drf-yasg==1.21.15
 whitenoise==6.6.0
 django-redis==5.4.0
-djangorestframework-simplejwt==5.3.1
+djangorestframework-simplejwt==5.5.1
 pydantic==2.13.4
 boto3~=1.40.0
 opentelemetry-api~=1.37.0
@@ -24,7 +19,7 @@ opentelemetry-sdk~=1.37.0
 opentelemetry-exporter-otlp-proto-grpc~=1.37.0
 opentelemetry-instrumentation-django==0.58b0
 channels==4.1.0
-daphne==4.1.2
+daphne==4.2.3
 channels_redis==4.2.1
 django-filter~=25.1
 jsonschema==4.25.1
@@ -32,6 +27,6 @@ croniter~=6.0.0
 faster-whisper==1.2.0
 pypdf~=6.0
 python-docx~=1.2
-Pillow~=11.3
+Pillow>=12.3,<13
 pgvector~=0.4
 sqlite-vec~=0.1

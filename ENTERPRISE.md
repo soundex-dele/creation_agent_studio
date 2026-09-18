@@ -22,13 +22,14 @@ Agent Studio uses a control-plane/data-plane architecture:
 2. Configure `GRAPHFLOW_*`, or create organization ProviderConfig and
    SecretReference records. SecretReference stores only an environment/Vault
    reference, never a provider secret.
-3. Run `docker compose -f backend/docker-compose.yml up --build -d`.
-4. Verify `GET /healthz/` and `GET /readyz/`.
-5. Open `http://localhost:3000/enterprise` after signing in.
+3. Configure the HTTPS edge and bootstrap procedure in `docs/DEPLOYMENT.md`.
+4. Run `docker compose -f backend/docker-compose.yml up --build -d`.
+5. Verify `GET /healthz/` and `GET /readyz/` through the HTTPS origin.
+6. Open `/enterprise` after signing in.
 
 The stack first completes migrations in a one-shot service, then starts the
-frontend, ASGI web, PostgreSQL 16, Redis 7.4, three execution workers
-(agent, media and workflow), the automation scheduler, and a maintenance
+frontend, ASGI web, PostgreSQL 16, Redis 7.4, five execution workers
+(agent, media, workflow, evaluation and knowledge), the automation scheduler, and a maintenance
 process. All application processes mount `runtime_data:/data`; the maintenance
 process enforces retention and compacts old Run events every hour. A one-shot
 run is also available with:

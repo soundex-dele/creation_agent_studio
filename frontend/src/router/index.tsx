@@ -32,6 +32,7 @@ const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchP
 const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
+const AccountManagementPage = lazy(() => import('@/pages/Settings/AccountManagementPage'));
 const KnowledgePage = lazy(() => import('@/pages/Knowledge/KnowledgePage'));
 const DelegatesPage = lazy(() => import('@/pages/Delegates/DelegatesPage'));
 const DelegateEditorPage = lazy(() => import('@/pages/Delegates/DelegateEditorPage'));
@@ -349,6 +350,10 @@ const router = createBrowserRouter([
   {
     path: '/settings',
     element: <ProtectedRoute><MainLayout hideSidebar>{page(<SettingsPage />)}</MainLayout></ProtectedRoute>,
+  },
+  {
+    path: '/settings/accounts',
+    element: <ProtectedRoute><MainLayout hideSidebar>{page(<AccountManagementPage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/auth/sso/callback',

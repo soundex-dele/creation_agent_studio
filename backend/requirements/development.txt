@@ -1,8 +1,7 @@
--r base.txt
+-r production.txt
 django-debug-toolbar==4.2.0
 faker==20.1.0
 ipython==8.18.1
 pytest==8.4.2
 pytest-django==4.8.0
 pytest-asyncio==0.25.3
-setuptools<81

@@ -7,6 +7,11 @@ import { api } from '@/services/api';
 
 const { Text } = Typography;
 
+interface AuthMode {
+  mode: 'account' | 'license';
+  registration_enabled: boolean;
+}
+
 const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [checkingMode, setCheckingMode] = useState(true);
@@ -15,13 +20,18 @@ const RegisterPage: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    api.get<{ mode: 'account' | 'license' }>('/auth/mode/')
+    api.get<AuthMode>('/auth/mode/')
       .then((result) => {
-        if (active && result.mode === 'license') {
+        if (active && (result.mode === 'license' || !result.registration_enabled)) {
           navigate('/auth/login', { replace: true });
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (active) {
+          message.error('无法读取注册配置');
+          navigate('/auth/login', { replace: true });
+        }
+      })
       .finally(() => { if (active) setCheckingMode(false); });
     return () => { active = false; };
   }, [navigate]);

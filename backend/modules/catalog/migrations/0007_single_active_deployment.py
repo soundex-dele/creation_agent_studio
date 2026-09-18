@@ -45,6 +45,10 @@ def collapse_environment_deployments(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # PostgreSQL may retain deferred trigger events after the data cleanup;
+    # subsequent ALTER TABLE operations must run outside that transaction.
+    atomic = False
+
     dependencies = [
         ('agents', '0007_agent_kind_supervisor_profile'),
         ('applications', '0007_generalize_default_experience'),

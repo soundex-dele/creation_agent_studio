@@ -163,6 +163,8 @@ DB_NAME=agent_studio
 DB_USER=agent_studio
 DB_PASSWORD=change-app-password
 REDIS_ENABLED=True
+REDIS_PASSWORD=change-redis-password
+REGISTRATION_ENABLED=False
 ```
 
 然后执行：
@@ -171,6 +173,12 @@ REDIS_ENABLED=True
 cd backend
 docker compose up --build
 ```
+
+Compose 只把前端绑定到宿主机 `127.0.0.1:3000`，不会直接暴露 Django、
+PostgreSQL 或 Redis。公网部署必须在宿主机配置 HTTPS 反向代理；完整的首个管理员
+初始化、备份恢复和发布门禁见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。正式环境
+默认关闭自主注册，可用 `docker compose exec web python manage.py createsuperuser`
+创建首个管理员。
 
 Compose 先以一次性 `migrate` 服务完成迁移，再启动 Web、Agent Worker、Media Worker、Workflow Worker、Evaluation Worker、Scheduler、Maintenance、PostgreSQL 16 和 Redis 7.4。应用数据库账号由初始化脚本创建为 `NOSUPERUSER/NOBYPASSRLS`；PostgreSQL 和 Redis 不暴露宿主机端口。
 

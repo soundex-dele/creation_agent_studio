@@ -7,7 +7,15 @@ import secrets
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
+
+
+class UserManager(DjangoUserManager):
+    """Keep Django superusers aligned with the application's admin role."""
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('role', 'admin')
+        return super().create_superuser(username, email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -27,6 +35,7 @@ class User(AbstractUser):
         choices=Role.choices,
         default=Role.MEMBER
     )
+    objects = UserManager()
     avatar = models.URLField(blank=True, help_text='用户头像 URL')
     bio = models.TextField(blank=True, help_text='用户简介')
     api_key = models.CharField(

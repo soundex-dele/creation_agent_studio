@@ -3,6 +3,7 @@ Base settings for Agent Studio backend.
 """
 import json
 from pathlib import Path
+from urllib.parse import quote
 from decouple import config
 
 from apps.applications.app_center.discovery import (
@@ -23,6 +24,8 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
+API_DOCS_ENABLED = config('API_DOCS_ENABLED', default=True, cast=bool)
+DJANGO_ADMIN_ENABLED = config('DJANGO_ADMIN_ENABLED', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
@@ -39,6 +42,7 @@ SINGLE_TENANT_ORGANIZATION_NAME = config(
     'SINGLE_TENANT_ORGANIZATION_NAME', default='Enterprise Workspace').strip()
 SINGLE_TENANT_DEFAULT_ROLE = config(
     'SINGLE_TENANT_DEFAULT_ROLE', default='viewer').strip().lower()
+REGISTRATION_ENABLED = config('REGISTRATION_ENABLED', default=False, cast=bool)
 
 # Optional offline desktop licensing. The public key is safe to distribute;
 # the matching private key must only exist in the vendor's license tool.
@@ -73,12 +77,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    'dj_rest_auth',
-    'django.contrib.sites',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'dj_rest_auth.registration',
     'drf_yasg',
     'django_filters',
 
@@ -111,7 +109,6 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'modules.tenancy.middleware.TenantDatabaseContextMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.enterprise.middleware.RequestContextMiddleware',
@@ -141,12 +138,15 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 ASGI_APPLICATION = 'backend.asgi.application'
 
 if REDIS_ENABLED:
+    _redis_password = config('REDIS_PASSWORD', default='')
+    _redis_auth = f':{quote(_redis_password, safe="")}@' if _redis_password else ''
+    _redis_host = config('REDIS_HOST', default='localhost')
+    _redis_port = int(config('REDIS_PORT', default='6379'))
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                'hosts': [(config('REDIS_HOST', default='localhost'),
-                           int(config('REDIS_PORT', default='6379')))],
+                'hosts': [f'redis://{_redis_auth}{_redis_host}:{_redis_port}/0'],
             },
         },
     }
@@ -178,6 +178,11 @@ elif DATABASE_ENGINE in {'postgres', 'postgresql'}:
             'PASSWORD': config('DB_PASSWORD', default='postgres'),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+            'CONN_HEALTH_CHECKS': True,
+            'OPTIONS': ({
+                'sslmode': config('DB_SSLMODE'),
+            } if config('DB_SSLMODE', default='').strip() else {}),
         }
     }
 else:
@@ -285,7 +290,7 @@ if REDIS_ENABLED:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': f"redis://{config('REDIS_HOST', default='localhost')}:{config('REDIS_PORT', default='6379')}/1",
+            'LOCATION': f"redis://{_redis_auth}{_redis_host}:{_redis_port}/1",
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
             }
@@ -334,6 +339,16 @@ STORAGES = {
         'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
     },
 }
+MEDIA_ACCESS_TTL_SECONDS = config(
+    'MEDIA_ACCESS_TTL_SECONDS', default=3600, cast=int)
+MEDIA_X_ACCEL_REDIRECT = config(
+    'MEDIA_X_ACCEL_REDIRECT', default=False, cast=bool)
+DATA_UPLOAD_MAX_MEMORY_SIZE = config(
+    'DATA_UPLOAD_MAX_MEMORY_SIZE', default=2 * 1024 * 1024, cast=int)
+FILE_UPLOAD_MAX_MEMORY_SIZE = config(
+    'FILE_UPLOAD_MAX_MEMORY_SIZE', default=2 * 1024 * 1024, cast=int)
+DATA_UPLOAD_MAX_NUMBER_FILES = config(
+    'DATA_UPLOAD_MAX_NUMBER_FILES', default=100, cast=int)
 
 # Media files (User uploaded content)
 MEDIA_URL = 'media/'
@@ -361,17 +376,23 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
         'core.throttles.OrganizationRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': config('ANON_RATE_LIMIT', default='30/minute'),
         'user': config('USER_RATE_LIMIT', default='300/minute'),
+        'login': config('LOGIN_RATE_LIMIT', default='10/minute'),
+        'registration': config('REGISTRATION_RATE_LIMIT', default='5/hour'),
+        'token_refresh': config('TOKEN_REFRESH_RATE_LIMIT', default='30/minute'),
     },
+    'NUM_PROXIES': config('REST_FRAMEWORK_NUM_PROXIES', default=1, cast=int),
 }
 
 SWAGGER_SETTINGS = {
     'DEFAULT_INFO': 'backend.schema.api_info',
 }
+SWAGGER_USE_COMPAT_RENDERERS = False
 
 # Deployed environments keep API throttling enabled. Development overrides
 # this default so local hot reloads cannot exhaust user or organization quotas.

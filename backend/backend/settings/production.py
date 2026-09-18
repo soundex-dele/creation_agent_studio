@@ -8,12 +8,25 @@ DEBUG = False
 
 if SECRET_KEY == 'django-insecure-change-in-production' or len(SECRET_KEY) < 50:
     raise ImproperlyConfigured('SECRET_KEY must be a production secret of at least 50 characters.')
+if REDIS_ENABLED and not config('REDIS_PASSWORD', default='').strip():
+    raise ImproperlyConfigured('REDIS_PASSWORD must be configured when Redis is enabled.')
 
 # WhiteNoise: serve compressed, cache-busted static files from STATIC_ROOT.
 # Requires `python manage.py collectstatic --noinput` to be run during deployment.
 STORAGES['staticfiles'] = {
     'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
 }
+STORAGES['default'] = {
+    'BACKEND': 'core.storage.SignedMediaFileSystemStorage',
+}
+MEDIA_URL = '/api/v1/media/'
+REGISTRATION_ENABLED = config('REGISTRATION_ENABLED', default=False, cast=bool)
+API_DOCS_ENABLED = config('API_DOCS_ENABLED', default=False, cast=bool)
+DJANGO_ADMIN_ENABLED = config('DJANGO_ADMIN_ENABLED', default=False, cast=bool)
+APPLICATION_RUNTIME_ALLOW_ALL_PATHS = config(
+    'APPLICATION_RUNTIME_ALLOW_ALL_PATHS', default=False, cast=bool)
+CREATION_MASTER_ALLOW_ALL_PATHS = config(
+    'CREATION_MASTER_ALLOW_ALL_PATHS', default=False, cast=bool)
 
 # Security settings
 SECURE_SSL_REDIRECT = True

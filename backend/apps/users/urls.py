@@ -8,6 +8,7 @@ urlpatterns = [
     path('mode/', views.auth_mode_view, name='auth_mode'),
     path('license/login/', views.license_login_view, name='license_login'),
     path('register/', views.RegisterView.as_view(), name='register'),
+    path('admin/users/', views.AdminUserListCreateView.as_view(), name='admin_users'),
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('token/refresh/', views.BrowserTokenRefreshView.as_view(), name='token_refresh'),

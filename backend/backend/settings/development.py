@@ -4,6 +4,7 @@ Development settings for Agent Studio backend.
 from .base import *
 
 DEBUG = True
+REGISTRATION_ENABLED = config('REGISTRATION_ENABLED', default=False, cast=bool)
 
 # API quotas protect deployed environments, but make local UI development
 # brittle because hot reloads and React StrictMode can issue extra requests.

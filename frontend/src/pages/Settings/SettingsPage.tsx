@@ -36,6 +36,7 @@ const navigationIconSelectOptions = NAVIGATION_ICON_OPTIONS.map((option) => {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const userId = useAuthStore((state) => state.user?.id);
+  const userRole = useAuthStore((state) => state.user?.role);
   const { theme, setTheme } = useThemeStore();
   const {
     sendShortcut, defaultPermissionMode, setSendShortcut,
@@ -235,6 +236,11 @@ export default function SettingsPage() {
           <Space wrap>
             <Button icon={<UserOutlined />} onClick={() => navigate('/profile')}>编辑个人资料</Button>
             <Button icon={<KeyOutlined />} onClick={() => navigate('/profile?tab=security')}>安全与 API Key</Button>
+            {userRole === 'admin' && (
+              <Button type="primary" icon={<TeamOutlined />} onClick={() => navigate('/settings/accounts')}>
+                账号管理
+              </Button>
+            )}
           </Space>
         </Card>
       </div>

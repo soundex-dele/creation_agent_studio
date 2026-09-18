@@ -9,6 +9,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from backend.schema import api_info
 from core.health import health, readiness
+from core.media import private_media
 
 # Debug Toolbar URLs - must be first in urlpatterns
 if settings.DEBUG:
@@ -28,14 +29,7 @@ schema_view = get_schema_view(
 urlpatterns += [
     path('healthz/', health, name='health'),
     path('readyz/', readiness, name='readiness'),
-    # Admin interface
-    path('admin/', admin.site.urls),
-
-    # API documentation
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-
+    path('api/v1/media/', private_media, name='private-media'),
     # Stable public contract. The project is pre-launch, so every application
     # route uses one versioned surface instead of carrying compatibility aliases.
     path('api/v1/auth/', include('apps.users.urls')),
@@ -75,6 +69,19 @@ urlpatterns += [
     ),
 
 ]
+
+if settings.DJANGO_ADMIN_ENABLED:
+    urlpatterns.append(path('admin/', admin.site.urls))
+
+if settings.API_DOCS_ENABLED:
+    urlpatterns += [
+        path('swagger/', schema_view.with_ui('swagger', cache_timeout=0),
+             name='schema-swagger-ui'),
+        path('redoc/', schema_view.with_ui('redoc', cache_timeout=0),
+             name='schema-redoc'),
+        path('swagger.json', schema_view.without_ui(cache_timeout=0),
+             name='schema-json'),
+    ]
 
 # Serve media files in development
 if settings.DEBUG:

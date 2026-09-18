@@ -1,6 +1,18 @@
+x-backend-security: &backend-security
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=2g,mode=1777
+
 services:
   migrate:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: "no"
     command: python manage.py migrate --noinput
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -13,7 +25,9 @@ services:
         condition: service_healthy
 
   app-center-sync:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: "no"
     command: python manage.py sync_app_center
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -26,7 +40,9 @@ services:
         condition: service_completed_successfully
 
   web:
+    <<: *backend-security
     build: .
+    networks: [app, data]
     restart: unless-stopped
     command: daphne -b 0.0.0.0 -p 8080 backend.asgi:application
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -39,9 +55,12 @@ services:
       ARTIFACT_ROOT: /data/artifacts
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
-      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
-    ports:
-      - "8080:8080"
+      MEDIA_X_ACCEL_REDIRECT: "true"
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
+    expose:
+      - "8080"
     volumes:
       - runtime_data:/data
     depends_on:
@@ -60,9 +79,10 @@ services:
       retries: 5
 
   agent-worker:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
-    init: true
     command: python manage.py run_execution_coordinator --worker-pool agent
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
@@ -72,9 +92,12 @@ services:
       ARTIFACT_ROOT: /data/artifacts
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
-      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
     volumes:
       - runtime_data:/data
+      - codex_data:/home/agentstudio/.codex
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,9 +114,10 @@ services:
       retries: 5
 
   media-worker:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
-    init: true
     command: python manage.py run_execution_coordinator --worker-pool media
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
@@ -103,7 +127,9 @@ services:
       ARTIFACT_ROOT: /data/artifacts
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
-      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
     volumes:
       - runtime_data:/data
     depends_on:
@@ -122,9 +148,10 @@ services:
       retries: 5
 
   workflow-worker:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
-    init: true
     command: python manage.py run_execution_coordinator --worker-pool workflow
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
@@ -134,9 +161,12 @@ services:
       ARTIFACT_ROOT: /data/artifacts
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
-      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
     volumes:
       - runtime_data:/data
+      - codex_data:/home/agentstudio/.codex
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,9 +183,10 @@ services:
       retries: 5
 
   evaluation-worker:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
-    init: true
     command: python manage.py run_execution_coordinator --worker-pool evaluation
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
@@ -165,9 +196,12 @@ services:
       ARTIFACT_ROOT: /data/artifacts
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
-      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
     volumes:
       - runtime_data:/data
+      - codex_data:/home/agentstudio/.codex
     depends_on:
       postgres:
         condition: service_healthy
@@ -184,9 +218,10 @@ services:
       retries: 5
 
   knowledge-worker:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
-    init: true
     command: python manage.py run_execution_coordinator --worker-pool knowledge
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
@@ -195,6 +230,10 @@ services:
       REDIS_HOST: redis
       ARTIFACT_ROOT: /data/artifacts
       MEDIA_ROOT: /data/media
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
+      APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
+      CREATION_MASTER_ALLOW_ALL_PATHS: "false"
     volumes:
       - runtime_data:/data
     depends_on:
@@ -211,7 +250,9 @@ services:
       retries: 5
 
   scheduler:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
     command: python manage.py run_automation_scheduler
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -235,7 +276,9 @@ services:
       retries: 5
 
   maintenance:
+    <<: *backend-security
     build: .
+    networks: [data]
     restart: unless-stopped
     command: python manage.py enforce_retention --loop --poll-interval 3600
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -265,8 +308,8 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
+    networks: [data]
     restart: unless-stopped
-    container_name: agent_studio_postgres
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: ${DB_ADMIN_USER:-postgres}
@@ -285,12 +328,17 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    networks: [data]
     restart: unless-stopped
-    container_name: agent_studio_redis
+    env_file: ${BACKEND_ENV_FILE:-.env}
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --appendfsync everysec --requirepass "$${REDIS_PASSWORD}"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -300,8 +348,11 @@ services:
       context: ..
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
+    networks: [edge, app]
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
+    volumes:
+      - runtime_data:/data:ro
     depends_on:
       web:
         condition: service_healthy
@@ -313,3 +364,11 @@ volumes:
     driver: local
   runtime_data:
     driver: local
+  codex_data:
+    driver: local
+
+networks:
+  edge:
+  app:
+    internal: true
+  data:

@@ -4,6 +4,7 @@ import {
   LogoutOutlined,
   MenuOutlined,
   SettingOutlined,
+  TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -49,6 +50,12 @@ const Header: React.FC<HeaderProps> = ({
       label: '设置',
       onClick: () => navigate('/settings'),
     },
+    ...(user?.role === 'admin' ? [{
+      key: 'account-management',
+      icon: <TeamOutlined />,
+      label: '账号管理',
+      onClick: () => navigate('/settings/accounts'),
+    }] : []),
     { type: 'divider' as const },
     {
       key: 'logout',

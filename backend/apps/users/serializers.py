@@ -58,6 +58,42 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Account data accepted only from an authenticated platform administrator."""
+
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'},
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'},
+    )
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'role', 'is_active',
+            'password', 'password_confirm', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({
+                'password_confirm': '两次输入的密码不一致',
+            })
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        password = validated_data.pop('password')
+        return User.objects.create_user(password=password, **validated_data)
+
+
 class LoginSerializer(serializers.Serializer):
     """登录序列化器"""
     username = serializers.CharField(required=True)

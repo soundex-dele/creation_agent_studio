@@ -1,0 +1,68 @@
+.account-management-page {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.account-management-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.account-management-heading h1 {
+  margin: 8px 0 0;
+}
+
+.account-management-heading p {
+  margin: 8px 0 0;
+  color: var(--color-text-sec);
+}
+
+.account-management-back {
+  margin-left: -12px;
+  color: var(--color-text-sec);
+}
+
+.account-management-notice {
+  margin-bottom: 20px;
+}
+
+.account-management-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.account-identity strong,
+.account-identity span {
+  overflow-wrap: anywhere;
+}
+
+.account-identity strong {
+  color: var(--color-text);
+}
+
+.account-identity span {
+  color: var(--color-text-sec);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .account-management-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-management-heading > .ant-btn {
+    min-height: 44px;
+  }
+}

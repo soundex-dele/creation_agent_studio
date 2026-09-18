@@ -163,12 +163,14 @@ const LoginPage: React.FC = () => {
         <Divider plain>或</Divider>
         <Button block onClick={() => setSsoOpen(true)}>企业 SSO 登录</Button>
 
-        <div className="text-center">
-          <Text className="text-text-sec">
-            还没有账户？{' '}
-            <a href="/auth/register" className="text-primary hover:underline">立即注册</a>
-          </Text>
-        </div>
+        {authMode.registration_enabled && (
+          <div className="text-center">
+            <Text className="text-text-sec">
+              还没有账户？{' '}
+              <a href="/auth/register" className="text-primary hover:underline">立即注册</a>
+            </Text>
+          </div>
+        )}
       </Form>}
       <Modal title="企业 SSO 登录" open={ssoOpen} onCancel={() => setSsoOpen(false)} okText="前往企业登录" okButtonProps={{ disabled: !ssoProvider }} onOk={() => { const provider = ssoProviders.find(item => item.id === ssoProvider); if (provider) window.location.assign(provider.login_url); }}>
         <Form layout="vertical" onFinish={discoverSso}><Form.Item name="email" label="企业邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item><Button htmlType="submit">查找身份提供商</Button></Form>

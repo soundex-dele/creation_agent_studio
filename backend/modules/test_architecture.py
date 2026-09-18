@@ -28,7 +28,10 @@ ALLOWED_DOMAIN_IMPORTS = {
         "apps.applications.models",
     },
     "modules/execution/runtime/builtin.py": {"apps.conversations.models"},
-    "modules/execution/runtime/supervisor.py": {"apps.enterprise.models"},
+    "modules/execution/runtime/supervisor.py": {
+        "apps.conversations.models",
+        "apps.enterprise.models",
+    },
     "modules/tenancy/middleware.py": {"apps.enterprise.tenancy"},
     "modules/tenancy/permissions.py": {
         "apps.enterprise.models",

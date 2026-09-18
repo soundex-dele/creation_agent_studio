@@ -45,6 +45,17 @@ class UserModelTest(TestCase):
         """
         self.assertTrue(str(self.user).startswith('testuser'))
 
+    def test_superuser_is_created_with_application_admin_role(self):
+        administrator = User.objects.create_superuser(
+            username='bootstrap-admin',
+            email='admin@example.com',
+            password='safe-test-password',
+        )
+
+        self.assertTrue(administrator.is_superuser)
+        self.assertTrue(administrator.is_staff)
+        self.assertEqual(administrator.role, User.Role.ADMIN)
+
 
 class BrowserSessionTest(TestCase):
     def setUp(self):
@@ -82,6 +93,84 @@ class BrowserSessionTest(TestCase):
     def test_refresh_without_cookie_is_rejected(self):
         response = self.client.post('/api/v1/auth/token/refresh/', {}, format='json')
         self.assertEqual(response.status_code, 401)
+
+    @override_settings(REGISTRATION_ENABLED=False, LICENSE_AUTH_ENABLED=False)
+    def test_private_deployment_can_disable_self_registration(self):
+        mode = self.client.get('/api/v1/auth/mode/')
+        register = self.client.post('/api/v1/auth/register/', {
+            'username': 'uninvited-user',
+            'email': 'uninvited@example.com',
+            'password': 'safe-test-password',
+            'password_confirm': 'safe-test-password',
+        }, format='json')
+
+        self.assertFalse(mode.data['registration_enabled'])
+        self.assertEqual(register.status_code, 403)
+
+
+class AdminAccountManagementTest(TestCase):
+    def setUp(self):
+        self.administrator = User.objects.create_user(
+            username='account-admin',
+            email='account-admin@example.com',
+            password='safe-test-password',
+            role=User.Role.ADMIN,
+        )
+        self.member = User.objects.create_user(
+            username='ordinary-member',
+            email='member@example.com',
+            password='safe-test-password',
+        )
+        self.client = APIClient()
+
+    @override_settings(REGISTRATION_ENABLED=False)
+    def test_admin_can_create_account_while_public_registration_is_closed(self):
+        self.client.force_authenticate(self.administrator)
+
+        response = self.client.post('/api/v1/auth/admin/users/', {
+            'username': 'provisioned-user',
+            'email': 'provisioned@example.com',
+            'role': User.Role.PROFESSIONAL,
+            'is_active': True,
+            'password': 'A-safe-password-123!',
+            'password_confirm': 'A-safe-password-123!',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        created = User.objects.get(username='provisioned-user')
+        self.assertTrue(created.check_password('A-safe-password-123!'))
+        self.assertEqual(created.role, User.Role.PROFESSIONAL)
+        self.assertNotIn('password', response.data)
+
+    def test_non_admin_cannot_list_or_create_accounts(self):
+        self.client.force_authenticate(self.member)
+
+        listed = self.client.get('/api/v1/auth/admin/users/')
+        created = self.client.post('/api/v1/auth/admin/users/', {
+            'username': 'forbidden-user',
+            'email': 'forbidden@example.com',
+            'role': User.Role.MEMBER,
+            'password': 'A-safe-password-123!',
+            'password_confirm': 'A-safe-password-123!',
+        }, format='json')
+
+        self.assertEqual(listed.status_code, 403)
+        self.assertEqual(created.status_code, 403)
+        self.assertFalse(User.objects.filter(username='forbidden-user').exists())
+
+    def test_password_confirmation_is_required(self):
+        self.client.force_authenticate(self.administrator)
+
+        response = self.client.post('/api/v1/auth/admin/users/', {
+            'username': 'mismatch-user',
+            'email': 'mismatch@example.com',
+            'role': User.Role.MEMBER,
+            'password': 'A-safe-password-123!',
+            'password_confirm': 'another-safe-password',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('password_confirm', response.data)
 
 
 class ProfileAndApiKeyTest(TestCase):
