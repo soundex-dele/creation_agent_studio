@@ -334,7 +334,7 @@ def test_deployment_rejects_revision_from_another_application(
 
 
 @pytest.mark.django_db
-def test_deployment_remains_admin_only_when_status_capability_is_delegated(
+def test_organization_developer_can_operate_application_deployment(
     catalog_api_client, catalog_api_organization
 ):
     application, _ = _create_application(
@@ -343,6 +343,8 @@ def test_deployment_remains_admin_only_when_status_capability_is_delegated(
     revision_response = _publish(
         catalog_api_client, catalog_api_organization, application, 1
     )
+    application.visibility = Application.Visibility.ORGANIZATION
+    application.save(update_fields=["visibility"])
     developer = get_user_model().objects.create_user(username="catalog-api-developer")
     Membership.objects.create(
         organization=catalog_api_organization,
@@ -356,15 +358,9 @@ def test_deployment_remains_admin_only_when_status_capability_is_delegated(
     )
     payload = {"revision_id": revision_response.data["id"], "expected_version": 0}
 
-    denied = developer_client.put(url, payload, format="json")
+    deployed = developer_client.put(url, payload, format="json")
 
-    assert denied.status_code == 403
-    assert denied.data["code"] == "application_update_forbidden"
-
-    developer.can_toggle_applications = True
-    developer.save(update_fields=["can_toggle_applications"])
-    still_denied = developer_client.put(url, payload, format="json")
-    assert still_denied.status_code == 403
+    assert deployed.status_code == 201, deployed.data
 
 
 @pytest.mark.django_db
@@ -431,38 +427,39 @@ def test_catalog_resources_are_scoped_to_path_organization(
 
 
 @pytest.mark.django_db
-def test_owner_can_disable_application_and_developer_cannot_change_status(
+def test_owner_can_disable_application_and_operator_can_change_status(
     catalog_api_client, catalog_api_organization
 ):
     application, _ = _create_application(
         catalog_api_client, catalog_api_organization
     )
     url = _application_url(catalog_api_organization, application)
+    application.visibility = Application.Visibility.ORGANIZATION
+    application.save(update_fields=["visibility"])
 
     disabled = catalog_api_client.patch(
         url, {"is_active": False}, format="json"
     )
 
-    developer = get_user_model().objects.create_user(
-        username="catalog-status-developer"
+    operator = get_user_model().objects.create_user(
+        username="catalog-status-operator"
     )
     Membership.objects.create(
         organization=catalog_api_organization,
-        user=developer,
-        role=Membership.Role.DEVELOPER,
+        user=operator,
+        role=Membership.Role.OPERATOR,
     )
-    developer_client = APIClient()
-    developer_client.force_authenticate(developer)
-    denied = developer_client.patch(
+    operator_client = APIClient()
+    operator_client.force_authenticate(operator)
+    enabled = operator_client.patch(
         url, {"is_active": True}, format="json"
     )
 
     application.refresh_from_db()
     assert disabled.status_code == 200
     assert disabled.data["is_active"] is False
-    assert denied.status_code == 403
-    assert denied.data["code"] == "application_status_requires_admin"
-    assert application.is_active is False
+    assert enabled.status_code == 200, enabled.data
+    assert application.is_active is True
 
 
 @pytest.mark.django_db

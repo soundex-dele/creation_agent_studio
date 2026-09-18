@@ -6,6 +6,7 @@ import AgentDetailModal from '@/components/Agents/AgentDetailModal';
 import AgentEditorModal from '@/components/Agents/AgentEditorModal';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import './AgentsPage.css';
 
 const { Search } = Input;
@@ -14,7 +15,10 @@ const AGENT_ICONS = ['🎬', '✍️', '🎙️', '✂️', '🎨', '🎵', '�
 
 const AgentsPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
-  const canCreateAgent = user?.role === 'admin' || user?.can_create_agents;
+  const { organizations, currentOrganizationId } = useOrganizationStore();
+  const currentRole = organizations.find((item) => item.id === currentOrganizationId)?.role;
+  const canCreateAgent = user?.role === 'admin'
+    || ['owner', 'admin', 'developer'].includes(currentRole ?? '');
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);

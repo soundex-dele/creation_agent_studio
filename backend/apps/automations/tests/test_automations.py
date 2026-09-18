@@ -41,7 +41,7 @@ def application(owner, organization):
         description="Application used by automation tests",
         created_by=owner,
         organization=organization,
-        access_scope=Application.AccessScope.ORGANIZATION,
+        visibility=Application.Visibility.ORGANIZATION,
     )
     revision = ApplicationRevision.objects.create(
         organization=organization,

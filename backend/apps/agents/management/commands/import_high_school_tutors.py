@@ -119,6 +119,7 @@ class Command(BaseCommand):
             "created_by": organization.owner,
             "is_public": True,
             "is_active": True,
+            "visibility": Agent.Visibility.ORGANIZATION,
         }
         agent, created = Agent.objects.update_or_create(
             organization=organization,

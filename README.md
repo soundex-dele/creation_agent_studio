@@ -119,6 +119,16 @@ SINGLE_TENANT_DEFAULT_ROLE=viewer
 
 已有数据的部署应将 `SINGLE_TENANT_ORGANIZATION_ID` 设置为需要保留的现有组织 UUID；不要只修改 slug，否则系统会创建新的默认企业，原组织数据不会自动迁移。
 
+## 权限模型
+
+权限分为三层，不再在账号上维护 `can_*` 能力开关：
+
+- 平台身份：`admin`、`auditor`、`member`。平台管理员具有全局覆盖权限；平台审计员可跨组织只读查看治理与审计信息，但不能修改组织或资源。
+- 组织角色：`owner`、`admin`、`developer`、`operator`、`auditor`、`viewer`，决定组织内的创建、编辑、运维、审计和查看能力。
+- 资源权限：Agent/Application 的可见范围为 `private`、`restricted`、`organization`。`restricted` 可按成员授予 `viewer`、`user`、`operator`、`editor`，依次对应发现、运行、运维和编辑。
+
+资源创建者始终拥有该资源的完整管理权限；组织 Owner/Admin 可管理资源授权；授权账号必须是资源所属组织的有效成员。用户创建的新资源默认 `private`，系统为组织安装的内置目录资源会显式设为 `organization`。
+
 ## Durable Run API
 
 组织级执行接口统一位于 `/api/v1/organizations/{organization_id}/`：

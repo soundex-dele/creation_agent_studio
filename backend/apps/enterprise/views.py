@@ -35,6 +35,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def _require_admin(self, organization):
+        if self.request.user.is_superuser or self.request.user.role == 'admin':
+            return
         membership = organization.memberships.filter(
             user=self.request.user, is_active=True).first()
         if not membership or membership.role not in (
@@ -46,13 +48,12 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             membership = provision_single_tenant_user(self.request.user)
             return Organization.objects.filter(
                 pk=membership.organization_id) if membership else Organization.objects.none()
-        return Organization.objects.filter(
-            memberships__user=self.request.user,
-            memberships__is_active=True,
-        ).distinct()
+        return Organization.objects.visible_to(self.request.user).filter(is_active=True)
 
     @transaction.atomic
     def perform_create(self, serializer):
+        if self.request.user.role == 'auditor' and not self.request.user.is_superuser:
+            raise PermissionDenied('Platform auditors have read-only access.')
         if single_tenant_mode_enabled():
             raise MethodNotAllowed(
                 'POST', detail='Organization creation is disabled in single-tenant mode.')
@@ -66,7 +67,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if single_tenant_mode_enabled():
             raise MethodNotAllowed(
                 'DELETE', detail='The deployment organization cannot be deleted.')
-        if instance.owner_id != self.request.user.id:
+        if (instance.owner_id != self.request.user.id
+                and not self.request.user.is_superuser
+                and self.request.user.role != 'admin'):
             raise PermissionDenied('Only the owner may delete an organization.')
         instance.is_active = False
         instance.save(update_fields=['is_active', 'updated_at'])
@@ -78,14 +81,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get', 'post'], url_path='members')
     def members(self, request, pk=None):
         organization = self.get_object()
-        membership = organization.memberships.filter(
-            user=request.user, is_active=True).first()
         if request.method == 'GET':
             return Response(MembershipSerializer(
                 organization.memberships.select_related('user'), many=True).data)
-        if not membership or membership.role not in (
-                Membership.Role.OWNER, Membership.Role.ADMIN):
-            return Response({'detail': 'Administrator role required.'}, status=403)
+        self._require_admin(organization)
         serializer = MembershipSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = get_user_model().objects.get(id=serializer.validated_data.pop('user_id'))
@@ -98,10 +97,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             url_path=r'members/(?P<member_id>[^/.]+)')
     def member_detail(self, request, pk=None, member_id=None):
         organization = self.get_object()
-        actor = organization.memberships.filter(
-            user=request.user, is_active=True).first()
-        if not actor or actor.role not in (Membership.Role.OWNER, Membership.Role.ADMIN):
-            return Response({'detail': 'Administrator role required.'}, status=403)
+        self._require_admin(organization)
         member = organization.memberships.filter(id=member_id).first()
         if member is None:
             return Response({'detail': 'Member not found.'}, status=404)
@@ -285,6 +281,7 @@ class EvaluationSuiteViewSet(TenantModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
     permission_classes = [IsAuthenticated, OrganizationRolePermission]
+    minimum_role = Membership.Role.AUDITOR
 
     def get_queryset(self):
         organization = resolve_organization(self.request)

@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.enterprise.models import Membership, Organization
@@ -17,6 +19,22 @@ ROLE_LEVEL = {
 }
 
 
+def _platform_membership(user, organization):
+    platform_role = getattr(user, "role", None)
+    if user.is_superuser or platform_role == "admin":
+        role = Membership.Role.OWNER
+    elif platform_role == "auditor":
+        role = Membership.Role.AUDITOR
+    else:
+        return None
+    return SimpleNamespace(
+        organization=organization,
+        organization_id=organization.id,
+        role=role,
+        is_active=True,
+    )
+
+
 def resolve_path_organization(request, organization_id):
     """Resolve an organization without revealing inaccessible tenants."""
 
@@ -27,7 +45,9 @@ def resolve_path_organization(request, organization_id):
         if membership is None or str(membership.organization_id) != str(organization_id):
             return None
         request.organization = membership.organization
-        request.organization_membership = membership
+        request.organization_membership = (
+            _platform_membership(request.user, membership.organization) or membership
+        )
         return membership.organization
     organization = (
         Organization.objects.visible_to(request.user)
@@ -36,6 +56,9 @@ def resolve_path_organization(request, organization_id):
     )
     if organization is not None:
         request.organization = organization
+        platform_membership = _platform_membership(request.user, organization)
+        if platform_membership is not None:
+            request.organization_membership = platform_membership
     return organization
 
 
@@ -55,16 +78,21 @@ class HasPathOrganizationRole(BasePermission):
         organization = resolve_path_organization(request, organization_id)
         if organization is None:
             return False
-        if request.user.is_superuser:
-            return True
-        membership = Membership.objects.filter(
-            organization=organization,
-            user=request.user,
-            is_active=True,
-        ).first()
+        membership = getattr(request, "organization_membership", None)
+        if membership is None:
+            membership = Membership.objects.filter(
+                organization=organization,
+                user=request.user,
+                is_active=True,
+            ).first()
         if membership is None:
             return False
         request.organization_membership = membership
+        if (
+            getattr(request.user, "role", None) == "auditor"
+            and request.method not in SAFE_METHODS
+        ):
+            return False
         required = getattr(view, "minimum_role", None)
         if required is None:
             required = (

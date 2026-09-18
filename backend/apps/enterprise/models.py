@@ -20,7 +20,7 @@ class TimeStampedModel(models.Model):
 
 class OrganizationQuerySet(models.QuerySet):
     def visible_to(self, user):
-        if user.is_superuser:
+        if user.is_superuser or getattr(user, 'role', None) in ('admin', 'auditor'):
             return self
         return self.filter(
             memberships__user=user,

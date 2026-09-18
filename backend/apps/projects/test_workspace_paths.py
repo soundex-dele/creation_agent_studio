@@ -20,7 +20,7 @@ class ApplicationWorkspaceTest(TestCase):
             slug='copy-writer-workspace',
             description='Test application workspace',
             created_by=self.user,
-            access_scope=Application.AccessScope.ORGANIZATION,
+            visibility=Application.Visibility.ORGANIZATION,
         )
         self.client = APIClient()
         self.client.force_authenticate(self.user)
@@ -51,9 +51,9 @@ class ApplicationWorkspaceTest(TestCase):
         other = User.objects.create_user('other-owner', password='secret')
         self.application.created_by = other
         self.application.is_public = False
-        self.application.access_scope = Application.AccessScope.ADMIN
+        self.application.visibility = Application.Visibility.PRIVATE
         self.application.save(update_fields=[
-            'created_by', 'is_public', 'access_scope',
+            'created_by', 'is_public', 'visibility',
         ])
 
         response = self.client.post('/api/v1/projects/', {

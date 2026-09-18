@@ -42,6 +42,7 @@ def provision_content_creation_agent(organization):
             "created_by": owner,
             "is_public": True,
             "is_active": True,
+            "visibility": Agent.Visibility.ORGANIZATION,
         },
     )
     agent_content = {

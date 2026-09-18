@@ -295,7 +295,7 @@ class AutomationTargetListView(APIView):
                 Q(organization_id=organization_id) | Q(organization__isnull=True),
                 id__in=application_ids,
                 is_active=True,
-            ), request.user).order_by("name")
+            ), request.user, operation="run").order_by("name")
             return Response([{
                 "type": "application", "id": str(item.id), "name": item.name,
                 "description": item.description,

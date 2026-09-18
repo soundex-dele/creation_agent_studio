@@ -124,6 +124,7 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
                 is_active=True,
             ),
             request.user,
+            operation="run",
         ).values_list('id', flat=True))
         if requested != allowed:
             raise serializers.ValidationError('包含不可用或未发布的应用版本。')

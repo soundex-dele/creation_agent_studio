@@ -25,7 +25,7 @@ export interface Agent {
   can_delete: boolean;
   can_toggle: boolean;
   can_manage_permissions: boolean;
-  access_scope: 'admin' | 'restricted' | 'organization';
+  visibility: 'private' | 'restricted' | 'organization';
   created_at: string;
 }
 

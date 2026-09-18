@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 
 from apps.applications.models import Application
 from apps.conversations.models import Conversation, Message
-from apps.enterprise.models import Membership
 from modules.catalog.errors import (
     DeploymentVersionConflict,
     DraftVersionConflict,
@@ -51,45 +50,22 @@ DEFAULT_LIMITS = {
 }
 
 
-def _membership(request, organization_id):
-    if request.user.is_superuser:
-        return None
-    return Membership.objects.filter(
-        organization_id=organization_id,
-        user=request.user,
-        is_active=True,
-    ).first()
-
-
 def _can_edit(request, agent):
-    return can_update_agents(request.user)
+    return can_update_agents(request.user, agent)
 
 
 def _can_delete(request, agent):
-    return can_delete_agents(request.user)
+    return can_delete_agents(request.user, agent)
 
 
 def _can_toggle(request, agent):
-    return can_toggle_agents(request.user)
+    return can_toggle_agents(request.user, agent)
 
 
 def _can_run(request, agent):
     if not agent.is_active:
         return False
-    if not can_access_resource(agent, request.user):
-        return False
-    if is_platform_admin(request.user):
-        return True
-    membership = _membership(request, agent.organization_id)
-    return bool(
-        membership
-        and membership.role in (
-            Membership.Role.OWNER,
-            Membership.Role.ADMIN,
-            Membership.Role.DEVELOPER,
-            Membership.Role.OPERATOR,
-        )
-    )
+    return can_access_resource(agent, request.user, operation='run')
 
 
 def _visible_supervisors(request, organization_id):
@@ -115,14 +91,14 @@ def validate_supervisor_team(agent, content, actor):
         id__in=agent_ids,
         kind=Agent.Kind.STANDARD,
         is_active=True,
-    ), actor)
+    ), actor, operation='run')
     if set(accessible_agents.values_list('id', flat=True)) != agent_ids:
         raise serializers.ValidationError({'agent_ids': '包含不可访问或非标准智能体。'})
     accessible_apps = accessible_resources(Application.objects.filter(
         Q(organization=agent.organization) | Q(organization__isnull=True),
         id__in=application_ids,
         is_active=True,
-    ), actor)
+    ), actor, operation='run')
     if set(accessible_apps.values_list('id', flat=True)) != application_ids:
         raise serializers.ValidationError({'application_ids': '包含不可访问的应用。'})
     missing_agents = agent_ids - set(AgentDeployment.objects.filter(
@@ -176,8 +152,8 @@ class SupervisorWriteSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     icon = serializers.CharField(required=False, allow_blank=True, max_length=50)
     visibility = serializers.ChoiceField(
-        choices=SupervisorProfile.Visibility.choices,
-        default=SupervisorProfile.Visibility.PRIVATE,
+        choices=(Agent.Visibility.PRIVATE, Agent.Visibility.ORGANIZATION),
+        default=Agent.Visibility.PRIVATE,
     )
     role_prompt = serializers.CharField()
     principles = serializers.ListField(
@@ -228,7 +204,7 @@ class SupervisorReadSerializer(serializers.Serializer):
     slug = serializers.CharField()
     description = serializers.CharField()
     icon = serializers.CharField()
-    visibility = serializers.ChoiceField(choices=SupervisorProfile.Visibility.choices)
+    visibility = serializers.ChoiceField(choices=Agent.Visibility.choices)
     role_prompt = serializers.CharField()
     principles = serializers.ListField(child=serializers.CharField())
     output_preferences = serializers.CharField()
@@ -295,7 +271,7 @@ def _serialize(agent, request):
         'slug': agent.slug,
         'description': agent.description,
         'icon': agent.icon,
-        'visibility': agent.supervisor_profile.visibility,
+        'visibility': agent.visibility,
         'role_prompt': content.get('system_prompt', ''),
         'principles': orchestration.get('principles') or [],
         'output_preferences': orchestration.get('output_preferences', ''),
@@ -331,7 +307,7 @@ class SupervisorListCreateView(APIView):
         responses={201: SupervisorReadSerializer},
     )
     def post(self, request, organization_id):
-        if not can_create_agents(request.user):
+        if not can_create_agents(request.user, organization_id):
             return Response({'detail': '当前账号未获授权创建 AI 分身。'}, status=403)
         serializer = SupervisorWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -362,15 +338,9 @@ class SupervisorListCreateView(APIView):
                 description=data.get('description', ''),
                 icon=data.get('icon', '') or '🧭',
                 is_public=False,
-                access_scope=(
-                    Agent.AccessScope.ORGANIZATION
-                    if data['visibility'] == SupervisorProfile.Visibility.ORGANIZATION
-                    else Agent.AccessScope.ADMIN
-                ),
+                visibility=data['visibility'],
             )
-            SupervisorProfile.objects.create(
-                agent=agent, visibility=data['visibility'],
-            )
+            SupervisorProfile.objects.create(agent=agent)
             AgentDraft.objects.create(
                 organization_id=organization_id,
                 agent=agent,
@@ -420,16 +390,9 @@ class SupervisorDetailView(APIView):
             agent.description = data.get('description', '')
             agent.icon = data.get('icon', '') or '🧭'
             agent.save(update_fields=['name', 'slug', 'description', 'icon', 'updated_at'])
-            profile = agent.supervisor_profile
-            profile.visibility = data['visibility']
-            profile.save(update_fields=['visibility', 'updated_at'])
-            agent.access_scope = (
-                Agent.AccessScope.ORGANIZATION
-                if data['visibility'] == SupervisorProfile.Visibility.ORGANIZATION
-                else Agent.AccessScope.ADMIN
-            )
-            agent.save(update_fields=['access_scope', 'updated_at'])
-            agent.allowed_users.clear()
+            agent.visibility = data['visibility']
+            agent.save(update_fields=['visibility', 'updated_at'])
+            agent.access_grants.all().delete()
             draft = AgentDraft.objects.select_for_update().get(agent=agent)
             draft.content = _definition(data)
             draft.version += 1
@@ -546,7 +509,7 @@ class SupervisorStatusView(APIView):
         )
         if not _can_toggle(request, agent):
             return Response({'detail': '无权启用或停用该分身。'}, status=403)
-        if not can_access_resource(agent, request.user):
+        if not can_access_resource(agent, request.user, operation='operate'):
             return Response({'detail': '未找到可访问的分身。'}, status=404)
         if not isinstance(request.data.get('is_active'), bool):
             return Response({'is_active': '必须提供布尔值。'}, status=400)

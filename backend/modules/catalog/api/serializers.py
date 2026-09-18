@@ -9,6 +9,11 @@ from modules.catalog.models import (
     SkillRevision,
 )
 from apps.applications.models import Application
+from core.resource_access import (
+    can_manage_resource_permissions,
+    can_toggle_applications,
+    can_update_applications,
+)
 
 
 def validate_json_object(value, field_name):
@@ -20,6 +25,24 @@ def validate_json_object(value, field_name):
 class ApplicationSerializer(serializers.ModelSerializer):
     organization_id = serializers.UUIDField(read_only=True)
     owner_id = serializers.ReadOnlyField(source="created_by_id")
+    can_edit = serializers.SerializerMethodField()
+    can_toggle = serializers.SerializerMethodField()
+    can_manage_permissions = serializers.SerializerMethodField()
+
+    def _request(self):
+        return self.context.get("request")
+
+    def get_can_edit(self, obj):
+        request = self._request()
+        return bool(request and can_update_applications(request.user, obj))
+
+    def get_can_toggle(self, obj):
+        request = self._request()
+        return bool(request and can_toggle_applications(request.user, obj))
+
+    def get_can_manage_permissions(self, obj):
+        request = self._request()
+        return bool(request and can_manage_resource_permissions(obj, request.user))
 
     class Meta:
         model = Application
@@ -31,8 +54,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "kind",
-            "access_scope",
+            "visibility",
             "is_active",
+            "can_edit",
+            "can_toggle",
+            "can_manage_permissions",
             "created_at",
             "updated_at",
         )

@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from types import SimpleNamespace
 
 from .models import Membership, Organization
 from .tenancy import provision_single_tenant_user, single_tenant_mode_enabled
@@ -19,9 +20,20 @@ def resolve_organization(request, *, required=True):
     """Resolve a tenant only through an active membership."""
     if not request.user or not request.user.is_authenticated:
         return None
+    platform_role = getattr(request.user, 'role', None)
+    is_platform_admin = request.user.is_superuser or platform_role == 'admin'
+    is_platform_auditor = platform_role == 'auditor'
     if single_tenant_mode_enabled():
         membership = provision_single_tenant_user(request.user)
         if membership:
+            if is_platform_admin or is_platform_auditor:
+                membership = SimpleNamespace(
+                    organization=membership.organization,
+                    organization_id=membership.organization_id,
+                    role=(Membership.Role.OWNER if is_platform_admin
+                          else Membership.Role.AUDITOR),
+                    is_active=True,
+                )
             request.organization = membership.organization
             request.organization_membership = membership
             return membership.organization
@@ -29,6 +41,26 @@ def resolve_organization(request, *, required=True):
 
     requested = request.headers.get('X-Organization-ID') or request.query_params.get(
         'organization_id')
+    if is_platform_admin or is_platform_auditor:
+        organizations = Organization.objects.filter(is_active=True)
+        if requested:
+            try:
+                organization = organizations.filter(pk=requested).first()
+            except (ValidationError, ValueError):
+                organization = None
+        else:
+            organization = organizations.order_by('created_at').first()
+        if organization:
+            request.organization = organization
+            request.organization_membership = SimpleNamespace(
+                organization=organization,
+                organization_id=organization.id,
+                role=(Membership.Role.OWNER if is_platform_admin
+                      else Membership.Role.AUDITOR),
+                is_active=True,
+            )
+            return organization
+        return None
     memberships = Membership.objects.select_related('organization').filter(
         user=request.user, is_active=True, organization__is_active=True)
     if requested:

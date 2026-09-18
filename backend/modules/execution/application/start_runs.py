@@ -253,7 +253,7 @@ def _start_once(
         if application is None:
             raise DeploymentUnavailable("Application is not available")
         from core.resource_access import can_access_resource
-        if not can_access_resource(application, actor):
+        if not can_access_resource(application, actor, operation="run"):
             raise DeploymentUnavailable("Application is not available")
         port.enforce_quota(application.organization)
         deployment = (
@@ -290,6 +290,7 @@ def _start_once(
                     is_active=True,
                 ),
                 actor,
+                operation="run",
             ).values_list("id", flat=True))
             if allowed_agent_ids != bound_agent_ids:
                 raise InvalidExecutionDefinition(
@@ -447,7 +448,7 @@ def start_agent_run(
         if agent is None:
             raise DeploymentUnavailable("Agent is not available")
         from core.resource_access import can_access_resource
-        if not can_access_resource(agent, actor):
+        if not can_access_resource(agent, actor, operation="run"):
             raise DeploymentUnavailable("Agent is not available")
         deployment = AgentDeployment.objects.for_organization(
             organization_id
@@ -620,7 +621,7 @@ def start_supervisor_run(
         if supervisor is None:
             raise DeploymentUnavailable("Supervisor is not available")
         from core.resource_access import accessible_resources, can_access_resource
-        if not can_access_resource(supervisor, actor):
+        if not can_access_resource(supervisor, actor, operation="run"):
             raise DeploymentUnavailable("Supervisor is not available")
         if "supervisor" not in getattr(settings, "EXECUTION_CHILD_ADAPTERS", {}).get(
             Run.ExecutorKind.WORKFLOW, {}
@@ -656,11 +657,11 @@ def start_supervisor_run(
             id__in=agent_ids,
             kind=Agent.Kind.STANDARD,
             is_active=True,
-        ), actor)
+        ), actor, operation="run")
         allowed_apps = accessible_resources(Application.objects.filter(
             id__in=application_ids,
             is_active=True,
-        ), actor)
+        ), actor, operation="run")
         if set(allowed_agents.values_list("id", flat=True)) != agent_ids:
             raise InvalidExecutionDefinition("Supervisor team contains unavailable agents")
         if set(allowed_apps.values_list("id", flat=True)) != application_ids:

@@ -12,7 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.agents.models import Agent, SupervisorProfile
+from apps.agents.models import Agent
 from apps.agents.runtime import get_agent_definition
 from apps.applications.models import Application, Skill
 from apps.applications.runtime_skills import (
@@ -45,7 +45,7 @@ from modules.execution.application.start_runs import (
     start_supervisor_run,
 )
 from modules.execution.models import IdempotencyRecord, Run
-from core.resource_access import accessible_resources
+from core.resource_access import accessible_resources, can_access_resource
 
 from .models import (
     Conversation,
@@ -77,6 +77,7 @@ def resolve_agent(agent_id, organization, user, *, use_default=False):
             is_active=True,
         ),
         user,
+        operation="run",
     )
     if agent_id is None:
         if use_default:
@@ -91,22 +92,10 @@ def resolve_agent(agent_id, organization, user, *, use_default=False):
 def ensure_supervisor_access(agent, user):
     if not agent or agent.kind != Agent.Kind.SUPERVISOR:
         return
-    profile = getattr(agent, 'supervisor_profile', None)
-    if profile is None:
+    if not hasattr(agent, 'supervisor_profile'):
         raise ValidationError({'agent_id': 'AI 分身配置不完整。'})
-    if (
-        profile.visibility == SupervisorProfile.Visibility.PRIVATE
-        and agent.created_by_id != user.id
-        and not user.is_superuser
-    ):
-        from apps.enterprise.models import Membership
-        if not Membership.objects.filter(
-            organization=agent.organization,
-            user=user,
-            is_active=True,
-            role__in=(Membership.Role.OWNER, Membership.Role.ADMIN),
-        ).exists():
-            raise ValidationError({'agent_id': '该 AI 分身为私有。'})
+    if not can_access_resource(agent, user, operation="run"):
+        raise ValidationError({'agent_id': '当前账号无权运行该 AI 分身。'})
 
 
 def resolve_conversation_agent(conversation, requested_agent_id):
@@ -122,6 +111,7 @@ def resolve_conversation_agent(conversation, requested_agent_id):
                     is_active=True,
                 ),
                 conversation.user,
+                operation="run",
             ).first()
             if selected is None:
                 raise ValidationError({
@@ -147,6 +137,7 @@ def resolve_conversation_agent(conversation, requested_agent_id):
             pk=requested_agent_id,
         ),
         conversation.user,
+        operation="run",
     ).first()
     if selected is None:
         raise ValidationError({"agent_id": "该智能体不存在或当前用户无权使用。"})
@@ -185,6 +176,17 @@ def validate_requested_skill_names(conversation, requested_skill_names):
             ).values_list("slug", flat=True))
             if not requested.issubset(allowed):
                 raise ValidationError({"skill_names": "包含应用未授权的 Skill。"})
+
+
+def application_agent_overrides(conversation, agent):
+    if not conversation.application_id:
+        return {}
+    definition = application_definition(conversation.application)
+    binding = next((
+        item for item in definition.get("agent_bindings", [])
+        if item.get("agent_id") == agent.id
+    ), None)
+    return dict((binding or {}).get("config_overrides") or {})
 
 
 class ConversationViewSet(viewsets.ViewSet):
@@ -265,6 +267,7 @@ class ConversationViewSet(viewsets.ViewSet):
                             is_active=True,
                         ),
                     request.user,
+                    operation="run",
                 ),
                 id=data["application_id"],
                 kind=Application.Kind.CHAT,
@@ -291,6 +294,7 @@ class ConversationViewSet(viewsets.ViewSet):
                         is_active=True,
                     ),
                     request.user,
+                    operation="run",
                 ),
                 id=binding["agent_id"],
             )
@@ -491,6 +495,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 is_active=True,
             ),
             request.user,
+            operation="run",
         ).exists():
             raise ValidationError({"application_id": "当前用户已无权使用该应用。"})
         agent, selected_agent = resolve_conversation_agent(
@@ -568,8 +573,10 @@ class ConversationViewSet(viewsets.ViewSet):
             return run, replayed
 
         definition = get_agent_definition(agent)
+        definition_overrides = application_agent_overrides(conversation, agent)
+        effective_definition = {**definition, **definition_overrides}
         adapter = resolve_skill_adapter(
-            (definition.get("model_config") or {}).get("adapter")
+            (effective_definition.get("model_config") or {}).get("adapter")
             or settings.AGENT_ENGINE_ADAPTER
         )
         if image_specs and adapter != "codex":
@@ -651,7 +658,9 @@ class ConversationViewSet(viewsets.ViewSet):
             source_id=conversation.id,
             allow_draft=True,
             definition_overrides=(
-                {"system_prompt": ""} if selected_agent is None else None
+                {"system_prompt": ""}
+                if selected_agent is None
+                else definition_overrides or None
             ),
         )
         if not replayed:

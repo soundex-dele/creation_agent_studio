@@ -15,29 +15,18 @@ ACCOUNT_COLUMNS = (
     ("role", "角色"),
     ("is_active", "允许登录"),
     ("password", "初始密码"),
-    ("can_view_agents", "查看智能体"),
-    ("can_create_agents", "创建智能体"),
-    ("can_update_agents", "修改智能体"),
-    ("can_delete_agents", "删除智能体"),
-    ("can_toggle_agents", "启停智能体"),
-    ("can_view_applications", "查看应用"),
-    ("can_toggle_applications", "启停应用"),
 )
 
-CAPABILITY_FIELDS = {
-    key for key, _ in ACCOUNT_COLUMNS if key.startswith("can_")
-}
-BOOLEAN_FIELDS = {"is_active", *CAPABILITY_FIELDS}
+BOOLEAN_FIELDS = {"is_active"}
 HEADER_TO_FIELD = {
     alias: key
     for key, label in ACCOUNT_COLUMNS
     for alias in (key, label)
 }
 ROLE_ALIASES = {
-    "管理员": User.Role.ADMIN,
-    "专业用户": User.Role.PROFESSIONAL,
-    "成员": User.Role.MEMBER,
-    "查看者": User.Role.VIEWER,
+    "平台管理员": User.Role.ADMIN,
+    "平台审计员": User.Role.AUDITOR,
+    "普通用户": User.Role.MEMBER,
     **{value: value for value, _ in User.Role.choices},
 }
 TRUE_VALUES = {"1", "true", "yes", "y", "是", "启用", "允许"}
@@ -75,13 +64,6 @@ def export_accounts_csv(queryset):
             "角色": user.role,
             "允许登录": "是" if user.is_active else "否",
             "初始密码": "",
-            "查看智能体": "是" if user.can_view_agents else "否",
-            "创建智能体": "是" if user.can_create_agents else "否",
-            "修改智能体": "是" if user.can_update_agents else "否",
-            "删除智能体": "是" if user.can_delete_agents else "否",
-            "启停智能体": "是" if user.can_toggle_agents else "否",
-            "查看应用": "是" if user.can_view_applications else "否",
-            "启停应用": "是" if user.can_toggle_applications else "否",
         })
     return _csv_text(rows)
 
@@ -95,13 +77,6 @@ def account_import_template_csv():
         # Deliberately blank so importing the untouched example cannot create
         # an account with a shared, predictable password.
         "初始密码": "",
-        "查看智能体": "是",
-        "创建智能体": "否",
-        "修改智能体": "否",
-        "删除智能体": "否",
-        "启停智能体": "否",
-        "查看应用": "是",
-        "启停应用": "否",
     }])
 
 
@@ -160,7 +135,7 @@ def _serializer_errors(row_number, errors):
     return result
 
 
-def import_accounts_csv(upload):
+def import_accounts_csv(upload, *, request=None):
     if not upload:
         raise AccountImportError("请选择要导入的 CSV 文件。")
     reader = csv.DictReader(io.StringIO(_decode_upload(upload), newline=""))
@@ -216,6 +191,7 @@ def import_accounts_csv(upload):
             instance,
             data=values,
             partial=instance is not None,
+            context={'request': request} if request is not None else {},
         )
         if not serializer.is_valid():
             errors.extend(_serializer_errors(row_number, serializer.errors))
@@ -230,6 +206,33 @@ def import_accounts_csv(upload):
     created = 0
     updated = 0
     with transaction.atomic():
+        # Lock the account set and validate the batch's final state as a whole.
+        # Per-row validation alone can miss two administrators being downgraded
+        # in the same import because each row still sees the other one.
+        existing_users = list(User.objects.select_for_update().all())
+        touched_ids = {
+            instance.pk for instance, _ in operations if instance is not None
+        }
+        remaining_admins = sum(
+            user.pk not in touched_ids
+            and user.is_active
+            and user.role == User.Role.ADMIN
+            for user in existing_users
+        )
+        resulting_admins = remaining_admins
+        for instance, serializer in operations:
+            role = serializer.validated_data.get(
+                "role", instance.role if instance is not None else User.Role.MEMBER,
+            )
+            is_active = serializer.validated_data.get(
+                "is_active", instance.is_active if instance is not None else True,
+            )
+            if role == User.Role.ADMIN and is_active:
+                resulting_admins += 1
+        if resulting_admins < 1:
+            raise AccountImportError(
+                "导入后系统将没有有效的平台管理员，已取消本次导入。"
+            )
         for instance, serializer in operations:
             serializer.save()
             if instance is None:

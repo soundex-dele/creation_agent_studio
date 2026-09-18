@@ -7,16 +7,9 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: string;
+  role: 'admin' | 'auditor' | 'member';
   avatar?: string;
   bio?: string;
-  can_view_agents: boolean;
-  can_create_agents: boolean;
-  can_update_agents: boolean;
-  can_delete_agents: boolean;
-  can_toggle_agents: boolean;
-  can_view_applications: boolean;
-  can_toggle_applications: boolean;
   created_at: string;
 }
 

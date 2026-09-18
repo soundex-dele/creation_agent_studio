@@ -70,6 +70,7 @@ def sync_package(package: DiscoveredPackage, organization: Organization) -> Sync
                 "developer": metadata.developer,
                 "is_public": True,
                 "is_active": True,
+                "visibility": Application.Visibility.ORGANIZATION,
                 "kind": spec.application_kind,
                 "created_by": organization.owner,
             },

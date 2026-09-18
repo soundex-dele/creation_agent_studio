@@ -14,16 +14,10 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'role', 'avatar', 'bio',
-            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
-            'can_toggle_agents', 'can_toggle_applications',
-            'can_view_applications',
-            'created_at',
+            'id', 'username', 'email', 'role', 'avatar', 'bio', 'created_at',
         ]
         read_only_fields = [
-            'id', 'role', 'can_view_agents', 'can_create_agents', 'can_update_agents',
-            'can_delete_agents', 'can_toggle_agents',
-            'can_view_applications', 'can_toggle_applications', 'created_at',
+            'id', 'role', 'created_at',
         ]
 
 
@@ -34,16 +28,10 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'role', 'avatar', 'bio',
-            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
-            'can_toggle_agents', 'can_toggle_applications',
-            'can_view_applications',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'role', 'can_view_agents', 'can_create_agents', 'can_update_agents',
-            'can_delete_agents', 'can_toggle_agents',
-            'can_view_applications', 'can_toggle_applications',
-            'created_at', 'updated_at',
+            'id', 'role', 'created_at', 'updated_at',
         ]
 
 
@@ -98,9 +86,6 @@ class AdminUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'role', 'is_active',
-            'can_view_agents', 'can_create_agents', 'can_update_agents', 'can_delete_agents',
-            'can_toggle_agents', 'can_toggle_applications',
-            'can_view_applications',
             'password', 'password_confirm', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
@@ -112,6 +97,30 @@ class AdminUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'password_confirm': '两次输入的密码不一致',
             })
+        actor = getattr(self.context.get('request'), 'user', None)
+        if self.instance is not None and actor is not None:
+            if self.instance.is_superuser and not actor.is_superuser:
+                raise serializers.ValidationError({
+                    'detail': '只有超级管理员可以修改超级管理员账号。',
+                })
+            role = attrs.get('role', self.instance.role)
+            is_active = attrs.get('is_active', self.instance.is_active)
+            sensitive_change = role != self.instance.role or is_active != self.instance.is_active
+            if actor.pk == self.instance.pk and sensitive_change:
+                raise serializers.ValidationError({
+                    'detail': '不能修改自己的平台角色或登录状态。',
+                })
+            removes_admin = (
+                self.instance.is_active
+                and self.instance.role == User.Role.ADMIN
+                and (not is_active or role != User.Role.ADMIN)
+            )
+            if removes_admin and not User.objects.filter(
+                role=User.Role.ADMIN, is_active=True,
+            ).exclude(pk=self.instance.pk).exists():
+                raise serializers.ValidationError({
+                    'detail': '系统必须至少保留一个有效的平台管理员。',
+                })
         return attrs
 
     def create(self, validated_data):

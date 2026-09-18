@@ -7,9 +7,9 @@ from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 from core.resource_access import (
     accessible_resources,
     can_delete_agents,
+    can_manage_resource_permissions,
     can_toggle_agents,
     can_update_agents,
-    is_platform_admin,
 )
 
 
@@ -17,9 +17,9 @@ def _agent_permissions(agent, request):
     if not request or not request.user.is_authenticated:
         return False, False, False
     return (
-        can_update_agents(request.user),
-        can_delete_agents(request.user),
-        can_toggle_agents(request.user),
+        can_update_agents(request.user, agent),
+        can_delete_agents(request.user, agent),
+        can_toggle_agents(request.user, agent),
     )
 
 
@@ -50,7 +50,7 @@ class AgentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agent
         fields = ['id', 'name', 'slug', 'description', 'icon', 'category_name',
-                  'is_public', 'is_active', 'access_scope', 'can_edit', 'can_delete',
+                  'is_public', 'is_active', 'visibility', 'can_edit', 'can_delete',
                   'can_toggle',
                   'can_manage_permissions', 'created_at']
 
@@ -65,7 +65,7 @@ class AgentListSerializer(serializers.ModelSerializer):
 
     def get_can_manage_permissions(self, obj):
         request = self.context.get('request')
-        return bool(request and is_platform_admin(request.user))
+        return bool(request and can_manage_resource_permissions(obj, request.user))
 
 
 class AgentDetailSerializer(serializers.ModelSerializer):
@@ -91,7 +91,7 @@ class AgentDetailSerializer(serializers.ModelSerializer):
             'system_prompt', 'model_config', 'tool_config',
             'knowledge_config', 'guardrail_config', 'workflow_config',
             'skill_bindings', 'is_public', 'is_active', 'created_by_username',
-            'access_scope', 'can_edit', 'can_delete',
+            'visibility', 'can_edit', 'can_delete',
             'can_toggle',
             'can_manage_permissions', 'created_at', 'updated_at',
         ]
@@ -142,7 +142,7 @@ class AgentDetailSerializer(serializers.ModelSerializer):
 
     def get_can_manage_permissions(self, obj):
         request = self.context.get('request')
-        return bool(request and is_platform_admin(request.user))
+        return bool(request and can_manage_resource_permissions(obj, request.user))
 
 
 class AgentWriteSerializer(serializers.ModelSerializer):

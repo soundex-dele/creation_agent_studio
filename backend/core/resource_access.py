@@ -1,16 +1,48 @@
-"""Shared visibility rules for user-facing applications and agents."""
+"""Tenant, role and resource-level authorization for Agents and Applications."""
 
 from copy import deepcopy
 
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
 
+from apps.enterprise.models import Membership
 from apps.users.models import User
 
 
-ADMIN_SCOPE = "admin"
-RESTRICTED_SCOPE = "restricted"
-ORGANIZATION_SCOPE = "organization"
+PRIVATE_VISIBILITY = "private"
+RESTRICTED_VISIBILITY = "restricted"
+ORGANIZATION_VISIBILITY = "organization"
+
+RESOURCE_ROLE_LEVEL = {
+    "viewer": 10,
+    "user": 20,
+    "operator": 30,
+    "editor": 40,
+}
+
+ORGANIZATION_ROLE_LEVEL = {
+    Membership.Role.VIEWER: 10,
+    Membership.Role.AUDITOR: 20,
+    Membership.Role.OPERATOR: 30,
+    Membership.Role.DEVELOPER: 40,
+    Membership.Role.ADMIN: 50,
+    Membership.Role.OWNER: 60,
+}
+
+OPERATION_RESOURCE_ROLE = {
+    "discover": "viewer",
+    "run": "user",
+    "operate": "operator",
+    "edit": "editor",
+}
+
+OPERATION_ORGANIZATION_ROLE = {
+    "discover": Membership.Role.VIEWER,
+    "run": Membership.Role.VIEWER,
+    "operate": Membership.Role.OPERATOR,
+    "edit": Membership.Role.DEVELOPER,
+}
 
 
 def is_platform_admin(user):
@@ -21,111 +53,197 @@ def is_platform_admin(user):
     )
 
 
-def can_create_agents(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_create_agents
+def is_platform_auditor(user):
+    return bool(
+        user
+        and user.is_authenticated
+        and user.role == User.Role.AUDITOR
     )
 
 
-def can_view_agents(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_view_agents
+def _membership_queryset(user):
+    if not user or not user.is_authenticated:
+        return Membership.objects.none()
+    return Membership.objects.filter(
+        user=user,
+        is_active=True,
+        organization__is_active=True,
     )
 
 
-def can_update_agents(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_update_agents
+def organization_role(user, organization_id):
+    if is_platform_admin(user):
+        return Membership.Role.OWNER
+    if organization_id is None:
+        return None
+    return _membership_queryset(user).filter(
+        organization_id=organization_id,
+    ).values_list("role", flat=True).first()
+
+
+def has_organization_role(user, organization, minimum_role):
+    if is_platform_admin(user):
+        return True
+    organization_id = getattr(organization, "id", organization)
+    role = organization_role(user, organization_id)
+    return (
+        ORGANIZATION_ROLE_LEVEL.get(role, 0)
+        >= ORGANIZATION_ROLE_LEVEL[minimum_role]
     )
 
 
-def can_delete_agents(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_delete_agents
-    )
+def _organization_ids_at_least(user, minimum_role):
+    minimum = ORGANIZATION_ROLE_LEVEL[minimum_role]
+    roles = [
+        role for role, level in ORGANIZATION_ROLE_LEVEL.items()
+        if level >= minimum
+    ]
+    return _membership_queryset(user).filter(
+        role__in=roles,
+    ).values_list("organization_id", flat=True)
 
 
-def can_toggle_agents(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_toggle_agents
-    )
+def _grant_roles_at_least(minimum_role):
+    minimum = RESOURCE_ROLE_LEVEL[minimum_role]
+    return [
+        role for role, level in RESOURCE_ROLE_LEVEL.items()
+        if level >= minimum
+    ]
 
 
-def can_administer_agents(user):
-    return any((
-        can_update_agents(user),
-        can_delete_agents(user),
-        can_toggle_agents(user),
-    ))
+def accessible_resources(queryset, user, *, operation="discover"):
+    """Filter resources by tenant membership, visibility and per-resource grant."""
 
-
-def can_toggle_applications(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_toggle_applications
-    )
-
-
-def can_view_applications(user):
-    return is_platform_admin(user) or bool(
-        user and user.is_authenticated and user.can_view_applications
-    )
-
-
-def can_view_resource_model(model, user):
-    label = model._meta.label_lower
-    if label == "agents.agent":
-        return can_view_agents(user)
-    if label == "applications.application":
-        return can_view_applications(user)
-    return True
-
-
-def accessible_resources(queryset, user):
-    """Return only resources that the user may discover or execute."""
-
+    if operation not in OPERATION_RESOURCE_ROLE:
+        raise ValueError(f"Unsupported resource operation: {operation}")
     if not user or not user.is_authenticated:
         return queryset.none()
     if is_platform_admin(user):
         return queryset
-    organization_ids = user.organization_memberships.filter(
-        is_active=True,
-    ).values_list("organization_id", flat=True)
-    tenant_boundary = Q(organization_id__in=organization_ids) | Q(
-        organization__isnull=True
+
+    memberships = _membership_queryset(user)
+    organization_ids = memberships.values_list("organization_id", flat=True)
+    administrator_ids = _organization_ids_at_least(user, Membership.Role.ADMIN)
+    operation_organization_ids = _organization_ids_at_least(
+        user, OPERATION_ORGANIZATION_ROLE[operation],
     )
-    if can_view_resource_model(queryset.model, user):
-        return queryset.filter(tenant_boundary).distinct()
-    return queryset.filter(
-        tenant_boundary,
-    ).filter(
-        Q(access_scope=RESTRICTED_SCOPE, allowed_users=user)
-        | Q(access_scope=ORGANIZATION_SCOPE)
-    ).distinct()
+    grant_roles = _grant_roles_at_least(OPERATION_RESOURCE_ROLE[operation])
 
-
-def can_access_resource(resource, user):
-    if not user or not user.is_authenticated:
-        return False
-    if is_platform_admin(user):
-        return True
-    if resource.organization_id is not None and not user.organization_memberships.filter(
-        organization_id=resource.organization_id,
-        is_active=True,
-    ).exists():
-        return False
-    if can_view_resource_model(type(resource), user):
-        return True
-    return bool(
-        resource.access_scope == ORGANIZATION_SCOPE
-        or (
-            resource.access_scope == RESTRICTED_SCOPE
-            and resource.allowed_users.filter(pk=user.pk).exists()
+    rule = (
+        Q(created_by=user)
+        | Q(organization_id__in=administrator_ids)
+        | Q(
+            organization_id__in=operation_organization_ids,
+            visibility=ORGANIZATION_VISIBILITY,
+        )
+        | Q(
+            organization_id__in=organization_ids,
+            visibility=RESTRICTED_VISIBILITY,
+            access_grants__user=user,
+            access_grants__role__in=grant_roles,
         )
     )
+    if operation in ("discover", "run"):
+        # Published global catalog entries are available to authenticated users.
+        rule |= Q(
+            organization__isnull=True,
+            is_public=True,
+            visibility=ORGANIZATION_VISIBILITY,
+        )
+        rule |= Q(
+            organization__isnull=True,
+            visibility=RESTRICTED_VISIBILITY,
+            access_grants__user=user,
+            access_grants__role__in=grant_roles,
+        )
+    return queryset.filter(rule).distinct()
+
+
+def can_access_resource(resource, user, *, operation="discover"):
+    if not resource or not user or not user.is_authenticated:
+        return False
+    return accessible_resources(
+        type(resource).objects.filter(pk=resource.pk),
+        user,
+        operation=operation,
+    ).exists()
+
+
+def can_manage_resource_permissions(resource, user):
+    if is_platform_admin(user):
+        return True
+    if resource.created_by_id == getattr(user, "id", None):
+        return True
+    return has_organization_role(
+        user, resource.organization_id, Membership.Role.ADMIN,
+    )
+
+
+def can_create_agents(user, organization=None):
+    if is_platform_admin(user):
+        return True
+    if organization is not None:
+        return has_organization_role(user, organization, Membership.Role.DEVELOPER)
+    return _organization_ids_at_least(
+        user, Membership.Role.DEVELOPER,
+    ).exists()
+
+
+def can_update_agents(user, resource=None, organization=None):
+    if resource is not None:
+        return can_access_resource(resource, user, operation="edit")
+    return can_create_agents(user, organization)
+
+
+def can_delete_agents(user, resource=None, organization=None):
+    if is_platform_admin(user):
+        return True
+    if resource is not None:
+        return bool(
+            resource.created_by_id == getattr(user, "id", None)
+            or has_organization_role(
+                user, resource.organization_id, Membership.Role.ADMIN,
+            )
+        )
+    if organization is not None:
+        return has_organization_role(user, organization, Membership.Role.ADMIN)
+    return _organization_ids_at_least(user, Membership.Role.ADMIN).exists()
+
+
+def can_toggle_agents(user, resource=None, organization=None):
+    if resource is not None:
+        return can_access_resource(resource, user, operation="operate")
+    if organization is not None:
+        return has_organization_role(user, organization, Membership.Role.OPERATOR)
+    return _organization_ids_at_least(user, Membership.Role.OPERATOR).exists()
+
+
+def can_administer_agents(user, organization=None):
+    return any((
+        can_update_agents(user, organization=organization),
+        can_delete_agents(user, organization=organization),
+        can_toggle_agents(user, organization=organization),
+    ))
+
+
+def can_create_applications(user, organization=None):
+    return can_create_agents(user, organization)
+
+
+def can_update_applications(user, resource=None, organization=None):
+    if resource is not None:
+        return can_access_resource(resource, user, operation="edit")
+    return can_create_agents(user, organization)
+
+
+def can_toggle_applications(user, resource=None, organization=None):
+    if resource is not None:
+        return can_access_resource(resource, user, operation="operate")
+    return can_toggle_agents(user, organization=organization)
 
 
 def filter_accessible_agent_bindings(definition, user, organization_id):
-    """Remove Agent bindings that would reveal or execute inaccessible Agents."""
+    """Remove Agent bindings that the caller is not allowed to run."""
 
     from apps.agents.models import Agent
 
@@ -143,6 +261,7 @@ def filter_accessible_agent_bindings(definition, user, organization_id):
             is_active=True,
         ),
         user,
+        operation="run",
     ).values_list("id", flat=True))
     result["agent_bindings"] = [
         binding for binding in bindings
@@ -151,45 +270,103 @@ def filter_accessible_agent_bindings(definition, user, organization_id):
     return result
 
 
+class ResourceGrantSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=tuple(RESOURCE_ROLE_LEVEL))
+
+
+class ResourcePermissionUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True, allow_blank=True)
+
+
 class ResourcePermissionSerializer(serializers.Serializer):
-    access_scope = serializers.ChoiceField(choices=(
-        ADMIN_SCOPE,
-        RESTRICTED_SCOPE,
-        ORGANIZATION_SCOPE,
+    visibility = serializers.ChoiceField(choices=(
+        PRIVATE_VISIBILITY,
+        RESTRICTED_VISIBILITY,
+        ORGANIZATION_VISIBILITY,
     ))
-    allowed_user_ids = serializers.PrimaryKeyRelatedField(
-        source="allowed_users",
-        queryset=User.objects.exclude(username="system").filter(is_active=True),
-        many=True,
-        required=False,
-        default=list,
-    )
+    grants = ResourceGrantSerializer(many=True, required=False, default=list)
+    available_users = ResourcePermissionUserSerializer(many=True, read_only=True)
+
+    def validate_grants(self, grants):
+        instance = self.instance
+        if instance is None:
+            return grants
+        valid_roles = set(RESOURCE_ROLE_LEVEL)
+        seen = set()
+        normalized = []
+        for index, grant in enumerate(grants):
+            user_id = grant.get("user_id")
+            role = grant.get("role", "user")
+            if not isinstance(user_id, int):
+                raise serializers.ValidationError(
+                    f"第 {index + 1} 项缺少有效的 user_id。")
+            if role not in valid_roles:
+                raise serializers.ValidationError(
+                    f"第 {index + 1} 项包含无效角色。")
+            if user_id in seen:
+                raise serializers.ValidationError("同一账号不能重复授权。")
+            seen.add(user_id)
+            normalized.append({"user_id": user_id, "role": role})
+
+        if instance.created_by_id in seen:
+            raise serializers.ValidationError("创建者已隐式拥有全部权限，无需重复授权。")
+        eligible = User.objects.filter(is_active=True).exclude(username="system")
+        if instance.organization_id is not None:
+            eligible = eligible.filter(
+                organization_memberships__organization_id=instance.organization_id,
+                organization_memberships__is_active=True,
+            )
+        eligible_ids = set(eligible.values_list("id", flat=True))
+        invalid = seen - eligible_ids
+        if invalid:
+            raise serializers.ValidationError("只能授权资源所属组织的有效成员。")
+        return normalized
 
     def validate(self, attrs):
-        scope = attrs["access_scope"]
-        allowed_users = attrs.get("allowed_users", [])
-        if scope == RESTRICTED_SCOPE and not allowed_users:
+        if attrs["visibility"] == RESTRICTED_VISIBILITY and not attrs.get("grants"):
             raise serializers.ValidationError({
-                "allowed_user_ids": "请至少选择一个账号。",
+                "grants": "指定账号范围至少需要一条授权。",
             })
-        if scope != RESTRICTED_SCOPE:
-            attrs["allowed_users"] = []
+        if attrs["visibility"] != RESTRICTED_VISIBILITY:
+            attrs["grants"] = []
         return attrs
 
+    @transaction.atomic
     def update(self, instance, validated_data):
-        allowed_users = validated_data.pop("allowed_users", [])
-        instance.access_scope = validated_data["access_scope"]
-        instance.save(update_fields=("access_scope", "updated_at"))
-        instance.allowed_users.set(allowed_users)
+        grants = validated_data.pop("grants", [])
+        instance.visibility = validated_data["visibility"]
+        instance.save(update_fields=("visibility", "updated_at"))
+        instance.access_grants.all().delete()
+        grant_model = instance.access_grants.model
+        parent_field = "agent" if instance._meta.label_lower == "agents.agent" else "application"
+        grant_model.objects.bulk_create([
+            grant_model(**{
+                parent_field: instance,
+                "user_id": grant["user_id"],
+                "role": grant["role"],
+            })
+            for grant in grants
+        ])
         return instance
 
     def create(self, validated_data):  # pragma: no cover - update-only serializer
         raise NotImplementedError
 
     def to_representation(self, instance):
+        eligible = User.objects.filter(is_active=True).exclude(username="system")
+        if instance.organization_id is not None:
+            eligible = eligible.filter(
+                organization_memberships__organization_id=instance.organization_id,
+                organization_memberships__is_active=True,
+            )
+        eligible = eligible.exclude(pk=instance.created_by_id).distinct().order_by("username")
         return {
-            "access_scope": instance.access_scope,
-            "allowed_user_ids": list(
-                instance.allowed_users.order_by("id").values_list("id", flat=True)
-            ),
+            "visibility": instance.visibility,
+            "grants": list(instance.access_grants.order_by("user_id").values(
+                "user_id", "role",
+            )),
+            "available_users": list(eligible.values("id", "username", "email")),
         }

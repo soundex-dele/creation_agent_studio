@@ -13,7 +13,10 @@ from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message, MessageAttachment
-from apps.conversations.views import ConversationViewSet
+from apps.conversations.views import (
+    ConversationViewSet,
+    application_agent_overrides,
+)
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
 from modules.catalog.services import canonical_content_hash
 from modules.execution.application.projections import (
@@ -43,7 +46,7 @@ class DurableConversationRunTest(TestCase):
             is_public=False,
             created_by=self.user,
             organization=self.organization,
-            access_scope=Agent.AccessScope.ORGANIZATION,
+            visibility=Agent.Visibility.ORGANIZATION,
         )
         definition = {"system_prompt": "You are a test agent."}
         revision = AgentRevision.objects.create(
@@ -108,6 +111,29 @@ class DurableConversationRunTest(TestCase):
             serialized = detail.data["messages"][0]["attachments"][0]
             self.assertEqual(serialized["original_name"], "diagram.png")
             self.assertIn("/media/conversations/", serialized["url"])
+
+    @patch("apps.conversations.views.application_definition")
+    def test_application_agent_overrides_use_the_matching_binding(self, definition):
+        definition.return_value = {
+            "agent_bindings": [
+                {
+                    "agent_id": self.agent.id,
+                    "config_overrides": {
+                        "model_config": {"adapter": "codex"},
+                    },
+                },
+            ],
+        }
+        conversation = SimpleNamespace(
+            application_id=1,
+            application=object(),
+        )
+
+        overrides = application_agent_overrides(conversation, self.agent)
+
+        self.assertEqual(overrides, {
+            "model_config": {"adapter": "codex"},
+        })
 
     def test_rejects_invalid_image_content(self):
         response = self.client.post(
@@ -429,7 +455,7 @@ class DurableConversationRunTest(TestCase):
             is_public=False,
             created_by=self.user,
             organization=self.organization,
-            access_scope=Agent.AccessScope.ORGANIZATION,
+            visibility=Agent.Visibility.ORGANIZATION,
         )
         definition = {"system_prompt": "Use the selected agent instructions."}
         draft = AgentDraft.objects.create(

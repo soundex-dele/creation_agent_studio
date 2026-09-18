@@ -204,6 +204,7 @@ class Command(BaseCommand):
                     'created_by': creator,
                     'organization': organization,
                     'is_public': True,
+                    'visibility': Agent.Visibility.ORGANIZATION,
                 }
             )
             draft, _ = AgentDraft.objects.update_or_create(
@@ -382,6 +383,7 @@ class Command(BaseCommand):
                     'created_by': creator,
                     'organization': organization,
                     'is_public': True,
+                    'visibility': Application.Visibility.ORGANIZATION,
                     'kind': kind,
                 }
             )

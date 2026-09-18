@@ -1,64 +1,76 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.agents.models import Agent, AgentCategory
-from apps.applications.models import Application, ApplicationCategory
+from apps.agents.models import Agent, AgentAccessGrant, AgentCategory
+from apps.applications.models import (
+    Application,
+    ApplicationAccessGrant,
+    ApplicationCategory,
+)
 from apps.enterprise.models import Membership, Organization
 from apps.users.models import User
+from core.resource_access import (
+    can_access_resource,
+    can_manage_resource_permissions,
+    can_toggle_applications,
+    can_update_applications,
+)
 
 
 class ResourcePermissionApiTest(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(
-            username="permission-admin",
-            password="secret",
-            role=User.Role.ADMIN,
+        self.platform_admin = User.objects.create_user(
+            username="platform-admin", role=User.Role.ADMIN,
         )
-        self.member = User.objects.create_user(
-            username="permission-member",
-            password="secret",
-        )
-        self.other_member = User.objects.create_user(
-            username="permission-other",
-            password="secret",
-        )
+        self.owner = User.objects.create_user(username="organization-owner")
+        self.creator = User.objects.create_user(username="resource-creator")
+        self.viewer = User.objects.create_user(username="resource-viewer")
+        self.org_admin = User.objects.create_user(username="organization-admin")
+        self.outsider = User.objects.create_user(username="other-organization-user")
         self.organization = Organization.objects.create(
             name="Permission Organization",
             slug="permission-organization",
-            owner=self.admin,
+            owner=self.owner,
+        )
+        for user, role in (
+            (self.owner, Membership.Role.OWNER),
+            (self.creator, Membership.Role.VIEWER),
+            (self.viewer, Membership.Role.VIEWER),
+            (self.org_admin, Membership.Role.ADMIN),
+        ):
+            Membership.objects.create(
+                organization=self.organization, user=user, role=role,
+            )
+        self.other_organization = Organization.objects.create(
+            name="Other Organization",
+            slug="other-permission-organization",
+            owner=self.outsider,
         )
         Membership.objects.create(
-            organization=self.organization,
-            user=self.admin,
+            organization=self.other_organization,
+            user=self.outsider,
             role=Membership.Role.OWNER,
         )
-        Membership.objects.create(
-            organization=self.organization,
-            user=self.member,
-            role=Membership.Role.VIEWER,
-        )
         agent_category = AgentCategory.objects.create(
-            name="Permission Agents",
-            slug="permission-agents",
+            name="Permission Agents", slug="permission-agents",
         )
         application_category = ApplicationCategory.objects.create(
-            name="Permission Applications",
-            slug="permission-applications",
+            name="Permission Applications", slug="permission-applications",
         )
         self.agent = Agent.objects.create(
             category=agent_category,
             name="Permission Agent",
             slug="permission-agent",
-            description="Hidden by default",
-            created_by=self.member,
+            description="Private by default",
+            created_by=self.creator,
             organization=self.organization,
         )
         self.application = Application.objects.create(
             category=application_category,
             name="Permission Application",
             slug="permission-application",
-            description="Hidden by default",
-            created_by=self.member,
+            description="Private by default",
+            created_by=self.creator,
             organization=self.organization,
         )
 
@@ -68,320 +80,116 @@ class ResourcePermissionApiTest(TestCase):
         client.force_authenticate(user)
         return client
 
-    def test_new_resources_are_admin_only_and_hidden_from_regular_users(self):
-        self.assertEqual(self.agent.access_scope, Agent.AccessScope.ADMIN)
-        self.assertEqual(
-            self.application.access_scope,
-            Application.AccessScope.ADMIN,
-        )
+    def test_private_resource_is_visible_to_creator_and_administrators_only(self):
+        self.assertEqual(self.agent.visibility, Agent.Visibility.PRIVATE)
+        detail = f"/api/v1/agents/{self.agent.id}/"
 
-        member_client = self.client_for(self.member)
-        self.assertEqual(
-            member_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            404,
-        )
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/apps/{self.application.slug}/"
-            ).status_code,
-            404,
-        )
+        self.assertEqual(self.client_for(self.creator).get(detail).status_code, 200)
+        self.assertEqual(self.client_for(self.org_admin).get(detail).status_code, 200)
+        self.assertEqual(self.client_for(self.platform_admin).get(detail).status_code, 200)
+        self.assertEqual(self.client_for(self.viewer).get(detail).status_code, 404)
+        self.assertEqual(self.client_for(self.outsider).get(detail).status_code, 404)
 
-        admin_client = self.client_for(self.admin)
-        self.assertEqual(
-            admin_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            200,
-        )
-        self.assertEqual(
-            admin_client.get(
-                f"/api/v1/apps/{self.application.slug}/"
-            ).status_code,
-            200,
-        )
-
-    def test_only_admin_can_update_restricted_access(self):
-        member_client = self.client_for(self.member)
-        denied = member_client.put(
+    def test_creator_can_manage_permissions_despite_viewer_membership(self):
+        response = self.client_for(self.creator).put(
             f"/api/v1/agents/{self.agent.id}/permissions/",
             {
-                "access_scope": "restricted",
-                "allowed_user_ids": [self.member.id],
+                "visibility": "restricted",
+                "grants": [{"user_id": self.viewer.id, "role": "user"}],
             },
             format="json",
         )
-        self.assertEqual(denied.status_code, 403)
 
-        admin_client = self.client_for(self.admin)
-        updated = admin_client.put(
-            f"/api/v1/agents/{self.agent.id}/permissions/",
-            {
-                "access_scope": "restricted",
-                "allowed_user_ids": [self.member.id],
-            },
-            format="json",
-        )
-        self.assertEqual(updated.status_code, 200, updated.data)
-        self.assertEqual(updated.data["allowed_user_ids"], [self.member.id])
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["visibility"], "restricted")
         self.assertEqual(
-            member_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            200,
+            response.data["grants"],
+            [{"user_id": self.viewer.id, "role": "user"}],
         )
-        self.assertEqual(
-            self.client_for(self.other_member).get(
-                f"/api/v1/agents/{self.agent.id}/"
-            ).status_code,
-            404,
+        self.assertTrue(can_manage_resource_permissions(self.agent, self.creator))
+
+    def test_restricted_grant_roles_form_an_operation_ladder(self):
+        self.agent.visibility = Agent.Visibility.RESTRICTED
+        self.agent.save(update_fields=["visibility"])
+        grant = AgentAccessGrant.objects.create(
+            agent=self.agent, user=self.viewer, role=AgentAccessGrant.Role.VIEWER,
         )
 
-    def test_account_view_capability_or_explicit_selection_grants_access(self):
-        member_client = self.client_for(self.member)
-        other_client = self.client_for(self.other_member)
+        self.assertTrue(can_access_resource(self.agent, self.viewer, operation="discover"))
+        self.assertFalse(can_access_resource(self.agent, self.viewer, operation="run"))
+        grant.role = AgentAccessGrant.Role.USER
+        grant.save(update_fields=["role"])
+        self.assertTrue(can_access_resource(self.agent, self.viewer, operation="run"))
+        self.assertFalse(can_access_resource(self.agent, self.viewer, operation="operate"))
+        grant.role = AgentAccessGrant.Role.OPERATOR
+        grant.save(update_fields=["role"])
+        self.assertTrue(can_access_resource(self.agent, self.viewer, operation="operate"))
+        self.assertFalse(can_access_resource(self.agent, self.viewer, operation="edit"))
+        grant.role = AgentAccessGrant.Role.EDITOR
+        grant.save(update_fields=["role"])
+        self.assertTrue(can_access_resource(self.agent, self.viewer, operation="edit"))
 
-        self.assertEqual(
-            member_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            404,
-        )
-        self.member.can_view_agents = True
-        self.member.save(update_fields=["can_view_agents"])
-        self.assertEqual(
-            member_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            200,
-        )
+    def test_grants_are_limited_to_active_members_of_resource_organization(self):
+        url = f"/api/v1/agents/{self.agent.id}/permissions/"
+        invalid = self.client_for(self.creator).put(url, {
+            "visibility": "restricted",
+            "grants": [{"user_id": self.outsider.id, "role": "user"}],
+        }, format="json")
+        duplicate_creator = self.client_for(self.creator).put(url, {
+            "visibility": "restricted",
+            "grants": [{"user_id": self.creator.id, "role": "editor"}],
+        }, format="json")
 
-        self.assertEqual(
-            other_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            404,
-        )
-        self.other_member.can_view_agents = True
-        self.other_member.save(update_fields=["can_view_agents"])
-        self.assertEqual(
-            other_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            404,
-        )
-        self.other_member.can_view_agents = False
-        self.other_member.save(update_fields=["can_view_agents"])
-        Membership.objects.create(
-            organization=self.organization,
-            user=self.other_member,
-            role=Membership.Role.VIEWER,
-        )
-        self.client_for(self.admin).put(
-            f"/api/v1/agents/{self.agent.id}/permissions/",
-            {
-                "access_scope": "restricted",
-                "allowed_user_ids": [self.other_member.id],
-            },
-            format="json",
-        )
-        self.assertEqual(
-            other_client.get(f"/api/v1/agents/{self.agent.id}/").status_code,
-            200,
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn("grants", invalid.data)
+        self.assertEqual(duplicate_creator.status_code, 400)
+        self.assertFalse(self.agent.access_grants.exists())
+
+    def test_permission_response_only_offers_members_of_the_resource_organization(self):
+        response = self.client_for(self.org_admin).get(
+            f"/api/v1/agents/{self.agent.id}/permissions/"
         )
 
-    def test_application_view_capability_grants_access_without_selection(self):
-        member_client = self.client_for(self.member)
+        self.assertEqual(response.status_code, 200, response.data)
+        available_ids = {item["id"] for item in response.data["available_users"]}
+        self.assertIn(self.viewer.id, available_ids)
+        self.assertIn(self.org_admin.id, available_ids)
+        self.assertNotIn(self.creator.id, available_ids)
+        self.assertNotIn(self.outsider.id, available_ids)
 
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/apps/{self.application.slug}/"
-            ).status_code,
-            404,
-        )
-        self.member.can_view_applications = True
-        self.member.save(update_fields=["can_view_applications"])
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/apps/{self.application.slug}/"
-            ).status_code,
-            200,
+    def test_organization_visibility_uses_membership_role_without_cross_tenant_leak(self):
+        self.agent.visibility = Agent.Visibility.ORGANIZATION
+        self.agent.save(update_fields=["visibility"])
+
+        self.assertTrue(can_access_resource(self.agent, self.viewer, operation="run"))
+        self.assertFalse(can_access_resource(self.agent, self.viewer, operation="operate"))
+        self.assertTrue(can_access_resource(self.agent, self.org_admin, operation="edit"))
+        self.assertFalse(can_access_resource(self.agent, self.outsider, operation="discover"))
+
+    def test_application_grants_and_organization_roles_use_the_same_model(self):
+        self.application.visibility = Application.Visibility.RESTRICTED
+        self.application.save(update_fields=["visibility"])
+        grant = ApplicationAccessGrant.objects.create(
+            application=self.application,
+            user=self.viewer,
+            role=ApplicationAccessGrant.Role.OPERATOR,
         )
 
-    def test_organization_scope_and_catalog_detail_use_same_access_rule(self):
-        admin_client = self.client_for(self.admin)
-        updated = admin_client.put(
+        self.assertTrue(can_toggle_applications(self.viewer, self.application))
+        self.assertFalse(can_update_applications(self.viewer, self.application))
+        grant.role = ApplicationAccessGrant.Role.EDITOR
+        grant.save(update_fields=["role"])
+        self.assertTrue(can_update_applications(self.viewer, self.application))
+        self.assertTrue(can_update_applications(self.org_admin, self.application))
+        self.assertTrue(can_update_applications(self.platform_admin, self.application))
+
+    def test_non_manager_cannot_change_permissions(self):
+        self.application.visibility = Application.Visibility.ORGANIZATION
+        self.application.save(update_fields=["visibility"])
+        response = self.client_for(self.viewer).put(
             f"/api/v1/apps/{self.application.slug}/permissions/",
-            {"access_scope": "organization", "allowed_user_ids": []},
+            {"visibility": "organization", "grants": []},
             format="json",
         )
-        self.assertEqual(updated.status_code, 200, updated.data)
 
-        member_client = self.client_for(self.member)
-        headers = {"HTTP_X_ORGANIZATION_ID": str(self.organization.id)}
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/apps/{self.application.slug}/",
-                **headers,
-            ).status_code,
-            200,
-        )
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/organizations/{self.organization.id}/applications/"
-                f"{self.application.id}",
-                **headers,
-            ).status_code,
-            200,
-        )
-
-        self.application.access_scope = Application.AccessScope.ADMIN
-        self.application.save(update_fields=["access_scope"])
-        self.assertEqual(
-            member_client.get(
-                f"/api/v1/organizations/{self.organization.id}/applications/"
-                f"{self.application.id}",
-                **headers,
-            ).status_code,
-            404,
-        )
-
-    def test_admin_can_delegate_agent_create_and_update_separately(self):
-        member_client = self.client_for(self.member)
-        headers = {"HTTP_X_ORGANIZATION_ID": str(self.organization.id)}
-        payload = {
-            "category": self.agent.category_id,
-            "name": "Delegated Agent",
-            "slug": "delegated-agent",
-            "description": "Created through delegated access",
-            "system_prompt": "Help the user.",
-        }
-
-        self.assertEqual(
-            member_client.post(
-                "/api/v1/agents/", payload, format="json", **headers
-            ).status_code,
-            403,
-        )
-        self.member.can_create_agents = True
-        self.member.save(update_fields=["can_create_agents"])
-        created = member_client.post(
-            "/api/v1/agents/", payload, format="json", **headers
-        )
-        self.assertEqual(created.status_code, 201, created.data)
-
-        update_url = f"/api/v1/agents/{created.data['id']}/"
-        self.assertEqual(
-            member_client.patch(
-                update_url,
-                {"description": "Not allowed yet", "system_prompt": "Help."},
-                format="json",
-                **headers,
-            ).status_code,
-            403,
-        )
-        self.member.can_view_agents = True
-        self.member.can_update_agents = True
-        self.member.save(update_fields=["can_view_agents", "can_update_agents"])
-        updated = member_client.patch(
-            update_url,
-            {"description": "Delegated update", "system_prompt": "Help."},
-            format="json",
-            **headers,
-        )
-        self.assertEqual(updated.status_code, 200, updated.data)
-
-    def test_admin_can_delegate_agent_delete_separately(self):
-        member_client = self.client_for(self.member)
-        headers = {"HTTP_X_ORGANIZATION_ID": str(self.organization.id)}
-        delete_url = f"/api/v1/agents/{self.agent.id}/"
-
-        self.assertEqual(member_client.delete(delete_url, **headers).status_code, 403)
-        self.member.can_view_agents = True
-        self.member.can_delete_agents = True
-        self.member.save(update_fields=["can_view_agents", "can_delete_agents"])
-
-        deleted = member_client.delete(delete_url, **headers)
-        self.assertEqual(deleted.status_code, 204, deleted.data)
-        self.assertFalse(Agent.objects.filter(pk=self.agent.pk).exists())
-
-    def test_admin_can_delegate_agent_toggle_separately(self):
-        member_client = self.client_for(self.member)
-        headers = {"HTTP_X_ORGANIZATION_ID": str(self.organization.id)}
-        status_url = f"/api/v1/agents/{self.agent.id}/status/"
-
-        self.assertEqual(
-            member_client.patch(
-                status_url, {"is_active": False}, format="json", **headers
-            ).status_code,
-            403,
-        )
-        self.member.can_view_agents = True
-        self.member.can_toggle_agents = True
-        self.member.save(update_fields=["can_view_agents", "can_toggle_agents"])
-
-        disabled = member_client.patch(
-            status_url, {"is_active": False}, format="json", **headers
-        )
-        self.assertEqual(disabled.status_code, 200, disabled.data)
-        self.assertFalse(disabled.data["is_active"])
-        enabled = member_client.patch(
-            status_url, {"is_active": True}, format="json", **headers
-        )
-        self.assertEqual(enabled.status_code, 200, enabled.data)
-        self.assertTrue(enabled.data["is_active"])
-
-    def test_application_creation_and_update_remain_admin_only(self):
-        member_client = self.client_for(self.member)
-        base_url = f"/api/v1/organizations/{self.organization.id}/applications"
-        payload = {
-            "category_id": self.application.category_id,
-            "name": "Delegated Application",
-            "slug": "delegated-application",
-            "description": "Created through delegated access",
-            "content": {
-                "executor_kind": "media",
-                "executor_key": "delegated-media",
-            },
-        }
-
-        self.assertEqual(
-            member_client.post(base_url, payload, format="json").status_code,
-            403,
-        )
-        self.member.can_view_applications = True
-        self.member.can_toggle_applications = True
-        self.member.save(update_fields=[
-            "can_view_applications", "can_toggle_applications",
-        ])
-        self.assertEqual(
-            member_client.post(base_url, payload, format="json").status_code,
-            403,
-        )
-        draft_url = f"{base_url}/{self.application.id}/draft"
-        self.assertEqual(
-            member_client.put(
-                draft_url,
-                {"expected_version": 1, "content": payload["content"]},
-                format="json",
-            ).status_code,
-            403,
-        )
-
-    def test_admin_can_delegate_application_toggle_only(self):
-        member_client = self.client_for(self.member)
-        status_url = (
-            f"/api/v1/organizations/{self.organization.id}/applications/"
-            f"{self.application.id}"
-        )
-
-        self.assertEqual(
-            member_client.patch(
-                status_url, {"is_active": False}, format="json"
-            ).status_code,
-            403,
-        )
-        self.member.can_toggle_applications = True
-        self.member.save(update_fields=["can_toggle_applications"])
-        selected = self.client_for(self.admin).put(
-            f"/api/v1/apps/{self.application.slug}/permissions/",
-            {
-                "access_scope": "restricted",
-                "allowed_user_ids": [self.member.id],
-            },
-            format="json",
-        )
-        self.assertEqual(selected.status_code, 200, selected.data)
-        disabled = member_client.patch(
-            status_url, {"is_active": False}, format="json"
-        )
-        self.assertEqual(disabled.status_code, 200, disabled.data)
-        self.assertFalse(disabled.data["is_active"])
+        self.assertEqual(response.status_code, 403)

@@ -17,7 +17,7 @@ type Profile = {
   id: string;
   username: string;
   email: string;
-  role: string;
+  role: 'admin' | 'auditor' | 'member';
   avatar?: string;
   bio?: string;
   created_at: string;
@@ -36,7 +36,7 @@ type ApiKey = {
 };
 
 const roleNames: Record<string, string> = {
-  admin: '管理员', professional: '专业用户', member: '成员', viewer: '查看者',
+  admin: '平台管理员', auditor: '平台审计员', member: '普通用户',
 };
 
 const formatDate = (value?: string | null) => value

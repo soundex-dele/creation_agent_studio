@@ -62,7 +62,7 @@ def _chat_step_snapshot(step, organization, actor):
         Q(organization=organization) | Q(organization__isnull=True),
         pk=binding.get("agent_id"),
         is_active=True,
-    ).select_related("draft"), actor).first()
+    ).select_related("draft"), actor, operation="run").first()
     if agent is None:
         raise ValueError(
             f"步骤“{step.name or application.name}”的默认智能体不可用。"
@@ -139,7 +139,7 @@ def build_workflow_step_snapshots(workflow, actor):
         raise ValueError("工作流至少需要一个应用。")
     snapshots = []
     for step in steps:
-        if not can_access_resource(step.application, actor):
+        if not can_access_resource(step.application, actor, operation="run"):
             raise ValueError(
                 f"步骤“{step.name or step.application.name}”的应用当前不可用。"
             )

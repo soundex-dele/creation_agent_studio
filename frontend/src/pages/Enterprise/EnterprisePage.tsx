@@ -10,7 +10,6 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import AgentLifecyclePanel from './AgentLifecyclePanel';
 import ApplicationManagementPanel from './ApplicationManagementPanel';
 import OrganizationGovernancePanel from './OrganizationGovernancePanel';
-import AuthoringAccessPanel from './AuthoringAccessPanel';
 import { useAuthStore } from '@/stores/useAuthStore';
 import './EnterprisePage.css';
 
@@ -18,6 +17,9 @@ type Row = Record<string, any>;
 type Field = { name: string; label: string; kind?: 'text' | 'textarea' | 'number' | 'select' | 'switch' | 'json'; required?: boolean; options?: Array<{ value: string; label?: string }>; initialValue?: any };
 
 const normalize = (value: any): Row[] => Array.isArray(value) ? value : value?.results ?? [];
+const organizationRoleLevel: Record<string, number> = {
+  viewer: 10, auditor: 20, operator: 30, developer: 40, admin: 50, owner: 60,
+};
 const parseJson = (value: any, fallback: any) => {
   if (value === undefined || value === null || value === '') return fallback;
   if (typeof value !== 'string') return value;
@@ -28,7 +30,6 @@ const sections: Record<string, { title: string; endpoint: string; fields?: Field
   organization: { title: '组织治理', endpoint: '' },
   applications: { title: '应用管理', endpoint: '' },
   lifecycle: { title: '智能体管理', endpoint: '' },
-  access: { title: '账号权限', endpoint: '' },
   traces: { title: '运行追踪', endpoint: '/enterprise/traces/', readOnly: true },
   providers: { title: '模型供应商', endpoint: '/enterprise/providers/', fields: [
     { name: 'name', label: '名称', required: true }, { name: 'base_url', label: 'Base URL', required: true },
@@ -72,7 +73,7 @@ function DynamicField({ field }: { field: Field }) {
 }
 
 export default function EnterprisePage() {
-  const isPlatformAdmin = useAuthStore((state) => state.user?.role === 'admin');
+  const isPlatformAuditor = useAuthStore((state) => state.user?.role === 'auditor');
   const {
     organizations, currentOrganizationId, singleTenantMode,
     loadOrganizations, selectOrganization,
@@ -86,6 +87,10 @@ export default function EnterprisePage() {
   const [detail, setDetail] = useState<Row | null>(null);
   const [form] = Form.useForm();
   const section = sections[active];
+  const currentOrg = organizations.find(o => o.id === currentOrganizationId);
+  const currentRoleLevel = organizationRoleLevel[currentOrg?.role ?? ''] ?? 0;
+  const minimumWriteLevel = ['secrets', 'identity'].includes(active) ? 50 : 40;
+  const canWriteSection = currentRoleLevel >= minimumWriteLevel;
 
   const reload = useCallback(async () => {
     if (!currentOrganizationId) return;
@@ -113,11 +118,11 @@ export default function EnterprisePage() {
     ];
     base.push({ title: '操作', fixed: 'right', width: 210, render: (_, row) => <Space wrap>
       <Button size="small" onClick={() => setDetail(row)}>详情</Button>
-      {!section.readOnly && <Button size="small" onClick={() => openEdit(row)}>编辑</Button>}
-      {active === 'connectors' && <Button size="small" onClick={() => invoke(row)}>测试</Button>}
-      {active === 'automations' && <Button size="small" onClick={() => trigger(row)}>触发</Button>}
-      {active === 'evaluations' && <Button size="small" onClick={() => manageEvaluation(row)}>用例</Button>}
-      {!section.readOnly && <Popconfirm title="确认删除该资源？" onConfirm={() => remove(row)}><Button danger size="small">删除</Button></Popconfirm>}
+      {!section.readOnly && canWriteSection && <Button size="small" onClick={() => openEdit(row)}>编辑</Button>}
+      {active === 'connectors' && canWriteSection && <Button size="small" onClick={() => invoke(row)}>测试</Button>}
+      {active === 'automations' && canWriteSection && <Button size="small" onClick={() => trigger(row)}>触发</Button>}
+      {active === 'evaluations' && canWriteSection && <Button size="small" onClick={() => manageEvaluation(row)}>用例</Button>}
+      {!section.readOnly && canWriteSection && <Popconfirm title="确认删除该资源？" onConfirm={() => remove(row)}><Button danger size="small">删除</Button></Popconfirm>}
     </Space> });
     return base;
   })();
@@ -151,15 +156,17 @@ export default function EnterprisePage() {
     </div>, onOk: async () => { if (!name) return; await api.post(`${section.endpoint}${row.id}/cases/`, { name, input: parseJson(input, {}), expected: parseJson(expected, {}) }); message.success('用例已创建'); } });
   };
 
-  const currentOrg = organizations.find(o => o.id === currentOrganizationId);
   return <div className="enterprise-page animate-fade-in">
     <div className="enterprise-hero"><div><h1 className="page-title">控制台</h1><p className="page-subtitle">{singleTenantMode ? '组织治理、运行观测、知识评测与系统集成' : '多组织治理、运行观测、知识评测与系统集成'}</p></div>{singleTenantMode ? <Tag color="blue">{currentOrg?.name || '当前组织'}</Tag> : <Select style={{ width: 280 }} value={currentOrganizationId} onChange={selectOrganization} options={organizations.map(o => ({ value: o.id, label: `${o.name} · ${o.role}` }))} />}</div>
     {!currentOrganizationId && <Alert type="warning" showIcon message="暂无可用组织" description={singleTenantMode ? '默认组织尚未完成初始化。' : '当前账号尚未加入任何组织。'} />}
     <div className="enterprise-grid"><Card><Statistic title="本月 Tokens" value={Number(usage.tokens || 0)} /></Card><Card><Statistic title="Token 配额" value={Number(usage.monthly_token_limit || 0)} /></Card><Card><Statistic title="本月成本" prefix="¥" value={Number(usage.cost || 0)} precision={4} /></Card><Card><Statistic title="成本预算" prefix="¥" value={Number(usage.monthly_cost_limit || 0)} /></Card></div>
     <div className="enterprise-table-card">
-      <Tabs activeKey={active} onChange={setActive} items={Object.entries(sections).filter(([key]) => key !== 'access' || isPlatformAdmin).map(([key, value]) => ({ key, label: value.title }))} />
-      {active === 'organization' && currentOrganizationId ? <OrganizationGovernancePanel organizationId={currentOrganizationId} role={currentOrg?.role} /> : active === 'applications' && currentOrganizationId ? <ApplicationManagementPanel organizationId={currentOrganizationId} /> : active === 'lifecycle' ? <AgentLifecyclePanel /> : active === 'access' && isPlatformAdmin ? <AuthoringAccessPanel /> : <>
-        <div className="enterprise-toolbar"><Typography.Text type="secondary">当前组织：{currentOrg?.name || '—'}</Typography.Text><Space><Button onClick={() => void reload()}>刷新</Button>{section.fields && <Button type="primary" onClick={openCreate}>新建</Button>}</Space></div>
+      <Tabs activeKey={active} onChange={setActive} items={Object.entries(sections).filter(([key]) => (
+        (key !== 'audit' || currentRoleLevel >= 20)
+        && (!isPlatformAuditor || !['applications', 'lifecycle'].includes(key))
+      )).map(([key, value]) => ({ key, label: value.title }))} />
+      {active === 'organization' && currentOrganizationId ? <OrganizationGovernancePanel organizationId={currentOrganizationId} role={currentOrg?.role} /> : active === 'applications' && currentOrganizationId ? <ApplicationManagementPanel organizationId={currentOrganizationId} /> : active === 'lifecycle' ? <AgentLifecyclePanel /> : <>
+        <div className="enterprise-toolbar"><Typography.Text type="secondary">当前组织：{currentOrg?.name || '—'}</Typography.Text><Space><Button onClick={() => void reload()}>刷新</Button>{section.fields && canWriteSection && <Button type="primary" onClick={openCreate}>新建</Button>}</Space></div>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 900 }} locale={{ emptyText: <Empty description="暂无数据" /> }} />
       </>}
     </div>

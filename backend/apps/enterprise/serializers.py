@@ -19,9 +19,16 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         request = self.context.get('request')
+        platform_role = getattr(getattr(request, 'user', None), 'role', None)
+        if platform_role == 'admin':
+            return Membership.Role.OWNER
+        if platform_role == 'auditor':
+            return Membership.Role.AUDITOR
         membership = obj.memberships.filter(user=request.user, is_active=True).first() \
             if request and request.user.is_authenticated else None
-        return membership.role if membership else None
+        if membership:
+            return membership.role
+        return None
 
 
 class MembershipSerializer(serializers.ModelSerializer):

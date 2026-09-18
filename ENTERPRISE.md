@@ -107,6 +107,16 @@ governance, model and secret references, knowledge documents, evaluation cases,
 connector invocation, automation dispatch, identity providers, traces, audit,
 and the agent draft/review/deploy/rollback lifecycle.
 
+Authorization is deliberately split into three layers. Platform identity is
+`admin`, `auditor`, or `member`; organization membership remains the source of
+tenant-scoped RBAC (`owner`, `admin`, `developer`, `operator`, `auditor`,
+`viewer`); and each Agent/Application has `private`, `restricted`, or
+`organization` visibility. Restricted resources grant one of `viewer`, `user`,
+`operator`, or `editor` to active members of the owning organization. Resource
+creators retain implicit full control, organization owners/admins manage grants,
+and platform administrators provide the global break-glass override. Platform
+auditors are cross-organization read-only identities.
+
 ## Verification
 
 ```shell

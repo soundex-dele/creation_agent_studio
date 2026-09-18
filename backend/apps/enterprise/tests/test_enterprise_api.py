@@ -98,6 +98,65 @@ def test_viewer_cannot_create_provider():
     assert response.status_code == 403
 
 
+def test_audit_log_requires_organization_auditor_role():
+    owner = get_user_model().objects.create_user(username='audit-role-owner')
+    viewer = get_user_model().objects.create_user(username='audit-role-viewer')
+    organization = owner.organization_memberships.get().organization
+    Membership.objects.create(
+        organization=organization, user=viewer, role=Membership.Role.VIEWER,
+    )
+    AuditLog.objects.create(
+        organization=organization, actor=owner, action='test.read',
+        resource_type='test', resource_id='1', request_id='audit-role-test',
+        metadata={'method': 'GET', 'path': '/test', 'status_code': 200},
+    )
+
+    denied = authenticated_client(viewer, organization).get(
+        '/api/v1/enterprise/audit-logs/'
+    )
+    membership = Membership.objects.get(organization=organization, user=viewer)
+    membership.role = Membership.Role.AUDITOR
+    membership.save(update_fields=['role'])
+    allowed = authenticated_client(viewer, organization).get(
+        '/api/v1/enterprise/audit-logs/'
+    )
+
+    assert denied.status_code == 403
+    assert allowed.status_code == 200
+
+
+def test_platform_auditor_can_read_all_organizations_but_cannot_mutate_them():
+    first_owner = get_user_model().objects.create_user(username='platform-audit-owner-a')
+    second_owner = get_user_model().objects.create_user(username='platform-audit-owner-b')
+    first = first_owner.organization_memberships.get().organization
+    second = second_owner.organization_memberships.get().organization
+    auditor = get_user_model().objects.create_user(
+        username='platform-auditor', role='auditor',
+    )
+    AuditLog.objects.create(
+        organization=second, actor=second_owner, action='test.read',
+        resource_type='test', resource_id='2', request_id='platform-audit-test',
+        metadata={'method': 'GET', 'path': '/test', 'status_code': 200},
+    )
+    client = authenticated_client(auditor, second)
+
+    context = client.get('/api/v1/enterprise/deployment-context/')
+    logs = client.get('/api/v1/enterprise/audit-logs/')
+    denied = client.patch(
+        f'/api/v1/enterprise/organizations/{first.id}/',
+        {'name': 'Auditor cannot rename'}, format='json',
+    )
+
+    assert context.status_code == 200
+    assert {item['id'] for item in context.data['organizations']} >= {
+        str(first.id), str(second.id),
+    }
+    assert logs.status_code == 200
+    values = logs.data.get('results', logs.data)
+    assert any(item['request_id'] == 'platform-audit-test' for item in values)
+    assert denied.status_code == 403
+
+
 def test_api_key_is_hashed_and_authenticates():
     User = get_user_model()
     user = User.objects.create_user(username='api-user', password='p')

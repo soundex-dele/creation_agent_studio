@@ -57,6 +57,14 @@ INDIRECT_POLICIES = {
         "EXISTS (SELECT 1 FROM templates t WHERE t.id = template_id "
         "AND (t.organization_id = cas_tenant_id() OR t.status = 'published'))"
     ),
+    "agent_access_grants": (
+        "EXISTS (SELECT 1 FROM agents a WHERE a.id = agent_id "
+        "AND a.organization_id = cas_tenant_id())"
+    ),
+    "application_access_grants": (
+        "EXISTS (SELECT 1 FROM applications a WHERE a.id = application_id "
+        "AND a.organization_id = cas_tenant_id())"
+    ),
 }
 
 INDIRECT_WRITES = {
@@ -88,6 +96,10 @@ INDIRECT_WRITES = {
         "EXISTS (SELECT 1 FROM templates t WHERE t.id = template_id "
         "AND t.organization_id = cas_tenant_id())"
     ),
+    "agent_access_grants": INDIRECT_POLICIES["agent_access_grants"],
+    "application_access_grants": INDIRECT_POLICIES[
+        "application_access_grants"
+    ],
 }
 
 
@@ -146,8 +158,8 @@ def disable_product_rls(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("agents", "0006_move_agent_definition_to_catalog"),
-        ("applications", "0006_chat_application_subtype"),
+        ("agents", "0008_compacted_0008_0010"),
+        ("applications", "0006_compacted_0006_0008"),
         ("catalog", "0004_deploy_seeded_general_agent"),
         ("conversations", "0007_chat_application_context"),
         ("projects", "0009_require_project_organization"),

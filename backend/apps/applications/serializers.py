@@ -9,7 +9,8 @@ from modules.catalog.definition import validate_application_definition
 from modules.catalog.models import ApplicationDraft
 from core.resource_access import (
     accessible_resources,
-    is_platform_admin,
+    can_manage_resource_permissions,
+    can_update_applications,
 )
 
 from .models import Application, ApplicationCategory, ChatApplication, Skill
@@ -265,14 +266,14 @@ class ApplicationListSerializer(serializers.ModelSerializer):
 
     def get_can_manage_permissions(self, obj):
         request = self.context.get('request')
-        return bool(request and is_platform_admin(request.user))
+        return bool(request and can_manage_resource_permissions(obj, request.user))
 
     class Meta:
         model = Application
         fields = [
             'id', 'slug', 'name', 'description', 'icon', 'color', 'tags',
             'developer', 'category_name', 'category_slug', 'usage_count', 'kind',
-            'renderer_key', 'access_scope', 'can_manage_permissions',
+            'renderer_key', 'visibility', 'can_manage_permissions',
         ]
 
 
@@ -285,16 +286,16 @@ class ApplicationDetailSerializer(ApplicationRuntimeSerializer):
 
     def get_can_edit(self, obj):
         request = self.context.get('request')
-        return bool(request and is_platform_admin(request.user))
+        return bool(request and can_update_applications(request.user, obj))
 
     def get_can_manage_permissions(self, obj):
         request = self.context.get('request')
-        return bool(request and is_platform_admin(request.user))
+        return bool(request and can_manage_resource_permissions(obj, request.user))
 
     class Meta(ApplicationRuntimeSerializer.Meta):
         fields = ApplicationRuntimeSerializer.Meta.fields + [
             'tags', 'developer', 'screenshots', 'category', 'usage_count',
-            'is_public', 'access_scope', 'created_by_username', 'can_edit',
+            'is_public', 'visibility', 'created_by_username', 'can_edit',
             'can_manage_permissions',
         ]
 

@@ -14,7 +14,7 @@ import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/useAuthStore';
 import './AccountManagementPage.css';
 
-type AccountRole = 'admin' | 'professional' | 'member' | 'viewer';
+type AccountRole = 'admin' | 'auditor' | 'member';
 
 interface Account {
   id: string;
@@ -22,13 +22,6 @@ interface Account {
   email: string;
   role: AccountRole;
   is_active: boolean;
-  can_view_agents: boolean;
-  can_create_agents: boolean;
-  can_update_agents: boolean;
-  can_delete_agents: boolean;
-  can_toggle_agents: boolean;
-  can_view_applications: boolean;
-  can_toggle_applications: boolean;
   created_at: string;
 }
 
@@ -46,25 +39,9 @@ interface CreateAccountValues {
   password_confirm: string;
 }
 
-type Capability =
-  | 'can_view_agents'
-  | 'can_create_agents'
-  | 'can_update_agents'
-  | 'can_delete_agents'
-  | 'can_toggle_agents'
-  | 'can_view_applications'
-  | 'can_toggle_applications';
-
 interface AccountPermissionValues {
   role: AccountRole;
   is_active: boolean;
-  can_view_agents: boolean;
-  can_create_agents: boolean;
-  can_update_agents: boolean;
-  can_delete_agents: boolean;
-  can_toggle_agents: boolean;
-  can_view_applications: boolean;
-  can_toggle_applications: boolean;
 }
 
 interface AccountImportResult {
@@ -80,38 +57,20 @@ interface AccountImportError {
 }
 
 const roleOptions = [
-  { value: 'member', label: '成员' },
-  { value: 'professional', label: '专业用户' },
-  { value: 'viewer', label: '查看者' },
-  { value: 'admin', label: '管理员' },
+  { value: 'member', label: '普通用户' },
+  { value: 'auditor', label: '平台审计员' },
+  { value: 'admin', label: '平台管理员' },
 ] satisfies Array<{ value: AccountRole; label: string }>;
 
 const rolePresentation: Record<AccountRole, { label: string; color: string }> = {
-  admin: { label: '管理员', color: 'red' },
-  professional: { label: '专业用户', color: 'purple' },
-  member: { label: '成员', color: 'blue' },
-  viewer: { label: '查看者', color: 'default' },
+  admin: { label: '平台管理员', color: 'red' },
+  auditor: { label: '平台审计员', color: 'purple' },
+  member: { label: '普通用户', color: 'blue' },
 };
 
 const fieldNames = new Set<keyof CreateAccountValues>([
   'username', 'email', 'role', 'is_active', 'password', 'password_confirm',
 ]);
-
-const capabilityOptions: Array<{
-  name: Capability;
-  label: string;
-  description: string;
-}> = [
-  { name: 'can_view_agents', label: '查看智能体', description: '可查看组织内全部智能体，不受单个资源授权限制。' },
-  { name: 'can_create_agents', label: '创建智能体', description: '可新建智能体。' },
-  { name: 'can_update_agents', label: '修改智能体', description: '可修改智能体配置和版本内容。' },
-  { name: 'can_delete_agents', label: '删除智能体', description: '可删除未被应用引用的智能体。' },
-  { name: 'can_toggle_agents', label: '启停智能体', description: '可启停、激活版本和回滚智能体。' },
-  { name: 'can_view_applications', label: '查看应用', description: '可查看组织内全部应用，不受单个资源授权限制。' },
-  { name: 'can_toggle_applications', label: '启停应用', description: '可启用或停用应用。' },
-];
-
-const capabilityKeys = capabilityOptions.map((item) => item.name);
 
 export default function AccountManagementPage() {
   const navigate = useNavigate();
@@ -119,7 +78,6 @@ export default function AccountManagementPage() {
   const canManageAccounts = user?.role === 'admin';
   const [form] = Form.useForm<CreateAccountValues>();
   const [permissionForm] = Form.useForm<AccountPermissionValues>();
-  const permissionRole = Form.useWatch('role', permissionForm);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -203,8 +161,7 @@ export default function AccountManagementPage() {
             permissionForm.setFieldsValue({
               role: account.role,
               is_active: account.is_active,
-              ...Object.fromEntries(capabilityKeys.map((key) => [key, account[key]])),
-            } as AccountPermissionValues);
+            });
           }}
         >
           权限设置
@@ -485,10 +442,8 @@ export default function AccountManagementPage() {
         <Alert
           type="info"
           showIcon
-          message={permissionRole === 'admin' ? '管理员默认拥有全部权限' : '账号权限与资源单独授权采用“或”关系'}
-          description={permissionRole === 'admin'
-            ? '管理员无需开启下方能力开关即可管理全部智能体和应用。'
-            : '查看能力可访问对应类型的全部资源；未开通时，仍可访问管理员单独授权的智能体或应用。'}
+          message="这里只设置平台身份"
+          description="组织内的管理能力由组织成员角色决定；单个智能体和应用的访问能力由资源权限设置决定。平台管理员拥有全局覆盖权限，平台审计员仅用于平台级审计。"
         />
         <Form<AccountPermissionValues>
           form={permissionForm}
@@ -510,19 +465,6 @@ export default function AccountManagementPage() {
                 disabled={permissionAccount?.id === user?.id}
               />
             </Form.Item>
-          </div>
-          <div className="account-capability-list">
-            {capabilityOptions.map((item) => (
-              <div className="account-capability-row" key={item.name}>
-                <div>
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </div>
-                <Form.Item name={item.name} valuePropName="checked" noStyle>
-                  <Switch disabled={permissionRole === 'admin'} />
-                </Form.Item>
-              </div>
-            ))}
           </div>
         </Form>
       </Modal>

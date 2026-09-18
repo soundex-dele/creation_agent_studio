@@ -136,12 +136,22 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='application',
-            name='access_scope',
-            field=models.CharField(choices=[('admin', '仅管理员'), ('restricted', '指定账号'), ('organization', '组织内全部账号')], db_index=True, default='admin', max_length=20),
+            name='visibility',
+            field=models.CharField(choices=[('private', '仅创建者'), ('restricted', '指定账号'), ('organization', '组织内全部账号')], db_index=True, default='private', max_length=20),
         ),
-        migrations.AddField(
-            model_name='application',
-            name='allowed_users',
-            field=models.ManyToManyField(blank=True, related_name='allowed_applications', to=settings.AUTH_USER_MODEL),
+        migrations.CreateModel(
+            name='ApplicationAccessGrant',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('role', models.CharField(choices=[('viewer', '查看者'), ('user', '使用者'), ('operator', '运维者'), ('editor', '编辑者')], default='user', max_length=20)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('application', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='access_grants', to='applications.application')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='application_access_grants', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'db_table': 'application_access_grants',
+                'constraints': [models.UniqueConstraint(fields=('application', 'user'), name='unique_application_access_grant')],
+            },
         ),
     ]

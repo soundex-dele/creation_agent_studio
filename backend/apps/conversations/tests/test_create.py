@@ -26,7 +26,7 @@ class CreateConversationTest(TestCase):
             description='写脚本',
             category=self.category,
             created_by=self.user,
-            access_scope=Agent.AccessScope.ORGANIZATION,
+            visibility=Agent.Visibility.ORGANIZATION,
         )
 
     def test_create_without_agent_id_leaves_agent_unbound(self):
@@ -103,7 +103,7 @@ class CreateConversationTest(TestCase):
             description='规划任务',
             category=self.category,
             created_by=self.user,
-            access_scope=Agent.AccessScope.ORGANIZATION,
+            visibility=Agent.Visibility.ORGANIZATION,
             organization=organization,
             kind=Agent.Kind.SUPERVISOR,
             is_public=False,

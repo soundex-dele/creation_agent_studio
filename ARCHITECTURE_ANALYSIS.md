@@ -166,7 +166,11 @@ Conversation Store 复用 `entities/run` 的 sequencer、reducer 和 snapshot �
 ## 5. 权限与隔离
 
 - 组织路径、资源 Organization 和 Membership 必须一致。
-- Application、Agent、Skill 的写操作校验组织角色；删除要求 Owner/Admin。
+- 权限按平台身份、组织 Membership、逐资源授权三层判定，不再使用 User `can_*` 开关。
+- 平台身份仅包含 Admin/Auditor/Member；Admin 全局覆盖，Auditor 跨组织只读，Member 的业务能力来自组织与资源层。
+- 组织角色为 Owner/Admin/Developer/Operator/Auditor/Viewer；Agent/Application 的逐资源角色为 Editor/Operator/User/Viewer。
+- Agent/Application 可见范围统一为 Private/Restricted/Organization。创建者隐式拥有完整权限，Owner/Admin 可管理授权，Restricted 只能授权同组织有效成员。
+- Application、Agent 的创建要求 Developer 及以上，运维要求 Operator 及以上，编辑要求 Developer/Editor，删除仅允许创建者、组织 Owner/Admin 或平台 Admin。
 - PostgreSQL Catalog 和 Execution 租户表启用并强制 RLS。
 - Agent、Application、Skill、Project、Conversation、Workflow、Template 及其租户子表也启用并强制 RLS；全局/已发布内容只允许跨租户读取，写策略仍严格限制为当前租户。Project 的 Organization 已改为必填，迁移会为历史记录回填工作区。
 - Scheduler、HTTP 请求与 Execution Worker 在访问上述表前均设置数据库租户上下文。

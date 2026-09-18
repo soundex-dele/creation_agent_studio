@@ -114,7 +114,7 @@ class AdminUserImportView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            result = import_accounts_csv(request.FILES.get('file'))
+            result = import_accounts_csv(request.FILES.get('file'), request=request)
         except AccountImportError as exc:
             return Response(
                 {'detail': exc.detail, 'errors': exc.errors},
@@ -200,7 +200,7 @@ def license_login_view(request):
             defaults={
                 'email': f'licensed-{username_suffix}@local.invalid',
                 'first_name': str(payload.get('customer') or '')[:150],
-                'role': User.Role.PROFESSIONAL,
+                'role': User.Role.MEMBER,
                 'is_active': True,
             },
         )
@@ -209,7 +209,7 @@ def license_login_view(request):
                             status=status.HTTP_403_FORBIDDEN)
         user.set_unusable_password()
         user.first_name = str(payload.get('customer') or '')[:150]
-        user.role = User.Role.PROFESSIONAL
+        user.role = User.Role.MEMBER
         user.save(update_fields=['password', 'first_name', 'role', 'updated_at'])
 
         from apps.enterprise.models import Membership

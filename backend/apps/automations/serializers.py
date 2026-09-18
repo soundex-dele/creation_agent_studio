@@ -82,7 +82,7 @@ class AutomationWriteSerializer(serializers.ModelSerializer):
                     Q(organization=organization) | Q(organization__isnull=True),
                     pk=target_id,
                     is_active=True,
-                ), self.context["request"].user).first()
+                ), self.context["request"].user, operation="run").first()
             except (TypeError, ValueError):
                 target = None
             if target is None:

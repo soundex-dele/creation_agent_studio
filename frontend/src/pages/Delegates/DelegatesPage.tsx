@@ -15,9 +15,11 @@ const instanceTime = (value: string) => new Intl.DateTimeFormat('zh-CN', {
 
 const DelegatesPage = () => {
   const navigate = useNavigate();
-  const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
+  const { organizations, currentOrganizationId: organizationId } = useOrganizationStore();
   const user = useAuthStore((state) => state.user);
-  const canCreateAgent = user?.role === 'admin' || Boolean(user?.can_create_agents);
+  const currentRole = organizations.find((item) => item.id === organizationId)?.role;
+  const canCreateAgent = user?.role === 'admin'
+    || ['owner', 'admin', 'developer'].includes(currentRole ?? '');
   const [items, setItems] = useState<Delegate[]>([]);
   const [instances, setInstances] = useState<DelegateInstance[]>([]);
   const [loading, setLoading] = useState(true);

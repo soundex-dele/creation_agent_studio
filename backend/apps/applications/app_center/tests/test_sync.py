@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
@@ -26,6 +29,10 @@ CHAT_SKILL_APPS = {
     "wechat-viral-topics": {
         "skill_slug": "wechat-viral-article",
     },
+    "tool-share-topic-expert": {
+        "skill_slug": "tool-share-topic-planner",
+        "agent_config_overrides": {"model_config": {"adapter": "codex"}},
+    },
 }
 
 
@@ -46,14 +53,14 @@ def test_sync_installs_all_packages_and_activates_deployments():
         "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
         "creation-master", "gzh-design", "html-cover-generator",
         "newmedia-workbench", "wechat-html-optimizer", "wechat-viral-article",
-        "wechat-viral-topics",
+        "wechat-viral-topics", "tool-share-topic-expert",
     }
     for application in applications.filter(
         slug__in=(
             "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
             "creation-master", "gzh-design", "html-cover-generator",
             "newmedia-workbench", "wechat-html-optimizer", "wechat-viral-article",
-            "wechat-viral-topics",
+            "wechat-viral-topics", "tool-share-topic-expert",
         )
     ):
         assert application.revisions.count() == 1
@@ -81,7 +88,7 @@ def test_sync_installs_all_packages_and_activates_deployments():
             "agent_id": agent.id,
             "label": agent.name,
             "is_default": True,
-            "config_overrides": {},
+            "config_overrides": expected.get("agent_config_overrides", {}),
             "order": 0,
         }]
         assert definition["skill_bindings"] == [{
@@ -92,12 +99,23 @@ def test_sync_installs_all_packages_and_activates_deployments():
         }]
         assert "pending-" not in str(definition)
 
+        if application_slug == "tool-share-topic-expert":
+            assert Path(skill.source_uri) == (
+                Path(settings.CODEX_SKILLS_DIRECTORY).expanduser().resolve()
+                / "tool-share-topic-planner"
+                / "SKILL.md"
+            )
+
     agent_draft = AgentDraft.objects.get(agent=content_agent)
     assert "必须使用应用绑定的必需 Skill" in agent_draft.content["system_prompt"]
     assert Agent.objects.filter(
         organization=organization,
         slug="content-creation-expert",
     ).count() == 1
+    assert not Agent.objects.filter(
+        organization=organization,
+        slug="tool-share-topic-expert",
+    ).exists()
 
     assert not Agent.objects.filter(
         organization=organization,

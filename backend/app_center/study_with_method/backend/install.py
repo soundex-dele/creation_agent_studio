@@ -120,6 +120,7 @@ def _provision_tutor(organization):
             "created_by": organization.owner,
             "is_public": False,
             "is_active": True,
+            "visibility": Agent.Visibility.ORGANIZATION,
         },
     )
     content = {
@@ -179,6 +180,7 @@ def _provision_subject_tutors(organization):
                 "created_by": organization.owner,
                 "is_public": False,
                 "is_active": True,
+                "visibility": Agent.Visibility.ORGANIZATION,
             },
         )
         content = {

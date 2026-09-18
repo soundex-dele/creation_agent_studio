@@ -7,6 +7,7 @@ from django.db.models import OuterRef, Q, Subquery
 from django.db.models.deletion import ProtectedError
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from .models import AgentCategory, Agent
 from modules.catalog.errors import (
     DeploymentRollbackUnavailable, DeploymentVersionConflict,
@@ -44,6 +45,8 @@ from core.permissions import (
 from core.resource_access import (
     ResourcePermissionSerializer,
     accessible_resources,
+    can_create_agents,
+    can_manage_resource_permissions,
     is_platform_admin,
     can_administer_agents,
     can_delete_agents,
@@ -73,7 +76,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == 'permissions':
-            return [IsAdmin()]
+            return [IsAuthenticated()]
         if self.action == 'create':
             return [CanCreateAgent()]
         if self.action in ('update', 'partial_update') or (
@@ -134,12 +137,24 @@ class AgentViewSet(viewsets.ModelViewSet):
             return queryset.filter(organization=resolve_organization(self.request))
         return queryset
 
+    @swagger_auto_schema(
+        method='get', responses={200: ResourcePermissionSerializer()},
+    )
+    @swagger_auto_schema(
+        method='put', request_body=ResourcePermissionSerializer,
+        responses={200: ResourcePermissionSerializer()},
+    )
     @action(detail=True, methods=['get', 'put'], url_path='permissions')
     def permissions(self, request, pk=None):
         agent = self.get_object()
+        if not can_manage_resource_permissions(agent, request.user):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('无权管理该智能体的访问权限。')
         if request.method == 'GET':
-            return Response(ResourcePermissionSerializer(agent).data)
-        serializer = ResourcePermissionSerializer(agent, data=request.data)
+            return Response(ResourcePermissionSerializer(
+                agent, context={'request': request}).data)
+        serializer = ResourcePermissionSerializer(
+            agent, data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -151,6 +166,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         if not organization or not membership:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('需要有效的组织成员资格才能创建智能体。')
+        if not can_create_agents(self.request.user, organization):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('需要组织开发者或更高角色才能创建智能体。')
         with transaction.atomic():
             agent = serializer.save(
                 created_by=self.request.user,
@@ -231,14 +249,7 @@ class AgentViewSet(viewsets.ModelViewSet):
             )
 
     def require_agent_capability(self, request, agent, capability, message):
-        if request.user.is_superuser:
-            return
-        from apps.enterprise.models import Membership
-        membership = Membership.objects.filter(
-            organization=agent.organization, user=request.user,
-            is_active=True,
-        ).first()
-        if membership is None or not capability(request.user):
+        if not capability(request.user, agent):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied(message)
 
@@ -248,7 +259,10 @@ class AgentViewSet(viewsets.ModelViewSet):
         self.require_agent_capability(
             request,
             agent,
-            lambda user: can_update_agents(user) or can_toggle_agents(user),
+            lambda user, resource: (
+                can_update_agents(user, resource)
+                or can_toggle_agents(user, resource)
+            ),
             '无权查看该智能体的部署信息。',
         )
         deployment = AgentDeployment.objects.filter(agent=agent).first()
@@ -262,7 +276,10 @@ class AgentViewSet(viewsets.ModelViewSet):
         self.require_agent_capability(
             request,
             agent,
-            lambda user: can_update_agents(user) or can_toggle_agents(user),
+            lambda user, resource: (
+                can_update_agents(user, resource)
+                or can_toggle_agents(user, resource)
+            ),
             '无权查看该智能体的版本。',
         )
         if request.method == 'GET':

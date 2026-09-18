@@ -131,7 +131,7 @@ class AdminAccountManagementTest(TestCase):
         response = self.client.post('/api/v1/auth/admin/users/', {
             'username': 'provisioned-user',
             'email': 'provisioned@example.com',
-            'role': User.Role.PROFESSIONAL,
+            'role': User.Role.AUDITOR,
             'is_active': True,
             'password': 'A-safe-password-123!',
             'password_confirm': 'A-safe-password-123!',
@@ -140,7 +140,7 @@ class AdminAccountManagementTest(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         created = User.objects.get(username='provisioned-user')
         self.assertTrue(created.check_password('A-safe-password-123!'))
-        self.assertEqual(created.role, User.Role.PROFESSIONAL)
+        self.assertEqual(created.role, User.Role.AUDITOR)
         self.assertNotIn('password', response.data)
 
     def test_non_admin_cannot_list_or_create_accounts(self):
@@ -173,43 +173,32 @@ class AdminAccountManagementTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('password_confirm', response.data)
 
-    def test_admin_can_delegate_account_capabilities(self):
+    def test_admin_can_assign_platform_role(self):
         self.client.force_authenticate(self.administrator)
 
         response = self.client.patch(
             f'/api/v1/auth/admin/users/{self.member.id}/',
-            {
-                'can_view_agents': True,
-                'can_create_agents': True,
-                'can_delete_agents': True,
-                'can_view_applications': True,
-                'can_toggle_applications': True,
-            },
+            {'role': User.Role.AUDITOR},
             format='json',
         )
 
         self.assertEqual(response.status_code, 200, response.data)
         self.member.refresh_from_db()
-        self.assertTrue(self.member.can_view_agents)
-        self.assertTrue(self.member.can_create_agents)
-        self.assertTrue(self.member.can_delete_agents)
-        self.assertTrue(self.member.can_view_applications)
-        self.assertTrue(self.member.can_toggle_applications)
-        self.assertFalse(self.member.can_update_agents)
-        self.assertFalse(self.member.can_toggle_agents)
+        self.assertEqual(self.member.role, User.Role.AUDITOR)
+        self.assertNotIn('can_create_agents', response.data)
 
-    def test_non_admin_cannot_delegate_account_capabilities(self):
+    def test_non_admin_cannot_assign_platform_role(self):
         self.client.force_authenticate(self.member)
 
         response = self.client.patch(
             f'/api/v1/auth/admin/users/{self.member.id}/',
-            {'can_create_agents': True},
+            {'role': User.Role.AUDITOR},
             format='json',
         )
 
         self.assertEqual(response.status_code, 403)
         self.member.refresh_from_db()
-        self.assertFalse(self.member.can_create_agents)
+        self.assertEqual(self.member.role, User.Role.MEMBER)
 
     def upload_csv(self, content):
         return self.client.post(
@@ -219,12 +208,7 @@ class AdminAccountManagementTest(TestCase):
             format='multipart',
         )
 
-    def test_admin_can_export_accounts_and_capabilities_without_passwords(self):
-        self.member.can_view_agents = True
-        self.member.can_toggle_applications = True
-        self.member.save(update_fields=[
-            'can_view_agents', 'can_toggle_applications',
-        ])
+    def test_admin_can_export_accounts_without_passwords_or_capabilities(self):
         self.client.force_authenticate(self.administrator)
 
         response = self.client.get('/api/v1/auth/admin/users/export/')
@@ -233,27 +217,83 @@ class AdminAccountManagementTest(TestCase):
         self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
         content = response.content.decode('utf-8-sig')
         self.assertIn('用户名,邮箱,角色,允许登录,初始密码', content)
-        self.assertIn('ordinary-member,member@example.com,member,是,,是', content)
+        self.assertIn('ordinary-member,member@example.com,member,是,', content)
+        self.assertNotIn('查看智能体', content)
         self.assertNotIn('safe-test-password', content)
 
-    def test_admin_can_import_new_accounts_and_update_existing_permissions(self):
+    def test_admin_can_import_new_accounts_and_update_existing_roles(self):
         self.client.force_authenticate(self.administrator)
         response = self.upload_csv(
-            '用户名,邮箱,角色,允许登录,初始密码,查看智能体,创建智能体,查看应用\n'
-            'ordinary-member,changed@example.com,专业用户,是,,是,否,是\n'
-            'imported-user,imported@example.com,member,是,A-safe-password-123!,否,是,是\n'
+            '用户名,邮箱,角色,允许登录,初始密码\n'
+            'ordinary-member,changed@example.com,平台审计员,是,\n'
+            'imported-user,imported@example.com,member,是,A-safe-password-123!\n'
         )
 
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data, {'total': 2, 'created': 1, 'updated': 1})
         self.member.refresh_from_db()
         self.assertEqual(self.member.email, 'changed@example.com')
-        self.assertEqual(self.member.role, User.Role.PROFESSIONAL)
-        self.assertTrue(self.member.can_view_agents)
-        self.assertTrue(self.member.can_view_applications)
+        self.assertEqual(self.member.role, User.Role.AUDITOR)
         imported = User.objects.get(username='imported-user')
         self.assertTrue(imported.check_password('A-safe-password-123!'))
-        self.assertTrue(imported.can_create_agents)
+
+    def test_last_platform_admin_cannot_be_downgraded_or_disabled(self):
+        second_admin = User.objects.create_user(
+            username='second-admin', role=User.Role.ADMIN,
+        )
+        actor = User.objects.create_superuser(username='root-operator')
+        actor.role = User.Role.AUDITOR
+        actor.save(update_fields=['role'])
+        self.client.force_authenticate(actor)
+
+        downgraded = self.client.patch(
+            f'/api/v1/auth/admin/users/{self.administrator.id}/',
+            {'role': User.Role.MEMBER}, format='json',
+        )
+        self.assertEqual(downgraded.status_code, 200, downgraded.data)
+        disabled_last = self.client.patch(
+            f'/api/v1/auth/admin/users/{second_admin.id}/',
+            {'is_active': False}, format='json',
+        )
+
+        self.assertEqual(disabled_last.status_code, 400)
+        second_admin.refresh_from_db()
+        self.assertTrue(second_admin.is_active)
+
+    def test_admin_cannot_change_own_platform_role_or_login_status(self):
+        self.client.force_authenticate(self.administrator)
+
+        response = self.client.patch(
+            f'/api/v1/auth/admin/users/{self.administrator.id}/',
+            {'role': User.Role.AUDITOR, 'is_active': False}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.administrator.refresh_from_db()
+        self.assertEqual(self.administrator.role, User.Role.ADMIN)
+        self.assertTrue(self.administrator.is_active)
+
+    def test_csv_import_cannot_downgrade_all_platform_admins_in_one_batch(self):
+        second_admin = User.objects.create_user(
+            username='batch-admin', email='batch@example.com',
+            role=User.Role.ADMIN,
+        )
+        actor = User.objects.create_superuser(username='root-import')
+        actor.role = User.Role.AUDITOR
+        actor.save(update_fields=['role'])
+        self.client.force_authenticate(actor)
+        response = self.upload_csv(
+            'username,email,role,is_active,password\n'
+            'account-admin,account-admin@example.com,member,true,\n'
+            'batch-admin,batch@example.com,auditor,true,\n'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('平台管理员', response.data['detail'])
+        self.administrator.refresh_from_db()
+        second_admin.refresh_from_db()
+        self.assertEqual(self.administrator.role, User.Role.ADMIN)
+        self.assertEqual(second_admin.role, User.Role.ADMIN)
 
     def test_invalid_import_is_atomic_and_reports_row_errors(self):
         self.client.force_authenticate(self.administrator)
@@ -306,26 +346,14 @@ class ProfileAndApiKeyTest(TestCase):
         self.assertEqual(updated.data['email'], 'after@example.com')
         self.assertEqual(updated.data['bio'], '团队成员')
 
-    def test_profile_cannot_grant_its_own_account_capabilities(self):
+    def test_profile_cannot_change_its_own_platform_role(self):
         updated = self.client.patch('/api/v1/auth/me/', {
-            'can_view_agents': True,
-            'can_create_agents': True,
-            'can_update_agents': True,
-            'can_delete_agents': True,
-            'can_toggle_agents': True,
-            'can_view_applications': True,
-            'can_toggle_applications': True,
+            'role': User.Role.ADMIN,
         }, format='json')
 
         self.assertEqual(updated.status_code, 200, updated.data)
         self.user.refresh_from_db()
-        self.assertFalse(self.user.can_view_agents)
-        self.assertFalse(self.user.can_create_agents)
-        self.assertFalse(self.user.can_update_agents)
-        self.assertFalse(self.user.can_delete_agents)
-        self.assertFalse(self.user.can_toggle_agents)
-        self.assertFalse(self.user.can_view_applications)
-        self.assertFalse(self.user.can_toggle_applications)
+        self.assertEqual(self.user.role, User.Role.MEMBER)
 
     def test_password_change_checks_current_password(self):
         rejected = self.client.put('/api/v1/auth/me/change-password/', {

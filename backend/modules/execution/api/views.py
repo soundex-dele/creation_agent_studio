@@ -167,7 +167,8 @@ def _can_access_run(request, run):
         return True
     if request.user.is_superuser or root.owner_id == request.user.id:
         return True
-    from apps.agents.models import Agent, SupervisorProfile
+    from apps.agents.models import Agent
+    from core.resource_access import can_access_resource
 
     supervisor = Agent.objects.select_related("supervisor_profile").filter(
         pk=root.source_id,
@@ -176,20 +177,7 @@ def _can_access_run(request, run):
     ).first()
     if supervisor is None:
         return False
-    if supervisor.created_by_id == request.user.id:
-        return True
-    membership = Membership.objects.filter(
-        organization_id=root.organization_id,
-        user=request.user,
-        is_active=True,
-    ).first()
-    if membership and membership.role in (Membership.Role.OWNER, Membership.Role.ADMIN):
-        return True
-    return bool(
-        membership
-        and supervisor.supervisor_profile.visibility
-        == SupervisorProfile.Visibility.ORGANIZATION
-    )
+    return can_access_resource(supervisor, request.user, operation="run")
 
 
 class OrganizationRunView(ProblemDetailsAPIView):

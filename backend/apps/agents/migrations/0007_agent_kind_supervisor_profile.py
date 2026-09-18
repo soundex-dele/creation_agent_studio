@@ -29,15 +29,6 @@ class Migration(migrations.Migration):
                         to='agents.agent',
                     ),
                 ),
-                (
-                    'visibility',
-                    models.CharField(
-                        choices=[('private', '仅自己'), ('organization', '组织共享')],
-                        db_index=True,
-                        default='private',
-                        max_length=20,
-                    ),
-                ),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],

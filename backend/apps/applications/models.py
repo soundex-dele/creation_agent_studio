@@ -32,8 +32,8 @@ class Application(models.Model):
         TASK = 'task', '任务应用'
         CUSTOM = 'custom', '自定义应用'
 
-    class AccessScope(models.TextChoices):
-        ADMIN = 'admin', '仅管理员'
+    class Visibility(models.TextChoices):
+        PRIVATE = 'private', '仅创建者'
         RESTRICTED = 'restricted', '指定账号'
         ORGANIZATION = 'organization', '组织内全部账号'
     category = models.ForeignKey(
@@ -52,16 +52,11 @@ class Application(models.Model):
     screenshots = models.JSONField(default=list, blank=True)
     usage_count = models.IntegerField(default=0)
     is_public = models.BooleanField(default=True)
-    access_scope = models.CharField(
+    visibility = models.CharField(
         max_length=20,
-        choices=AccessScope.choices,
-        default=AccessScope.ADMIN,
+        choices=Visibility.choices,
+        default=Visibility.PRIVATE,
         db_index=True,
-    )
-    allowed_users = models.ManyToManyField(
-        User,
-        blank=True,
-        related_name='allowed_applications',
     )
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -88,6 +83,31 @@ class Application(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ApplicationAccessGrant(models.Model):
+    """Per-account access inside an Application's organization."""
+
+    class Role(models.TextChoices):
+        VIEWER = 'viewer', '查看者'
+        USER = 'user', '使用者'
+        OPERATOR = 'operator', '运维者'
+        EDITOR = 'editor', '编辑者'
+
+    application = models.ForeignKey(
+        Application, on_delete=models.CASCADE, related_name='access_grants',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='application_access_grants',
+    )
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.USER)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'application_access_grants'
+        constraints = [models.UniqueConstraint(
+            fields=['application', 'user'], name='unique_application_access_grant')]
 
 
 class Skill(models.Model):

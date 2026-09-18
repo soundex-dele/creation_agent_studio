@@ -40,7 +40,7 @@ export interface AppItem {
   runtime?: import('./application').ApplicationRuntime
   canEdit?: boolean
   canManagePermissions?: boolean
-  accessScope?: 'admin' | 'restricted' | 'organization'
+  visibility?: 'private' | 'restricted' | 'organization'
 }
 
 export * from './application'

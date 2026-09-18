@@ -90,7 +90,7 @@ class AgentFilterTest(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 403)
 
-    def test_global_user_role_does_not_bypass_organization_membership(self):
+    def test_platform_auditor_does_not_bypass_resource_membership(self):
         owner = User.objects.create_user(username='other-agent-owner', password='p')
         organization = owner.organization_memberships.get().organization
         agent = Agent.objects.create(
@@ -102,7 +102,7 @@ class AgentFilterTest(TestCase):
             created_by=owner,
             organization=organization,
         )
-        self.user.role = User.Role.ADMIN
+        self.user.role = User.Role.AUDITOR
         self.user.save(update_fields=['role'])
 
         self.client.credentials(HTTP_X_ORGANIZATION_ID=str(organization.id))
@@ -112,7 +112,7 @@ class AgentFilterTest(TestCase):
             format='json',
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         agent.refresh_from_db()
         self.assertEqual(agent.description, 'x')
 

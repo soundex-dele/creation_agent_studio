@@ -25,10 +25,9 @@ class User(AbstractUser):
     """
 
     class Role(models.TextChoices):
-        ADMIN = 'admin', '管理员'
-        PROFESSIONAL = 'professional', '专业用户'
-        MEMBER = 'member', '成员'
-        VIEWER = 'viewer', '查看者'
+        ADMIN = 'admin', '平台管理员'
+        AUDITOR = 'auditor', '平台审计员'
+        MEMBER = 'member', '普通用户'
 
     role = models.CharField(
         max_length=20,
@@ -38,13 +37,6 @@ class User(AbstractUser):
     objects = UserManager()
     avatar = models.URLField(blank=True, help_text='用户头像 URL')
     bio = models.TextField(blank=True, help_text='用户简介')
-    can_view_agents = models.BooleanField(default=False)
-    can_create_agents = models.BooleanField(default=False)
-    can_update_agents = models.BooleanField(default=False)
-    can_delete_agents = models.BooleanField(default=False)
-    can_toggle_agents = models.BooleanField(default=False)
-    can_view_applications = models.BooleanField(default=False)
-    can_toggle_applications = models.BooleanField(default=False)
     api_key = models.CharField(
         max_length=255,
         unique=True,

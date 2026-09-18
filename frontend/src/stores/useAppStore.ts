@@ -42,7 +42,7 @@ function toAppItem(app: any): AppItem {
     runtime: app.renderer_key ? app : undefined,
     canEdit: Boolean(app.can_edit),
     canManagePermissions: Boolean(app.can_manage_permissions),
-    accessScope: app.access_scope,
+    visibility: app.visibility,
   };
 }
 

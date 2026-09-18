@@ -30,36 +30,36 @@ class CanCreateAgent(permissions.BasePermission):
 
 class CanUpdateAgent(permissions.BasePermission):
     def has_permission(self, request, view):
-        return can_update_agents(request.user)
+        return bool(request.user and request.user.is_authenticated)
 
 
 class CanDeleteAgent(permissions.BasePermission):
     def has_permission(self, request, view):
-        return can_delete_agents(request.user)
+        return bool(request.user and request.user.is_authenticated)
 
 
 class CanToggleAgent(permissions.BasePermission):
     def has_permission(self, request, view):
-        return can_toggle_agents(request.user)
+        return bool(request.user and request.user.is_authenticated)
 
 
 class CanToggleApplication(permissions.BasePermission):
     def has_permission(self, request, view):
-        return can_toggle_applications(request.user)
+        return bool(request.user and request.user.is_authenticated)
 
 
 class IsProfessionalOrAdmin(permissions.BasePermission):
-    """专业用户或管理员权限"""
+    """Legacy alias: any authenticated platform user."""
 
     def has_permission(self, request, view):
-        return request.user and request.user.role in ['professional', 'admin']
+        return bool(request.user and request.user.is_authenticated)
 
 
 class IsMemberOrAbove(permissions.BasePermission):
-    """成员及以上权限。"""
+    """Legacy alias: any authenticated platform user."""
 
     def has_permission(self, request, view):
-        return request.user and request.user.role in ['member', 'professional', 'admin']
+        return bool(request.user and request.user.is_authenticated)
 
 
 # Backward-compatible import alias for integrations that imported the old class name.
