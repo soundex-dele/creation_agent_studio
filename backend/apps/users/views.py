@@ -3,6 +3,7 @@ Views for users app.
 """
 import hashlib
 
+from django.http import HttpResponse
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -32,6 +33,12 @@ from .licensing import (
     machine_code,
     save_installed_license,
     validate_license,
+)
+from .account_transfer import (
+    AccountImportError,
+    account_import_template_csv,
+    export_accounts_csv,
+    import_accounts_csv,
 )
 
 
@@ -78,6 +85,42 @@ class AdminUserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = AdminUserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset = User.objects.exclude(username='system')
+
+
+def _csv_response(content, filename):
+    response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+class AdminUserExportView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        content = export_accounts_csv(User.objects.exclude(username='system'))
+        return _csv_response(content, 'accounts.csv')
+
+
+class AdminUserImportTemplateView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        return _csv_response(account_import_template_csv(), 'accounts-import-template.csv')
+
+
+class AdminUserImportView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            result = import_accounts_csv(request.FILES.get('file'))
+        except AccountImportError as exc:
+            return Response(
+                {'detail': exc.detail, 'errors': exc.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(result)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

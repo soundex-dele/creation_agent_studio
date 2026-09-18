@@ -8,6 +8,7 @@ from pathlib import Path
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from .session import refresh_cookie_name
@@ -209,6 +210,76 @@ class AdminAccountManagementTest(TestCase):
         self.assertEqual(response.status_code, 403)
         self.member.refresh_from_db()
         self.assertFalse(self.member.can_create_agents)
+
+    def upload_csv(self, content):
+        return self.client.post(
+            '/api/v1/auth/admin/users/import/',
+            {'file': SimpleUploadedFile(
+                'accounts.csv', content.encode('utf-8'), content_type='text/csv')},
+            format='multipart',
+        )
+
+    def test_admin_can_export_accounts_and_capabilities_without_passwords(self):
+        self.member.can_view_agents = True
+        self.member.can_toggle_applications = True
+        self.member.save(update_fields=[
+            'can_view_agents', 'can_toggle_applications',
+        ])
+        self.client.force_authenticate(self.administrator)
+
+        response = self.client.get('/api/v1/auth/admin/users/export/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
+        content = response.content.decode('utf-8-sig')
+        self.assertIn('用户名,邮箱,角色,允许登录,初始密码', content)
+        self.assertIn('ordinary-member,member@example.com,member,是,,是', content)
+        self.assertNotIn('safe-test-password', content)
+
+    def test_admin_can_import_new_accounts_and_update_existing_permissions(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.upload_csv(
+            '用户名,邮箱,角色,允许登录,初始密码,查看智能体,创建智能体,查看应用\n'
+            'ordinary-member,changed@example.com,专业用户,是,,是,否,是\n'
+            'imported-user,imported@example.com,member,是,A-safe-password-123!,否,是,是\n'
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data, {'total': 2, 'created': 1, 'updated': 1})
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.email, 'changed@example.com')
+        self.assertEqual(self.member.role, User.Role.PROFESSIONAL)
+        self.assertTrue(self.member.can_view_agents)
+        self.assertTrue(self.member.can_view_applications)
+        imported = User.objects.get(username='imported-user')
+        self.assertTrue(imported.check_password('A-safe-password-123!'))
+        self.assertTrue(imported.can_create_agents)
+
+    def test_invalid_import_is_atomic_and_reports_row_errors(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.upload_csv(
+            'username,email,role,is_active,password\n'
+            'valid-user,valid@example.com,member,true,A-safe-password-123!\n'
+            'invalid-user,invalid@example.com,unknown,true,A-safe-password-123!\n'
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data['detail'], '导入校验失败，未写入任何账号。')
+        self.assertEqual(response.data['errors'][0]['row'], 3)
+        self.assertFalse(User.objects.filter(username='valid-user').exists())
+
+    def test_non_admin_cannot_import_or_export_accounts(self):
+        self.client.force_authenticate(self.member)
+
+        exported = self.client.get('/api/v1/auth/admin/users/export/')
+        imported = self.upload_csv(
+            'username,email,role,password\n'
+            'forbidden-import,forbidden@example.com,member,A-safe-password-123!\n'
+        )
+
+        self.assertEqual(exported.status_code, 403)
+        self.assertEqual(imported.status_code, 403)
+        self.assertFalse(User.objects.filter(username='forbidden-import').exists())
 
 
 class ProfileAndApiKeyTest(TestCase):

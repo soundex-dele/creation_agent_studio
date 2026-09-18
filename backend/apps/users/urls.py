@@ -10,6 +10,21 @@ urlpatterns = [
     path('register/', views.RegisterView.as_view(), name='register'),
     path('admin/users/', views.AdminUserListCreateView.as_view(), name='admin_users'),
     path(
+        'admin/users/export/',
+        views.AdminUserExportView.as_view(),
+        name='admin_users_export',
+    ),
+    path(
+        'admin/users/import-template/',
+        views.AdminUserImportTemplateView.as_view(),
+        name='admin_users_import_template',
+    ),
+    path(
+        'admin/users/import/',
+        views.AdminUserImportView.as_view(),
+        name='admin_users_import',
+    ),
+    path(
         'admin/users/<int:pk>/',
         views.AdminUserDetailView.as_view(),
         name='admin_user_detail',

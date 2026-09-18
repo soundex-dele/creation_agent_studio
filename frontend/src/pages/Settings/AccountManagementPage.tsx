@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import {
-  Alert, Button, Card, Form, Input, Modal, Result, Select, Switch,
-  Table, Tag, Typography, message,
+  Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Switch,
+  Table, Tag, Typography, Upload, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  ArrowLeftOutlined, ReloadOutlined, TeamOutlined, UserAddOutlined,
+  ArrowLeftOutlined, DownloadOutlined, ImportOutlined, InboxOutlined,
+  LockOutlined, ReloadOutlined, TeamOutlined, UserAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -21,6 +22,13 @@ interface Account {
   email: string;
   role: AccountRole;
   is_active: boolean;
+  can_view_agents: boolean;
+  can_create_agents: boolean;
+  can_update_agents: boolean;
+  can_delete_agents: boolean;
+  can_toggle_agents: boolean;
+  can_view_applications: boolean;
+  can_toggle_applications: boolean;
   created_at: string;
 }
 
@@ -36,6 +44,39 @@ interface CreateAccountValues {
   is_active: boolean;
   password: string;
   password_confirm: string;
+}
+
+type Capability =
+  | 'can_view_agents'
+  | 'can_create_agents'
+  | 'can_update_agents'
+  | 'can_delete_agents'
+  | 'can_toggle_agents'
+  | 'can_view_applications'
+  | 'can_toggle_applications';
+
+interface AccountPermissionValues {
+  role: AccountRole;
+  is_active: boolean;
+  can_view_agents: boolean;
+  can_create_agents: boolean;
+  can_update_agents: boolean;
+  can_delete_agents: boolean;
+  can_toggle_agents: boolean;
+  can_view_applications: boolean;
+  can_toggle_applications: boolean;
+}
+
+interface AccountImportResult {
+  total: number;
+  created: number;
+  updated: number;
+}
+
+interface AccountImportError {
+  row: number;
+  field: string;
+  messages: string[];
 }
 
 const roleOptions = [
@@ -56,17 +97,39 @@ const fieldNames = new Set<keyof CreateAccountValues>([
   'username', 'email', 'role', 'is_active', 'password', 'password_confirm',
 ]);
 
+const capabilityOptions: Array<{
+  name: Capability;
+  label: string;
+  description: string;
+}> = [
+  { name: 'can_view_agents', label: '查看智能体', description: '可查看组织内全部智能体，不受单个资源授权限制。' },
+  { name: 'can_create_agents', label: '创建智能体', description: '可新建智能体。' },
+  { name: 'can_update_agents', label: '修改智能体', description: '可修改智能体配置和版本内容。' },
+  { name: 'can_delete_agents', label: '删除智能体', description: '可删除未被应用引用的智能体。' },
+  { name: 'can_toggle_agents', label: '启停智能体', description: '可启停、激活版本和回滚智能体。' },
+  { name: 'can_view_applications', label: '查看应用', description: '可查看组织内全部应用，不受单个资源授权限制。' },
+  { name: 'can_toggle_applications', label: '启停应用', description: '可启用或停用应用。' },
+];
+
+const capabilityKeys = capabilityOptions.map((item) => item.name);
+
 export default function AccountManagementPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const canManageAccounts = user?.role === 'admin';
   const [form] = Form.useForm<CreateAccountValues>();
+  const [permissionForm] = Form.useForm<AccountPermissionValues>();
+  const permissionRole = Form.useWatch('role', permissionForm);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [permissionAccount, setPermissionAccount] = useState<Account | null>(null);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const loadAccounts = useCallback(async (nextPage = 1) => {
     setLoading(true);
@@ -127,7 +190,28 @@ export default function AccountManagementPage() {
         timeStyle: 'short',
       }).format(new Date(value)),
     },
-  ], []);
+    {
+      title: '操作',
+      key: 'actions',
+      width: 132,
+      fixed: 'right',
+      render: (_, account) => (
+        <Button
+          icon={<LockOutlined aria-hidden="true" />}
+          onClick={() => {
+            setPermissionAccount(account);
+            permissionForm.setFieldsValue({
+              role: account.role,
+              is_active: account.is_active,
+              ...Object.fromEntries(capabilityKeys.map((key) => [key, account[key]])),
+            } as AccountPermissionValues);
+          }}
+        >
+          权限设置
+        </Button>
+      ),
+    },
+  ], [permissionForm]);
 
   const openCreate = () => {
     form.resetFields();
@@ -165,6 +249,77 @@ export default function AccountManagementPage() {
     }
   };
 
+  const downloadCsv = async (endpoint: string, filename: string) => {
+    try {
+      const blob = await api.get<Blob>(endpoint, undefined, { responseType: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error('下载失败，请稍后重试');
+    }
+  };
+
+  const importAccounts = async (file: File) => {
+    const data = new FormData();
+    data.append('file', file);
+    setImporting(true);
+    try {
+      const result = await api.post<AccountImportResult>(
+        '/auth/admin/users/import/',
+        data,
+        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60_000 },
+      );
+      message.success(`导入完成：新增 ${result.created} 个，更新 ${result.updated} 个`);
+      setImportOpen(false);
+      await loadAccounts(1);
+    } catch (error: unknown) {
+      const response = axios.isAxiosError(error)
+        ? error.response?.data as { detail?: string; errors?: AccountImportError[] } | undefined
+        : undefined;
+      const details = (response?.errors ?? []).slice(0, 12).map((item) => (
+        `第 ${item.row} 行 · ${item.field}：${item.messages.join('；')}`
+      ));
+      Modal.error({
+        title: response?.detail || '账号导入失败',
+        width: 640,
+        content: details.length > 0
+          ? <pre className="account-import-errors">{details.join('\n')}</pre>
+          : '请确认文件为 UTF-8 编码的 CSV，并使用下载的模板填写。',
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const savePermissions = async (values: AccountPermissionValues) => {
+    if (!permissionAccount) return;
+    setSavingPermissions(true);
+    try {
+      const updated = await api.patch<Account>(
+        `/auth/admin/users/${permissionAccount.id}/`,
+        values,
+      );
+      setAccounts((items) => items.map((item) => (
+        item.id === updated.id ? { ...item, ...updated } : item
+      )));
+      setPermissionAccount(null);
+      message.success(`${updated.username} 的账号权限已更新`);
+    } catch (error: unknown) {
+      const detail = axios.isAxiosError(error) && typeof error.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : '更新账号权限失败';
+      message.error(detail);
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
   if (!canManageAccounts) {
     return (
       <Result
@@ -191,9 +346,20 @@ export default function AccountManagementPage() {
           <h1 className="page-title">账号管理</h1>
           <p className="page-subtitle">自主注册关闭后，由管理员在这里为团队添加登录账号。</p>
         </div>
-        <Button type="primary" size="large" icon={<UserAddOutlined />} onClick={openCreate}>
-          添加账号
-        </Button>
+        <Space wrap>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => void downloadCsv('/auth/admin/users/export/', 'accounts.csv')}
+          >
+            导出账号
+          </Button>
+          <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+            导入账号
+          </Button>
+          <Button type="primary" icon={<UserAddOutlined />} onClick={openCreate}>
+            添加账号
+          </Button>
+        </Space>
       </div>
 
       <Alert
@@ -222,7 +388,7 @@ export default function AccountManagementPage() {
           columns={columns}
           dataSource={accounts}
           loading={loading}
-          scroll={{ x: 680 }}
+          scroll={{ x: 820 }}
           locale={{ emptyText: '还没有可管理的账号' }}
           pagination={{
             current: page,
@@ -303,6 +469,102 @@ export default function AccountManagementPage() {
             <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`账号权限 · ${permissionAccount?.username ?? ''}`}
+        open={permissionAccount !== null}
+        okText="保存权限"
+        cancelText="取消"
+        confirmLoading={savingPermissions}
+        onOk={() => permissionForm.submit()}
+        onCancel={() => !savingPermissions && setPermissionAccount(null)}
+        destroyOnHidden
+        width={680}
+      >
+        <Alert
+          type="info"
+          showIcon
+          message={permissionRole === 'admin' ? '管理员默认拥有全部权限' : '账号权限与资源单独授权采用“或”关系'}
+          description={permissionRole === 'admin'
+            ? '管理员无需开启下方能力开关即可管理全部智能体和应用。'
+            : '查看能力可访问对应类型的全部资源；未开通时，仍可访问管理员单独授权的智能体或应用。'}
+        />
+        <Form<AccountPermissionValues>
+          form={permissionForm}
+          layout="vertical"
+          className="account-permission-form"
+          onFinish={savePermissions}
+        >
+          <div className="account-permission-basics">
+            <Form.Item name="role" label="账号角色" rules={[{ required: true }]}>
+              <Select
+                options={roleOptions}
+                disabled={permissionAccount?.id === user?.id}
+              />
+            </Form.Item>
+            <Form.Item name="is_active" label="允许登录" valuePropName="checked">
+              <Switch
+                checkedChildren="启用"
+                unCheckedChildren="停用"
+                disabled={permissionAccount?.id === user?.id}
+              />
+            </Form.Item>
+          </div>
+          <div className="account-capability-list">
+            {capabilityOptions.map((item) => (
+              <div className="account-capability-row" key={item.name}>
+                <div>
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
+                </div>
+                <Form.Item name={item.name} valuePropName="checked" noStyle>
+                  <Switch disabled={permissionRole === 'admin'} />
+                </Form.Item>
+              </div>
+            ))}
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="批量导入账号"
+        open={importOpen}
+        footer={null}
+        onCancel={() => !importing && setImportOpen(false)}
+        destroyOnHidden
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="CSV 导入规则"
+          description="同名账号会更新，新增账号必须填写初始密码。文件会整批校验，任一行有误时不会写入任何账号。"
+        />
+        <Upload.Dragger
+          className="account-import-dragger"
+          accept=".csv,text/csv"
+          showUploadList={false}
+          disabled={importing}
+          beforeUpload={(file) => {
+            void importAccounts(file);
+            return Upload.LIST_IGNORE;
+          }}
+        >
+          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+          <p className="ant-upload-text">点击或拖入 CSV 文件</p>
+          <p className="ant-upload-hint">支持一次新增或更新最多 1000 个账号</p>
+        </Upload.Dragger>
+        <Button
+          type="link"
+          icon={<DownloadOutlined />}
+          disabled={importing}
+          onClick={() => void downloadCsv(
+            '/auth/admin/users/import-template/',
+            'accounts-import-template.csv',
+          )}
+        >
+          下载导入模板
+        </Button>
       </Modal>
     </div>
   );

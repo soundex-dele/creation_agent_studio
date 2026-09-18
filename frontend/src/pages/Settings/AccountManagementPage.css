@@ -35,6 +35,62 @@
   gap: 8px;
 }
 
+.account-permission-form {
+  margin-top: 20px;
+}
+
+.account-permission-basics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 16px;
+}
+
+.account-capability-list {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.account-capability-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.account-capability-row:last-child {
+  border-bottom: 0;
+}
+
+.account-capability-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-capability-row span {
+  color: var(--color-text-sec);
+  font-size: 12px;
+}
+
+.account-import-dragger {
+  display: block;
+  margin-top: 18px;
+}
+
+.account-import-errors {
+  max-height: 320px;
+  margin: 12px 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--color-text);
+  font-family: inherit;
+  line-height: 1.75;
+}
+
 .account-identity {
   display: flex;
   min-width: 0;
@@ -64,5 +120,9 @@
 
   .account-management-heading > .ant-btn {
     min-height: 44px;
+  }
+
+  .account-permission-basics {
+    grid-template-columns: 1fr;
   }
 }
