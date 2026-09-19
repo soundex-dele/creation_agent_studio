@@ -32,7 +32,6 @@ const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWith
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchPage'));
-const WeMDPage = lazy(() => import('@/pages/Apps/WeMDPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 const AccountManagementPage = lazy(() => import('@/pages/Settings/AccountManagementPage'));
@@ -254,16 +253,6 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ApplicationShell fullBleed>
           {page(<CreationToolboxPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/wemd',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<WeMDPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),

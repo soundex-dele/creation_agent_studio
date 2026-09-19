@@ -3,9 +3,8 @@
 ## 1. Prepare the host
 
 - Use a supported Linux host with Docker Engine and Docker Compose v2.
-- Clone with `--recurse-submodules`. The frontend can omit optional WeMD, but
-  every enabled App Center submodule must be pinned to the commit recorded by
-  this repository.
+- Clone with `--recurse-submodules`. Every enabled App Center submodule must be
+  pinned to the commit recorded by this repository.
 - Copy `backend/.env.example` to a secret-managed path outside the repository
   when possible. Pass it with `BACKEND_ENV_FILE`.
 - Generate independent random values for `SECRET_KEY`, `DB_ADMIN_PASSWORD`,

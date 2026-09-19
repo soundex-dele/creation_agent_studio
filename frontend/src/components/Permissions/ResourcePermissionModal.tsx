@@ -1,28 +1,29 @@
 import { useEffect, useState } from 'react';
-import { Form, Modal, Radio, Select, Space, Spin, message } from 'antd';
+import { Button, Form, Modal, Radio, Select, Space, Spin, message } from 'antd';
+import type { FormInstance } from 'antd';
 import { api } from '@/services/api';
 import './ResourcePermissionModal.css';
 
 export type ResourceVisibility = 'private' | 'restricted' | 'organization';
 export type ResourceRole = 'viewer' | 'user' | 'operator' | 'editor';
 
-interface ResourceGrant {
+export interface ResourceGrant {
   user_id: number;
   role: ResourceRole;
 }
 
-interface PermissionValues {
+export interface PermissionValues {
   visibility: ResourceVisibility;
   grants: ResourceGrant[];
 }
 
-interface Account {
+export interface Account {
   id: number;
   username: string;
   email: string;
 }
 
-interface ResourcePermissionResponse extends PermissionValues {
+export interface ResourcePermissionResponse extends PermissionValues {
   available_users: Account[];
 }
 
@@ -35,7 +36,7 @@ interface ResourcePermissionModalProps {
   onSaved?: () => void | Promise<void>;
 }
 
-const scopeOptions: Array<{
+export const RESOURCE_SCOPE_OPTIONS: Array<{
   value: ResourceVisibility;
   title: string;
   description: string;
@@ -57,6 +58,93 @@ const scopeOptions: Array<{
   },
 ];
 
+export const RESOURCE_ROLE_OPTIONS = [
+  { value: 'viewer', label: '查看者' },
+  { value: 'user', label: '使用者' },
+  { value: 'operator', label: '运维者' },
+  { value: 'editor', label: '编辑者' },
+] as const;
+
+export const getResourcePermissionEndpoint = (
+  resourceType: 'agent' | 'application',
+  resourceId: number | string,
+) => resourceType === 'agent'
+  ? `/agents/${resourceId}/permissions/`
+  : `/apps/${resourceId}/permissions/`;
+
+export function ResourcePermissionFields({
+  form,
+  accounts,
+}: {
+  form: FormInstance<PermissionValues>;
+  accounts: Account[];
+}) {
+  const scope = Form.useWatch('visibility', form);
+  return (
+    <>
+      <Form.Item name="visibility" label="可见范围" rules={[{ required: true, message: '请选择可见范围' }]}>
+        <Radio.Group className="resource-permission-options">
+          {RESOURCE_SCOPE_OPTIONS.map((option) => (
+            <Radio key={option.value} value={option.value} className="resource-permission-option">
+              <span className="resource-permission-title">{option.title}</span>
+              <span className="resource-permission-description">{option.description}</span>
+            </Radio>
+          ))}
+        </Radio.Group>
+      </Form.Item>
+      {scope === 'restricted' && (
+        <Form.List name="grants" rules={[{
+          validator: async (_, grants) => {
+            if (!grants?.length) throw new Error('请至少添加一个授权账号');
+          },
+        }]}
+        >
+          {(fields, { add, remove }, { errors }) => (
+            <Space direction="vertical" className="resource-permission-grants">
+              {fields.map((field) => (
+                <Space key={field.key} align="baseline" wrap className="resource-permission-grant-row">
+                  <Form.Item
+                    {...field}
+                    name={[field.name, 'user_id']}
+                    rules={[{ required: true, message: '请选择账号' }]}
+                  >
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      placeholder="选择组织成员"
+                      className="resource-permission-account-select"
+                      options={accounts.map((account) => ({
+                        value: account.id,
+                        label: account.email
+                          ? `${account.username} (${account.email})`
+                          : account.username,
+                      }))}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    {...field}
+                    name={[field.name, 'role']}
+                    initialValue="user"
+                    rules={[{ required: true, message: '请选择角色' }]}
+                  >
+                    <Select
+                      className="resource-permission-role-select"
+                      options={[...RESOURCE_ROLE_OPTIONS]}
+                    />
+                  </Form.Item>
+                  <Button type="link" danger onClick={() => remove(field.name)}>移除</Button>
+                </Space>
+              ))}
+              <Button type="dashed" block onClick={() => add({ role: 'user' })}>添加授权账号</Button>
+              <Form.ErrorList errors={errors} />
+            </Space>
+          )}
+        </Form.List>
+      )}
+    </>
+  );
+}
+
 export default function ResourcePermissionModal({
   resourceType,
   resourceId,
@@ -66,16 +154,13 @@ export default function ResourcePermissionModal({
   onSaved,
 }: ResourcePermissionModalProps) {
   const [form] = Form.useForm<PermissionValues>();
-  const scope = Form.useWatch('visibility', form);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const endpoint = resourceId == null
     ? ''
-    : resourceType === 'agent'
-      ? `/agents/${resourceId}/permissions/`
-      : `/apps/${resourceId}/permissions/`;
+    : getResourcePermissionEndpoint(resourceType, resourceId);
 
   useEffect(() => {
     if (!open || !endpoint) return;
@@ -146,67 +231,7 @@ export default function ResourcePermissionModal({
           initialValues={{ visibility: 'private', grants: [] }}
           onFinish={save}
         >
-          <Form.Item name="visibility" label="可见范围" rules={[{ required: true }]}>
-            <Radio.Group className="resource-permission-options">
-              {scopeOptions.map((option) => (
-                <Radio key={option.value} value={option.value} className="resource-permission-option">
-                  <span className="resource-permission-title">{option.title}</span>
-                  <span className="resource-permission-description">{option.description}</span>
-                </Radio>
-              ))}
-            </Radio.Group>
-          </Form.Item>
-          {scope === 'restricted' && (
-            <Form.List name="grants" rules={[{
-              validator: async (_, grants) => {
-                if (!grants?.length) throw new Error('请至少添加一个授权账号');
-              },
-            }]}
-            >
-              {(fields, { add, remove }, { errors }) => (
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  {fields.map((field) => (
-                    <Space key={field.key} align="baseline" wrap>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'user_id']}
-                        rules={[{ required: true, message: '请选择账号' }]}
-                      >
-                        <Select
-                          showSearch
-                          optionFilterProp="label"
-                          placeholder="选择组织成员"
-                          style={{ width: 300 }}
-                          options={accounts.map((account) => ({
-                            value: account.id,
-                            label: account.email
-                              ? `${account.username} (${account.email})`
-                              : account.username,
-                          }))}
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'role']}
-                        initialValue="user"
-                        rules={[{ required: true, message: '请选择角色' }]}
-                      >
-                        <Select style={{ width: 120 }} options={[
-                          { value: 'viewer', label: '查看者' },
-                          { value: 'user', label: '使用者' },
-                          { value: 'operator', label: '运维者' },
-                          { value: 'editor', label: '编辑者' },
-                        ]} />
-                      </Form.Item>
-                      <a onClick={() => remove(field.name)}>移除</a>
-                    </Space>
-                  ))}
-                  <a onClick={() => add({ role: 'user' })}>+ 添加授权账号</a>
-                  <Form.ErrorList errors={errors} />
-                </Space>
-              )}
-            </Form.List>
-          )}
+          <ResourcePermissionFields form={form} accounts={accounts} />
         </Form>
       )}
     </Modal>

@@ -45,4 +45,16 @@ describe('mobile page scrolling', () => {
     expect(agentStyles).toMatch(/\.agents-category-strip button\s*\{\s*min-height:\s*44px/);
     expect(taskStyles).toMatch(/\.task-mobile-title,[\s\S]*?\.task-relation-part button\s*\{\s*min-height:\s*44px/);
   });
+
+  it('separates bulk permission controls from their tables on every viewport', () => {
+    const styles = readSource('../../pages/Enterprise/EnterprisePage.css');
+    const toolbarRule = styles.match(/\.enterprise-bulk-toolbar\s*\{([^}]*)\}/)?.[1] ?? '';
+    const mobileRule = styles.match(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*?\.enterprise-bulk-toolbar \.ant-btn\s*\{([^}]*)\}/,
+    )?.[1] ?? '';
+
+    expect(toolbarRule).toMatch(/gap:\s*16px/);
+    expect(toolbarRule).toMatch(/margin-bottom:\s*16px/);
+    expect(mobileRule).toMatch(/min-height:\s*44px/);
+  });
 });

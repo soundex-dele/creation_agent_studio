@@ -17,12 +17,6 @@ describe('application renderer registry', () => {
     })).toBe('/applications/18/creation-toolbox?entry=apps');
   });
 
-  it('opens WeMD in its isolated editor runtime', () => {
-    expect(applicationPath({
-      id: 'wemd', applicationId: 16, kind: 'custom', rendererKey: 'wemd',
-    })).toBe('/applications/16/wemd?entry=apps');
-  });
-
   it('opens the new media workbench in its dedicated runtime', () => {
     expect(applicationPath({
       id: 'newmedia-workbench', applicationId: 19, kind: 'custom', rendererKey: 'newmedia-workbench',

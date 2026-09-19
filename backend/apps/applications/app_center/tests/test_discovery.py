@@ -60,14 +60,6 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
         assert "creation-master" not in package_ids
         assert "creation-master" not in settings.EXECUTION_CHILD_ADAPTERS["media"]
 
-    wemd_manifest = settings.APP_CENTER_ROOT / "wemd_app" / "application.yaml"
-    if wemd_manifest.is_file():
-        assert "wemd" in package_ids
-        wemd = next(package for package in packages if package.manifest.metadata.id == "wemd")
-        assert wemd.manifest.spec.launch_mode == "dedicated"
-        assert [frontend.renderer_key for frontend in wemd.manifest.spec.frontends] == ["wemd"]
-
-
 def test_invalid_package_is_quarantined(tmp_path: Path):
     package = tmp_path / "broken_app"
     package.mkdir()

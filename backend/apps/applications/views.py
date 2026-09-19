@@ -26,6 +26,7 @@ from .serializers import application_definition
 from core.resource_access import (
     ResourcePermissionSerializer,
     accessible_resources,
+    bulk_update_resource_permissions,
     can_manage_resource_permissions,
 )
 
@@ -49,7 +50,9 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        queryset = _runtime_prefetch(Application.objects.filter(is_active=True))
+        queryset = _runtime_prefetch(Application.objects.all())
+        if self.action != 'permissions':
+            queryset = queryset.filter(is_active=True)
         return accessible_resources(queryset, self.request.user)
 
     def get_permissions(self):
@@ -80,6 +83,17 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    @action(detail=False, methods=['put'], url_path='bulk-permissions')
+    def bulk_permissions(self, request, *args, **kwargs):
+        updated = bulk_update_resource_permissions(
+            Application.objects.filter(
+                organization=resolve_organization(request),
+            ),
+            request,
+            request.data,
+        )
+        return Response({'updated': updated})
 
     @action(detail=True, methods=['post'], url_path='compose-prompt')
     def compose_prompt(self, request, *args, **kwargs):

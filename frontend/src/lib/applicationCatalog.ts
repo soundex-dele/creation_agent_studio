@@ -26,7 +26,6 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'newmedia-workbench': (app, entry) => withEntry(
     `/applications/${app.applicationId}/newmedia-workbench`, entry,
   ),
-  wemd: (app, entry) => withEntry(`/applications/${app.applicationId}/wemd`, entry),
   chat: (app, entry) => withEntry(
     `/applications/${app.applicationId}/chat`,
     entry,

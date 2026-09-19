@@ -40,3 +40,52 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+.resource-permission-grants {
+  width: 100%;
+}
+
+.resource-permission-account-select {
+  width: 300px;
+}
+
+.resource-permission-role-select {
+  width: 120px;
+}
+
+.resource-permission-bulk-alert {
+  margin-bottom: 12px;
+}
+
+.resource-permission-selection {
+  margin-bottom: 16px;
+  color: var(--color-text-sec);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .resource-permission-option.ant-radio-wrapper {
+    min-height: 76px;
+    padding: 12px;
+  }
+
+  .resource-permission-grant-row.ant-space {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px auto;
+    width: 100%;
+  }
+
+  .resource-permission-grant-row .ant-space-item,
+  .resource-permission-grant-row .ant-form-item,
+  .resource-permission-account-select,
+  .resource-permission-role-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .resource-permission-grant-row .ant-btn {
+    min-height: 44px;
+  }
+}

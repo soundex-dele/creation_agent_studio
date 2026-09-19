@@ -370,3 +370,64 @@ class ResourcePermissionSerializer(serializers.Serializer):
             )),
             "available_users": list(eligible.values("id", "username", "email")),
         }
+
+
+class BulkResourcePermissionSerializer(serializers.Serializer):
+    resource_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        max_length=200,
+    )
+    visibility = serializers.ChoiceField(choices=(
+        PRIVATE_VISIBILITY,
+        RESTRICTED_VISIBILITY,
+        ORGANIZATION_VISIBILITY,
+    ))
+    grants = ResourceGrantSerializer(many=True, required=False, default=list)
+
+    def validate_resource_ids(self, resource_ids):
+        if len(resource_ids) != len(set(resource_ids)):
+            raise serializers.ValidationError('资源不能重复。')
+        return resource_ids
+
+    def validate(self, attrs):
+        if attrs['visibility'] == RESTRICTED_VISIBILITY and not attrs['grants']:
+            raise serializers.ValidationError({
+                'grants': '指定账号范围至少需要一条授权。',
+            })
+        if attrs['visibility'] != RESTRICTED_VISIBILITY:
+            attrs['grants'] = []
+        return attrs
+
+
+def bulk_update_resource_permissions(queryset, request, data):
+    """Validate every resource first, then update the selection atomically."""
+    bulk = BulkResourcePermissionSerializer(data=data)
+    bulk.is_valid(raise_exception=True)
+    resource_ids = bulk.validated_data['resource_ids']
+    resources = list(queryset.filter(pk__in=resource_ids))
+    if len(resources) != len(resource_ids):
+        raise serializers.ValidationError({
+            'resource_ids': '部分资源不存在或不属于当前组织。',
+        })
+    if any(not can_manage_resource_permissions(resource, request.user)
+           for resource in resources):
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied('无权管理部分所选资源的访问权限。')
+
+    payload = {
+        'visibility': bulk.validated_data['visibility'],
+        'grants': bulk.validated_data['grants'],
+    }
+    updates = []
+    for resource in resources:
+        update = ResourcePermissionSerializer(
+            resource, data=payload, context={'request': request},
+        )
+        update.is_valid(raise_exception=True)
+        updates.append(update)
+
+    with transaction.atomic():
+        for update in updates:
+            update.save()
+    return len(updates)

@@ -50,6 +50,7 @@ class AgentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agent
         fields = ['id', 'name', 'slug', 'description', 'icon', 'category_name',
+                  'created_by_id',
                   'is_public', 'is_active', 'visibility', 'can_edit', 'can_delete',
                   'can_toggle',
                   'can_manage_permissions', 'created_at']

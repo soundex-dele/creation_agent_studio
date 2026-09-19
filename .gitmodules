@@ -1,6 +1,3 @@
 [submodule "backend/app_center/creation_master"]
 	path = backend/app_center/creation_master
 	url = https://github.com/soundex-dele/creation-master.git
-[submodule "backend/app_center/WeMD"]
-	path = backend/app_center/WeMD
-	url = https://github.com/soundex-dele/WeMD.git

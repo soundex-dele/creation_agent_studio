@@ -45,6 +45,7 @@ from core.permissions import (
 from core.resource_access import (
     ResourcePermissionSerializer,
     accessible_resources,
+    bulk_update_resource_permissions,
     can_create_agents,
     can_manage_resource_permissions,
     is_platform_admin,
@@ -98,7 +99,7 @@ class AgentViewSet(viewsets.ModelViewSet):
             and self.request.query_params.get('manageable') == '1'
             and can_administer_agents(self.request.user)
         )
-        if self.action not in ('status', 'destroy') and not manageable_list:
+        if self.action not in ('status', 'destroy', 'permissions') and not manageable_list:
             queryset = queryset.filter(is_active=True)
         from apps.enterprise.models import Membership
         queryset = queryset.annotate(current_user_org_role=Subquery(
@@ -158,6 +159,19 @@ class AgentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    @action(detail=False, methods=['put'], url_path='bulk-permissions')
+    def bulk_permissions(self, request):
+        from apps.enterprise.permissions import resolve_organization
+        updated = bulk_update_resource_permissions(
+            Agent.objects.filter(
+                organization=resolve_organization(request),
+                kind=Agent.Kind.STANDARD,
+            ),
+            request,
+            request.data,
+        )
+        return Response({'updated': updated})
 
     def perform_create(self, serializer):
         from apps.enterprise.permissions import resolve_organization

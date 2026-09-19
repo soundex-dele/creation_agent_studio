@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentAccessGrant, AgentCategory
@@ -17,6 +17,7 @@ from core.resource_access import (
 )
 
 
+@override_settings(SINGLE_TENANT_MODE=False)
 class ResourcePermissionApiTest(TestCase):
     def setUp(self):
         self.platform_admin = User.objects.create_user(
@@ -107,6 +108,96 @@ class ResourcePermissionApiTest(TestCase):
             [{"user_id": self.viewer.id, "role": "user"}],
         )
         self.assertTrue(can_manage_resource_permissions(self.agent, self.creator))
+
+    def test_admin_can_bulk_update_agent_and_application_permissions(self):
+        second_agent = Agent.objects.create(
+            category=self.agent.category,
+            name='Second Permission Agent',
+            slug='second-permission-agent',
+            description='Second agent',
+            created_by=self.creator,
+            organization=self.organization,
+        )
+        agent_response = self.client_for(self.org_admin).put(
+            '/api/v1/agents/bulk-permissions/',
+            {
+                'resource_ids': [self.agent.id, second_agent.id],
+                'visibility': 'organization',
+                'grants': [],
+            },
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(agent_response.status_code, 200, agent_response.data)
+        self.assertEqual(agent_response.data['updated'], 2)
+        self.agent.refresh_from_db()
+        second_agent.refresh_from_db()
+        self.assertEqual(self.agent.visibility, Agent.Visibility.ORGANIZATION)
+        self.assertEqual(second_agent.visibility, Agent.Visibility.ORGANIZATION)
+
+        second_application = Application.objects.create(
+            category=self.application.category,
+            name='Second Permission Application',
+            slug='second-permission-application',
+            description='Second application',
+            created_by=self.creator,
+            organization=self.organization,
+        )
+        application_response = self.client_for(self.org_admin).put(
+            '/api/v1/apps/bulk-permissions/',
+            {
+                'resource_ids': [self.application.id, second_application.id],
+                'visibility': 'restricted',
+                'grants': [{'user_id': self.viewer.id, 'role': 'user'}],
+            },
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(
+            application_response.status_code, 200, application_response.data,
+        )
+        self.assertEqual(application_response.data['updated'], 2)
+        self.assertTrue(ApplicationAccessGrant.objects.filter(
+            application=self.application,
+            user=self.viewer,
+            role=ApplicationAccessGrant.Role.USER,
+        ).exists())
+        self.assertTrue(ApplicationAccessGrant.objects.filter(
+            application=second_application,
+            user=self.viewer,
+            role=ApplicationAccessGrant.Role.USER,
+        ).exists())
+
+    def test_bulk_permission_update_is_atomic_when_one_resource_is_invalid(self):
+        viewer_owned_agent = Agent.objects.create(
+            category=self.agent.category,
+            name='Viewer Owned Agent',
+            slug='viewer-owned-agent',
+            description='Owned by the selected grant account',
+            created_by=self.viewer,
+            organization=self.organization,
+        )
+
+        response = self.client_for(self.org_admin).put(
+            '/api/v1/agents/bulk-permissions/',
+            {
+                'resource_ids': [self.agent.id, viewer_owned_agent.id],
+                'visibility': 'restricted',
+                'grants': [{'user_id': self.viewer.id, 'role': 'editor'}],
+            },
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.agent.refresh_from_db()
+        viewer_owned_agent.refresh_from_db()
+        self.assertEqual(self.agent.visibility, Agent.Visibility.PRIVATE)
+        self.assertEqual(viewer_owned_agent.visibility, Agent.Visibility.PRIVATE)
+        self.assertFalse(self.agent.access_grants.exists())
+        self.assertFalse(viewer_owned_agent.access_grants.exists())
 
     def test_restricted_grant_roles_form_an_operation_ladder(self):
         self.agent.visibility = Agent.Visibility.RESTRICTED

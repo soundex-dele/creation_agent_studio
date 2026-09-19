@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Empty, Switch, Table, Tag, Typography, message } from 'antd';
+import { useCallback, useEffect, useState, type Key } from 'react';
+import { Alert, Button, Empty, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { api } from '@/services/api';
 import ResourcePermissionModal, {
   type ResourceVisibility,
 } from '@/components/Permissions/ResourcePermissionModal';
+import BulkResourcePermissionModal from '@/components/Permissions/BulkResourcePermissionModal';
 
 interface ManagedApplication {
   id: number;
+  owner_id: number;
   name: string;
   slug: string;
   description: string;
@@ -45,6 +47,8 @@ export default function ApplicationManagementPanel({
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [permissionApplication, setPermissionApplication] = useState<ManagedApplication | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  const [bulkPermissionOpen, setBulkPermissionOpen] = useState(false);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -53,7 +57,11 @@ export default function ApplicationManagementPanel({
         `/organizations/${organizationId}/applications`,
         { limit: 200 },
       );
-      setApplications(Array.isArray(response) ? response : response.results ?? []);
+      const items = Array.isArray(response) ? response : response.results ?? [];
+      setApplications(items);
+      setSelectedRowKeys((current) => current.filter((key) => (
+        items.some((item) => item.id === key && item.can_manage_permissions)
+      )));
     } finally {
       setLoading(false);
     }
@@ -134,6 +142,10 @@ export default function ApplicationManagementPanel({
     },
   ];
 
+  const selectedApplications = applications.filter((application) => (
+    selectedRowKeys.includes(application.id)
+  ));
+
   return (
     <div className="enterprise-subpanel">
       <Alert
@@ -142,11 +154,40 @@ export default function ApplicationManagementPanel({
         message="应用可用性"
         description="停用后，应用将从应用中心隐藏，并且无法发起新的运行；按钮是否可用由组织角色和资源授权决定。"
       />
+      <div className="enterprise-bulk-toolbar">
+        <Typography.Text type="secondary">
+          勾选应用后可统一覆盖可见范围和账号授权，支持表头全选。
+        </Typography.Text>
+        <Space wrap size={12}>
+          <Button
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => setSelectedRowKeys([])}
+          >
+            取消选择
+          </Button>
+          <Button
+            type="primary"
+            icon={<LockOutlined aria-hidden="true" />}
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => setBulkPermissionOpen(true)}
+          >
+            批量设置权限{selectedRowKeys.length > 0 ? `（${selectedRowKeys.length}）` : ''}
+          </Button>
+        </Space>
+      </div>
       <Table
         rowKey="id"
         loading={loading}
         columns={columns}
         dataSource={applications}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
+          getCheckboxProps: (application) => ({
+            disabled: !application.can_manage_permissions,
+            'aria-label': `选择${application.name}`,
+          }),
+        }}
         scroll={{ x: 860 }}
         pagination={false}
         locale={{ emptyText: <Empty description="暂无应用" /> }}
@@ -158,6 +199,21 @@ export default function ApplicationManagementPanel({
         open={permissionApplication !== null}
         onClose={() => setPermissionApplication(null)}
         onSaved={loadApplications}
+      />
+      <BulkResourcePermissionModal
+        resourceType="application"
+        resources={selectedApplications.map((application) => ({
+          id: application.id,
+          permissionId: application.slug,
+          name: application.name,
+          ownerId: application.owner_id,
+        }))}
+        open={bulkPermissionOpen}
+        onClose={() => setBulkPermissionOpen(false)}
+        onSaved={async () => {
+          await loadApplications();
+          setSelectedRowKeys([]);
+        }}
       />
     </div>
   );
