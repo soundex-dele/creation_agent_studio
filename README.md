@@ -78,6 +78,20 @@ npm run dev
 
 浏览器访问 `http://localhost:3030`。Vite 将 `/api` 代理到 `http://localhost:8080`；产品 API 的稳定入口统一为 `/api/v1`。
 
+也可以从仓库根目录一键完成迁移、管理员初始化、全部 App Center 应用同步，
+并启动前端、后端和所有执行池 worker：
+
+```makefile
+DJANGO_SUPERUSER_USERNAME=admin \
+DJANGO_SUPERUSER_PASSWORD='安全密码' \
+DJANGO_SUPERUSER_EMAIL=admin@example.com \
+./deploy.sh
+```
+
+脚本只会在目标管理员不存在时创建账号；已有 superuser 时可直接运行
+`./deploy.sh`。如果尚无 superuser 且未提供上述环境变量，终端会进入 Django
+的交互式创建流程。按 `Ctrl-C` 会一并停止前端、后端和 worker。
+
 ## Android / iOS 移动端外壳
 
 `mobile` 目录提供 React Native WebView 外壳，Android 和 iOS 共用同一套
