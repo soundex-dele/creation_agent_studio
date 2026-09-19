@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { Avatar, Button, Image, message as toast, Tooltip, Typography } from 'antd';
 import {
   CopyOutlined,
@@ -17,7 +17,7 @@ import './MessageList.css';
 
 const { Text } = Typography;
 
-interface Message {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -39,11 +39,20 @@ interface Message {
   attachments?: MessageAttachment[];
 }
 
+export interface AssistantMessageRenderContext {
+  message: ChatMessage;
+  content: string;
+  isStreaming: boolean;
+}
+
 interface MessageListProps {
-  messages: Message[];
+  messages: ChatMessage[];
   isLoading?: boolean;
   isStreaming?: boolean;
   streamingMessageId?: string | null;
+  renderAssistantContent?: (
+    context: AssistantMessageRenderContext,
+  ) => ReactNode | undefined;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -51,6 +60,7 @@ const MessageList: React.FC<MessageListProps> = ({
   isLoading = false,
   isStreaming = false,
   streamingMessageId = null,
+  renderAssistantContent,
 }) => {
   const copyMessageContent = async (content: string) => {
     try {
@@ -118,7 +128,7 @@ const MessageList: React.FC<MessageListProps> = ({
     );
   };
 
-  const renderMessage = (message: Message) => {
+  const renderMessage = (message: ChatMessage) => {
     const isUser = message.role === 'user';
     const isSystem = message.role === 'system';
     const toolCalls = message.metadata?.agent?.tool_calls
@@ -131,6 +141,13 @@ const MessageList: React.FC<MessageListProps> = ({
       ?? message.metadata?.composer?.skills
       ?? [];
     const isStreamingMessage = message.id === streamingMessageId;
+    const customAssistantContent = !isUser && !isSystem && message.content
+      ? renderAssistantContent?.({
+        message,
+        content: message.content,
+        isStreaming: isStreamingMessage,
+      })
+      : undefined;
 
     return (
       <div
@@ -215,18 +232,22 @@ const MessageList: React.FC<MessageListProps> = ({
                   <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
                 </div>
               )}
-              {message.content && (isUser || isSystem || isStreamingMessage ? (
-                <span className={isStreamingMessage ? 'message-streaming-content' : undefined}>
-                  {message.content}
-                </span>
-              ) : (
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                >
-                  {normalizeMarkdownMath(message.content)}
-                </ReactMarkdown>
-              ))}
+              {customAssistantContent !== undefined
+                ? customAssistantContent
+                : message.content && (
+                  isUser || isSystem || isStreamingMessage ? (
+                    <span className={isStreamingMessage ? 'message-streaming-content' : undefined}>
+                      {message.content}
+                    </span>
+                  ) : (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
+                    >
+                      {normalizeMarkdownMath(message.content)}
+                    </ReactMarkdown>
+                  )
+                )}
             </div>
           </div>
 

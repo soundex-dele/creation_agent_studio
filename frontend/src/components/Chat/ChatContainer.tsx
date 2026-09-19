@@ -7,6 +7,7 @@ import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import MessageList from './MessageList';
+import type { AssistantMessageRenderContext } from './MessageList';
 import MessageInput from './MessageInput';
 import type { ComposerAgent, ComposerContext } from './MessageInput';
 import AgentQuestionCard from './AgentQuestionCard';
@@ -19,7 +20,7 @@ interface ChatSuggestion {
   onSelect?: () => void;
 }
 
-interface ChatContainerProps {
+export interface ChatContainerProps {
   conversationId: string | null;
   /** When false, skip auto-fetching the conversation on mount/id change.
    *  The workspace uses this to seed a guided conversation without a fetch
@@ -43,6 +44,11 @@ interface ChatContainerProps {
   defaultAgent?: ComposerAgent | null;
   composerMode?: 'default' | 'study';
   inputAccessory?: React.ReactNode;
+  /** Allows a feature page to specialize assistant presentation while keeping
+   * the shared conversation, streaming, attachments, and composer behavior. */
+  renderAssistantContent?: (
+    context: AssistantMessageRenderContext,
+  ) => React.ReactNode | undefined;
 }
 
 const defaultSuggestions: ChatSuggestion[] = [
@@ -66,6 +72,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   defaultAgent = null,
   composerMode = 'default',
   inputAccessory,
+  renderAssistantContent,
 }) => {
   const { user } = useAuthStore();
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
@@ -294,6 +301,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                 isLoading={isLoading}
                 isStreaming={isStreaming}
                 streamingMessageId={streamingMessageId}
+                renderAssistantContent={renderAssistantContent}
               />
               {agentActivity && isStreaming && (
                 <div className="agent-activity">{agentActivity}</div>

@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import ChatContainer from '@/components/Chat/ChatContainer';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import {
   addGuardianLink, completeStudyReview, createTutorSession, deleteStudyData, exportStudyData,
@@ -35,6 +34,7 @@ import {
 } from './StudyLearningModules';
 import type { ReviewMode } from './learningModules';
 import { MethodologyEntry, StudyMethodologyCenter } from './StudyMethodologyCenter';
+import StudyTutorChat from './StudyTutorChat';
 import { recommendStudyMethod, type StudyMethodAction } from './studyMethodology';
 import './StudyWithMethodPage.css';
 
@@ -387,45 +387,21 @@ function TutorView(props: {
 
   if (p.conversationId) {
     return <section className="swm-view swm-tutor-view">
-      <div className="swm-embedded-tutor">
-        <div className="swm-tutor-chat-header">
-          <Button type="text" icon={<ArrowLeft size={18} />} onClick={() => {
+      <StudyTutorChat
+        conversationId={p.conversationId}
+        tutor={p.activeTutor}
+        subjectLabel={subjectLabels[p.activeSubject]}
+        activeProblem={p.activeProblem}
+        resultBusy={p.busy === 'result'}
+        draftRequest={p.draftRequest}
+        quickReplies={quickReplies}
+        onBack={() => {
             p.setConversationId(null);
             p.setTutorMode('hub');
-          }}>辅导首页</Button>
-          <div>
-            <strong>{p.activeTutor?.name || subjectLabels[p.activeSubject]}</strong>
-            <span>{subjectLabels[p.activeSubject]} · 本会话固定老师</span>
-          </div>
-        </div>
-        <div className="swm-chat-frame">
-          <ChatContainer
-            conversationId={p.conversationId}
-            composerMode="study"
-            defaultAgent={p.activeTutor ? {
-              id: p.activeTutor.id,
-              name: p.activeTutor.name,
-              description: p.activeTutor.description,
-            } : null}
-            draftRequest={p.draftRequest}
-            inputPlaceholder="也可以补充你的问题…"
-            suggestions={[]}
-            inputAccessory={<div className="swm-quick-replies" aria-label="快捷提问">
-              {quickReplies.map((text) => <button
-                type="button"
-                key={text}
-                onClick={() => p.setDraftRequest({ id: Date.now(), text })}
-              >{text}</button>)}
-            </div>}
-          />
-        </div>
-        {p.activeProblem && <div className="swm-learning-result">
-          <span>辅导结束后，选下一步</span>
-          <Button disabled={p.busy === 'result'} onClick={() => p.setDraftRequest({ id: Date.now(), text: '出一道同类题让我练习' })}>做同类题</Button>
-          <Button loading={p.busy === 'result'} onClick={() => void p.recordPhotoResult(false)}>加入复习</Button>
-          <Button type="primary" loading={p.busy === 'result'} onClick={() => void p.recordPhotoResult(true)}>我会了</Button>
-        </div>}
-      </div>
+        }}
+        onDraftRequest={p.setDraftRequest}
+        onRecordResult={(correct) => void p.recordPhotoResult(correct)}
+      />
     </section>;
   }
 
