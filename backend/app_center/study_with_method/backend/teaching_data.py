@@ -136,6 +136,7 @@ def public_curriculum_tree(*, subject: str, curriculum_id: str) -> dict:
                                         "common_mistakes": points[point_id]["common_mistakes"],
                                         "keywords": points[point_id]["keywords"],
                                         "competency_tags": points[point_id]["competency_tags"],
+                                        "knowledge_items": points[point_id]["knowledge_items"],
                                     }
                                     for point_id in section["knowledge_points"]
                                 ],
@@ -227,6 +228,7 @@ def sync_curriculum_nodes() -> int:
                                         "active": True,
                                         "summary": point["summary"],
                                         "keywords": point["keywords"],
+                                        "knowledge_items": point["knowledge_items"],
                                         "data_version": bundle.manifest["data_version"],
                                     },
                                 },

@@ -17,7 +17,13 @@ class Command(BaseCommand):
             for item in bundle.curricula.values()
             for point in item["points"].values()
         )
+        detailed_items = sum(
+            len(point["knowledge_items"])
+            for item in bundle.curricula.values()
+            for point in item["points"].values()
+        )
         self.stdout.write(self.style.SUCCESS(
             f"Teaching data {bundle.manifest['data_version']} is valid: "
-            f"{points} knowledge points, {questions} questions."
+            f"{points} knowledge points, {detailed_items} detailed items, "
+            f"{questions} questions."
         ))

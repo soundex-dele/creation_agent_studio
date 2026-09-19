@@ -242,6 +242,18 @@ export interface StudyCatalogSubject {
   curriculum_version_options: Array<{ id: string; label: string }>;
 }
 
+export interface CurriculumKnowledgeItem {
+  id: string;
+  type: 'concept' | 'definition' | 'formula' | 'theorem' | 'property' | 'method' | 'model' | 'event' | 'process' | 'impact' | 'comparison' | 'institution' | 'person' | 'cause' | 'evidence';
+  name: string;
+  content: string;
+  formulas?: string[];
+  conditions?: string[];
+  conclusion?: string;
+  common_mistakes?: string[];
+  review_status: 'candidate' | 'self_checked' | 'teacher_reviewed';
+}
+
 export interface CurriculumKnowledgePoint {
   id: string;
   name: string;
@@ -251,6 +263,7 @@ export interface CurriculumKnowledgePoint {
   common_mistakes: string[];
   keywords: string[];
   competency_tags: string[];
+  knowledge_items: CurriculumKnowledgeItem[];
 }
 
 export interface CurriculumSection {

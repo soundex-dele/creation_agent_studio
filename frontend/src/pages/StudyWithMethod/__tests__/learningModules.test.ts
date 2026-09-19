@@ -106,6 +106,14 @@ describe('study learning modules', () => {
                 common_mistakes: ['混淆元素与集合'],
                 keywords: ['集合', '元素'],
                 competency_tags: ['数学抽象'],
+                knowledge_items: [{
+                  id: 'membership',
+                  type: 'definition',
+                  name: '元素与集合的关系',
+                  content: '用属于和不属于描述对象与集合之间的关系。',
+                  formulas: ['a\\in A', 'a\\notin A'],
+                  review_status: 'self_checked',
+                }],
               },
               {
                 id: 'math.xj.required-1.operations',
@@ -116,6 +124,14 @@ describe('study learning modules', () => {
                 common_mistakes: ['忽略全集范围'],
                 keywords: ['交集', '并集', '补集'],
                 competency_tags: ['逻辑推理'],
+                knowledge_items: [{
+                  id: 'set-operations',
+                  type: 'formula',
+                  name: '集合的交、并、补运算',
+                  content: '交集取公共元素，并集汇总元素，补集依赖给定全集。',
+                  formulas: ['A\\cap B'],
+                  review_status: 'self_checked',
+                }],
               },
             ],
           }],
@@ -143,6 +159,10 @@ describe('study learning modules', () => {
       summary: '理解集合、元素与表示方法。',
       objectives: ['判断元素与集合的关系'],
       commonMistakes: ['混淆元素与集合'],
+      knowledgeItems: [expect.objectContaining({
+        name: '元素与集合的关系',
+        formulas: ['a\\in A', 'a\\notin A'],
+      })],
     });
     expect(nodes[1]).toMatchObject({
       id: 'math.xj.required-1.operations',

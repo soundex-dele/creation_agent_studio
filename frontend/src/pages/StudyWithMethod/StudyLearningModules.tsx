@@ -10,6 +10,7 @@ import remarkMath from 'remark-math';
 
 import { normalizeMarkdownMath } from '@/lib/markdownMath';
 import type {
+  CurriculumKnowledgeItem,
   CurriculumTree,
   StudyDashboard,
   StudyMastery,
@@ -155,6 +156,24 @@ const nodeMeta: Record<KnowledgeNodeStatus, { label: string; icon: typeof Check 
   current: { label: '当前章节', icon: Sparkles },
 };
 
+const knowledgeItemTypeLabels: Record<CurriculumKnowledgeItem['type'], string> = {
+  concept: '概念',
+  definition: '定义',
+  formula: '公式',
+  theorem: '定理',
+  property: '性质',
+  method: '方法',
+  model: '模型',
+  event: '事件',
+  process: '过程',
+  impact: '影响',
+  comparison: '比较',
+  institution: '制度',
+  person: '人物',
+  cause: '原因',
+  evidence: '史料',
+};
+
 function KnowledgePointMarkdown({ children }: { children: string }) {
   return <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
     {normalizeMarkdownMath(children)}
@@ -205,6 +224,15 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
           </summary>
           <div className="swm-map-details">
             {node.summary && <section><h4>知识摘要</h4><KnowledgePointMarkdown>{node.summary}</KnowledgePointMarkdown></section>}
+            {!!node.knowledgeItems?.length && <section><h4>详细知识点</h4><div className="swm-map-atomic-list">{node.knowledgeItems.map((item) => <article key={item.id} className="swm-map-atomic-item">
+              <header><Tag>{knowledgeItemTypeLabels[item.type]}</Tag><strong>{item.name}</strong></header>
+              <KnowledgePointMarkdown>{item.content}</KnowledgePointMarkdown>
+              {!!item.formulas?.length && <div className="swm-map-formulas">{item.formulas.map((formula) => <KnowledgePointMarkdown key={formula}>{`$$${formula}$$`}</KnowledgePointMarkdown>)}</div>}
+              {!!item.conditions?.length && <div className="swm-map-conditions"><strong>适用条件</strong><ul>{item.conditions.map((condition) => <li key={condition}><KnowledgePointMarkdown>{condition}</KnowledgePointMarkdown></li>)}</ul></div>}
+              {item.conclusion && <div className="swm-map-conclusion"><strong>结论</strong><KnowledgePointMarkdown>{item.conclusion}</KnowledgePointMarkdown></div>}
+              {!!item.common_mistakes?.length && <div className="swm-map-item-mistakes"><strong>易错点</strong><ul>{item.common_mistakes.map((mistake) => <li key={mistake}>{mistake}</li>)}</ul></div>}
+              <Button size="small" onClick={() => onPractice(item.name)}>练习此项</Button>
+            </article>)}</div></section>}
             {!!node.objectives?.length && <section><h4>学习目标</h4><ul>{node.objectives.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}
             {!!node.prerequisites?.length && <section><h4>前置知识</h4><ul>{node.prerequisites.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}
             {!!node.commonMistakes?.length && <section className="swm-map-mistakes"><h4>易错提醒</h4><ul>{node.commonMistakes.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}

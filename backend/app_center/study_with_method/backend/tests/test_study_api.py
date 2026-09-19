@@ -257,6 +257,9 @@ def test_curriculum_tree_and_answer_card_server_side_grading(study_context):
     assert first_point["common_mistakes"]
     assert first_point["keywords"]
     assert first_point["competency_tags"]
+    assert len(first_point["knowledge_items"]) == 5
+    assert first_point["knowledge_items"][0]["name"] == "元素与集合的关系"
+    assert first_point["knowledge_items"][0]["formulas"] == ["a\\in A", "a\\notin A"]
 
     api, created = create_answer_card(study_context)
     assert created.status_code == 201, created.data

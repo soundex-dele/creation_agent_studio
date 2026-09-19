@@ -1278,6 +1278,21 @@
 .swm-map-details p { margin: 0; color: var(--swm-text); line-height: 1.7; }
 .swm-map-details ul { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--swm-text); }
 .swm-map-details li p { display: inline; }
+.swm-map-atomic-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.swm-map-atomic-item { display: grid; align-content: start; gap: 10px; padding: 14px; border: 1px solid var(--swm-border); border-radius: 14px; background: var(--swm-card); }
+.swm-map-atomic-item header { display: flex; align-items: center; gap: 7px; }
+.swm-map-atomic-item header strong { color: var(--swm-ink); }
+.swm-map-atomic-item > p { font-size: 13px; }
+.swm-map-atomic-item > .ant-btn { justify-self: start; margin-top: auto; }
+.swm-map-formulas { display: grid; gap: 6px; overflow-x: auto; padding: 8px; border-radius: 10px; background: var(--swm-soft); }
+.swm-map-formulas .katex-display { margin: 0; text-align: left; }
+.swm-map-conditions,
+.swm-map-conclusion,
+.swm-map-item-mistakes { display: grid; gap: 5px; font-size: 12px; }
+.swm-map-conditions > strong,
+.swm-map-conclusion > strong,
+.swm-map-item-mistakes > strong { color: var(--swm-green-dark); }
+.swm-map-conclusion > p { margin: 0; }
 .swm-map-mistakes { padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--swm-danger) 7%, var(--swm-card)); }
 .swm-map-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .swm-map-details > .ant-btn { justify-self: start; }
@@ -1389,6 +1404,7 @@ html.dark .swm-page .ant-btn-default { color: var(--swm-text); }
   .swm-map-state { grid-column: 3; white-space: normal; }
   .swm-map-list > details > summary > svg:last-child { grid-column: 4; grid-row: 1 / span 2; }
   .swm-map-details { padding: 16px; }
+  .swm-map-atomic-list { grid-template-columns: 1fr; }
   .swm-tutor-entry-grid { grid-template-columns: 1fr; }
   .swm-tutor-entry-grid > button { min-height: 188px; }
   .swm-setup-banner { align-items: flex-start; }

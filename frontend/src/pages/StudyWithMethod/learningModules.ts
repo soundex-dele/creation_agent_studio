@@ -1,4 +1,5 @@
 import type {
+  CurriculumKnowledgeItem,
   CurriculumTree,
   StudyDashboard,
   StudyMastery,
@@ -45,6 +46,7 @@ export interface KnowledgeMapNode {
   commonMistakes?: string[];
   keywords?: string[];
   competencyTags?: string[];
+  knowledgeItems?: CurriculumKnowledgeItem[];
 }
 
 const subjectLabels: Record<StudySubject, string> = {
@@ -177,6 +179,7 @@ export function buildKnowledgeMapNodes(
               commonMistakes: point.common_mistakes,
               keywords: point.keywords,
               competencyTags: point.competency_tags,
+              knowledgeItems: point.knowledge_items,
             });
           });
         });
