@@ -21,6 +21,7 @@ urlpatterns = [
     path("applications/<int:application_id>/study/problems/<uuid:problem_id>/attempts", views.AttemptCreateView.as_view(), name="attempt-create"),
     path("applications/<int:application_id>/study/mistakes", views.MistakeListView.as_view(), name="mistakes"),
     path("applications/<int:application_id>/study/mistakes/<uuid:mistake_id>", views.MistakeDetailView.as_view(), name="mistake-detail"),
+    path("applications/<int:application_id>/study/mistake-check-ins", views.MistakeCheckInView.as_view(), name="mistake-check-ins"),
     path("applications/<int:application_id>/study/reviews", views.ReviewListView.as_view(), name="reviews"),
     path("applications/<int:application_id>/study/reviews/<uuid:review_id>/complete", views.ReviewCompleteView.as_view(), name="review-complete"),
     path("applications/<int:application_id>/study/reports", views.ReportListView.as_view(), name="reports"),

@@ -6,6 +6,7 @@ import type {
   StudyDashboard,
   StudyCatalog,
   StudyMistake,
+  StudyMistakeCheckInSummary,
   StudyProblem,
   StudyProfile,
   StudyProfileInput,
@@ -153,10 +154,27 @@ export const requestVariantProblem = (
 );
 
 export const listStudyMistakes = (
-  organizationId: string, applicationId: string, subject?: StudySubject,
+  organizationId: string,
+  applicationId: string,
+  options?: {
+    subject?: StudySubject;
+    date?: string;
+    month?: string;
+    start_date?: string;
+    end_date?: string;
+  },
 ) => api.get<StudyMistake[]>(
   `${studyRoot(organizationId, applicationId)}/mistakes`,
-  subject ? { subject } : undefined,
+  options,
+);
+
+export const getMistakeCheckInSummary = (
+  organizationId: string,
+  applicationId: string,
+  subject: StudySubject,
+) => api.get<StudyMistakeCheckInSummary>(
+  `${studyRoot(organizationId, applicationId)}/mistake-check-ins`,
+  { subject },
 );
 
 export const importStudyMistake = (

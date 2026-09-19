@@ -100,6 +100,20 @@ export interface StudyMistake {
   updated_at: string;
 }
 
+export interface StudyMistakeCheckIn {
+  id: string;
+  subject: StudySubject;
+  checked_on: string;
+  created_at: string;
+}
+
+export interface StudyMistakeCheckInSummary {
+  subject: StudySubject;
+  checked_in_today: boolean;
+  streak: number;
+  check_ins: StudyMistakeCheckIn[];
+}
+
 export interface ManualStudyMistakeInput {
   problemText: string;
   image?: Blob;

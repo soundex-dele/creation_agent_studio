@@ -5,6 +5,7 @@ from .models import (
     GradeStage,
     GuardianLink,
     KnowledgeMastery,
+    MistakeCheckIn,
     MistakeRecord,
     Problem,
     ReviewSchedule,
@@ -298,6 +299,36 @@ class MistakeSerializer(serializers.ModelSerializer):
             "knowledge_summary", "notes", "correct_answer", "similar_problem_types",
             "mastery", "next_review_at", "created_at", "updated_at",
         )
+
+
+class MistakeListQuerySerializer(serializers.Serializer):
+    subject = serializers.ChoiceField(choices=Subject.choices, required=False)
+    date = serializers.DateField(required=False)
+    month = serializers.RegexField(
+        r"^\d{4}-(0[1-9]|1[0-2])$", required=False
+    )
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        has_range = attrs.get("start_date") or attrs.get("end_date")
+        if bool(attrs.get("start_date")) != bool(attrs.get("end_date")):
+            raise serializers.ValidationError("开始日期和结束日期必须同时提供。")
+        if sum(bool(value) for value in (attrs.get("date"), attrs.get("month"), has_range)) > 1:
+            raise serializers.ValidationError("日期、月份和日期范围不能同时使用。")
+        if has_range and attrs["start_date"] > attrs["end_date"]:
+            raise serializers.ValidationError("开始日期不能晚于结束日期。")
+        return attrs
+
+
+class MistakeCheckInInputSerializer(serializers.Serializer):
+    subject = serializers.ChoiceField(choices=Subject.choices, required=False)
+
+
+class MistakeCheckInSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MistakeCheckIn
+        fields = ("id", "subject", "checked_on", "created_at")
 
 
 class ReviewSerializer(serializers.ModelSerializer):

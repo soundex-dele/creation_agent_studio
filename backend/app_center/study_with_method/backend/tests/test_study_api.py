@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta
 from io import BytesIO
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -24,6 +25,7 @@ from ..install import _seed_curriculum
 from ..models import (
     GradeStage,
     GuardianLink,
+    MistakeCheckIn,
     MistakeRecord,
     Problem,
     ReviewSchedule,
@@ -530,6 +532,117 @@ def test_manual_mistake_import_accepts_text_image_and_learning_details(study_con
         )
     finally:
         image_mistake.problem.source_image.delete(save=False)
+
+
+@pytest.mark.django_db
+def test_mistakes_can_be_filtered_by_record_date(study_context):
+    assert create_profile(study_context).status_code == 200
+    student = client(study_context["student"])
+    endpoint = f"{root(study_context)}/mistakes"
+
+    yesterday_response = student.post(
+        endpoint,
+        {"problem_text": "昨天的错题", "cause": "concept"},
+        format="multipart",
+    )
+    today_response = student.post(
+        endpoint,
+        {"problem_text": "今天的错题", "cause": "calculation"},
+        format="multipart",
+    )
+    assert yesterday_response.status_code == 201
+    assert today_response.status_code == 201
+
+    current_date = timezone.localdate()
+    previous_month_date = (current_date.replace(day=1) - timedelta(days=1)).replace(day=15)
+    previous_month = timezone.make_aware(
+        datetime.combine(previous_month_date, time(hour=12))
+    )
+    MistakeRecord.objects.filter(pk=yesterday_response.data["id"]).update(
+        created_at=previous_month
+    )
+
+    today_result = student.get(
+        endpoint,
+        {"subject": "math", "date": current_date.isoformat()},
+    )
+    yesterday_result = student.get(
+        endpoint,
+        {"subject": "math", "date": previous_month_date.isoformat()},
+    )
+
+    assert today_result.status_code == 200
+    assert [item["id"] for item in today_result.data] == [today_response.data["id"]]
+    assert yesterday_result.status_code == 200
+    assert [item["id"] for item in yesterday_result.data] == [yesterday_response.data["id"]]
+    current_month_result = student.get(
+        endpoint, {"subject": "math", "month": current_date.strftime("%Y-%m")}
+    )
+    previous_month_result = student.get(
+        endpoint,
+        {"subject": "math", "month": previous_month_date.strftime("%Y-%m")},
+    )
+    assert [item["id"] for item in current_month_result.data] == [today_response.data["id"]]
+    assert [item["id"] for item in previous_month_result.data] == [
+        yesterday_response.data["id"]
+    ]
+    week_start = current_date - timedelta(days=current_date.weekday())
+    week_result = student.get(
+        endpoint,
+        {
+            "subject": "math",
+            "start_date": week_start.isoformat(),
+            "end_date": (week_start + timedelta(days=6)).isoformat(),
+        },
+    )
+    assert [item["id"] for item in week_result.data] == [today_response.data["id"]]
+    assert len(student.get(endpoint, {"subject": "math"}).data) == 2
+    assert student.get(endpoint, {"date": "2026-99-99"}).status_code == 400
+    assert student.get(endpoint, {"month": "2026-13"}).status_code == 400
+    assert student.get(
+        endpoint,
+        {"date": current_date.isoformat(), "month": current_date.strftime("%Y-%m")},
+    ).status_code == 400
+    assert student.get(endpoint, {"start_date": current_date.isoformat()}).status_code == 400
+
+
+@pytest.mark.django_db
+def test_mistake_check_in_is_daily_idempotent_and_reports_streak(study_context):
+    assert create_profile(study_context).status_code == 200
+    student = client(study_context["student"])
+    profile = StudyProfile.objects.get(student=study_context["student"])
+    today = timezone.localdate()
+    for days_ago in (2, 1):
+        MistakeCheckIn.objects.create(
+            organization=study_context["organization"],
+            profile=profile,
+            subject="math",
+            checked_on=today - timedelta(days=days_ago),
+        )
+
+    mistakes_endpoint = f"{root(study_context)}/mistakes"
+    first = student.post(
+        mistakes_endpoint,
+        {"problem_text": "第一道今日错题", "cause": "concept"},
+        format="multipart",
+    )
+    second = student.post(
+        mistakes_endpoint,
+        {"problem_text": "第二道今日错题", "cause": "calculation"},
+        format="multipart",
+    )
+    endpoint = f"{root(study_context)}/mistake-check-ins"
+    summary = student.get(endpoint, {"subject": "math"})
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert summary.status_code == 200
+    assert summary.data["checked_in_today"] is True
+    assert summary.data["streak"] == 3
+    assert len(summary.data["check_ins"]) == 3
+    assert MistakeCheckIn.objects.filter(profile=profile, subject="math").count() == 3
+    assert student.post(endpoint, {"subject": "math"}, format="json").status_code == 405
+    assert student.get(endpoint, {"subject": "not-a-subject"}).status_code == 400
 
 
 @pytest.mark.django_db

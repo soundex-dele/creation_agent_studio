@@ -22,6 +22,7 @@ from .models import (
     CurriculumNode,
     GradeStage,
     KnowledgeMastery,
+    MistakeCheckIn,
     MistakeRecord,
     Problem,
     ReviewSchedule,
@@ -194,7 +195,7 @@ def record_attempt(
             update_fields=("attempts_count", "correct_count", "score", "updated_at")
         )
     if is_correct is False:
-        mistake, _ = MistakeRecord.objects.get_or_create(
+        mistake, mistake_created = MistakeRecord.objects.get_or_create(
             organization=problem.organization,
             profile=problem.profile,
             problem=problem,
@@ -214,6 +215,13 @@ def record_attempt(
                 "next_review_at": timezone.now() + timedelta(days=REVIEW_INTERVALS[0]),
             },
         )
+        if mistake_created:
+            MistakeCheckIn.objects.get_or_create(
+                organization=problem.organization,
+                profile=problem.profile,
+                subject=problem.subject,
+                checked_on=timezone.localdate(),
+            )
     problem.status = Problem.Status.COMPLETED
     problem.save(update_fields=("status", "updated_at"))
     return attempt

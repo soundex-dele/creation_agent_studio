@@ -4,23 +4,26 @@ import {
 } from 'react';
 import { Button, Collapse, Empty, Input, message, Modal, Progress, Select, Skeleton, Slider, Tag } from 'antd';
 import {
-  ArrowLeft, BookOpenCheck, Camera, Check, ChevronRight, CircleUserRound, Clock3, Compass,
-  Download, ImagePlus, ListChecks, MessageCircle, RefreshCcw, Send, Settings2,
+  ArrowLeft, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
+  CircleUserRound, Clock3, Compass, Download, Flame, ImagePlus, ListChecks, MessageCircle,
+  RefreshCcw, Send, Settings2,
   Sparkles, Trash2, UserRoundPlus,
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import {
-  addGuardianLink, completeStudyReview, createTutorSession, deleteStudyData, exportStudyData,
-  generateWeeklyQuiz, generateWeeklyReport, getWeeklyReportSummary, importStudyMistake,
+  addGuardianLink, completeStudyReview, createTutorSession, deleteStudyData,
+  exportStudyData, generateWeeklyQuiz, generateWeeklyReport, getMistakeCheckInSummary,
+  getWeeklyReportSummary, importStudyMistake,
   listGuardianLinks, listStudyMistakes, listStudyReviews, listStudyTutors, listTutorSessions,
   listWeeklyQuizzes, loadStudyCatalog, loadStudyDashboard, removeGuardianLink, saveStudyProfile,
   submitStudyAttempt, submitWeeklyQuiz, updateStudyEnrollment, updateStudyTask,
 } from '@/services/studyWithMethod';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import type {
-  GradeStage, GuardianLink, StudyCatalog, StudyDashboard, StudyMistake, StudyProblem,
+  GradeStage, GuardianLink, StudyCatalog, StudyDashboard, StudyMistake,
+  StudyMistakeCheckInSummary, StudyProblem,
   StudyReportSummary, StudyReview, StudySubject, StudyTutor, StudyTutorSession,
   WeeklyReport, WeeklyQuiz,
 } from '@/types/studyWithMethod';
@@ -40,6 +43,7 @@ import './StudyWithMethodPage.css';
 
 type StudentTab = 'today' | 'tutor' | 'mistakes' | 'review' | 'me';
 type TutorMode = 'hub' | 'photo' | 'chat';
+type MistakeFilterMode = 'week' | 'all' | 'month' | 'date';
 
 const tabs: StudentTab[] = ['today', 'tutor', 'mistakes', 'review', 'me'];
 const subjectLabels: Record<StudySubject, string> = {
@@ -69,6 +73,58 @@ function errorText(error: unknown, fallback: string) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(value));
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function localMonthKey(date = new Date()) {
+  return localDateKey(date).slice(0, 7);
+}
+
+function mistakeFilterFromSearch(params: URLSearchParams): MistakeFilterMode {
+  if (params.get('date')) return 'date';
+  if (params.get('month')) return 'month';
+  if (params.get('scope') === 'all') return 'all';
+  return 'week';
+}
+
+function mistakeDateFromSearch(params: URLSearchParams) {
+  const value = params.get('date');
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return localDateKey();
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? localDateKey() : value;
+}
+
+function mistakeMonthFromSearch(params: URLSearchParams) {
+  const value = params.get('month');
+  return value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : localMonthKey();
+}
+
+function formatLongDate(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatMonth(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long' })
+    .format(new Date(`${value}-01T00:00:00`));
+}
+
+function currentWeekDateKeys() {
+  const today = new Date();
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return localDateKey(date);
+  });
 }
 
 async function compressStudyImage(file: File) {
@@ -166,6 +222,11 @@ export default function StudyWithMethodPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState('');
   const [mistakes, setMistakes] = useState<StudyMistake[]>([]);
+  const [mistakeFilter, setMistakeFilter] = useState<MistakeFilterMode>(() => mistakeFilterFromSearch(searchParams));
+  const [mistakeDate, setMistakeDate] = useState(() => mistakeDateFromSearch(searchParams));
+  const [mistakeMonth, setMistakeMonth] = useState(() => mistakeMonthFromSearch(searchParams));
+  const [mistakesLoading, setMistakesLoading] = useState(false);
+  const [checkInSummary, setCheckInSummary] = useState<StudyMistakeCheckInSummary | null>(null);
   const [reviews, setReviews] = useState<StudyReview[]>([]);
   const [quiz, setQuiz] = useState<WeeklyQuiz | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, boolean>>({});
@@ -215,7 +276,31 @@ export default function StudyWithMethodPage() {
   useEffect(() => {
     if (!organizationId || !applicationId || dashboard?.mode !== 'student') return;
     if (tab === 'tutor') void Promise.all([listStudyTutors(organizationId, applicationId), listTutorSessions(organizationId, applicationId)]).then(([nextTutors, nextSessions]) => { setTutors(nextTutors); setSessions(nextSessions); });
-    if (tab === 'mistakes') void listStudyMistakes(organizationId, applicationId).then(setMistakes);
+    let cancelled = false;
+    if (tab === 'mistakes') {
+      setMistakesLoading(true);
+      const weekDates = currentWeekDateKeys();
+      const mistakeQuery = {
+        subject: activeSubject,
+        ...(mistakeFilter === 'week' ? { start_date: weekDates[0], end_date: weekDates[6] } : {}),
+        ...(mistakeFilter === 'date' ? { date: mistakeDate } : {}),
+        ...(mistakeFilter === 'month' ? { month: mistakeMonth } : {}),
+      };
+      void Promise.all([
+        listStudyMistakes(organizationId, applicationId, mistakeQuery),
+        listStudyReviews(organizationId, applicationId, { subject: activeSubject, dueOnly: false }),
+        getMistakeCheckInSummary(organizationId, applicationId, activeSubject),
+      ]).then(([nextMistakes, nextReviews, nextCheckIn]) => {
+        if (cancelled) return;
+        setMistakes(nextMistakes);
+        setReviews(nextReviews);
+        setCheckInSummary(nextCheckIn);
+      }).catch((error) => {
+        if (!cancelled) message.error(errorText(error, '加载错题记录失败'));
+      }).finally(() => {
+        if (!cancelled) setMistakesLoading(false);
+      });
+    }
     if (tab === 'review') void Promise.all([
       listStudyReviews(organizationId, applicationId, { dueOnly: false }),
       listWeeklyQuizzes(organizationId, applicationId, activeSubject),
@@ -227,7 +312,44 @@ export default function StudyWithMethodPage() {
       setQuizAnswers({});
     });
     if (tab === 'me') void Promise.all([getWeeklyReportSummary(organizationId, applicationId), listGuardianLinks(organizationId, applicationId)]).then(([summary, links]) => { setReportSummary(summary); setGuardians(links); });
-  }, [activeSubject, applicationId, dashboard?.mode, organizationId, tab]);
+    return () => { cancelled = true; };
+  }, [activeSubject, applicationId, dashboard?.mode, mistakeDate, mistakeFilter, mistakeMonth, organizationId, tab]);
+
+  const changeMistakeFilter = useCallback((mode: MistakeFilterMode) => {
+    setMistakeFilter(mode);
+    setSearchParams((current) => {
+      const value = new URLSearchParams(current);
+      value.delete('date');
+      value.delete('month');
+      value.delete('scope');
+      if (mode === 'all') value.set('scope', 'all');
+      if (mode === 'date') value.set('date', mistakeDate);
+      if (mode === 'month') value.set('month', mistakeMonth);
+      return value;
+    }, { replace: true });
+  }, [mistakeDate, mistakeMonth, setSearchParams]);
+
+  const changeMistakeDate = useCallback((date: string) => {
+    setMistakeDate(date);
+    setSearchParams((current) => {
+      const value = new URLSearchParams(current);
+      value.delete('month');
+      value.delete('scope');
+      value.set('date', date);
+      return value;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const changeMistakeMonth = useCallback((month: string) => {
+    setMistakeMonth(month);
+    setSearchParams((current) => {
+      const value = new URLSearchParams(current);
+      value.delete('date');
+      value.delete('scope');
+      value.set('month', month);
+      return value;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const saveProfile = async (value: { grade: GradeStage; subjects: StudySubject[]; focus: StudySubject[]; minutes: number }) => {
     if (!organizationId || !applicationId) return false;
@@ -295,7 +417,20 @@ export default function StudyWithMethodPage() {
   const saveMistake = async () => {
     if (!organizationId || !applicationId || (!mistakeFile && !mistakeText.trim())) return;
     setBusy('mistake');
-    try { const image = mistakeFile ? await compressStudyImage(mistakeFile) : undefined; const created = await importStudyMistake(organizationId, applicationId, { problemText: mistakeText.trim(), image, knowledgeSummary: '', cause: mistakeCause, notes: mistakeNotes.trim(), correctAnswer: '', similarProblemTypes: [] }, activeSubject, studentDashboard?.profile.grade_stage || 'high_2'); setMistakes((items) => [created, ...items]); setMistakeOpen(false); setMistakeFile(null); setMistakeUrl(''); setMistakeText(''); setMistakeNotes(''); message.success('错题已收好，并安排了复习'); await reload(); }
+    try {
+      const image = mistakeFile ? await compressStudyImage(mistakeFile) : undefined;
+      const created = await importStudyMistake(organizationId, applicationId, { problemText: mistakeText.trim(), image, knowledgeSummary: '', cause: mistakeCause, notes: mistakeNotes.trim(), correctAnswer: '', similarProblemTypes: [] }, activeSubject, studentDashboard?.profile.grade_stage || 'high_2');
+      const today = localDateKey();
+      const visibleInCurrentFilter = mistakeFilter === 'all'
+        || mistakeFilter === 'week'
+        || (mistakeFilter === 'date' && mistakeDate === today)
+        || (mistakeFilter === 'month' && mistakeMonth === today.slice(0, 7));
+      if (visibleInCurrentFilter) setMistakes((items) => [created, ...items]);
+      setCheckInSummary(await getMistakeCheckInSummary(organizationId, applicationId, activeSubject));
+      setMistakeOpen(false); setMistakeFile(null); setMistakeUrl(''); setMistakeText(''); setMistakeNotes('');
+      message.success('错题已收好，今日打卡完成');
+      await reload();
+    }
     catch (error) { message.error(errorText(error, '录入错题失败')); } finally { setBusy(''); }
   };
 
@@ -316,7 +451,7 @@ export default function StudyWithMethodPage() {
       <header className="swm-mobile-header"><div><span className="swm-eyebrow">{gradeLabels[dashboard.profile.grade_stage]} · {dashboard.profile.enrollments.length} 门学科</span><h1>{tab === 'today' ? `今天也稳稳向前，${dashboard.profile.display_name || dashboard.profile.student_name}` : navItems.find((item) => item.key === tab)?.label}</h1></div><div className="swm-logo"><Compass size={24} /></div></header>
       {tab === 'today' && <TodayView dashboard={dashboard} onTutor={openTutor} onReview={() => openReviewModule('due', dashboard.due_reviews[0]?.subject)} onOpenModule={openReviewModule} onMethodology={() => setMethodologyOpen(true)} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
       {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
-      {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} reviews={reviews} setReviews={setReviews} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
+      {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} reviews={reviews} setReviews={setReviews} filterMode={mistakeFilter} mistakeDate={mistakeDate} mistakeMonth={mistakeMonth} onFilterChange={changeMistakeFilter} onDateChange={changeMistakeDate} onMonthChange={changeMistakeMonth} loading={mistakesLoading} checkInSummary={checkInSummary} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
       {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} quiz={quiz} setQuiz={setQuiz} quizAnswers={quizAnswers} setQuizAnswers={setQuizAnswers} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} />}
       {tab === 'me' && <ProfileView dashboard={dashboard} reportSummary={reportSummary} setReportSummary={setReportSummary} guardians={guardians} setGuardians={setGuardians} organizationId={organizationId} applicationId={applicationId} setActiveSubject={setActiveSubject} onEditProfile={openProfileSettings} openEnrollment={(item) => { setActiveSubject(item.subject); setCurriculumVersion(item.curriculum_version || '通用高中课程'); setCurrentChapter(item.current_chapter); setEnrollmentOpen(true); }} reload={reload} />}
     </main>
@@ -523,10 +658,43 @@ function TutorView(props: {
   </section>;
 }
 
-function MistakesView({ catalog, enabledSubjects, activeSubject, setActiveSubject, mistakes, reviews, setReviews, open, onTutor, organizationId, applicationId }: { catalog: StudyCatalog; enabledSubjects: StudySubject[]; activeSubject: StudySubject; setActiveSubject: (value: StudySubject) => void; mistakes: StudyMistake[]; reviews: StudyReview[]; setReviews: Dispatch<SetStateAction<StudyReview[]>>; open: () => void; onTutor: (subject: StudySubject) => void; organizationId: string; applicationId: string }) {
+function MistakesView({
+  catalog, enabledSubjects, activeSubject, setActiveSubject, mistakes, reviews, setReviews,
+  filterMode, mistakeDate, mistakeMonth, onFilterChange, onDateChange, onMonthChange,
+  loading, checkInSummary, open, onTutor, organizationId, applicationId,
+}: {
+  catalog: StudyCatalog;
+  enabledSubjects: StudySubject[];
+  activeSubject: StudySubject;
+  setActiveSubject: (value: StudySubject) => void;
+  mistakes: StudyMistake[];
+  reviews: StudyReview[];
+  setReviews: Dispatch<SetStateAction<StudyReview[]>>;
+  filterMode: MistakeFilterMode;
+  mistakeDate: string;
+  mistakeMonth: string;
+  onFilterChange: (value: MistakeFilterMode) => void;
+  onDateChange: (value: string) => void;
+  onMonthChange: (value: string) => void;
+  loading: boolean;
+  checkInSummary: StudyMistakeCheckInSummary | null;
+  open: () => void;
+  onTutor: (subject: StudySubject) => void;
+  organizationId: string;
+  applicationId: string;
+}) {
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [masteredIds, setMasteredIds] = useState<string[]>([]);
   const filtered = mistakes.filter((item) => item.subject === activeSubject && !masteredIds.includes(item.id));
+  const today = localDateKey();
+  const activeCheckInSummary = checkInSummary?.subject === activeSubject ? checkInSummary : null;
+  const weekDates = currentWeekDateKeys();
+  const checkedDateKeys = new Set(activeCheckInSummary?.check_ins.map((item) => item.checked_on) || []);
+  const checkedThisWeek = weekDates.filter((date) => checkedDateKeys.has(date)).length;
+  const filterDescription = filterMode === 'week'
+    ? '本周错题'
+    : filterMode === 'all' ? '全部错题'
+      : filterMode === 'month' ? formatMonth(mistakeMonth) : formatLongDate(mistakeDate);
   const markMastered = async (mistake: StudyMistake) => {
     const review = reviews.find((item) => item.mistake.id === mistake.id);
     if (review) {
@@ -539,12 +707,45 @@ function MistakesView({ catalog, enabledSubjects, activeSubject, setActiveSubjec
   return <section className="swm-view">
     <SubjectChips catalog={catalog} selected={activeSubject} enabled={enabledSubjects} onChange={(subject) => { setActiveSubject(subject); setOpenedId(null); }} />
     <div className="swm-section-title"><div><span className="swm-eyebrow">错题不是终点</span><h2>错题再战</h2></div><Button type="primary" icon={<Camera size={17} />} onClick={open}>拍照录入</Button></div>
-    <p className="swm-section-description">先遮住解析再做一次，只需点选结果，不用填写复盘文字。</p>
-    {filtered.map((mistake) => {
+    <p className="swm-section-description">新增一道错题即完成当天打卡；先遮住解析再做一次，逐步把错题变成会做的题。</p>
+    <article className="swm-week-check-in" aria-label={`本周已打卡 ${checkedThisWeek} 天`}>
+      <div className="swm-week-check-in-heading">
+        <span className="swm-check-in-icon"><Flame size={22} aria-hidden="true" /></span>
+        <div><strong>本周打卡</strong><span>{subjectLabels[activeSubject]} · 新增错题自动打卡</span></div>
+        <div><strong>{checkedThisWeek}<small> / 7 天</small></strong><span>连续 {activeCheckInSummary?.streak ?? 0} 天</span></div>
+      </div>
+      <div className="swm-week-days">
+        {weekDates.map((date, index) => {
+          const checked = checkedDateKeys.has(date);
+          const future = date > today;
+          return <div key={date} aria-current={date === today ? 'date' : undefined} className={`${checked ? 'is-checked' : ''} ${date === today ? 'is-today' : ''} ${future ? 'is-future' : ''}`}>
+            <span>周{['一', '二', '三', '四', '五', '六', '日'][index]}</span>
+            <strong>{Number(date.slice(-2))}</strong>
+            <small>{checked ? <><CheckCircle2 size={13} aria-hidden="true" />已打卡</> : future ? '未到' : '未打卡'}</small>
+          </div>;
+        })}
+      </div>
+    </article>
+    <div className="swm-mistake-filter-panel">
+      <div className="swm-mistake-filter-modes" role="group" aria-label="错题时间范围">
+        {([['week', '本周'], ['all', '全部'], ['month', '按月份'], ['date', '按日期']] as const).map(([value, label]) => <button
+          type="button"
+          key={value}
+          className={filterMode === value ? 'active' : ''}
+          aria-pressed={filterMode === value}
+          onClick={() => onFilterChange(value)}
+        >{label}</button>)}
+      </div>
+      {filterMode === 'month' && <label htmlFor="swm-mistake-month"><span>选择月份</span><input id="swm-mistake-month" type="month" value={mistakeMonth} max={localMonthKey()} onChange={(event) => { if (event.target.value) onMonthChange(event.target.value); }} /></label>}
+      {filterMode === 'date' && <label htmlFor="swm-mistake-date"><span>选择日期</span><input id="swm-mistake-date" type="date" value={mistakeDate} max={today} onChange={(event) => { if (event.target.value) onDateChange(event.target.value); }} /></label>}
+      <span className="swm-filter-result" role="status">正在查看：{filterDescription}</span>
+    </div>
+    {loading && <div className="swm-mistake-loading" aria-busy="true" aria-label="正在加载错题"><Skeleton active paragraph={{ rows: 3 }} /></div>}
+    {!loading && filtered.map((mistake) => {
       const opened = openedId === mistake.id;
       const answer = mistake.correct_answer || mistake.knowledge_summary;
       return <article className={`swm-mistake-card swm-battle-card ${opened ? 'is-open' : ''}`} key={mistake.id}>
-        <div className="swm-card-heading"><Tag>{mistake.cause_label}</Tag><span>掌握度 {mistake.mastery}%</span></div>
+        <div className="swm-card-heading"><div><Tag>{mistake.cause_label}</Tag><span className="swm-muted">记录于 {formatDate(mistake.created_at)}</span></div><span>掌握度 {mistake.mastery}%</span></div>
         {mistake.problem.source_image_url && <img src={mistake.problem.source_image_url} alt={`${subjectLabels[mistake.subject]}错题`} />}
         <p>{mistake.problem.confirmed_text || mistake.problem.original_text || '看题图，先独立重做这道题'}</p>
         {!opened ? <Button size="large" block onClick={() => setOpenedId(mistake.id)}>开始再做一次</Button> : <>
@@ -558,7 +759,7 @@ function MistakesView({ catalog, enabledSubjects, activeSubject, setActiveSubjec
         <span className="swm-muted">下次复习：{mistake.next_review_at ? formatDate(mistake.next_review_at) : '待安排'}</span>
       </article>;
     })}
-    {!filtered.length && <div className="swm-module-empty"><Empty description={`当前没有待再战的${subjectLabels[activeSubject]}错题`} />{masteredIds.length > 0 && <Button icon={<RefreshCcw size={17} />} onClick={() => setMasteredIds([])}>重新查看</Button>}</div>}
+    {!loading && !filtered.length && <div className="swm-module-empty"><Empty description={`${filterDescription}没有待再战的${subjectLabels[activeSubject]}错题`} />{masteredIds.length > 0 ? <Button icon={<RefreshCcw size={17} />} onClick={() => setMasteredIds([])}>重新查看</Button> : filterMode !== 'all' ? <Button icon={<CalendarDays size={17} />} onClick={() => onFilterChange('all')}>查看全部错题</Button> : <Button type="primary" icon={<Camera size={17} />} onClick={open}>录入第一道错题</Button>}</div>}
   </section>;
 }
 

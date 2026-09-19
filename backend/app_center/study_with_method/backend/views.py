@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -40,6 +41,9 @@ from .serializers import (
     GuardianLinkSerializer,
     ManualMistakeInputSerializer,
     MasterySerializer,
+    MistakeCheckInInputSerializer,
+    MistakeCheckInSerializer,
+    MistakeListQuerySerializer,
     MistakeSerializer,
     MistakeUpdateSerializer,
     ProblemInputSerializer,
@@ -667,10 +671,24 @@ class MistakeListView(StudyAPIView):
         mistakes = profile.mistakes.select_related(
             "problem", "knowledge_point", "review_schedule"
         ).prefetch_related("problem__attempts")
-        subject = request.query_params.get("subject")
-        if subject:
+        query = MistakeListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        if subject := query.validated_data.get("subject"):
             mistakes = mistakes.filter(subject=subject)
-        return Response(MistakeSerializer(mistakes[:100], many=True, context={"request": request}).data)
+        if recorded_on := query.validated_data.get("date"):
+            mistakes = mistakes.filter(created_at__date=recorded_on)
+        if month := query.validated_data.get("month"):
+            year, month_number = (int(part) for part in month.split("-"))
+            mistakes = mistakes.filter(
+                created_at__year=year,
+                created_at__month=month_number,
+            )
+        if start_date := query.validated_data.get("start_date"):
+            mistakes = mistakes.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=query.validated_data["end_date"],
+            )
+        return Response(MistakeSerializer(mistakes, many=True, context={"request": request}).data)
 
     def post(self, request, organization_id, application_id):
         profile, error = self.require_profile(request, organization_id, application_id)
@@ -762,6 +780,40 @@ class MistakeDetailView(StudyAPIView):
                 setattr(mistake, field, data[field])
         mistake.save(update_fields=(*data.keys(), "updated_at"))
         return Response(MistakeSerializer(mistake, context={"request": request}).data)
+
+
+def mistake_check_in_summary(profile, subject, request):
+    today = timezone.localdate()
+    check_ins = profile.mistake_check_ins.filter(subject=subject)
+    checked_dates = set(
+        check_ins.filter(checked_on__gte=today - timedelta(days=365))
+        .values_list("checked_on", flat=True)
+    )
+    checked_in_today = today in checked_dates
+    cursor = today if checked_in_today else today - timedelta(days=1)
+    streak = 0
+    while cursor in checked_dates:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return {
+        "subject": subject,
+        "checked_in_today": checked_in_today,
+        "streak": streak,
+        "check_ins": MistakeCheckInSerializer(
+            check_ins[:14], many=True, context={"request": request}
+        ).data,
+    }
+
+
+class MistakeCheckInView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        serializer = MistakeCheckInInputSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        subject = serializer.validated_data.get("subject") or profile.primary_subject
+        return Response(mistake_check_in_summary(profile, subject, request))
 
 
 class ReviewListView(StudyAPIView):
@@ -948,6 +1000,9 @@ class ExportView(StudyAPIView):
                 profile.mistakes.select_related("problem", "review_schedule").prefetch_related("problem__attempts"),
                 many=True,
                 context={"request": request},
+            ).data,
+            "mistake_check_ins": MistakeCheckInSerializer(
+                profile.mistake_check_ins.all(), many=True
             ).data,
             "reports": WeeklyReportSerializer(profile.weekly_reports.all(), many=True).data,
             "quizzes": WeeklyQuizSerializer(profile.weekly_quizzes.all(), many=True).data,

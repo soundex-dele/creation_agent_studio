@@ -1041,6 +1041,98 @@
 }
 
 .swm-section-description { margin: -4px 0 16px; line-height: 1.65; }
+.swm-week-check-in {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 18px;
+  border: 1px solid var(--swm-border);
+  border-radius: 20px;
+  background: var(--swm-card);
+  box-shadow: var(--swm-shadow-sm);
+}
+.swm-week-check-in-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.swm-week-check-in-heading > div { display: grid; min-width: 0; gap: 3px; }
+.swm-week-check-in-heading > div:last-child { text-align: right; }
+.swm-week-check-in-heading > div:last-child strong { color: var(--swm-green-dark); font-size: 20px; font-variant-numeric: tabular-nums; }
+.swm-week-check-in-heading > div:last-child small { color: var(--swm-muted-text); font-size: 11px; font-weight: 500; }
+.swm-week-check-in-heading span { color: var(--swm-muted-text); font-size: 12px; line-height: 1.45; }
+.swm-check-in-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 14px;
+  color: #745c25;
+  background: color-mix(in srgb, var(--swm-warm) 30%, var(--swm-card));
+}
+.swm-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; }
+.swm-week-days > div {
+  display: grid;
+  min-width: 0;
+  min-height: 78px;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid var(--swm-border);
+  border-radius: 14px;
+  color: var(--swm-muted-text);
+  background: var(--swm-soft);
+}
+.swm-week-days > div > span { font-size: 10px; }
+.swm-week-days > div > strong { color: var(--swm-ink); font-size: 17px; font-variant-numeric: tabular-nums; }
+.swm-week-days > div > small { display: flex; align-items: center; gap: 2px; font-size: 10px; white-space: nowrap; }
+.swm-week-days > div.is-checked { border-color: var(--swm-green); color: var(--swm-green-dark); background: var(--swm-mint); }
+.swm-week-days > div.is-today { box-shadow: inset 0 0 0 1px var(--swm-green); }
+.swm-week-days > div.is-future { opacity: .58; }
+.swm-mistake-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid var(--swm-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--swm-card) 82%, transparent);
+}
+.swm-mistake-filter-modes { display: grid; grid-template-columns: repeat(4, auto); gap: 5px; }
+.swm-mistake-filter-modes button {
+  min-height: 44px;
+  padding: 0 15px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--swm-text);
+  background: transparent;
+  cursor: pointer;
+}
+.swm-mistake-filter-modes button.active { border-color: var(--swm-green); color: #fff; background: var(--swm-green); }
+.swm-mistake-filter-panel > label { display: flex; align-items: center; gap: 8px; color: var(--swm-muted-text); font-size: 12px; }
+.swm-mistake-filter-panel input {
+  min-width: 150px;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 1px solid var(--swm-border);
+  border-radius: 12px;
+  color: var(--swm-ink);
+  color-scheme: light;
+  background: var(--swm-soft);
+  cursor: pointer;
+}
+.swm-filter-result { margin-left: auto; color: var(--swm-muted-text); font-size: 12px; }
+.swm-mistake-loading {
+  margin-bottom: 12px;
+  padding: 22px;
+  border: 1px solid var(--swm-border);
+  border-radius: 22px;
+  background: var(--swm-card);
+}
+.swm-battle-card .swm-card-heading > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .swm-action-section .swm-section-title { margin-bottom: 12px; }
 .swm-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .swm-action-grid > button {
@@ -1219,6 +1311,7 @@ html.dark .swm-page {
 }
 
 html.dark .swm-onboarding { background: linear-gradient(180deg, #10201a, var(--swm-paper)); }
+html.dark .swm-mistake-filter-panel input { color-scheme: dark; }
 html.dark .swm-platform-header,
 html.dark .swm-bottom-nav { background: rgba(24, 42, 36, .94); }
 html.dark .swm-mobile-header h1,
@@ -1252,6 +1345,17 @@ html.dark .swm-page .ant-btn-default { color: var(--swm-text); }
   .swm-onboarding-actions .ant-btn:last-child { flex: 1; }
   .swm-quick-start { grid-template-columns: 1fr; }
   .swm-action-grid { grid-template-columns: 1fr; }
+  .swm-week-check-in { padding: 14px 10px; }
+  .swm-week-check-in-heading { padding-inline: 4px; }
+  .swm-week-days { gap: 4px; }
+  .swm-week-days > div { min-height: 72px; border-radius: 11px; }
+  .swm-week-days > div > small { font-size: 9px; }
+  .swm-mistake-filter-panel { display: grid; }
+  .swm-mistake-filter-modes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .swm-mistake-filter-modes button { min-width: 0; padding-inline: 8px; }
+  .swm-mistake-filter-panel > label { display: grid; grid-template-columns: auto 1fr; }
+  .swm-mistake-filter-panel input { width: 100%; min-width: 0; }
+  .swm-filter-result { margin-left: 0; }
   .swm-action-grid > button { min-height: 96px; }
   .swm-module-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .swm-module-picker > button { min-height: 72px; }

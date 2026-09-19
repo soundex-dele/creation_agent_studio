@@ -329,6 +329,28 @@ class MistakeRecord(TenantOwnedModel):
         ordering = ("-updated_at",)
 
 
+class MistakeCheckIn(TenantOwnedModel):
+    """A student's once-per-day commitment to revisit mistakes for one subject."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(
+        StudyProfile, on_delete=models.CASCADE, related_name="mistake_check_ins"
+    )
+    subject = models.CharField(max_length=32, choices=Subject.choices, db_index=True)
+    checked_on = models.DateField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "study_mistake_check_ins"
+        ordering = ("-checked_on", "-created_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("profile", "subject", "checked_on"),
+                name="unique_study_mistake_check_in",
+            )
+        ]
+
+
 class ReviewSchedule(TenantOwnedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     profile = models.ForeignKey(
