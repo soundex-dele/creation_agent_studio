@@ -16,7 +16,7 @@ import {
 } from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { SELECTABLE_THEME_PRESETS } from '@/components/Theme/themePresets';
+import { DEFAULT_THEME_ID, SELECTABLE_THEME_PRESETS } from '@/components/Theme/themePresets';
 import {
   DEFAULT_NAVIGATION_ICONS,
   HEADER_NAV_ITEMS,
@@ -55,7 +55,7 @@ export default function SettingsPage() {
 
   const reset = () => {
     resetPreferences();
-    setTheme('dark');
+    setTheme(DEFAULT_THEME_ID);
     message.success('偏好设置已恢复默认值');
   };
 

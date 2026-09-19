@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
+  DEFAULT_THEME_ID,
   getThemePreset,
   isSelectableThemeId,
   type ThemeId,
@@ -40,7 +41,7 @@ export function applyThemeToDOM(theme: ThemeMode): void {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: 'dark',
+      theme: DEFAULT_THEME_ID,
 
       setTheme: (theme: ThemeMode) => {
         set({ theme });
@@ -61,7 +62,7 @@ export const useThemeStore = create<ThemeState>()(
       partialize: (state) => ({ theme: state.theme }),
       merge: (persisted, current) => {
         const savedTheme = (persisted as Partial<ThemeState> | undefined)?.theme;
-        return { ...current, theme: isSelectableThemeId(savedTheme) ? savedTheme : 'dark' };
+        return { ...current, theme: isSelectableThemeId(savedTheme) ? savedTheme : DEFAULT_THEME_ID };
       },
       onRehydrateStorage: () => (state) => {
         if (state) {

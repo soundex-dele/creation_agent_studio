@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_THEME_ID,
   getThemePreset,
   isSelectableThemeId,
   isThemeId,
@@ -25,6 +26,11 @@ const contrastRatio = (foreground: string, background: string) => {
 };
 
 describe('theme presets', () => {
+  it('uses 晨光 as the default theme', () => {
+    expect(DEFAULT_THEME_ID).toBe('light');
+    expect(getThemePreset(DEFAULT_THEME_ID).name).toBe('晨光');
+  });
+
   it('provides unique, resolvable theme ids', () => {
     const ids = THEME_PRESETS.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);

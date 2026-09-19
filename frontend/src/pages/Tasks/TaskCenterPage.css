@@ -627,16 +627,16 @@
 
   .task-list-heading,
   .task-type-tabs {
-    padding-right: 18px;
-    padding-left: 18px;
+    padding-right: 16px;
+    padding-left: 16px;
   }
 
   .task-list-toolbar {
     align-items: stretch;
     flex-direction: column;
-    gap: 8px;
-    margin-right: 18px;
-    margin-left: 18px;
+    gap: 12px;
+    margin-right: 16px;
+    margin-left: 16px;
   }
 
   .task-filter-group {
@@ -660,7 +660,7 @@
   .task-mobile-list {
     display: grid;
     gap: 12px;
-    padding: 16px 18px 20px;
+    padding: 16px 16px 24px;
   }
 
   .task-mobile-card {
@@ -693,6 +693,16 @@
     cursor: pointer;
   }
 
+  .task-mobile-title,
+  .task-relation-part button {
+    min-height: 44px;
+  }
+
+  .task-relation-chain,
+  .task-relation-part {
+    gap: 8px;
+  }
+
   .task-mobile-card footer {
     display: flex;
     align-items: center;
@@ -712,6 +722,23 @@
 
   .task-mobile-card footer > div {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .task-detail-drawer .ant-drawer-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .task-detail-drawer .ant-drawer-extra {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .task-detail-drawer .ant-drawer-extra .ant-btn {
+    width: 100%;
   }
 
   .task-payload-grid {
@@ -725,7 +752,7 @@
   }
 
   .task-center-hero {
-    padding: 22px 18px;
+    padding: 24px 16px;
     border-radius: var(--border-radius-lg);
   }
 
@@ -746,7 +773,7 @@
   .task-stat-card {
     grid-template-columns: auto 1fr;
     gap: 8px;
-    padding: 13px;
+    padding: 16px;
   }
 
   .task-stat-icon {
@@ -809,7 +836,7 @@
 
   .task-detail-relation,
   .task-detail-card {
-    padding: 15px;
+    padding: 16px;
   }
 
   .task-detail-card .ant-descriptions-item-label {

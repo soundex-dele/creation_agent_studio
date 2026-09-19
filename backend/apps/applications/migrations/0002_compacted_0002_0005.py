@@ -10,18 +10,14 @@ from django.db import migrations, models
 # Move them and any dependencies into this file, then update the
 # RunPython operations to refer to the local versions:
 # apps.applications.migrations.0002_seed_default_chat
-# apps.applications.migrations.0003_seed_wechat_article_app
 
 _seed_chat = import_module("apps.applications.migrations.0002_seed_default_chat")
-_seed_wechat = import_module(
-    "apps.applications.migrations.0003_seed_wechat_article_app"
-)
 
 class Migration(migrations.Migration):
 
     atomic = False
 
-    replaces = [('applications', '0002_seed_default_chat'), ('applications', '0003_seed_wechat_article_app'), ('applications', '0004_application_is_active_alter_application_slug_and_more'), ('applications', '0005_application_unique_global_application_slug_and_more')]
+    replaces = [('applications', '0002_seed_default_chat'), ('applications', '0004_application_is_active_alter_application_slug_and_more'), ('applications', '0005_application_unique_global_application_slug_and_more')]
 
     dependencies = [
         ('agents', '0003_seed_general_agent'),
@@ -33,10 +29,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             code=_seed_chat.seed_default_chat,
-            reverse_code=django.db.migrations.operations.special.RunPython.noop,
-        ),
-        migrations.RunPython(
-            code=_seed_wechat.seed_wechat_article_app,
             reverse_code=django.db.migrations.operations.special.RunPython.noop,
         ),
         migrations.AddField(

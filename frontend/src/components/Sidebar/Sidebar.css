@@ -301,12 +301,20 @@
 .home-app-config-icon { display: inline-block; margin: 0 8px 0 4px; }
 
 @media (max-width: 767px) {
+  .home-app-list { gap: 8px; }
+
   .sidebar-item,
   .sidebar-new-btn,
   .home-app-item,
   .home-all-apps,
   .app-sidebar .ant-menu-item {
     min-height: 44px;
+  }
+
+  .sidebar-item { margin: 4px 0; }
+
+  .app-sidebar .ant-menu-item {
+    margin: 4px 8px !important;
   }
 
   .tpl-history-delete {

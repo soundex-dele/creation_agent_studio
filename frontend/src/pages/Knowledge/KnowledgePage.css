@@ -24,4 +24,15 @@
   .knowledge-main { min-height: 0; }
   .knowledge-title .ant-space,
   .knowledge-toolbar .ant-space { width: 100%; flex-wrap: wrap; }
+  .knowledge-header { gap: 16px; }
+  .knowledge-title,
+  .knowledge-toolbar { gap: 12px; }
+  .knowledge-main > .ant-card-body,
+  .knowledge-bases > .ant-card-body { padding: 16px; }
+  .knowledge-documents .ant-list-item { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .knowledge-documents .ant-list-item-action { display: flex; flex-wrap: wrap; gap: 8px; margin-inline-start: 0; }
+  .knowledge-documents .ant-list-item-action > li { padding: 0; }
+  .knowledge-chunk-fields { display: flex; width: 100%; flex-wrap: wrap; gap: 12px; }
+  .knowledge-chunk-fields > .ant-space-item { flex: 1 1 150px; }
+  .knowledge-chunk-fields .ant-input-number { width: 100%; }
 }

@@ -56,6 +56,7 @@
 .workflow-step-index { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); }
 .workflow-step-icon { font-size: 26px; }
 .workflow-step-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.workflow-step-actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .workflow-step-mapping { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); }
 .workflow-mapping-row { display: grid; grid-template-columns: minmax(110px, 0.8fr) minmax(190px, 1.2fr); gap: 8px; align-items: center; }
 .workflow-mapping-row > .ant-input { grid-column: 2; }
@@ -96,10 +97,16 @@
   .workflow-output-mapping label { grid-template-columns: minmax(0, 1fr); }
   .workflow-mapping-row > .ant-input { grid-column: auto; }
   .workflow-mode-field { align-items: flex-start; flex-direction: column; }
+  .workflow-mode-field .ant-segmented { width: 100%; }
+  .workflow-mode-field .ant-segmented-group { width: 100%; }
+  .workflow-mode-field .ant-segmented-item { flex: 1; }
+  .workflow-editor-step .ant-card-body { align-items: flex-start; flex-wrap: wrap; gap: 12px 8px; }
+  .workflow-step-copy { flex: 1 0 100%; order: 2; }
+  .workflow-step-actions { width: 100%; order: 3; justify-content: flex-end; }
   .workflow-runner { flex-direction: column; }
   .workflow-run-sidebar { width: 100%; flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--color-border); }
   .workflow-run-brand { display: none; }
-  .workflow-run-steps { display: flex; gap: 6px; padding: 8px; overflow-x: auto; }
+  .workflow-run-steps { display: flex; gap: 8px; padding: 8px; overflow-x: auto; }
   .workflow-run-step { width: 48px; min-width: 48px; min-height: 44px; justify-content: center; margin: 0; padding: 8px; }
   .workflow-run-step-text,
   .workflow-history-progress { display: none; }

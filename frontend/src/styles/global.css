@@ -338,10 +338,39 @@ a:hover {
     min-height: 44px;
   }
 
+  .ant-radio-wrapper,
+  .ant-checkbox-wrapper {
+    min-height: 44px;
+    align-items: center;
+    margin-inline-end: 12px;
+  }
+
+  .ant-segmented {
+    max-width: 100%;
+  }
+
+  .ant-segmented-item-label {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+  }
+
   .ant-modal {
     width: auto !important;
     max-width: calc(100vw - 24px);
     margin: 12px auto;
+  }
+
+  .ant-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .ant-modal-footer .ant-btn + .ant-btn {
+    margin-inline-start: 0;
   }
 
   .ant-drawer-content-wrapper {

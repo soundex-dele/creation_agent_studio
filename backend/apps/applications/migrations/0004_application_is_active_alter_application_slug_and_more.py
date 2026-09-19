@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('applications', '0003_seed_wechat_article_app'),
+        ('applications', '0002_seed_default_chat'),
         ('enterprise', '0005_external_identity'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

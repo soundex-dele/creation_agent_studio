@@ -20,18 +20,18 @@ describe('useAppStore.loadApp', () => {
       resolveRequest = resolve;
     }));
 
-    const first = useAppStore.getState().loadApp('wechat-article-writer');
-    const second = useAppStore.getState().loadApp('wechat-article-writer');
+    const first = useAppStore.getState().loadApp('writing-assistant');
+    const second = useAppStore.getState().loadApp('writing-assistant');
 
     expect(api.get).toHaveBeenCalledTimes(1);
     resolveRequest?.({
       id: 1,
-      slug: 'wechat-article-writer',
-      name: '微信公众号文章生成',
+      slug: 'writing-assistant',
+      name: '写作助手',
     });
 
-    await expect(first).resolves.toMatchObject({ id: 'wechat-article-writer' });
-    await expect(second).resolves.toMatchObject({ id: 'wechat-article-writer' });
+    await expect(first).resolves.toMatchObject({ id: 'writing-assistant' });
+    await expect(second).resolves.toMatchObject({ id: 'writing-assistant' });
   });
 });
 

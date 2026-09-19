@@ -185,3 +185,18 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.25);
 }
+
+@media (max-width: 640px) {
+  .app-detail-header { margin-bottom: 24px; }
+  .app-detail-title-row { align-items: flex-start; gap: 16px; }
+  .app-detail-icon { width: 56px; height: 56px; border-radius: 14px; font-size: 30px; }
+  .app-detail-meta { min-width: 0; }
+  .app-detail-actions { width: 100%; }
+  .app-detail-actions .ant-btn { width: 100%; }
+  .app-detail-shots {
+    gap: 12px;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-detail-shot { flex-basis: min(82vw, 320px); }
+}

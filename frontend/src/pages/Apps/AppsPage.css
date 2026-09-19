@@ -37,6 +37,8 @@
   margin-bottom: 16px;
   padding-bottom: 2px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
@@ -318,12 +320,16 @@
 
   .apps-view-switch button { flex: 1; justify-content: center; }
 
+  .apps-category-strip button { min-height: 44px; padding: 8px 14px; }
+
+  .apps-view-switch button { min-height: 40px; }
+
   .app-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
 
-  .app-card-favorite { opacity: 1; }
+  .app-card-favorite { top: 8px; right: 8px; width: 44px; height: 44px; opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

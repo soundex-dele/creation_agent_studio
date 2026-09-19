@@ -331,19 +331,21 @@ const WorkflowEditorPage = () => {
                   </>
                 )}
               </div>
-              <Button icon={<ArrowUpOutlined />} disabled={index === 0}
-                onClick={() => move(index, -1)} />
-              <Button icon={<ArrowDownOutlined />} disabled={index === steps.length - 1}
-                onClick={() => move(index, 1)} />
-              <Button danger icon={<DeleteOutlined />}
-                onClick={() => setSteps((current) => current.filter((_, i) => i !== index)
-                  .map((item, order) => ({
-                    ...item,
-                    order,
-                    depends_on: (item.depends_on || []).filter((key) => key !== step.key),
-                    condition: item.condition?.source === 'dependency'
-                      && item.condition?.step === step.key ? {} : item.condition,
-                  })))} />
+              <div className="workflow-step-actions">
+                <Button icon={<ArrowUpOutlined />} disabled={index === 0}
+                  aria-label="上移步骤" onClick={() => move(index, -1)} />
+                <Button icon={<ArrowDownOutlined />} disabled={index === steps.length - 1}
+                  aria-label="下移步骤" onClick={() => move(index, 1)} />
+                <Button danger icon={<DeleteOutlined />} aria-label="删除步骤"
+                  onClick={() => setSteps((current) => current.filter((_, i) => i !== index)
+                    .map((item, order) => ({
+                      ...item,
+                      order,
+                      depends_on: (item.depends_on || []).filter((key) => key !== step.key),
+                      condition: item.condition?.source === 'dependency'
+                        && item.condition?.step === step.key ? {} : item.condition,
+                    })))} />
+              </div>
             </Card>
           ))}
       </div>
