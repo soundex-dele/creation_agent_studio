@@ -382,6 +382,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/creation-toolbox/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_analytics_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{application_id}/creation-toolbox/copywritings": {
         parameters: {
             query?: never;
@@ -394,24 +412,6 @@ export interface paths {
         get: operations["applications_creation-toolbox_copywritings_list"];
         put?: never;
         post: operations["applications_creation-toolbox_copywritings_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/creation-toolbox/copywritings/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_creation-toolbox_copywritings_generate_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -435,6 +435,97 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["applications_creation-toolbox_copywritings_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_deliverables_list"];
+        put?: never;
+        post: operations["applications_creation-toolbox_deliverables_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/deliverables/{deliverable_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["applications_creation-toolbox_deliverables_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_creation-toolbox_deliverables_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/metrics-csv/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_metrics-csv_export_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/metrics-csv/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_creation-toolbox_metrics-csv_import_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/metrics-csv/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_metrics-csv_template_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/applications/{application_id}/creation-toolbox/projects": {
@@ -465,13 +556,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        get: operations["applications_creation-toolbox_projects_read"];
         put?: never;
         post?: never;
         delete: operations["applications_creation-toolbox_projects_delete"];
         options?: never;
         head?: never;
         patch: operations["applications_creation-toolbox_projects_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/projects/{project_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_creation-toolbox_projects_archive_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/applications/{application_id}/creation-toolbox/projects/{project_id}/assets": {
@@ -550,6 +660,101 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/projects/{project_id}/stage-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_projects_stage-transitions_list"];
+        put?: never;
+        post: operations["applications_creation-toolbox_projects_stage-transitions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_publications_list"];
+        put?: never;
+        post: operations["applications_creation-toolbox_publications_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/publications/{publication_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["applications_creation-toolbox_publications_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_creation-toolbox_publications_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_publications_metrics_list"];
+        put?: never;
+        post: operations["applications_creation-toolbox_publications_metrics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["applications_creation-toolbox_publications_metrics_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_creation-toolbox_publications_metrics_partial_update"];
         trace?: never;
     };
     "/applications/{application_id}/creation-toolbox/recordings": {
@@ -683,6 +888,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_creation-toolbox_scripts_scenes_reorder_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/{scene_id}": {
         parameters: {
             query?: never;
@@ -701,6 +925,98 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["applications_creation-toolbox_scripts_scenes_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_topics_list"];
+        put?: never;
+        post: operations["applications_creation-toolbox_topics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/topics/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_creation-toolbox_topics_bulk_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/topics/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_topics_tags_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/topics/{topic_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_creation-toolbox_topics_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_creation-toolbox_topics_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_creation-toolbox_topics_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/creation-toolbox/topics/{topic_id}/create-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_creation-toolbox_topics_create-project_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/applications/{application_id}/creation-toolbox/workspace": {
@@ -3306,6 +3622,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_analytics_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/copywritings": {
         parameters: {
             query?: never;
@@ -3319,25 +3654,6 @@ export interface paths {
         get: operations["organizations_applications_creation-toolbox_copywritings_list"];
         put?: never;
         post: operations["organizations_applications_creation-toolbox_copywritings_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/copywritings/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_creation-toolbox_copywritings_generate_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3362,6 +3678,102 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["organizations_applications_creation-toolbox_copywritings_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_deliverables_list"];
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_deliverables_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/deliverables/{deliverable_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_creation-toolbox_deliverables_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_creation-toolbox_deliverables_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_metrics-csv_export_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_metrics-csv_import_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_metrics-csv_template_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects": {
@@ -3394,13 +3806,33 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        get: operations["organizations_applications_creation-toolbox_projects_read"];
         put?: never;
         post?: never;
         delete: operations["organizations_applications_creation-toolbox_projects_delete"];
         options?: never;
         head?: never;
         patch: operations["organizations_applications_creation-toolbox_projects_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_projects_archive_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}/assets": {
@@ -3483,6 +3915,106 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}/stage-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_projects_stage-transitions_list"];
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_projects_stage-transitions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_publications_list"];
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_publications_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_creation-toolbox_publications_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_creation-toolbox_publications_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_publications_metrics_list"];
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_publications_metrics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_creation-toolbox_publications_metrics_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_creation-toolbox_publications_metrics_partial_update"];
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/recordings": {
@@ -3623,6 +4155,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_scripts_scenes_reorder_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/{scene_id}": {
         parameters: {
             query?: never;
@@ -3642,6 +4194,103 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["organizations_applications_creation-toolbox_scripts_scenes_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_topics_list"];
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_topics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_topics_bulk_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_topics_tags_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/{topic_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_creation-toolbox_topics_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_creation-toolbox_topics_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_creation-toolbox_topics_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/{topic_id}/create-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_creation-toolbox_topics_create-project_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/workspace": {
@@ -8901,6 +9550,25 @@ export interface operations {
             };
         };
     };
+    "applications_creation-toolbox_analytics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "applications_creation-toolbox_copywritings_list": {
         parameters: {
             query?: never;
@@ -8921,25 +9589,6 @@ export interface operations {
         };
     };
     "applications_creation-toolbox_copywritings_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "applications_creation-toolbox_copywritings_generate_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -8998,6 +9647,141 @@ export interface operations {
             };
         };
     };
+    "applications_creation-toolbox_deliverables_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_deliverables_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_deliverables_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_deliverables_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_metrics-csv_export_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_metrics-csv_import_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_metrics-csv_template_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "applications_creation-toolbox_projects_list": {
         parameters: {
             query?: never;
@@ -9029,6 +9813,26 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_projects_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9069,6 +9873,26 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_projects_archive_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9191,6 +10015,206 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_projects_stage-transitions_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_projects_stage-transitions_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_metrics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_metrics_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_metrics_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_publications_metrics_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9394,6 +10418,26 @@ export interface operations {
             };
         };
     };
+    "applications_creation-toolbox_scripts_scenes_reorder_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "applications_creation-toolbox_scripts_scenes_delete": {
         parameters: {
             query?: never;
@@ -9429,6 +10473,162 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_bulk_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_tags_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_creation-toolbox_topics_create-project_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14361,6 +15561,26 @@ export interface operations {
             };
         };
     };
+    "organizations_applications_creation-toolbox_analytics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "organizations_applications_creation-toolbox_copywritings_list": {
         parameters: {
             query?: never;
@@ -14382,26 +15602,6 @@ export interface operations {
         };
     };
     "organizations_applications_creation-toolbox_copywritings_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "organizations_applications_creation-toolbox_copywritings_generate_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -14463,6 +15663,148 @@ export interface operations {
             };
         };
     };
+    "organizations_applications_creation-toolbox_deliverables_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_deliverables_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_deliverables_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_deliverables_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                deliverable_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_metrics-csv_export_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_metrics-csv_import_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_metrics-csv_template_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "organizations_applications_creation-toolbox_projects_list": {
         parameters: {
             query?: never;
@@ -14496,6 +15838,27 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_projects_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14538,6 +15901,27 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_projects_archive_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14666,6 +16050,216 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_projects_stage-transitions_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_projects_stage-transitions_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_metrics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_metrics_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_metrics_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_publications_metrics_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                publication_id: string;
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14879,6 +16473,27 @@ export interface operations {
             };
         };
     };
+    "organizations_applications_creation-toolbox_scripts_scenes_reorder_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "organizations_applications_creation-toolbox_scripts_scenes_delete": {
         parameters: {
             query?: never;
@@ -14916,6 +16531,170 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_bulk_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_tags_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_creation-toolbox_topics_create-project_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

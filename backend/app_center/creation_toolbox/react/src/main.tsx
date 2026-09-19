@@ -1,7 +1,11 @@
 import {
   ArrowLeft,
+  Archive,
   AudioLines,
+  BarChart3,
+  BookOpen,
   Check,
+  CheckCircle2,
   ChevronRight,
   CircleStop,
   Clapperboard,
@@ -11,8 +15,10 @@ import {
   Folder,
   FolderPlus,
   Gauge,
+  GitBranch,
   Image,
   LayoutDashboard,
+  Lightbulb,
   LoaderCircle,
   Menu,
   Mic,
@@ -22,12 +28,13 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
+  Send,
   Settings,
-  Sparkles,
+  Tags,
   Trash2,
   Upload,
   Video,
-  WandSparkles,
   X,
 } from 'lucide-react';
 import {
@@ -37,14 +44,19 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
 
 import './styles.css';
+import { restoreTopicFilters, topicFilterReducer, topicMatchesFilters } from './topicDomain';
 
-type ViewKey = 'overview' | 'projects' | 'recordings' | 'copywriting' | 'scripts' | 'settings';
+type ViewKey = 'overview' | 'topics' | 'projects' | 'capture' | 'content' | 'publishing' | 'analytics' | 'settings';
 type CopyStyle = 'funny' | 'emotional' | 'informative' | 'science' | 'marketing';
+type TopicStatus = 'pending' | 'ready' | 'adopted' | 'postponed' | 'archived';
+type ProjectStage = 'planning' | 'scripting' | 'materials' | 'producing' | 'review' | 'published' | 'retrospective';
+type Platform = 'douyin' | 'kuaishou' | 'wechat_channels' | 'xiaohongshu' | 'bilibili' | 'other';
 type Requester = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 interface Workspace {
@@ -58,16 +70,74 @@ interface Workspace {
   recording_count: number;
   copywriting_count: number;
   script_count: number;
+  topic_count: number;
+  publication_count: number;
+}
+
+interface TopicIdea {
+  id: string; title: string; notes: string; source_name: string; source_url: string;
+  target_platforms: Platform[]; tags: string[]; status: TopicStatus; status_label: string;
+  project_count: number; publication_count: number; created_by_name: string; updated_at: string;
+  projects?: Project[];
 }
 
 interface Project {
   id: string;
   name: string;
   description: string;
+  topic: string | null;
+  topic_title: string;
+  stage: ProjectStage;
+  stage_label: string;
+  owner_name: string;
+  reviewer_name: string;
+  planned_publish_at: string | null;
+  target_platforms: Platform[];
+  tags: string[];
+  archived_at: string | null;
+  deliverable_count: number;
+  publication_count: number;
   asset_count: number;
   recording_count: number;
   script_count: number;
   updated_at: string;
+}
+
+interface Deliverable {
+  id: string; project: string; name: string; version_label: string; platform: Platform | '';
+  platform_label: string; file_url: string; external_url: string; duration_ms: number;
+  review_status: 'draft' | 'pending' | 'approved' | 'changes_requested';
+  review_status_label: string; review_note: string; updated_at: string;
+}
+
+interface Metrics {
+  id: string; observed_on: string; impressions: number; views: number; completions: number;
+  likes: number; comments: number; shares: number; saves: number; followers_gained: number;
+  conversions: number; play_rate: number | null; completion_rate: number | null;
+  engagement_rate: number | null;
+  follow_rate?: number | null; conversion_rate?: number | null; average_watch_seconds?: number;
+}
+
+interface StageEvent {
+  id: string; from_stage: ProjectStage; from_stage_label: string; to_stage: ProjectStage;
+  to_stage_label: string; note: string; changed_by_name: string; created_at: string;
+}
+
+interface Publication {
+  id: string; project: string; project_name: string; deliverable: string | null;
+  platform: Platform; platform_label: string; platform_name: string; account_name: string;
+  title: string; external_post_id: string; post_url: string; published_at: string;
+  latest_metrics: Metrics | null;
+}
+
+interface AnalyticsData {
+  summary: Record<string, number | null>;
+  stage_distribution: Array<{ stage: ProjectStage; label: string; count: number }>;
+  trend: Array<Record<string, string | number>>;
+  platforms: Array<Record<string, string | number | null>>;
+  topics: { total: number; adopted: number; adoption_rate: number | null; performance: Array<{ topic_id: string; title: string; project_count: number; first_project_hours?: number | null; views: number; engagement_rate: number | null; tags: string[]; source_name: string }>; tag_performance: Array<{ tag: string; topic_count: number; project_count: number; views: number; engagement_rate: number | null }>; source_performance: Array<{ source_name: string; topic_count: number; project_count: number; views: number; engagement_rate: number | null }> };
+  insights: Array<{ kind: string; level: string; title: string; detail: string; resource_id: string }>;
+  formulas: Record<string, string>;
 }
 
 interface FolderItem {
@@ -137,16 +207,27 @@ interface CreationToolboxAppProps {
 
 const navItems: { key: ViewKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'overview', label: '工作台', icon: LayoutDashboard },
-  { key: 'projects', label: '工程与素材', icon: Folder },
-  { key: 'recordings', label: '录音', icon: Mic },
-  { key: 'copywriting', label: '文案生成', icon: PenLine },
-  { key: 'scripts', label: '脚本创作', icon: Clapperboard },
+  { key: 'topics', label: '选题库', icon: Lightbulb },
+  { key: 'projects', label: '项目流程', icon: GitBranch },
+  { key: 'capture', label: '素材与录音', icon: Folder },
+  { key: 'content', label: '内容资料', icon: BookOpen },
+  { key: 'publishing', label: '成片与发布', icon: Send },
+  { key: 'analytics', label: '数据分析', icon: BarChart3 },
   { key: 'settings', label: '设置', icon: Settings },
 ];
 
 const styleLabels: Record<CopyStyle, string> = {
   funny: '搞笑', emotional: '情感', informative: '干货', science: '科普', marketing: '营销',
 };
+
+const topicStatusLabels: Record<TopicStatus, string> = { pending: '待评估', ready: '待创作', adopted: '已采用', postponed: '暂缓', archived: '已归档' };
+const projectStages: Array<{ key: ProjectStage; label: string }> = [
+  { key: 'planning', label: '策划' }, { key: 'scripting', label: '脚本' },
+  { key: 'materials', label: '素材' }, { key: 'producing', label: '制作中' },
+  { key: 'review', label: '待审核' }, { key: 'published', label: '已发布' },
+  { key: 'retrospective', label: '复盘完成' },
+];
+const platformLabels: Record<Platform, string> = { douyin: '抖音', kuaishou: '快手', wechat_channels: '视频号', xiaohongshu: '小红书', bilibili: 'B站', other: '其他' };
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({
   method,
@@ -173,14 +254,26 @@ const formatDuration = (milliseconds: number) => {
 };
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const dialogRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const close = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [href]') || []);
+    window.setTimeout(() => focusable()[0]?.focus(), 0);
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Tab') return;
+      const items = focusable(); if (!items.length) return;
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => { window.removeEventListener('keydown', handleKey); previous?.focus(); };
   }, [onClose]);
   return (
     <div className="ct-modal-mask" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="ct-modal" role="dialog" aria-modal="true" aria-labelledby="ct-modal-title">
+      <section ref={dialogRef} className="ct-modal" role="dialog" aria-modal="true" aria-labelledby="ct-modal-title">
         <header><h2 id="ct-modal-title">{title}</h2><button className="ct-icon-button" aria-label="关闭" onClick={onClose}><X /></button></header>
         {children}
       </section>
@@ -199,6 +292,11 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
   const [mobileNav, setMobileNav] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [topics, setTopics] = useState<TopicIdea[]>([]);
+  const [topicTags, setTopicTags] = useState<string[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [publications, setPublications] = useState<Publication[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [copywritings, setCopywritings] = useState<Copywriting[]>([]);
   const [scripts, setScripts] = useState<Script[]>([]);
@@ -212,6 +310,7 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
   const [modal, setModal] = useState<'project' | 'folder' | null>(null);
   const [folderStack, setFolderStack] = useState<FolderItem[]>([]);
   const currentFolder = folderStack[folderStack.length - 1] ?? null;
+  const activeProjects = useMemo(() => projects.filter((item) => !item.archived_at), [projects]);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -230,18 +329,28 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
     setLoading(true);
     setError('');
     try {
-      const [workspaceData, projectData, recordingData, copyData, scriptData] = await Promise.all([
+      const [workspaceData, projectData, topicData, tagData, recordingData, copyData, scriptData, deliverableData, publicationData, analyticsData] = await Promise.all([
         requester<Workspace>(`${apiBasePath}/workspace`),
-        requester<Project[]>(`${apiBasePath}/projects`),
+        requester<Project[]>(`${apiBasePath}/projects?include_archived=true`),
+        requester<TopicIdea[]>(`${apiBasePath}/topics`),
+        requester<string[]>(`${apiBasePath}/topics/tags`),
         requester<Recording[]>(`${apiBasePath}/recordings`),
         requester<Copywriting[]>(`${apiBasePath}/copywritings`),
         requester<Script[]>(`${apiBasePath}/scripts`),
+        requester<Deliverable[]>(`${apiBasePath}/deliverables`),
+        requester<Publication[]>(`${apiBasePath}/publications`),
+        requester<AnalyticsData>(`${apiBasePath}/analytics`),
       ]);
       setWorkspace(workspaceData);
       setProjects(projectData);
+      setTopics(topicData);
+      setTopicTags(tagData);
       setRecordings(recordingData);
       setCopywritings(copyData);
       setScripts(scriptData);
+      setDeliverables(deliverableData);
+      setPublications(publicationData);
+      setAnalytics(analyticsData);
       setSelectedProjectId((current) => current && projectData.some((item) => item.id === current)
         ? current : projectData[0]?.id ?? null);
     } catch (reason) {
@@ -353,11 +462,13 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
         {showHeader && <header className="ct-app-header"><button className="ct-back" onClick={onBack}><ArrowLeft />应用中心</button><div /><button className="ct-icon-button" aria-label="刷新" onClick={() => void refreshAll()}><RefreshCw /></button></header>}
         <div className="ct-content">
           {error ? <EmptyState icon={Gauge} title="工作区暂时不可用" detail={error} action={<button className="ct-button primary" onClick={() => void refreshAll()}>重新加载</button>} /> : <>
-            {view === 'overview' && <Overview workspace={workspace} projects={projects} recordings={recordings} scripts={scripts} setView={setView} openProject={() => setModal('project')} />}
-            {view === 'projects' && <ProjectsView projects={projects} selectedProjectId={selectedProjectId} selectProject={(id) => { setSelectedProjectId(id); setFolderStack([]); }} folderStack={folderStack} enterFolder={(folder) => setFolderStack((items) => [...items, folder])} goUp={() => setFolderStack((items) => items.slice(0, -1))} folders={folders} assets={assets} busy={busy === 'assets'} openProject={() => setModal('project')} openFolder={() => setModal('folder')} uploadAssets={uploadAssets} removeAsset={removeAsset} />}
-            {view === 'recordings' && <RecordingsView apiBasePath={apiBasePath} requester={requester} projects={projects} recordings={recordings} refresh={refreshAll} notify={notify} errorText={errorText} />}
-            {view === 'copywriting' && <CopywritingView apiBasePath={apiBasePath} requester={requester} projects={projects} items={copywritings} refresh={refreshAll} notify={notify} errorText={errorText} />}
-            {view === 'scripts' && <ScriptsView apiBasePath={apiBasePath} requester={requester} projects={projects} scripts={scripts} refresh={refreshAll} notify={notify} errorText={errorText} />}
+            {view === 'overview' && <Overview workspace={workspace} projects={activeProjects} topics={topics} deliverables={deliverables} publications={publications} analytics={analytics} setView={setView} openProject={() => setModal('project')} />}
+            {view === 'topics' && <TopicsView apiBasePath={apiBasePath} requester={requester} topics={topics} recentTags={topicTags} projects={projects} publications={publications} refresh={refreshAll} notify={notify} errorText={errorText} onProject={(id) => { setSelectedProjectId(id); setView('projects'); }} />}
+            {view === 'projects' && <ProjectFlowView apiBasePath={apiBasePath} requester={requester} projects={projects} recordings={recordings} copywritings={copywritings} scripts={scripts} deliverables={deliverables} publications={publications} selectedProjectId={selectedProjectId} selectProject={setSelectedProjectId} openSection={setView} refresh={refreshAll} notify={notify} errorText={errorText} openProject={() => setModal('project')} />}
+            {view === 'capture' && <CaptureView projectsView={<ProjectsView projects={activeProjects} selectedProjectId={selectedProjectId} selectProject={(id) => { setSelectedProjectId(id); setFolderStack([]); }} folderStack={folderStack} enterFolder={(folder) => setFolderStack((items) => [...items, folder])} goUp={() => setFolderStack((items) => items.slice(0, -1))} folders={folders} assets={assets} busy={busy === 'assets'} openProject={() => setModal('project')} openFolder={() => setModal('folder')} uploadAssets={uploadAssets} removeAsset={removeAsset} />} recordingsView={<RecordingsView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} recordings={recordings} refresh={refreshAll} notify={notify} errorText={errorText} />} />}
+            {view === 'content' && <ContentView copyView={<CopywritingView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} items={copywritings} refresh={refreshAll} notify={notify} errorText={errorText} />} scriptsView={<ScriptsView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} scripts={scripts} assets={assets} refresh={refreshAll} notify={notify} errorText={errorText} />} />}
+            {view === 'publishing' && <PublishingView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} deliverables={deliverables} publications={publications} refresh={refreshAll} notify={notify} errorText={errorText} />}
+            {view === 'analytics' && <AnalyticsView apiBasePath={apiBasePath} requester={requester} data={analytics} notify={notify} errorText={errorText} />}
             {view === 'settings' && workspace && <SettingsView apiBasePath={apiBasePath} requester={requester} workspace={workspace} refresh={refreshAll} notify={notify} errorText={errorText} />}
           </>}
         </div>
@@ -373,27 +484,164 @@ function PageTitle({ eyebrow, title, detail, actions }: { eyebrow: string; title
   return <header className="ct-page-title"><div><span>{eyebrow}</span><h1>{title}</h1><p>{detail}</p></div>{actions && <div className="ct-page-actions">{actions}</div>}</header>;
 }
 
-function Overview({ workspace, projects, recordings, scripts, setView, openProject }: {
-  workspace: Workspace | null; projects: Project[]; recordings: Recording[]; scripts: Script[]; setView: (view: ViewKey) => void; openProject: () => void;
+function Overview({ workspace, projects, topics, deliverables, publications, analytics, setView, openProject }: {
+  workspace: Workspace | null; projects: Project[]; topics: TopicIdea[]; deliverables: Deliverable[]; publications: Publication[]; analytics: AnalyticsData | null; setView: (view: ViewKey) => void; openProject: () => void;
 }) {
   const stats = [
-    { label: '视频工程', value: workspace?.project_count ?? projects.length, icon: Folder, tone: 'pink' },
-    { label: '素材文件', value: workspace?.asset_count ?? 0, icon: Image, tone: 'blue' },
-    { label: '录音片段', value: workspace?.recording_count ?? recordings.length, icon: AudioLines, tone: 'green' },
-    { label: '分镜脚本', value: workspace?.script_count ?? scripts.length, icon: Clapperboard, tone: 'amber' },
+    { label: '待评估选题', value: topics.filter((item) => item.status === 'pending').length, icon: Lightbulb, tone: 'pink', view: 'topics' as ViewKey },
+    { label: '待创作选题', value: topics.filter((item) => item.status === 'ready').length, icon: PenLine, tone: 'blue', view: 'topics' as ViewKey },
+    { label: '待审核成片', value: deliverables.filter((item) => item.review_status === 'pending').length, icon: CheckCircle2, tone: 'amber', view: 'publishing' as ViewKey },
+    { label: '待补发布数据', value: publications.filter((item) => !item.latest_metrics).length, icon: Gauge, tone: 'green', view: 'publishing' as ViewKey },
   ];
   return <>
-    <PageTitle eyebrow="CREATOR DESK" title="让每个灵感都有落点" detail="从素材整理、现场录音到文案和分镜，在一个工作台完成短视频前期创作。" actions={<button className="ct-button primary" onClick={openProject}><Plus />新建工程</button>} />
-    <section className="ct-stat-grid">{stats.map(({ label, value, icon: Icon, tone }) => <button key={label} className={`ct-stat-card ${tone}`} onClick={() => setView(label === '录音片段' ? 'recordings' : label === '分镜脚本' ? 'scripts' : 'projects')}><span><Icon /></span><strong>{value}</strong><small>{label}</small><ChevronRight /></button>)}</section>
+    <PageTitle eyebrow="CREATOR DESK" title="短视频创作数据中枢" detail="从选题沉淀到发布复盘，用真实记录推动每一个创作环节。" actions={<><button className="ct-button ghost" onClick={() => setView('topics')}><Lightbulb />记录选题</button><button className="ct-button primary" onClick={openProject}><Plus />新建工程</button></>} />
+    <section className="ct-stat-grid">{stats.map(({ label, value, icon: Icon, tone, view }) => <button key={label} className={`ct-stat-card ${tone}`} onClick={() => setView(view)}><span><Icon /></span><strong>{value}</strong><small>{label}</small><ChevronRight /></button>)}</section>
     <section className="ct-overview-grid">
-      <div className="ct-panel ct-workflow"><header><div><span className="ct-kicker">QUICK START</span><h2>今天从哪里开始？</h2></div></header><div className="ct-quick-grid">
-        <button onClick={openProject}><FolderPlus /><strong>建立工程</strong><span>整理同一条视频的所有素材</span></button>
-        <button onClick={() => setView('recordings')}><Mic /><strong>录一段旁白</strong><span>在浏览器内录制并转写</span></button>
-        <button onClick={() => setView('copywriting')}><WandSparkles /><strong>生成文案</strong><span>按内容风格快速起稿</span></button>
-        <button onClick={() => setView('scripts')}><Clapperboard /><strong>设计分镜</strong><span>拆解场景、画面与时长</span></button>
-      </div></div>
+      <div className="ct-panel ct-workflow"><header><div><span className="ct-kicker">WORKFLOW</span><h2>项目阶段分布</h2></div><button className="ct-text-button" onClick={() => setView('projects')}>进入项目流程</button></header><div className="ct-stage-summary">{projectStages.map((stage) => { const count = analytics?.stage_distribution.find((item) => item.stage === stage.key)?.count ?? projects.filter((item) => item.stage === stage.key).length; return <div key={stage.key}><span>{stage.label}</span><strong>{count}</strong><i style={{ width: `${projects.length ? Math.max(4, count / projects.length * 100) : 0}%` }} /></div>; })}</div></div>
       <div className="ct-panel ct-recent"><header><div><span className="ct-kicker">RECENT</span><h2>最近工程</h2></div><button className="ct-text-button" onClick={() => setView('projects')}>查看全部</button></header>{projects.length ? <div className="ct-recent-list">{projects.slice(0, 4).map((project) => <button key={project.id} onClick={() => setView('projects')}><span><Folder /></span><div><strong>{project.name}</strong><small>{project.asset_count} 个素材 · {formatDate(project.updated_at)}</small></div><ChevronRight /></button>)}</div> : <EmptyState icon={Folder} title="还没有工程" detail="创建第一个工程，开始收集素材。" />}</div>
     </section>
+  </>;
+}
+
+function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publications, refresh, notify, errorText, onProject }: {
+  apiBasePath: string; requester: Requester; topics: TopicIdea[]; recentTags: string[]; projects: Project[]; publications: Publication[];
+  refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string; onProject: (id: string) => void;
+}) {
+  const [filters, dispatchFilters] = useReducer(
+    topicFilterReducer,
+    undefined,
+    () => restoreTopicFilters(sessionStorage.getItem('ct-topic-filters')),
+  );
+  const { search, status, tag, layout } = filters;
+  const [selected, setSelected] = useState<string[]>([]);
+  const [currentId, setCurrentId] = useState(topics[0]?.id ?? '');
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const current = topics.find((item) => item.id === currentId) ?? topics[0];
+  const filtered = useMemo(() => topics.filter((item) => topicMatchesFilters(item, filters)), [filters, topics]);
+  useEffect(() => { sessionStorage.setItem('ct-topic-filters', JSON.stringify(filters)); }, [filters]);
+  useEffect(() => { if (!currentId && topics[0]) setCurrentId(topics[0].id); }, [currentId, topics]);
+
+  const postTopic = async (payload: Record<string, unknown>, allowDuplicate = false) => {
+    try { await requester(`${apiBasePath}/topics`, jsonInit('POST', { ...payload, allow_duplicate: allowDuplicate })); return true; }
+    catch (reason) {
+      const response = (reason as { response?: { status?: number; data?: { code?: string } } })?.response;
+      if (!allowDuplicate && response?.status === 409 && response.data?.code === 'duplicate_topic' && window.confirm('选题库中已有完全相同的标题，仍要保存吗？')) return postTopic(payload, true);
+      notify(errorText(reason, '保存选题失败')); return false;
+    }
+  };
+  const create = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true);
+    const payload = { title: String(form.get('title') || '').trim(), notes: String(form.get('notes') || '').trim(), source_name: String(form.get('source_name') || '').trim(), source_url: String(form.get('source_url') || '').trim(), tags: String(form.get('tags') || '').split(/[，,]/).map((item) => item.trim()).filter(Boolean), target_platforms: form.getAll('platforms') };
+    const ok = await postTopic(payload);
+    if (ok) { (event.currentTarget as HTMLFormElement).reset(); setExpanded(false); await refresh(); notify('选题已记录'); }
+    setBusy(false);
+  };
+  const update = async (topic: TopicIdea, payload: Record<string, unknown>, message: string) => {
+    try { await requester(`${apiBasePath}/topics/${topic.id}`, jsonInit('PATCH', payload)); await refresh(); notify(message); }
+    catch (reason) { notify(errorText(reason, '更新选题失败')); }
+  };
+  const bulk = async (payload: Record<string, unknown>) => {
+    if (!selected.length) return;
+    try { await requester(`${apiBasePath}/topics/bulk`, jsonInit('POST', { ids: selected, ...payload })); setSelected([]); await refresh(); notify(`已更新 ${selected.length} 个选题`); }
+    catch (reason) { notify(errorText(reason, '批量更新失败')); }
+  };
+  const remove = async (topic: TopicIdea) => {
+    if (topic.project_count) { await update(topic, { status: 'archived' }, '已归档选题'); return; }
+    if (!window.confirm(`永久删除未关联工程的选题“${topic.title}”？`)) return;
+    try { await requester(`${apiBasePath}/topics/${topic.id}`, { method: 'DELETE' }); setCurrentId(''); await refresh(); notify('选题已删除'); }
+    catch (reason) { notify(errorText(reason, '删除选题失败')); }
+  };
+  const createProject = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); if (!current) return; const form = new FormData(event.currentTarget); setBusy(true);
+    try { const project = await requester<Project>(`${apiBasePath}/topics/${current.id}/create-project`, jsonInit('POST', { name: form.get('name'), description: form.get('description'), target_platforms: form.getAll('target_platforms') })); await refresh(); notify('已从选题创建工程'); onProject(project.id); }
+    catch (reason) { notify(errorText(reason, '创建工程失败')); }
+    finally { setBusy(false); }
+  };
+  const relatedProjects = current ? projects.filter((item) => item.topic === current.id) : [];
+  const relatedPublications = publications.filter((item) => relatedProjects.some((project) => project.id === item.project));
+  return <>
+    <PageTitle eyebrow="TOPIC LIBRARY" title="选题库" detail="先沉淀值得做的方向，再按平台和版本转成多个视频工程。" />
+    <form className="ct-panel ct-quick-topic" onSubmit={create}><div><Lightbulb /><input name="title" required maxLength={240} aria-label="选题标题" placeholder="快速记录一个有价值的选题…" /><button type="button" className="ct-text-button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>{expanded ? '收起' : '补充详情'}</button><button className="ct-button primary" disabled={busy}><Plus />记录</button></div>{expanded && <section><label><span>创作角度 / 备注</span><textarea name="notes" rows={3} /></label><label><span>来源名称</span><input name="source_name" /></label><label><span>来源链接</span><input name="source_url" type="url" /></label><label><span>标签（逗号分隔）</span><input name="tags" list="ct-recent-tags" /><datalist id="ct-recent-tags">{recentTags.map((item) => <option key={item} value={item} />)}</datalist></label><fieldset><legend>目标平台</legend><div className="ct-check-grid">{(Object.keys(platformLabels) as Platform[]).map((key) => <label key={key}><input type="checkbox" name="platforms" value={key} />{platformLabels[key]}</label>)}</div></fieldset></section>}</form>
+    <div className="ct-filterbar"><label><Search /><input list="ct-topic-suggestions" value={search} onChange={(event) => dispatchFilters({ type: 'search', value: event.target.value })} placeholder="搜索标题、来源、备注或标签" /><datalist id="ct-topic-suggestions">{topics.slice(0, 20).map((item) => <option key={item.id} value={item.title} />)}</datalist></label><select aria-label="按状态筛选" value={status} onChange={(event) => dispatchFilters({ type: 'status', value: event.target.value as TopicStatus | '' })}><option value="">全部状态</option>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><select aria-label="按标签筛选" value={tag} onChange={(event) => dispatchFilters({ type: 'tag', value: event.target.value })}><option value="">全部标签</option>{recentTags.map((item) => <option key={item}>{item}</option>)}</select><div className="ct-segmented"><button className={layout === 'list' ? 'active' : ''} onClick={() => dispatchFilters({ type: 'layout', value: 'list' })}>列表</button><button className={layout === 'cards' ? 'active' : ''} onClick={() => dispatchFilters({ type: 'layout', value: 'cards' })}>卡片</button></div></div>
+    {selected.length > 0 && <div className="ct-bulkbar"><strong>已选 {selected.length} 项</strong><select defaultValue="" aria-label="批量更改状态" onChange={(event) => { if (event.target.value) void bulk({ status: event.target.value }); }}><option value="">更改状态…</option>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><form onSubmit={(event) => { event.preventDefault(); const value = String(new FormData(event.currentTarget).get('tag') || '').trim(); if (value) void bulk({ add_tags: [value] }); }}><input name="tag" placeholder="添加标签" /><button className="ct-button small"><Tags />添加</button></form><button className="ct-text-button" onClick={() => setSelected([])}>取消选择</button></div>}
+    <div className="ct-topic-layout"><section className={`ct-topic-results ${layout}`}>{filtered.length ? filtered.map((item) => <article key={item.id} className={item.id === current?.id ? 'active' : ''}><label className="ct-check"><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id))} /><span /></label><button className="ct-topic-main" onClick={() => setCurrentId(item.id)}><div><span className={`ct-status ${item.status}`}>{item.status_label}</span><strong>{item.title}</strong></div><p>{item.notes || '暂无创作角度或备注'}</p><footer><span>{item.source_name || '自主选题'}</span><span>{item.project_count} 个工程</span><span>{formatDate(item.updated_at)}</span></footer><div className="ct-tags">{item.tags.map((value) => <i key={value}>{value}</i>)}</div></button></article>) : <div className="ct-panel"><EmptyState icon={Search} title="没有符合条件的选题" detail="调整搜索或筛选条件后重试。" /></div>}</section>
+      <aside className="ct-panel ct-topic-detail">{current ? <><header><div><span className="ct-kicker">TOPIC DETAIL</span><h2>{current.title}</h2></div><button className="ct-icon-button danger" aria-label={current.project_count ? '归档选题' : '删除选题'} onClick={() => void remove(current)}>{current.project_count ? <Archive /> : <Trash2 />}</button></header><div className="ct-detail-body"><label><span>状态</span><select value={current.status} onChange={(event) => void update(current, { status: event.target.value }, '状态已更新')}>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><p>{current.notes || '暂无创作角度或备注。'}</p>{current.source_url ? <a href={current.source_url} target="_blank" rel="noreferrer">{current.source_name || '查看来源'} ↗</a> : <small>来源：{current.source_name || '未记录'}</small>}<div className="ct-tags">{current.tags.map((value) => <i key={value}>{value}</i>)}</div><section><h3>关联工程与发布</h3>{relatedProjects.length ? relatedProjects.map((project) => <button className="ct-linked-row" key={project.id} onClick={() => onProject(project.id)}><span>{project.name}<small>{project.stage_label} · {project.publication_count} 次发布</small></span><ChevronRight /></button>) : <small>尚未转为工程</small>}<p className="ct-performance">累计 {relatedPublications.reduce((sum, item) => sum + (item.latest_metrics?.views || 0), 0).toLocaleString()} 播放 · {relatedPublications.length} 条发布记录</p></section><form className="ct-convert-form" onSubmit={createProject}><h3>转为工程</h3><input name="name" required defaultValue={current.title} aria-label="工程名称" /><textarea name="description" rows={2} defaultValue={current.notes} aria-label="工程简报" /><div className="ct-check-grid">{(Object.keys(platformLabels) as Platform[]).map((key) => <label key={key}><input type="checkbox" name="target_platforms" value={key} defaultChecked={current.target_platforms.includes(key)} />{platformLabels[key]}</label>)}</div><button className="ct-button primary wide" disabled={busy}><GitBranch />创建工程</button></form></div></> : <EmptyState icon={Lightbulb} title="选择一个选题" detail="在这里查看详情、关联工程和最终表现。" />}</aside>
+    </div>
+  </>;
+}
+
+function ProjectFlowView({ apiBasePath, requester, projects, recordings, copywritings, scripts, deliverables, publications, selectedProjectId, selectProject, openSection, refresh, notify, errorText, openProject }: {
+  apiBasePath: string; requester: Requester; projects: Project[]; recordings: Recording[]; copywritings: Copywriting[]; scripts: Script[]; deliverables: Deliverable[]; publications: Publication[]; selectedProjectId: string | null; selectProject: (id: string) => void; openSection: (view: ViewKey) => void; refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string; openProject: () => void;
+}) {
+  const [showArchived, setShowArchived] = useState(false);
+  const visibleProjects = projects.filter((item) => showArchived || !item.archived_at);
+  const current = visibleProjects.find((item) => item.id === selectedProjectId) ?? visibleProjects[0];
+  const [events, setEvents] = useState<StageEvent[]>([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (!current) { setEvents([]); return; } requester<StageEvent[]>(`${apiBasePath}/projects/${current.id}/stage-transitions`).then(setEvents).catch(() => setEvents([])); }, [apiBasePath, current?.id, requester]);
+  const transition = async (stage: ProjectStage) => {
+    if (!current || stage === current.stage) return; setBusy(true);
+    try { await requester(`${apiBasePath}/projects/${current.id}/stage-transitions`, jsonInit('POST', { to_stage: stage, note })); setNote(''); await refresh(); setEvents(await requester<StageEvent[]>(`${apiBasePath}/projects/${current.id}/stage-transitions`)); notify('项目阶段已更新'); }
+    catch (reason) { notify(errorText(reason, '阶段流转失败')); }
+    finally { setBusy(false); }
+  };
+  const toggleArchive = async () => { if (!current) return; const restoring = Boolean(current.archived_at); if (!restoring && !window.confirm(`归档工程“${current.name}”？`)) return; try { await requester(`${apiBasePath}/projects/${current.id}/archive`, jsonInit('POST', { restore: restoring })); await refresh(); notify(restoring ? '工程已恢复' : '工程已归档'); } catch (reason) { notify(errorText(reason, restoring ? '恢复工程失败' : '归档工程失败')); } };
+  return <><PageTitle eyebrow="PROJECT PIPELINE" title="项目流程" detail="允许返工回退，并完整保留每次阶段变化记录。" actions={<><label className="ct-toggle"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />显示已归档</label><button className="ct-button primary" onClick={openProject}><Plus />新建工程</button></>} />
+    {!visibleProjects.length ? <div className="ct-panel"><EmptyState icon={GitBranch} title={projects.length ? '没有未归档工程' : '还没有工程'} detail="从选题库转为工程，或直接建立一个工程。" action={<button className="ct-button primary" onClick={openProject}>新建工程</button>} /></div> : <div className="ct-flow-layout"><aside className="ct-project-list"><span className="ct-kicker">PROJECTS · {visibleProjects.length}</span>{visibleProjects.map((project) => <button key={project.id} className={project.id === current?.id ? 'active' : ''} onClick={() => selectProject(project.id)}><span><Clapperboard /></span><div><strong>{project.name}</strong><small>{project.archived_at ? '已归档' : project.stage_label} · {project.publication_count} 次发布</small></div><ChevronRight /></button>)}</aside><section className="ct-flow-main"><div className="ct-panel ct-project-brief"><header><div><span className="ct-kicker">PROJECT BRIEF</span><h2>{current?.name}</h2><p>{current?.description || '暂无工程简报。'}</p></div><span className={`ct-status ${current?.stage}`}>{current?.archived_at ? '已归档' : current?.stage_label}</span><button className="ct-button tiny" onClick={() => void toggleArchive()}><Archive />{current?.archived_at ? '恢复' : '归档'}</button></header><div className="ct-project-meta"><span>来源选题<strong>{current?.topic_title || '独立创建'}</strong></span><span>目标平台<strong>{current?.target_platforms.map((item) => platformLabels[item]).join('、') || '未指定'}</strong></span><span>计划发布<strong>{current?.planned_publish_at ? formatDate(current.planned_publish_at) : '未设置'}</strong></span><span>负责人 / 审核人<strong>{current?.owner_name || '未指定'} / {current?.reviewer_name || '未指定'}</strong></span></div></div><section className="ct-project-sections" aria-label="工程内容概览"><button onClick={() => openSection('content')}><FileText /><span>文案 / 脚本<strong>{copywritings.filter((item) => item.project_id === current?.id).length} / {scripts.filter((item) => item.project_id === current?.id).length}</strong></span><ChevronRight /></button><button onClick={() => openSection('capture')}><Folder /><span>素材 / 录音<strong>{current?.asset_count || 0} / {recordings.filter((item) => item.project_id === current?.id).length}</strong></span><ChevronRight /></button><button onClick={() => openSection('publishing')}><Video /><span>成片审核<strong>{deliverables.filter((item) => item.project === current?.id).length}</strong></span><ChevronRight /></button><button onClick={() => openSection('publishing')}><Send /><span>发布数据<strong>{publications.filter((item) => item.project === current?.id).length}</strong></span><ChevronRight /></button></section>{!current?.archived_at && <section className="ct-panel ct-stage-panel"><header><div><span className="ct-kicker">SEVEN STAGES</span><h2>阶段进度</h2><p>点击任意阶段进行推进或返工，备注会写入历史。</p></div></header><div className="ct-stage-stepper">{projectStages.map((stage, index) => { const activeIndex = projectStages.findIndex((item) => item.key === current?.stage); return <button key={stage.key} className={`${stage.key === current?.stage ? 'active' : ''} ${index < activeIndex ? 'done' : ''}`} disabled={busy} onClick={() => void transition(stage.key)}><i>{index < activeIndex ? <Check /> : index + 1}</i><span>{stage.label}</span></button>; })}</div><label className="ct-stage-note"><span>本次流转备注（可选）</span><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：封面需要调整，退回制作" /></label></section>}<section className="ct-panel ct-stage-history"><header><div><span className="ct-kicker">HISTORY</span><h2>阶段记录</h2></div><b>{events.length}</b></header>{events.length ? events.map((event) => <article key={event.id}><i /><div><strong>{event.from_stage_label} → {event.to_stage_label}</strong><p>{event.note || '无备注'}</p><small>{event.changed_by_name || '系统'} · {formatDate(event.created_at)}</small></div></article>) : <EmptyState icon={GitBranch} title="暂无阶段变化" detail="当前工程从策划阶段开始。" />}</section></section></div>}
+  </>;
+}
+
+function CaptureView({ projectsView, recordingsView }: { projectsView: ReactNode; recordingsView: ReactNode }) {
+  const [tab, setTab] = useState<'assets' | 'recordings'>('assets');
+  return <><div className="ct-tabs" role="tablist"><button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'active' : ''} onClick={() => setTab('assets')}><Folder />素材管理</button><button role="tab" aria-selected={tab === 'recordings'} className={tab === 'recordings' ? 'active' : ''} onClick={() => setTab('recordings')}><Mic />录音与转写</button></div>{tab === 'assets' ? projectsView : recordingsView}</>;
+}
+
+function ContentView({ copyView, scriptsView }: { copyView: ReactNode; scriptsView: ReactNode }) {
+  const [tab, setTab] = useState<'copy' | 'scripts'>('copy');
+  return <><div className="ct-tabs" role="tablist"><button role="tab" aria-selected={tab === 'copy'} className={tab === 'copy' ? 'active' : ''} onClick={() => setTab('copy')}><FileText />文案资料</button><button role="tab" aria-selected={tab === 'scripts'} className={tab === 'scripts' ? 'active' : ''} onClick={() => setTab('scripts')}><Clapperboard />脚本与分镜</button></div>{tab === 'copy' ? copyView : scriptsView}</>;
+}
+
+function PublishingView({ apiBasePath, requester, projects, deliverables, publications, refresh, notify, errorText }: {
+  apiBasePath: string; requester: Requester; projects: Project[]; deliverables: Deliverable[]; publications: Publication[]; refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<{ valid: boolean; row_count: number; errors: Array<{ row?: number; field?: string; detail?: string; message?: string }>; preview: Array<Record<string, unknown>> } | null>(null);
+  const submitDeliverable = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const duration = Number(form.get('duration_seconds') || 0); const file = form.get('file'); if (file instanceof File && !file.size) form.delete('file'); form.delete('duration_seconds'); form.set('duration_ms', String(duration * 1000)); setBusy(true); try { await requester(`${apiBasePath}/deliverables`, { method: 'POST', body: form }); (event.currentTarget as HTMLFormElement).reset(); await refresh(); notify('成片版本已添加'); } catch (reason) { notify(errorText(reason, '添加成片失败')); } finally { setBusy(false); } };
+  const submitPublication = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const payload = Object.fromEntries(form.entries()); setBusy(true); try { await requester(`${apiBasePath}/publications`, jsonInit('POST', { ...payload, deliverable: payload.deliverable || null, published_at: new Date(String(payload.published_at)).toISOString() })); (event.currentTarget as HTMLFormElement).reset(); await refresh(); notify('发布记录已添加，工程已进入已发布阶段'); } catch (reason) { notify(errorText(reason, '添加发布记录失败')); } finally { setBusy(false); } };
+  const submitMetrics = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const publicationId = String(form.get('publication')); const numeric = ['impressions', 'views', 'completions', 'likes', 'comments', 'shares', 'saves', 'followers_gained', 'conversions', 'average_watch_seconds']; const payload: Record<string, string | number> = { observed_on: String(form.get('observed_on')) }; numeric.forEach((key) => { payload[key] = Number(form.get(key) || 0); }); setBusy(true); try { await requester(`${apiBasePath}/publications/${publicationId}/metrics`, jsonInit('POST', payload)); (event.currentTarget as HTMLFormElement).reset(); await refresh(); notify('指标快照已保存'); } catch (reason) { notify(errorText(reason, '保存指标失败')); } finally { setBusy(false); } };
+  const review = async (item: Deliverable, review_status: Deliverable['review_status']) => { const review_note = review_status === 'changes_requested' ? window.prompt('请输入修改意见', item.review_note || '') : item.review_note; if (review_status === 'changes_requested' && review_note === null) return; try { await requester(`${apiBasePath}/deliverables/${item.id}`, jsonInit('PATCH', { review_status, review_note })); await refresh(); notify('审核状态已更新'); } catch (reason) { notify(errorText(reason, '审核失败')); } };
+  const importCsv = async (commit: boolean) => { if (!csvFile) return; const form = new FormData(); form.append('file', csvFile); if (commit) form.append('commit', 'true'); setBusy(true); try { const result = await requester<typeof csvPreview>(`${apiBasePath}/metrics-csv/import`, { method: 'POST', body: form }); setCsvPreview(result); if (commit) { await refresh(); notify('CSV 数据已导入'); } else notify('预检完成'); } catch (reason) { const data = (reason as { response?: { data?: typeof csvPreview } })?.response?.data; if (data) setCsvPreview(data); else notify(errorText(reason, 'CSV 预检失败')); } finally { setBusy(false); } };
+  const downloadCsv = async (kind: 'template' | 'export') => { try { const content = await requester<string>(`${apiBasePath}/metrics-csv/${kind}`); const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = kind === 'template' ? 'creation-metrics-template.csv' : 'creation-metrics-export.csv'; link.click(); URL.revokeObjectURL(url); } catch (reason) { notify(errorText(reason, '下载 CSV 失败')); } };
+  return <><PageTitle eyebrow="DELIVERY & RELEASE" title="成片与发布" detail="管理成片版本、审核结论、发布记录和可追溯的累计指标快照。" actions={<button className="ct-button ghost" onClick={() => void downloadCsv('export')}><Download />导出 CSV</button>} />
+    <div className="ct-publish-forms"><form className="ct-panel ct-data-form" onSubmit={submitDeliverable}><span className="ct-kicker">DELIVERABLE</span><h2>添加成片版本</h2><label><span>工程</span><select name="project" required><option value="">选择工程</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><div className="ct-form-row"><label><span>名称</span><input name="name" required /></label><label><span>版本</span><input name="version_label" defaultValue="v1" required /></label></div><div className="ct-form-row"><label><span>适配平台</span><select name="platform"><option value="">通用</option>{Object.entries(platformLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label><span>时长（秒）</span><input name="duration_seconds" type="number" min="0" /></label></div><label><span>成片文件（与外链二选一）</span><input name="file" type="file" accept="video/*" /></label><label><span>外部链接</span><input name="external_url" type="url" /></label><button className="ct-button primary" disabled={busy}><Video />保存成片</button></form>
+      <form className="ct-panel ct-data-form" onSubmit={submitPublication}><span className="ct-kicker">PUBLICATION</span><h2>登记发布作品</h2><label><span>工程</span><select name="project" required><option value="">选择工程</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><div className="ct-form-row"><label><span>平台</span><select name="platform" required>{Object.entries(platformLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label><span>其他平台名称</span><input name="platform_name" placeholder="选择其他时填写" /></label></div><label><span>账号</span><input name="account_name" required /></label><label><span>作品标题</span><input name="title" required /></label><div className="ct-form-row"><label><span>作品 ID</span><input name="external_post_id" /></label><label><span>发布时间</span><input name="published_at" type="datetime-local" required /></label></div><label><span>作品链接（与作品 ID 至少一项）</span><input name="post_url" type="url" /></label><label><span>关联成片</span><select name="deliverable"><option value="">不关联</option>{deliverables.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version_label}</option>)}</select></label><button className="ct-button primary" disabled={busy}><Send />登记发布</button></form>
+      <form className="ct-panel ct-data-form" onSubmit={submitMetrics}><span className="ct-kicker">METRICS</span><h2>补充指标快照</h2><label><span>发布作品</span><select name="publication" required><option value="">选择作品</option>{publications.map((item) => <option key={item.id} value={item.id}>{item.platform_label} · {item.title}</option>)}</select></label><label><span>统计日期</span><input name="observed_on" type="date" required /></label><div className="ct-metric-grid">{[['impressions','曝光'],['views','播放'],['completions','完播'],['likes','点赞'],['comments','评论'],['shares','分享'],['saves','收藏'],['followers_gained','涨粉'],['conversions','转化'],['average_watch_seconds','平均观看秒数']].map(([name, label]) => <label key={name}><span>{label}</span><input name={name} type="number" min="0" step={name === 'average_watch_seconds' ? '0.01' : '1'} defaultValue="0" /></label>)}</div><button className="ct-button primary" disabled={busy}><Gauge />保存快照</button></form></div>
+    <section className="ct-panel ct-deliverable-list"><header><div><span className="ct-kicker">REVIEW QUEUE</span><h2>成片审核</h2></div><b>{deliverables.length}</b></header>{deliverables.length ? deliverables.map((item) => <article key={item.id}><Video /><div><strong>{item.name} · {item.version_label}</strong><small>{projects.find((project) => project.id === item.project)?.name} · {item.platform_label || '通用版本'}{item.review_note ? ` · ${item.review_note}` : ''}</small></div><span className={`ct-status ${item.review_status}`}>{item.review_status_label}</span><div className="ct-row-actions">{item.review_status === 'draft' && <button className="ct-button tiny" onClick={() => void review(item, 'pending')}><Send />送审</button>}<button className="ct-button tiny" onClick={() => void review(item, 'approved')}><Check />通过</button><button className="ct-button tiny" onClick={() => void review(item, 'changes_requested')}>退回</button></div></article>) : <EmptyState icon={Video} title="还没有成片" detail="上传成片文件或记录外部成片链接。" />}</section>
+    <section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">RELEASES</span><h2>发布记录</h2></div><b>{publications.length}</b></header><div className="ct-table-wrap"><table><thead><tr><th>作品</th><th>平台 / 账号</th><th>发布时间</th><th>曝光</th><th>播放</th><th>互动率</th></tr></thead><tbody>{publications.map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.project_name}</small></td><td>{item.platform_label}<small>{item.account_name}</small></td><td>{formatDate(item.published_at)}</td><td>{item.latest_metrics?.impressions?.toLocaleString() ?? '待补'}</td><td>{item.latest_metrics?.views?.toLocaleString() ?? '—'}</td><td>{item.latest_metrics?.engagement_rate == null ? '—' : `${(item.latest_metrics.engagement_rate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table></div>{!publications.length && <EmptyState icon={Send} title="还没有发布记录" detail="登记真实发布作品后，工程会自动进入已发布阶段。" />}</section>
+    <section className="ct-panel ct-csv-panel"><header><div><span className="ct-kicker">CSV IMPORT</span><h2>批量导入发布数据</h2><p>先逐行预检，确认无误后再提交；同作品同一天的数据会覆盖更新。</p></div><button className="ct-button tiny" onClick={() => void downloadCsv('template')}><Download />下载模板</button></header><div className="ct-csv-controls"><input type="file" accept=".csv,text/csv" onChange={(event) => { setCsvFile(event.target.files?.[0] ?? null); setCsvPreview(null); }} /><button className="ct-button ghost" disabled={!csvFile || busy} onClick={() => void importCsv(false)}>预检</button><button className="ct-button primary" disabled={!csvPreview?.valid || busy} onClick={() => void importCsv(true)}>确认导入</button></div>{csvPreview && <div className={`ct-csv-result ${csvPreview.valid ? 'valid' : 'invalid'}`}><strong>{csvPreview.valid ? `预检通过：${csvPreview.row_count} 行` : `发现 ${csvPreview.errors.length} 个错误`}</strong>{csvPreview.errors.map((error, index) => <p key={index}>第 {error.row ?? '?'} 行 · {error.field || '数据'}：{error.detail || error.message || '格式错误'}</p>)}</div>}</section>
+  </>;
+}
+
+function AnalyticsView({ apiBasePath, requester, data, notify, errorText }: { apiBasePath: string; requester: Requester; data: AnalyticsData | null; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string }) {
+  const [shown, setShown] = useState(data);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => setShown(data), [data]);
+  const applyFilters = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const query = new URLSearchParams(); ['start', 'end', 'platform'].forEach((key) => { const value = String(form.get(key) || ''); if (value) query.set(key, value); }); setLoading(true); try { setShown(await requester<AnalyticsData>(`${apiBasePath}/analytics?${query}`)); } catch (reason) { notify(errorText(reason, '分析数据加载失败')); } finally { setLoading(false); } };
+  const percent = (value: number | null | undefined) => value == null ? '—' : `${(value * 100).toFixed(2)}%`;
+  const summary = shown?.summary ?? {};
+  return <><PageTitle eyebrow="MEASUREMENT" title="数据分析" detail="仅使用所选范围内每条作品的最新累计快照，所有公式和规则均可解释。" />
+    <form className="ct-analysis-filters" onSubmit={applyFilters}><label><span>开始日期</span><input name="start" type="date" /></label><label><span>结束日期</span><input name="end" type="date" /></label><label><span>平台</span><select name="platform"><option value="">全部平台</option>{Object.entries(platformLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><button className="ct-button ghost" disabled={loading}>{loading ? <LoaderCircle className="ct-spin" /> : <RefreshCw />}应用筛选</button></form>
+    <section className="ct-analytics-kpis">{[['累计播放', Number(summary.views || 0).toLocaleString()], ['播放率', percent(summary.play_rate)], ['完播率', percent(summary.completion_rate)], ['互动率', percent(summary.engagement_rate)], ['选题采用率', percent(shown?.topics.adoption_rate)]].map(([label, value]) => <article className="ct-panel" key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
+    <section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">PUBLICATION TREND</span><h2>发布数据趋势</h2><p>{shown?.trend.length ? `基于相邻累计快照计算，共 ${shown.trend.length} 个增量日期。` : '添加同一作品的多日累计快照后，将按相邻快照计算增量。'}</p></div></header><div className="ct-table-wrap"><table><thead><tr><th>日期</th><th>新增曝光</th><th>新增播放</th><th>新增完播</th><th>新增互动</th><th>新增涨粉</th><th>新增转化</th></tr></thead><tbody>{shown?.trend.map((row) => <tr key={String(row.date)}><td>{String(row.date)}</td><td>{Number(row.impressions || 0).toLocaleString()}</td><td>{Number(row.views || 0).toLocaleString()}</td><td>{Number(row.completions || 0).toLocaleString()}</td><td>{(Number(row.likes || 0) + Number(row.comments || 0) + Number(row.shares || 0) + Number(row.saves || 0)).toLocaleString()}</td><td>{Number(row.followers_gained || 0).toLocaleString()}</td><td>{Number(row.conversions || 0).toLocaleString()}</td></tr>)}</tbody></table></div></section>
+    <div className="ct-analytics-grid"><section className="ct-panel"><header><div><span className="ct-kicker">TOPIC FUNNEL</span><h2>选题采用漏斗</h2></div></header><div className="ct-funnel"><div style={{ width: '100%' }}><strong>{shown?.topics.total ?? 0}</strong><span>全部选题</span></div><div style={{ width: `${Math.max(35, (shown?.topics.adoption_rate || 0) * 100)}%` }}><strong>{shown?.topics.adopted ?? 0}</strong><span>已产生工程</span></div></div><p className="ct-summary-copy">当前每 {shown?.topics.adopted ? Math.max(1, Math.round((shown.topics.total || 0) / shown.topics.adopted)) : '—'} 个选题产生 1 个已采用方向。此处不使用虚构评分。</p></section><section className="ct-panel"><header><div><span className="ct-kicker">STAGES</span><h2>项目阶段分布</h2></div></header><div className="ct-stage-summary">{projectStages.map((stage) => { const row = shown?.stage_distribution.find((item) => item.stage === stage.key); const max = Math.max(1, ...(shown?.stage_distribution.map((item) => item.count) || [1])); return <div key={stage.key}><span>{stage.label}</span><strong>{row?.count ?? 0}</strong><i style={{ width: `${(row?.count || 0) / max * 100}%` }} /></div>; })}</div></section></div>
+    <section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">PLATFORM PERFORMANCE</span><h2>平台表现</h2><p>按平台汇总最新累计快照。</p></div></header><div className="ct-table-wrap"><table><thead><tr><th>平台</th><th>作品数</th><th>曝光</th><th>播放</th><th>互动率</th></tr></thead><tbody>{shown?.platforms.map((row) => <tr key={String(row.platform)}><td>{String(row.label)}</td><td>{Number(row.publication_count || 0)}</td><td>{Number(row.impressions || 0).toLocaleString()}</td><td>{Number(row.views || 0).toLocaleString()}</td><td>{percent(row.engagement_rate as number | null)}</td></tr>)}</tbody></table></div>{!shown?.platforms.length && <EmptyState icon={BarChart3} title="暂无平台数据" detail="添加发布记录和指标快照后会显示对比。" />}</section>
+    <section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">TOPIC PERFORMANCE</span><h2>选题效果</h2><p>通过关联工程与发布数据实时聚合。</p></div></header><div className="ct-table-wrap"><table><thead><tr><th>选题</th><th>标签</th><th>来源</th><th>工程数</th><th>首次转工程</th><th>播放</th><th>互动率</th></tr></thead><tbody>{shown?.topics.performance.map((row) => <tr key={row.topic_id}><td><strong>{row.title}</strong></td><td>{row.tags.join('、') || '—'}</td><td>{row.source_name || '—'}</td><td>{row.project_count}</td><td>{row.first_project_hours == null ? '—' : `${row.first_project_hours} 小时`}</td><td>{row.views.toLocaleString()}</td><td>{percent(row.engagement_rate)}</td></tr>)}</tbody></table></div></section>
+    <div className="ct-analytics-grid"><section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">TAGS</span><h2>标签表现</h2></div></header><div className="ct-table-wrap"><table><thead><tr><th>标签</th><th>选题</th><th>工程</th><th>播放</th><th>互动率</th></tr></thead><tbody>{shown?.topics.tag_performance.map((row) => <tr key={row.tag}><td>{row.tag}</td><td>{row.topic_count}</td><td>{row.project_count}</td><td>{row.views.toLocaleString()}</td><td>{percent(row.engagement_rate)}</td></tr>)}</tbody></table></div></section><section className="ct-panel ct-publication-table"><header><div><span className="ct-kicker">SOURCES</span><h2>来源表现</h2></div></header><div className="ct-table-wrap"><table><thead><tr><th>来源</th><th>选题</th><th>工程</th><th>播放</th><th>互动率</th></tr></thead><tbody>{shown?.topics.source_performance.map((row) => <tr key={row.source_name}><td>{row.source_name}</td><td>{row.topic_count}</td><td>{row.project_count}</td><td>{row.views.toLocaleString()}</td><td>{percent(row.engagement_rate)}</td></tr>)}</tbody></table></div></section></div>
+    <section className="ct-panel ct-insights"><header><div><span className="ct-kicker">RULE INSIGHTS</span><h2>规则洞察</h2><p>由逾期、缺数据、累计回退、阶段耗时和同平台四分位规则触发。</p></div><b>{shown?.insights.length ?? 0}</b></header>{shown?.insights.length ? shown.insights.map((item, index) => <article key={`${item.kind}-${item.resource_id}-${index}`} className={item.level}><Gauge /><div><strong>{item.title}</strong><p>{item.detail}</p></div></article>) : <EmptyState icon={CheckCircle2} title="暂未发现异常" detail="规则检查没有发现需要处理的事项。" />}</section>
+    <details className="ct-panel ct-formulas"><summary>查看指标公式</summary>{Object.entries(shown?.formulas || {}).map(([key, value]) => <p key={key}><code>{key}</code><span>{value}</span></p>)}</details>
   </>;
 }
 
@@ -508,19 +756,20 @@ function CopywritingView({ apiBasePath, requester, projects, items, refresh, not
   apiBasePath: string; requester: Requester; projects: Project[]; items: Copywriting[]; refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string;
 }) {
   const [style, setStyle] = useState<CopyStyle>('informative');
-  const [topic, setTopic] = useState('');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
   const [projectId, setProjectId] = useState('');
   const [current, setCurrent] = useState<Copywriting | null>(items[0] ?? null);
   const [draft, setDraft] = useState(items[0]?.content ?? '');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (!current && items[0]) { setCurrent(items[0]); setDraft(items[0].content); } }, [current, items]);
   const select = (item: Copywriting) => { setCurrent(item); setDraft(item.content); };
-  const generate = async (event: FormEvent) => {
-    event.preventDefault(); if (!topic.trim()) return; setBusy(true);
+  const create = async (event: FormEvent) => {
+    event.preventDefault(); if (!title.trim() || !content.trim()) return; setBusy(true);
     try {
-      const item = await requester<Copywriting>(`${apiBasePath}/copywritings/generate`, jsonInit('POST', { topic: topic.trim(), style, project_id: projectId || null }));
-      await refresh(); select(item); notify('文案已生成');
-    } catch (reason) { notify(errorText(reason, '文案生成失败')); }
+      const item = await requester<Copywriting>(`${apiBasePath}/copywritings`, jsonInit('POST', { title: title.trim(), content: content.trim(), style, project_id: projectId || null }));
+      await refresh(); select(item); setTitle(''); setContent(''); notify('文案资料已创建');
+    } catch (reason) { notify(errorText(reason, '创建文案失败')); }
     finally { setBusy(false); }
   };
   const save = async () => {
@@ -535,16 +784,16 @@ function CopywritingView({ apiBasePath, requester, projects, items, refresh, not
     catch (reason) { notify(errorText(reason, '删除文案失败')); }
   };
   return <>
-    <PageTitle eyebrow="AI COPY DESK" title="文案生成" detail="用主题和内容风格快速起稿，再在编辑区打磨成可发布版本。" />
-    <div className="ct-copy-layout"><form className="ct-panel ct-generator" onSubmit={generate}><span className="ct-kicker">BRIEF</span><h2>描述你的创作主题</h2><label><span>主题 <b>*</b></span><textarea value={topic} onChange={(event) => setTopic(event.target.value)} required rows={4} placeholder="例如：用 60 秒讲清楚普通人如何建立个人知识库" /></label><fieldset><legend>内容风格</legend><div className="ct-style-grid">{(Object.keys(styleLabels) as CopyStyle[]).map((key) => <label key={key}><input type="radio" name="style" checked={style === key} onChange={() => setStyle(key)} /><span>{styleLabels[key]}</span></label>)}</div></fieldset><label><span>关联工程</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">不关联工程</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><button className="ct-button primary wide" disabled={busy}>{busy ? <LoaderCircle className="ct-spin" /> : <Sparkles />}生成文案</button></form>
+    <PageTitle eyebrow="COPY MATERIALS" title="文案资料" detail="仅维护人工创建或导入的文案资料，不自动生成内容。" />
+    <div className="ct-copy-layout"><form className="ct-panel ct-generator" onSubmit={create}><span className="ct-kicker">NEW MATERIAL</span><h2>新建文案资料</h2><label className="ct-button ghost"><Upload />导入 TXT / Markdown<input type="file" hidden accept=".txt,.md,text/plain,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; file.text().then((value) => { setTitle(file.name.replace(/\.(txt|md)$/i, '')); setContent(value); }); event.target.value = ''; }} /></label><label><span>标题 <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="输入文案标题" /></label><label><span>文案内容 <b>*</b></span><textarea value={content} onChange={(event) => setContent(event.target.value)} required rows={7} placeholder="粘贴或输入你的文案内容" /></label><fieldset><legend>内容分类</legend><div className="ct-style-grid">{(Object.keys(styleLabels) as CopyStyle[]).map((key) => <label key={key}><input type="radio" name="style" checked={style === key} onChange={() => setStyle(key)} /><span>{styleLabels[key]}</span></label>)}</div></fieldset><label><span>关联工程</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">不关联工程</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><button className="ct-button primary wide" disabled={busy}>{busy ? <LoaderCircle className="ct-spin" /> : <Plus />}创建资料</button></form>
       <section className="ct-panel ct-editor"><header><div><span className="ct-kicker">EDITOR</span><h2>{current?.title || '文案编辑器'}</h2></div>{current && <div><button className="ct-icon-button danger" aria-label="删除文案" onClick={() => void remove()}><Trash2 /></button><button className="ct-button small" onClick={() => void save()} disabled={busy}><Save />保存</button></div>}</header>{current ? <><div className="ct-editor-meta"><span>{current.style_label}</span><small>更新于 {formatDate(current.updated_at)}</small></div><textarea aria-label="文案内容" value={draft} onChange={(event) => setDraft(event.target.value)} /></> : <EmptyState icon={PenLine} title="生成结果会出现在这里" detail="选择风格并输入主题，开始第一版创作。" />}</section>
-      <aside className="ct-panel ct-copy-history"><header><div><span className="ct-kicker">LIBRARY</span><h2>文案库</h2></div><b>{items.length}</b></header>{items.length ? items.map((item) => <button key={item.id} className={item.id === current?.id ? 'active' : ''} onClick={() => select(item)}><span>{styleLabels[item.style]}</span><strong>{item.title}</strong><small>{formatDate(item.updated_at)}</small></button>) : <EmptyState icon={FileText} title="暂无文案" detail="生成后会自动保存在这里。" />}</aside>
+      <aside className="ct-panel ct-copy-history"><header><div><span className="ct-kicker">LIBRARY</span><h2>文案库</h2></div><b>{items.length}</b></header>{items.length ? items.map((item) => <button key={item.id} className={item.id === current?.id ? 'active' : ''} onClick={() => select(item)}><span>{styleLabels[item.style]}</span><strong>{item.title}</strong><small>{formatDate(item.updated_at)}</small></button>) : <EmptyState icon={FileText} title="暂无文案" detail="手工创建的文案会保存在这里。" />}</aside>
     </div>
   </>;
 }
 
-function ScriptsView({ apiBasePath, requester, projects, scripts, refresh, notify, errorText }: {
-  apiBasePath: string; requester: Requester; projects: Project[]; scripts: Script[]; refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string;
+function ScriptsView({ apiBasePath, requester, projects, scripts, assets, refresh, notify, errorText }: {
+  apiBasePath: string; requester: Requester; projects: Project[]; scripts: Script[]; assets: Asset[]; refresh: () => Promise<void>; notify: (message: string) => void; errorText: (reason: unknown, fallback: string) => string;
 }) {
   const [selectedId, setSelectedId] = useState(scripts[0]?.id ?? '');
   const [creating, setCreating] = useState(false);
@@ -559,7 +808,7 @@ function ScriptsView({ apiBasePath, requester, projects, scripts, refresh, notif
   };
   const addScene = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!current) return; const form = new FormData(event.currentTarget); setCreating(true);
-    try { await requester(`${apiBasePath}/scripts/${current.id}/scenes`, jsonInit('POST', { title: form.get('title'), description: form.get('description'), duration_seconds: Number(form.get('duration_seconds') || 5) })); setSceneOpen(false); await refresh(); notify('场景已添加'); }
+    try { await requester(`${apiBasePath}/scripts/${current.id}/scenes`, jsonInit('POST', { title: form.get('title'), description: form.get('description'), duration_seconds: Number(form.get('duration_seconds') || 5), image_asset_id: form.get('image_asset_id') || null })); setSceneOpen(false); await refresh(); notify('场景已添加'); }
     catch (reason) { notify(errorText(reason, '添加场景失败')); }
     finally { setCreating(false); }
   };
@@ -573,11 +822,17 @@ function ScriptsView({ apiBasePath, requester, projects, scripts, refresh, notif
     try { const result = await requester<{ filename: string; content: string }>(`${apiBasePath}/scripts/${current.id}/export`); const url = URL.createObjectURL(new Blob([result.content], { type: 'text/plain;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = result.filename; link.click(); URL.revokeObjectURL(url); notify('脚本已导出'); }
     catch (reason) { notify(errorText(reason, '导出脚本失败')); }
   };
+  const moveScene = async (index: number, direction: -1 | 1) => {
+    if (!current) return; const next = index + direction; if (next < 0 || next >= current.scenes.length) return;
+    const ids = current.scenes.map((item) => item.id); [ids[index], ids[next]] = [ids[next], ids[index]];
+    try { await requester(`${apiBasePath}/scripts/${current.id}/scenes/reorder`, jsonInit('POST', { scene_ids: ids })); await refresh(); notify('分镜顺序已更新'); }
+    catch (reason) { notify(errorText(reason, '调整顺序失败')); }
+  };
   return <>
     <PageTitle eyebrow="STORYBOARD" title="脚本创作" detail="用场景、画面说明和时长搭建可执行的短视频分镜。" actions={current && <><button className="ct-button ghost" onClick={() => void exportScript()}><Download />导出脚本</button><button className="ct-button primary" onClick={() => setSceneOpen(true)}><Plus />添加场景</button></>} />
     <div className="ct-script-layout"><aside className="ct-panel ct-script-list"><header><div><span className="ct-kicker">SCRIPTS</span><h2>脚本库</h2></div><b>{scripts.length}</b></header>{scripts.map((script) => <button key={script.id} className={current?.id === script.id ? 'active' : ''} onClick={() => setSelectedId(script.id)}><Clapperboard /><div><strong>{script.title}</strong><small>{script.scenes.length} 个场景 · {script.total_duration_seconds} 秒</small></div></button>)}<form className="ct-new-script" onSubmit={createScript}><input name="title" required maxLength={200} placeholder="新脚本标题" /><select name="project_id"><option value="">不关联工程</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><textarea name="description" rows={2} placeholder="脚本说明（可选）" /><button className="ct-button small wide" disabled={creating}><Plus />创建脚本</button></form></aside>
-      <section className="ct-script-canvas">{current ? <><div className="ct-script-hero"><span>脚本</span><h2>{current.title}</h2><p>{current.description || '还没有脚本说明。'}</p><div><b>{current.scenes.length}</b><small>场景</small><b>{current.total_duration_seconds}s</b><small>总时长</small></div></div>{current.scenes.length ? <div className="ct-timeline">{current.scenes.map((scene, index) => <article key={scene.id}><div className="ct-timeline-index"><span>{String(index + 1).padStart(2, '0')}</span><i /></div><div className="ct-scene-card">{scene.image_url ? <img src={scene.image_url} alt="" /> : <div className="ct-scene-placeholder"><Image /></div>}<div><header><span>SCENE {index + 1}</span><b>{scene.duration_seconds} 秒</b></header><h3>{scene.title}</h3><p>{scene.description || '暂无画面说明'}</p></div><button className="ct-icon-button danger" aria-label={`删除场景 ${scene.title}`} onClick={() => void deleteScene(scene)}><Trash2 /></button></div></article>)}</div> : <div className="ct-panel"><EmptyState icon={Clapperboard} title="脚本还没有场景" detail="添加第一个场景，写下画面、台词或镜头动作。" action={<button className="ct-button primary" onClick={() => setSceneOpen(true)}>添加场景</button>} /></div>}</> : <div className="ct-panel"><EmptyState icon={Clapperboard} title="先创建一个脚本" detail="给脚本命名后，就可以逐场景搭建分镜。" /></div>}</section></div>
-    {sceneOpen && current && <Modal title={`为“${current.title}”添加场景`} onClose={() => setSceneOpen(false)}><form className="ct-form" onSubmit={addScene}><label><span>场景标题 <b>*</b></span><input name="title" required autoFocus maxLength={200} placeholder="例如：清晨街道空镜" /></label><label><span>画面与台词</span><textarea name="description" rows={5} placeholder="描述景别、动作、旁白或台词" /></label><label><span>预计时长（秒）</span><input name="duration_seconds" type="number" min="1" max="3600" defaultValue="5" required /></label><footer><button type="button" className="ct-button ghost" onClick={() => setSceneOpen(false)}>取消</button><button className="ct-button primary" disabled={creating}>添加场景</button></footer></form></Modal>}
+      <section className="ct-script-canvas">{current ? <><div className="ct-script-hero"><span>脚本</span><h2>{current.title}</h2><p>{current.description || '还没有脚本说明。'}</p><div><b>{current.scenes.length}</b><small>场景</small><b>{current.total_duration_seconds}s</b><small>总时长</small></div></div>{current.scenes.length ? <div className="ct-timeline">{current.scenes.map((scene, index) => <article key={scene.id}><div className="ct-timeline-index"><span>{String(index + 1).padStart(2, '0')}</span><i /></div><div className="ct-scene-card">{scene.image_url ? <img src={scene.image_url} alt="" /> : <div className="ct-scene-placeholder"><Image /></div>}<div><header><span>SCENE {index + 1}</span><b>{scene.duration_seconds} 秒</b></header><h3>{scene.title}</h3><p>{scene.description || '暂无画面说明'}</p><div className="ct-scene-order"><button disabled={index === 0} onClick={() => void moveScene(index, -1)} aria-label={`上移 ${scene.title}`}>↑ 上移</button><button disabled={index === current.scenes.length - 1} onClick={() => void moveScene(index, 1)} aria-label={`下移 ${scene.title}`}>↓ 下移</button></div></div><button className="ct-icon-button danger" aria-label={`删除场景 ${scene.title}`} onClick={() => void deleteScene(scene)}><Trash2 /></button></div></article>)}</div> : <div className="ct-panel"><EmptyState icon={Clapperboard} title="脚本还没有场景" detail="添加第一个场景，写下画面、台词或镜头动作。" action={<button className="ct-button primary" onClick={() => setSceneOpen(true)}>添加场景</button>} /></div>}</> : <div className="ct-panel"><EmptyState icon={Clapperboard} title="先创建一个脚本" detail="给脚本命名后，就可以逐场景搭建分镜。" /></div>}</section></div>
+    {sceneOpen && current && <Modal title={`为“${current.title}”添加场景`} onClose={() => setSceneOpen(false)}><form className="ct-form" onSubmit={addScene}><label><span>场景标题 <b>*</b></span><input name="title" required autoFocus maxLength={200} placeholder="例如：清晨街道空镜" /></label><label><span>画面与台词</span><textarea name="description" rows={5} placeholder="描述景别、动作、旁白或台词" /></label><label><span>关联图片素材</span><select name="image_asset_id"><option value="">暂不关联</option>{assets.filter((asset) => asset.kind === 'image').map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label><label><span>预计时长（秒）</span><input name="duration_seconds" type="number" min="1" max="3600" defaultValue="5" required /></label><footer><button type="button" className="ct-button ghost" onClick={() => setSceneOpen(false)}>取消</button><button className="ct-button primary" disabled={creating}>添加场景</button></footer></form></Modal>}
   </>;
 }
 

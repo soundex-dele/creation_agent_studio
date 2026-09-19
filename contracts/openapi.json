@@ -926,24 +926,12 @@
                 }
             ]
         },
-        "/applications/{application_id}/creation-toolbox/copywritings": {
+        "/applications/{application_id}/creation-toolbox/analytics": {
             "get": {
-                "operationId": "applications_creation-toolbox_copywritings_list",
+                "operationId": "applications_creation-toolbox_analytics_list",
                 "description": "",
                 "responses": {
                     "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "post": {
-                "operationId": "applications_creation-toolbox_copywritings_create",
-                "description": "",
-                "responses": {
-                    "201": {
                         "description": ""
                     }
                 },
@@ -962,9 +950,21 @@
                 }
             ]
         },
-        "/applications/{application_id}/creation-toolbox/copywritings/generate": {
+        "/applications/{application_id}/creation-toolbox/copywritings": {
+            "get": {
+                "operationId": "applications_creation-toolbox_copywritings_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
             "post": {
-                "operationId": "applications_creation-toolbox_copywritings_generate_create",
+                "operationId": "applications_creation-toolbox_copywritings_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -1030,6 +1030,158 @@
                 }
             ]
         },
+        "/applications/{application_id}/creation-toolbox/deliverables": {
+            "get": {
+                "operationId": "applications_creation-toolbox_deliverables_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_creation-toolbox_deliverables_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/deliverables/{deliverable_id}": {
+            "patch": {
+                "operationId": "applications_creation-toolbox_deliverables_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_creation-toolbox_deliverables_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "deliverable_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/metrics-csv/export": {
+            "get": {
+                "operationId": "applications_creation-toolbox_metrics-csv_export_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/metrics-csv/import": {
+            "post": {
+                "operationId": "applications_creation-toolbox_metrics-csv_import_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/metrics-csv/template": {
+            "get": {
+                "operationId": "applications_creation-toolbox_metrics-csv_template_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/creation-toolbox/projects": {
             "get": {
                 "operationId": "applications_creation-toolbox_projects_list",
@@ -1067,6 +1219,18 @@
             ]
         },
         "/applications/{application_id}/creation-toolbox/projects/{project_id}": {
+            "get": {
+                "operationId": "applications_creation-toolbox_projects_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
             "patch": {
                 "operationId": "applications_creation-toolbox_projects_partial_update",
                 "description": "",
@@ -1084,6 +1248,38 @@
                 "description": "",
                 "responses": {
                     "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/projects/{project_id}/archive": {
+            "post": {
+                "operationId": "applications_creation-toolbox_projects_archive_create",
+                "description": "",
+                "responses": {
+                    "201": {
                         "description": ""
                     }
                 },
@@ -1270,6 +1466,226 @@
                 },
                 {
                     "name": "folder_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/projects/{project_id}/stage-transitions": {
+            "get": {
+                "operationId": "applications_creation-toolbox_projects_stage-transitions_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_creation-toolbox_projects_stage-transitions_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/publications": {
+            "get": {
+                "operationId": "applications_creation-toolbox_publications_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_creation-toolbox_publications_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/publications/{publication_id}": {
+            "patch": {
+                "operationId": "applications_creation-toolbox_publications_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_creation-toolbox_publications_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics": {
+            "get": {
+                "operationId": "applications_creation-toolbox_publications_metrics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_creation-toolbox_publications_metrics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics/{snapshot_id}": {
+            "patch": {
+                "operationId": "applications_creation-toolbox_publications_metrics_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_creation-toolbox_publications_metrics_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "snapshot_id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -1522,6 +1938,38 @@
                 }
             ]
         },
+        "/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/reorder": {
+            "post": {
+                "operationId": "applications_creation-toolbox_scripts_scenes_reorder_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "script_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/{scene_id}": {
             "patch": {
                 "operationId": "applications_creation-toolbox_scripts_scenes_partial_update",
@@ -1566,6 +2014,178 @@
                 },
                 {
                     "name": "scene_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/topics": {
+            "get": {
+                "operationId": "applications_creation-toolbox_topics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_creation-toolbox_topics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/topics/bulk": {
+            "post": {
+                "operationId": "applications_creation-toolbox_topics_bulk_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/topics/tags": {
+            "get": {
+                "operationId": "applications_creation-toolbox_topics_tags_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/topics/{topic_id}": {
+            "get": {
+                "operationId": "applications_creation-toolbox_topics_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_creation-toolbox_topics_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_creation-toolbox_topics_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "topic_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/creation-toolbox/topics/{topic_id}/create-project": {
+            "post": {
+                "operationId": "applications_creation-toolbox_topics_create-project_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "topic_id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -8154,24 +8774,12 @@
                 }
             ]
         },
-        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/copywritings": {
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/analytics": {
             "get": {
-                "operationId": "organizations_applications_creation-toolbox_copywritings_list",
+                "operationId": "organizations_applications_creation-toolbox_analytics_list",
                 "description": "",
                 "responses": {
                     "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "post": {
-                "operationId": "organizations_applications_creation-toolbox_copywritings_create",
-                "description": "",
-                "responses": {
-                    "201": {
                         "description": ""
                     }
                 },
@@ -8198,9 +8806,21 @@
                 }
             ]
         },
-        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/copywritings/generate": {
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/copywritings": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_copywritings_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
             "post": {
-                "operationId": "organizations_applications_creation-toolbox_copywritings_generate_create",
+                "operationId": "organizations_applications_creation-toolbox_copywritings_create",
                 "description": "",
                 "responses": {
                     "201": {
@@ -8282,6 +8902,198 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/deliverables": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_deliverables_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_deliverables_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/deliverables/{deliverable_id}": {
+            "patch": {
+                "operationId": "organizations_applications_creation-toolbox_deliverables_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_creation-toolbox_deliverables_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "deliverable_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/export": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_metrics-csv_export_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/import": {
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_metrics-csv_import_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/metrics-csv/template": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_metrics-csv_template_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects": {
             "get": {
                 "operationId": "organizations_applications_creation-toolbox_projects_list",
@@ -8327,6 +9139,18 @@
             ]
         },
         "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_projects_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
             "patch": {
                 "operationId": "organizations_applications_creation-toolbox_projects_partial_update",
                 "description": "",
@@ -8344,6 +9168,46 @@
                 "description": "",
                 "responses": {
                     "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}/archive": {
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_projects_archive_create",
+                "description": "",
+                "responses": {
+                    "201": {
                         "description": ""
                     }
                 },
@@ -8570,6 +9434,266 @@
                 },
                 {
                     "name": "folder_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/projects/{project_id}/stage-transitions": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_projects_stage-transitions_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_projects_stage-transitions_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_publications_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_publications_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}": {
+            "patch": {
+                "operationId": "organizations_applications_creation-toolbox_publications_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_creation-toolbox_publications_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_publications_metrics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_publications_metrics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/publications/{publication_id}/metrics/{snapshot_id}": {
+            "patch": {
+                "operationId": "organizations_applications_creation-toolbox_publications_metrics_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_creation-toolbox_publications_metrics_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "publication_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "snapshot_id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -8878,6 +10002,46 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/reorder": {
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_scripts_scenes_reorder_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "script_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/scripts/{script_id}/scenes/{scene_id}": {
             "patch": {
                 "operationId": "organizations_applications_creation-toolbox_scripts_scenes_partial_update",
@@ -8930,6 +10094,218 @@
                 },
                 {
                     "name": "scene_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_topics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_topics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/bulk": {
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_topics_bulk_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/tags": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_topics_tags_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/{topic_id}": {
+            "get": {
+                "operationId": "organizations_applications_creation-toolbox_topics_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_creation-toolbox_topics_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_creation-toolbox_topics_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "topic_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/creation-toolbox/topics/{topic_id}/create-project": {
+            "post": {
+                "operationId": "organizations_applications_creation-toolbox_topics_create-project_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "topic_id",
                     "in": "path",
                     "required": true,
                     "schema": {

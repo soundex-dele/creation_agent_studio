@@ -1,6 +1,8 @@
 import pytest
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.applications.models import Application, ApplicationCategory
@@ -15,6 +17,7 @@ def toolbox_context(db, settings, tmp_path):
     User = get_user_model()
     owner = User.objects.create_user(username="toolbox-owner")
     developer = User.objects.create_user(username="toolbox-developer")
+    viewer = User.objects.create_user(username="toolbox-viewer")
     outsider = User.objects.create_user(username="toolbox-outsider")
     organization = Organization.objects.create(
         name="Toolbox Organization", slug="toolbox-organization", owner=owner
@@ -24,6 +27,9 @@ def toolbox_context(db, settings, tmp_path):
     )
     Membership.objects.create(
         organization=organization, user=developer, role=Membership.Role.DEVELOPER
+    )
+    Membership.objects.create(
+        organization=organization, user=viewer, role=Membership.Role.VIEWER
     )
     category = ApplicationCategory.objects.create(name="Creative", slug="toolbox-creative")
     application = Application.objects.create(
@@ -41,6 +47,7 @@ def toolbox_context(db, settings, tmp_path):
     return {
         "owner": owner,
         "developer": developer,
+        "viewer": viewer,
         "outsider": outsider,
         "organization": organization,
         "application": application,
@@ -102,13 +109,18 @@ def test_project_asset_and_workspace_counts(toolbox_context):
 def test_copywriting_and_script_workflow(toolbox_context):
     client = _client(toolbox_context["developer"])
     root = _root(toolbox_context)
-    generated = client.post(
-        f"{root}/copywritings/generate",
-        {"topic": "秋日旅行", "style": "emotional"},
+    created_copy = client.post(
+        f"{root}/copywritings",
+        {
+            "title": "秋日旅行",
+            "content": "用户自己记录的文案。",
+            "style": "emotional",
+        },
         format="json",
     )
-    assert generated.status_code == 201, generated.data
-    assert "秋日旅行" in generated.data["content"]
+    assert created_copy.status_code == 201, created_copy.data
+    assert created_copy.data["content"] == "用户自己记录的文案。"
+    assert client.post(f"{root}/copywritings/generate", {}, format="json").status_code == 404
 
     script = client.post(
         f"{root}/scripts",
@@ -131,3 +143,197 @@ def test_copywriting_and_script_workflow(toolbox_context):
 def test_tenant_boundary(toolbox_context):
     outsider = _client(toolbox_context["outsider"])
     assert outsider.get(f"{_root(toolbox_context)}/workspace").status_code == 403
+
+    viewer = _client(toolbox_context["viewer"])
+    assert viewer.get(f"{_root(toolbox_context)}/topics").status_code == 200
+    assert viewer.post(
+        f"{_root(toolbox_context)}/topics", {"title": "只读用户不能新增"}, format="json"
+    ).status_code == 403
+
+
+@pytest.mark.django_db
+def test_topic_duplicate_multi_project_and_delete_guard(toolbox_context):
+    client = _client(toolbox_context["developer"])
+    root = _root(toolbox_context)
+    topic = client.post(
+        f"{root}/topics",
+        {
+            "title": "普通人如何建立知识库",
+            "notes": "从真实使用场景切入",
+            "tags": ["知识管理", "效率"],
+            "target_platforms": ["douyin", "bilibili"],
+        },
+        format="json",
+    )
+    assert topic.status_code == 201, topic.data
+    duplicate = client.post(
+        f"{root}/topics", {"title": "  普通人如何建立知识库  "}, format="json"
+    )
+    assert duplicate.status_code == 409
+    allowed = client.post(
+        f"{root}/topics",
+        {"title": "普通人如何建立知识库", "allow_duplicate": True},
+        format="json",
+    )
+    assert allowed.status_code == 201, allowed.data
+
+    first = client.post(
+        f"{root}/topics/{topic.data['id']}/create-project",
+        {"name": "知识库·抖音版", "target_platforms": ["douyin"]},
+        format="json",
+    )
+    second = client.post(
+        f"{root}/topics/{topic.data['id']}/create-project",
+        {"name": "知识库·B站版", "target_platforms": ["bilibili"]},
+        format="json",
+    )
+    assert first.status_code == second.status_code == 201
+    detail = client.get(f"{root}/topics/{topic.data['id']}")
+    assert detail.data["status"] == "adopted"
+    assert len(detail.data["projects"]) == 2
+    assert client.delete(f"{root}/topics/{topic.data['id']}").status_code == 409
+
+
+@pytest.mark.django_db
+def test_publication_metrics_stage_and_analytics(toolbox_context):
+    client = _client(toolbox_context["developer"])
+    root = _root(toolbox_context)
+    project = client.post(
+        f"{root}/projects",
+        {
+            "name": "产品演示短片",
+            "description": "人工策划",
+            "planned_publish_at": (timezone.now() - timedelta(days=1)).isoformat(),
+        },
+        format="json",
+    )
+    assert project.status_code == 201, project.data
+    project_id = project.data["id"]
+    blocked = client.post(
+        f"{root}/projects/{project_id}/stage-transitions",
+        {"to_stage": "retrospective"},
+        format="json",
+    )
+    assert blocked.status_code == 400
+
+    deliverable = client.post(
+        f"{root}/deliverables",
+        {
+            "project": project_id,
+            "name": "正式版",
+            "version_label": "v1",
+            "platform": "douyin",
+            "external_url": "https://example.com/final.mp4",
+            "review_status": "approved",
+        },
+        format="json",
+    )
+    assert deliverable.status_code == 201, deliverable.data
+    publication = client.post(
+        f"{root}/publications",
+        {
+            "project": project_id,
+            "deliverable": deliverable.data["id"],
+            "platform": "douyin",
+            "account_name": "品牌账号",
+            "external_post_id": "dy-100",
+            "post_url": "https://example.com/posts/dy-100",
+            "published_at": timezone.now().isoformat(),
+        },
+        format="json",
+    )
+    assert publication.status_code == 201, publication.data
+    assert client.get(f"{root}/projects/{project_id}").data["stage"] == "published"
+    snapshot = client.post(
+        f"{root}/publications/{publication.data['id']}/metrics",
+        {
+            "observed_on": timezone.localdate().isoformat(),
+            "impressions": 1000,
+            "views": 800,
+            "completions": 400,
+            "likes": 80,
+            "comments": 20,
+            "shares": 10,
+            "saves": 10,
+            "followers_gained": 8,
+            "conversions": 4,
+        },
+        format="json",
+    )
+    assert snapshot.status_code == 201, snapshot.data
+    assert snapshot.data["play_rate"] == 0.8
+    assert snapshot.data["engagement_rate"] == 0.15
+    completed = client.post(
+        f"{root}/projects/{project_id}/stage-transitions",
+        {"to_stage": "retrospective", "note": "完成复盘"},
+        format="json",
+    )
+    assert completed.status_code == 200, completed.data
+    analytics = client.get(f"{root}/analytics")
+    assert analytics.status_code == 200, analytics.data
+    assert analytics.data["summary"]["views"] == 800
+    assert analytics.data["summary"]["completion_rate"] == 0.5
+    assert analytics.data["topics"]["tag_performance"] == []
+
+    zero_project = client.post(f"{root}/projects", {"name": "零分母工程"}, format="json")
+    zero_publication = client.post(
+        f"{root}/publications",
+        {
+            "project": zero_project.data["id"], "platform": "bilibili",
+            "account_name": "品牌账号", "external_post_id": "zero-1",
+            "published_at": timezone.now().isoformat(),
+        },
+        format="json",
+    )
+    zero_snapshot = client.post(
+        f"{root}/publications/{zero_publication.data['id']}/metrics",
+        {"observed_on": timezone.localdate().isoformat()},
+        format="json",
+    )
+    assert zero_snapshot.status_code == 201, zero_snapshot.data
+    assert zero_snapshot.data["play_rate"] is None
+    assert zero_snapshot.data["engagement_rate"] is None
+
+
+@pytest.mark.django_db
+def test_metrics_csv_preview_and_commit_are_idempotent(toolbox_context):
+    client = _client(toolbox_context["developer"])
+    root = _root(toolbox_context)
+    project = client.post(f"{root}/projects", {"name": "CSV 工程"}, format="json")
+    csv_text = (
+        "project_name,platform,platform_name,account_name,title,external_post_id,post_url,"
+        "published_at,observed_on,impressions,views,completions,likes,comments,shares,saves,"
+        "followers_gained,conversions,average_watch_seconds\n"
+        "CSV 工程,douyin,,账号,作品,post-1,https://example.com/post-1,2026-09-20 18:00:00,"
+        "2026-09-21,100,80,40,8,2,1,1,1,0,18.5\n"
+    )
+    preview = client.post(
+        f"{root}/metrics-csv/import",
+        {"file": SimpleUploadedFile("metrics.csv", csv_text.encode("utf-8"), content_type="text/csv")},
+        format="multipart",
+    )
+    assert preview.status_code == 200, preview.data
+    assert preview.data["valid"] is True
+    for expected_status in (200, 200):
+        committed = client.post(
+            f"{root}/metrics-csv/import",
+            {
+                "commit": "true",
+                "file": SimpleUploadedFile("metrics.csv", csv_text.encode("utf-8"), content_type="text/csv"),
+            },
+            format="multipart",
+        )
+        assert committed.status_code == expected_status, committed.data
+        assert committed.data["publication_count"] == 1
+        assert committed.data["snapshot_count"] == 1
+    assert client.get(f"{root}/projects/{project.data['id']}").data["stage"] == "published"
+
+    invalid_text = csv_text.replace("18.5", "not-a-number")
+    invalid = client.post(
+        f"{root}/metrics-csv/import",
+        {"file": SimpleUploadedFile("invalid.csv", invalid_text.encode("utf-8"), content_type="text/csv")},
+        format="multipart",
+    )
+    assert invalid.status_code == 400
+    assert invalid.data["valid"] is False
+    assert invalid.data["errors"][0]["row"] == 2
