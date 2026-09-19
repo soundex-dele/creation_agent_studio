@@ -389,7 +389,17 @@ class ConversationViewSet(viewsets.ViewSet):
         from modules.execution.application.projections import (
             repair_conversation_messages,
         )
-        repair_conversation_messages(conversation)
+        try:
+            repair_conversation_messages(conversation)
+        except OperationalError as exc:
+            detail = str(exc).lower()
+            if "locked" not in detail and "busy" not in detail:
+                raise
+            logger.warning(
+                "Skipped conversation message repair because SQLite is busy "
+                "conversation_id=%s",
+                conversation.id,
+            )
         conversation = Conversation.objects.prefetch_related(
             "messages__attachments",
             "skill_bindings__skill",

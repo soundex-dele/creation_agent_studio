@@ -450,6 +450,7 @@ def project_terminal_run(run_id, output):
 def repair_conversation_messages(conversation):
     """Idempotently rebuild missing chat messages from durable Run history."""
 
+    from apps.conversations.models import Message
     from modules.execution.models import RunCommand
 
     runs = Run.objects.for_organization(conversation.organization_id).filter(
@@ -465,9 +466,16 @@ def repair_conversation_messages(conversation):
         owner_id=conversation.user_id,
     ).order_by("created_at")
     for run in runs:
+        projected_sequences = set(Message.objects.filter(
+            conversation=conversation,
+            run=run,
+            run_event_sequence__isnull=False,
+        ).values_list("run_event_sequence", flat=True))
         for event in run.events.filter(
             type__in=("input.required", "input.accepted"),
         ).order_by("sequence"):
+            if event.sequence in projected_sequences:
+                continue
             if event.type == "input.required":
                 project_input_required(run.id, event)
                 continue
@@ -479,4 +487,15 @@ def repair_conversation_messages(conversation):
             if command is not None:
                 project_input_accepted(run.id, event, command)
         if run.status == Run.Status.SUCCEEDED and run.output_summary:
-            project_terminal_run(run.id, run.output_summary)
+            terminal_missing = run.next_event_sequence not in projected_sequences
+            automated_user_missing = (
+                run.source_type in {"workflow_step", "supervisor_task"}
+                and not Message.objects.filter(
+                    conversation=conversation,
+                    run=run,
+                    role="user",
+                    run_event_sequence__isnull=True,
+                ).exists()
+            )
+            if terminal_missing or automated_user_missing:
+                project_terminal_run(run.id, run.output_summary)

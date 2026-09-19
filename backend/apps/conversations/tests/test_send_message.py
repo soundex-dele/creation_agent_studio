@@ -23,6 +23,7 @@ from modules.execution.application.projections import (
     project_input_accepted,
     project_input_required,
     project_terminal_run,
+    repair_conversation_messages,
 )
 from modules.execution.models import Run, RunEvent
 
@@ -868,3 +869,47 @@ class DurableConversationRunTest(TestCase):
             role="assistant",
             content="Recovered final answer",
         ).exists())
+
+    @patch(
+        "modules.execution.application.projections.project_terminal_run"
+    )
+    def test_message_repair_does_not_reproject_an_existing_terminal_message(
+        self, project_terminal
+    ):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "finish once"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-terminal-already-projected",
+            **self.headers,
+        )
+        run = Run.objects.get(pk=response.data["id"])
+        run.status = Run.Status.SUCCEEDED
+        run.next_event_sequence = 2
+        run.output_summary = {"result": "Existing final answer"}
+        run.save(update_fields=("status", "next_event_sequence", "output_summary"))
+        Message.objects.create(
+            conversation=self.conversation,
+            run=run,
+            run_event_sequence=2,
+            role="assistant",
+            content="Existing final answer",
+        )
+
+        repair_conversation_messages(self.conversation)
+
+        project_terminal.assert_not_called()
+
+    @patch(
+        "modules.execution.application.projections.repair_conversation_messages",
+        side_effect=OperationalError("database is locked"),
+    )
+    def test_detail_returns_existing_messages_when_repair_database_is_locked(
+        self, _repair
+    ):
+        detail = self.client.get(
+            f"/api/v1/conversations/{self.conversation.id}/",
+            **self.headers,
+        )
+
+        self.assertEqual(detail.status_code, 200, detail.data)
