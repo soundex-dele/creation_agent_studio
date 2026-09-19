@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Button, Descriptions, Drawer, Empty, Input, Select, Space, Table,
+  Button, Descriptions, Drawer, Empty, Input, Select, Space, Spin, Table,
   Tabs, Tag, Typography, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   ApartmentOutlined, AppstoreOutlined, CheckCircleOutlined, ClockCircleOutlined,
-  CloseCircleOutlined, CommentOutlined, CompassOutlined, ExperimentOutlined,
+  CaretDownOutlined, CaretRightOutlined, CloseCircleOutlined, CommentOutlined,
+  CompassOutlined, ExperimentOutlined,
   ExportOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined,
   RobotOutlined, SearchOutlined, UnorderedListOutlined, WarningOutlined,
 } from '@ant-design/icons';
@@ -18,7 +19,9 @@ import { tenantApiRoot } from '@/services/tenantContext';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import {
   buildTaskRelation,
+  buildTaskTree,
   collapseConversationRuns,
+  flattenTaskTree,
   primaryTaskTypes,
   taskApplicationId,
   taskConversationId,
@@ -26,6 +29,7 @@ import {
   taskType,
   taskWorkflowId,
   type PrimaryTaskType,
+  type TaskTreeNode,
 } from './taskCenterModel';
 import './TaskCenterPage.css';
 
@@ -95,9 +99,13 @@ export default function TaskCenterPage() {
   const [runs, setRuns] = useState<RunResource[]>([]);
   const [children, setChildren] = useState<RunResource[]>([]);
   const [selected, setSelected] = useState<RunResource | null>(null);
+  const [treeRoot, setTreeRoot] = useState<RunResource | null>(null);
+  const [treeRuns, setTreeRuns] = useState<RunResource[]>([]);
+  const [treeLoading, setTreeLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TaskTypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('all');
   const [query, setQuery] = useState('');
+  const [collapsedTreeNodes, setCollapsedTreeNodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { void loadOrganizations(); }, [loadOrganizations]);
@@ -128,6 +136,9 @@ export default function TaskCenterPage() {
   }, [organizationId, selected]);
 
   const taskRuns = useMemo(() => collapseConversationRuns(runs), [runs]);
+  const runsWithChildren = useMemo(() => new Set(
+    taskRuns.flatMap((run) => run.parent_id ? [run.parent_id] : []),
+  ), [taskRuns]);
 
   const totals = useMemo(() => ({
     active: taskRuns.filter((run) => ACTIVE_STATUSES.has(run.status)).length,
@@ -161,6 +172,24 @@ export default function TaskCenterPage() {
   const openDestination = (run: RunResource, requestedType = taskType(run)) => {
     const destination = taskDestination(run, requestedType);
     if (destination) navigate(destination.path);
+  };
+
+  const openTreeBoard = async (run: RunResource) => {
+    setTreeRoot(run);
+    setTreeRuns([]);
+    setCollapsedTreeNodes(new Set());
+    if (!organizationId) return;
+    setTreeLoading(true);
+    try {
+      const descendants = await api.get<RunResource[]>(
+        `${tenantApiRoot(organizationId)}/runs/${run.id}/children`,
+      );
+      setTreeRuns(descendants);
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '加载任务树失败');
+    } finally {
+      setTreeLoading(false);
+    }
   };
 
   const renderRelationship = (run: RunResource, source = runs) => {
@@ -209,10 +238,11 @@ export default function TaskCenterPage() {
     },
     { title: '开始时间', dataIndex: 'created_at', width: 155, render: formatTime },
     {
-      title: '操作', width: 150, fixed: 'right', render: (_, run) => {
+      title: '操作', width: 260, fixed: 'right', render: (_, run) => {
         const destination = taskDestination(run);
         return <Space size={4}>
           <Button size="small" onClick={() => setSelected(run)}>详情</Button>
+          {runsWithChildren.has(run.id) && <Button size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
           {destination && taskType(run) !== 'conversation' && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>
             打开
           </Button>}
@@ -226,6 +256,23 @@ export default function TaskCenterPage() {
     children.forEach((run) => merged.set(run.id, run));
     return [...merged.values()];
   }, [children, runs]);
+  const treeNodes = useMemo(() => {
+    if (!treeRoot) return [];
+    const merged = new Map<string, RunResource>([[treeRoot.id, treeRoot]]);
+    treeRuns.forEach((run) => merged.set(run.id, run));
+    return buildTaskTree([...merged.values()]);
+  }, [treeRoot, treeRuns]);
+  const treeBranchIds = useMemo(() => {
+    const ids = new Set<string>();
+    const collect = (nodes: TaskTreeNode[]) => nodes.forEach((node) => {
+      if (node.children.length) ids.add(node.run.id);
+      collect(node.children);
+    });
+    collect(treeNodes);
+    return ids;
+  }, [treeNodes]);
+  const allTreeBranchesCollapsed = treeBranchIds.size > 0
+    && [...treeBranchIds].every((id) => collapsedTreeNodes.has(id));
   const selectedDestination = selected ? taskDestination(selected) : null;
   const selectedParent = selected?.parent_id
     ? relationSource.find((run) => run.id === selected.parent_id)
@@ -254,6 +301,83 @@ export default function TaskCenterPage() {
   const clearFilters = () => {
     setStatusFilter('all');
     setQuery('');
+  };
+
+  const toggleTreeNode = (runId: string) => {
+    setCollapsedTreeNodes((current) => {
+      const next = new Set(current);
+      if (next.has(runId)) next.delete(runId);
+      else next.add(runId);
+      return next;
+    });
+  };
+
+  const renderTreeNode = (node: TaskTreeNode, depth = 0): ReactNode => {
+    const { run } = node;
+    const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
+    const destination = taskDestination(run);
+    const hasChildren = node.children.length > 0;
+    const expanded = hasChildren && !collapsedTreeNodes.has(run.id);
+    const descendants = hasChildren ? flattenTaskTree(node.children) : [];
+    const completedChildren = descendants.filter((item) => item.status === 'succeeded').length;
+    const activeChildren = descendants.filter((item) => ACTIVE_STATUSES.has(item.status)).length;
+    const failedChildren = descendants.filter((item) => item.status === 'failed').length;
+    const completion = descendants.length
+      ? Math.round((completedChildren / descendants.length) * 100)
+      : 0;
+
+    return <div
+      className={`task-tree-node ${depth === 0 ? 'task-tree-node--root' : 'task-tree-node--child'}`}
+      key={run.id}
+      data-depth={depth}
+    >
+      <div className="task-tree-node-row">
+        {hasChildren ? <button
+          type="button"
+          className="task-tree-toggle"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? '收起' : '展开'}${taskTitle(run)}的子任务`}
+          onClick={() => toggleTreeNode(run.id)}
+        >
+          {expanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
+        </button> : <span className="task-tree-toggle-placeholder" aria-hidden="true" />}
+        <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
+        <button type="button" className="task-tree-title" onClick={() => {
+          setTreeRoot(null);
+          setSelected(run);
+        }}>
+          <strong>{taskTitle(run)}</strong>
+          <small>
+            {meta.label} · {triggerLabel(run.trigger_type)}
+            {hasChildren ? ` · ${descendants.length} 个下级任务` : ''}
+          </small>
+        </button>
+        <TaskStatusBadge status={run.status} />
+        <span className="task-tree-time"><ClockCircleOutlined aria-hidden="true" />{formatTime(run.created_at)}</span>
+        <div className="task-tree-actions">
+          <Button type="text" size="small" onClick={() => {
+            setTreeRoot(null);
+            setSelected(run);
+          }}>详情</Button>
+          {destination && taskType(run) !== 'conversation' && <Button
+            type="link" size="small" icon={<ExportOutlined />}
+            onClick={() => openDestination(run)}
+          >打开</Button>}
+        </div>
+      </div>
+      {depth === 0 && hasChildren && <div className="task-tree-progress" aria-label={`子任务进度 ${completedChildren}/${descendants.length}`}>
+        <span><strong>{completedChildren}/{descendants.length}</strong> 子任务已完成</span>
+        <span className="task-tree-progress-track" aria-hidden="true"><i style={{ width: `${completion}%` }} /></span>
+        <span className="task-tree-progress-states">
+          {activeChildren > 0 && <em className="active">{activeChildren} 执行中</em>}
+          {failedChildren > 0 && <em className="failed">{failedChildren} 失败</em>}
+          {activeChildren === 0 && failedChildren === 0 && <em>{completion === 100 ? '全部完成' : '等待执行'}</em>}
+        </span>
+      </div>}
+      {expanded && <div className="task-tree-children" role="group" aria-label={`${taskTitle(run)}的子任务`}>
+        {node.children.map((child) => renderTreeNode(child, depth + 1))}
+      </div>}
+    </div>;
   };
 
   return <div className="task-center-page animate-fade-in">
@@ -352,6 +476,7 @@ export default function TaskCenterPage() {
               <span><ClockCircleOutlined aria-hidden="true" />{formatTime(run.created_at)}</span>
               <div>
                 <Button type="text" size="small" onClick={() => setSelected(run)}>查看详情</Button>
+                {runsWithChildren.has(run.id) && <Button type="text" size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
                 {destination && taskType(run) !== 'conversation' && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>打开</Button>}
               </div>
             </footer>
@@ -360,6 +485,27 @@ export default function TaskCenterPage() {
         {!loading && visibleRuns.length === 0 && <Empty description={hasFilters ? '没有匹配的任务' : '暂无任务'} />}
       </div>
     </section>
+
+    <Drawer
+      rootClassName="task-tree-drawer"
+      title={treeRoot ? <div className="task-tree-drawer-title">
+        <span><ApartmentOutlined aria-hidden="true" /></span>
+        <span><strong>树状看板</strong><small>{taskTitle(treeRoot)}</small></span>
+      </div> : '树状看板'}
+      width={920}
+      open={Boolean(treeRoot)}
+      onClose={() => setTreeRoot(null)}
+      extra={treeBranchIds.size > 0 && <Button type="text" onClick={() => {
+        setCollapsedTreeNodes(allTreeBranchesCollapsed ? new Set() : new Set(treeBranchIds));
+      }}>
+        {allTreeBranchesCollapsed ? '全部展开' : '全部收起'}
+      </Button>}
+    >
+      {treeLoading ? <div className="task-tree-loading"><Spin tip="正在加载任务树" /></div> : <div className="task-tree-board">
+        {treeNodes.map((node) => renderTreeNode(node))}
+        {treeNodes.length === 0 && <Empty description="暂无任务数据" />}
+      </div>}
+    </Drawer>
 
     <Drawer
       rootClassName="task-detail-drawer"

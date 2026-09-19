@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RunResource } from '@/services/applicationRuntime';
 import {
+  buildTaskTree,
   buildTaskRelation,
   collapseConversationRuns,
   taskDestination,
@@ -20,6 +21,27 @@ const run = (overrides: Partial<RunResource>): RunResource => ({
 });
 
 describe('task center relationships', () => {
+  it('builds a task tree and orders workflow steps from earliest to latest', () => {
+    const root = run({
+      id: 'workflow-root', source_type: 'workflow', created_at: '2026-09-19T08:00:00Z',
+    });
+    const laterStep = run({
+      id: 'later-step', parent_id: root.id, node_key: 'publish',
+      source_type: 'workflow_step', created_at: '2026-09-19T08:02:00Z',
+    });
+    const firstStep = run({
+      id: 'first-step', parent_id: root.id, node_key: 'draft',
+      source_type: 'workflow_step', created_at: '2026-09-19T08:01:00Z',
+    });
+
+    const tree = buildTaskTree([laterStep, root, firstStep]);
+
+    expect(tree).toHaveLength(1);
+    expect(tree[0].run.id).toBe(root.id);
+    expect(tree[0].children.map((node) => node.run.id))
+      .toEqual([firstStep.id, laterStep.id]);
+  });
+
   it('treats all message turns in one conversation as one task', () => {
     const firstTurn = run({
       id: 'conversation-turn-1',

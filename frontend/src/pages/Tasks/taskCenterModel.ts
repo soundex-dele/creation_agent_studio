@@ -115,6 +115,42 @@ export interface TaskRelationNode {
   run: RunResource;
 }
 
+export interface TaskTreeNode {
+  run: RunResource;
+  children: TaskTreeNode[];
+}
+
+const taskTimestamp = (run: RunResource) => run.created_at
+  ? Date.parse(run.created_at)
+  : 0;
+
+/** Build the parent/child execution hierarchy returned by the Run API. */
+export const buildTaskTree = (runs: RunResource[]): TaskTreeNode[] => {
+  const nodes = new Map<string, TaskTreeNode>(runs.map((item): [string, TaskTreeNode] => [
+    item.id,
+    { run: item, children: [] },
+  ]));
+  const roots: TaskTreeNode[] = [];
+
+  nodes.forEach((node) => {
+    const parent = node.run.parent_id ? nodes.get(node.run.parent_id) : undefined;
+    if (parent && parent !== node) parent.children.push(node);
+    else roots.push(node);
+  });
+
+  const sortChildren = (items: TaskTreeNode[]) => {
+    items.sort((left, right) => taskTimestamp(left.run) - taskTimestamp(right.run));
+    items.forEach((item) => sortChildren(item.children));
+  };
+  sortChildren(roots);
+  roots.sort((left, right) => taskTimestamp(right.run) - taskTimestamp(left.run));
+  return roots;
+};
+
+export const flattenTaskTree = (nodes: TaskTreeNode[]): RunResource[] => nodes.flatMap(
+  (node) => [node.run, ...flattenTaskTree(node.children)],
+);
+
 /** Build a compact type chain such as 自动化 → 工作流 → 应用 → 对话. */
 export const buildTaskRelation = (
   run: RunResource,
