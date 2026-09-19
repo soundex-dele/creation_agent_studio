@@ -23,6 +23,7 @@ import {
   buildFlashcards,
   buildKnowledgeMapNodes,
   buildLearningActions,
+  formatKnowledgeCondition,
   type KnowledgeNodeStatus,
   type ReviewMode,
 } from './learningModules';
@@ -228,7 +229,7 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
               <header><Tag>{knowledgeItemTypeLabels[item.type]}</Tag><strong>{item.name}</strong></header>
               <KnowledgePointMarkdown>{item.content}</KnowledgePointMarkdown>
               {!!item.formulas?.length && <div className="swm-map-formulas">{item.formulas.map((formula) => <KnowledgePointMarkdown key={formula}>{`$$${formula}$$`}</KnowledgePointMarkdown>)}</div>}
-              {!!item.conditions?.length && <div className="swm-map-conditions"><strong>适用条件</strong><ul>{item.conditions.map((condition) => <li key={condition}><KnowledgePointMarkdown>{condition}</KnowledgePointMarkdown></li>)}</ul></div>}
+              {!!item.conditions?.length && <div className="swm-map-conditions"><strong>适用条件</strong><ul>{item.conditions.map((condition) => <li key={condition}><KnowledgePointMarkdown>{formatKnowledgeCondition(condition)}</KnowledgePointMarkdown></li>)}</ul></div>}
               {item.conclusion && <div className="swm-map-conclusion"><strong>结论</strong><KnowledgePointMarkdown>{item.conclusion}</KnowledgePointMarkdown></div>}
               {!!item.common_mistakes?.length && <div className="swm-map-item-mistakes"><strong>易错点</strong><ul>{item.common_mistakes.map((mistake) => <li key={mistake}>{mistake}</li>)}</ul></div>}
               <Button size="small" onClick={() => onPractice(item.name)}>练习此项</Button>

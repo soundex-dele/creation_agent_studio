@@ -139,6 +139,19 @@ function masteryStatus(score: number): KnowledgeNodeStatus {
   return 'needs-work';
 }
 
+export function formatKnowledgeCondition(value: string) {
+  const condition = value.trim();
+  if (!condition || condition.includes('$') || condition.includes('\\(') || condition.includes('\\[')) {
+    return condition;
+  }
+  const containsLatexCommand = /\\[a-zA-Z]+/.test(condition);
+  const containsComparison = /[=<>≤≥≠]/.test(condition);
+  const containsChinese = /[\u3400-\u9fff]/.test(condition);
+  return containsLatexCommand || (containsComparison && !containsChinese)
+    ? `$${condition}$`
+    : condition;
+}
+
 export function buildKnowledgeMapNodes(
   enrollment: SubjectEnrollment | undefined,
   subject: StudySubject,

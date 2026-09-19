@@ -12,6 +12,7 @@ import {
   buildFlashcards,
   buildKnowledgeMapNodes,
   buildLearningActions,
+  formatKnowledgeCondition,
 } from '../learningModules';
 
 describe('study learning modules', () => {
@@ -169,5 +170,14 @@ describe('study learning modules', () => {
       status: 'unstarted',
       score: null,
     });
+  });
+
+  it('marks formula-like applicability conditions as inline math', () => {
+    expect(formatKnowledgeCondition('a\\ne0')).toBe('$a\\ne0$');
+    expect(formatKnowledgeCondition('P(B)>0')).toBe('$P(B)>0$');
+    expect(formatKnowledgeCondition('{B_i}\\text{ 构成样本空间的一个划分}'))
+      .toBe('${B_i}\\text{ 构成样本空间的一个划分}$');
+    expect(formatKnowledgeCondition('全集 U 已确定')).toBe('全集 U 已确定');
+    expect(formatKnowledgeCondition('$a>0$')).toBe('$a>0$');
   });
 });
