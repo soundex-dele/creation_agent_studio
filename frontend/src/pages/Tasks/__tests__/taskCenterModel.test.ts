@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RunResource } from '@/services/applicationRuntime';
 import {
   buildTaskRelation,
+  collapseConversationRuns,
   taskDestination,
   taskType,
 } from '../taskCenterModel';
@@ -19,6 +20,64 @@ const run = (overrides: Partial<RunResource>): RunResource => ({
 });
 
 describe('task center relationships', () => {
+  it('treats all message turns in one conversation as one task', () => {
+    const firstTurn = run({
+      id: 'conversation-turn-1',
+      source_type: 'conversation',
+      source_id: '42',
+      conversation_id: '42',
+      status: 'succeeded',
+      created_at: '2026-09-19T08:00:00Z',
+    });
+    const latestTurn = run({
+      id: 'conversation-turn-2',
+      source_type: 'conversation',
+      source_id: '42',
+      conversation_id: '42',
+      status: 'running',
+      created_at: '2026-09-19T08:05:00Z',
+    });
+
+    expect(collapseConversationRuns([firstTurn, latestTurn])).toEqual([latestTurn]);
+  });
+
+  it('uses the completed latest answer as the conversation task status', () => {
+    const runningTurn = run({
+      id: 'conversation-turn-running',
+      source_type: 'conversation',
+      source_id: '42',
+      conversation_id: '42',
+      status: 'running',
+      created_at: '2026-09-19T08:00:00Z',
+    });
+    const completedAnswer = run({
+      id: 'conversation-turn-completed',
+      source_type: 'conversation',
+      source_id: '42',
+      conversation_id: '42',
+      status: 'succeeded',
+      created_at: '2026-09-19T08:05:00Z',
+    });
+
+    expect(collapseConversationRuns([runningTurn, completedAnswer]))
+      .toEqual([completedAnswer]);
+  });
+
+  it('does not merge different conversations or non-conversation tasks', () => {
+    const conversationOne = run({
+      id: 'conversation-1', source_type: 'conversation', source_id: '1',
+    });
+    const conversationTwo = run({
+      id: 'conversation-2', source_type: 'conversation', source_id: '2',
+    });
+    const workflow = run({
+      id: 'workflow-1', source_type: 'workflow', source_id: 'workflow-1',
+    });
+
+    expect(collapseConversationRuns([conversationOne, conversationTwo, workflow]))
+      .toEqual([conversationOne, conversationTwo, workflow]);
+  });
+
   it('treats an application as a source instead of a task category', () => {
     const applicationRun = run({
       source_type: 'application',

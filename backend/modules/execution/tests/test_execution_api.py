@@ -298,6 +298,68 @@ def test_conversation_run_exposes_title_application_and_jump_identifiers(
 
 
 @pytest.mark.django_db
+def test_task_run_list_collapses_message_turns_by_conversation(
+    authenticated_client, api_actor, api_organization,
+):
+    conversation = Conversation.objects.create(
+        user=api_actor,
+        organization=api_organization,
+        title="同一个会话",
+    )
+    first_turn = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="conversation",
+        source_id=str(conversation.id),
+        definition_snapshot={},
+        input_data={"message": "第一条消息"},
+    )
+    latest_turn = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.AGENT,
+        executor_key="agent-completion",
+        source_type="conversation",
+        source_id=str(conversation.id),
+        definition_snapshot={},
+        input_data={"message": "第二条消息"},
+    )
+    Run.objects.filter(pk=first_turn.pk).update(
+        status=Run.Status.SUCCEEDED,
+        finished_at=timezone.now(),
+    )
+
+    response = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"collapse_conversations": "true"},
+    )
+
+    assert response.status_code == 200
+    conversation_tasks = [
+        item for item in response.data
+        if item["conversation_id"] == str(conversation.id)
+    ]
+    assert [item["id"] for item in conversation_tasks] == [str(latest_turn.id)]
+    assert conversation_tasks[0]["status"] == Run.Status.QUEUED
+
+    Run.objects.filter(pk=latest_turn.pk).update(
+        status=Run.Status.SUCCEEDED,
+        finished_at=timezone.now(),
+    )
+    completed = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"collapse_conversations": "true"},
+    )
+    completed_task = next(
+        item for item in completed.data
+        if item["conversation_id"] == str(conversation.id)
+    )
+    assert completed_task["status"] == Run.Status.SUCCEEDED
+
+
+@pytest.mark.django_db
 def test_finished_run_owner_can_delete_history(
     authenticated_client, api_organization, api_run, api_artifact, settings, tmp_path,
 ):

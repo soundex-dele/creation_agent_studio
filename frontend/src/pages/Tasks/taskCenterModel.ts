@@ -13,6 +13,42 @@ export const taskConversationId = (run: RunResource): string | null => {
   return value ? String(value) : null;
 };
 
+/**
+ * A conversation is one user-facing task even though every message turn has
+ * its own durable Run. Keep the newest Run as the conversation task's current
+ * state so a completed answer resolves the task to `succeeded`.
+ */
+export const collapseConversationRuns = (runs: RunResource[]): RunResource[] => {
+  const collapsed: RunResource[] = [];
+  const conversationIndexes = new Map<string, number>();
+
+  runs.forEach((run) => {
+    const conversationId = taskConversationId(run);
+    if (!conversationId) {
+      collapsed.push(run);
+      return;
+    }
+
+    const existingIndex = conversationIndexes.get(conversationId);
+    if (existingIndex === undefined) {
+      conversationIndexes.set(conversationId, collapsed.length);
+      collapsed.push(run);
+      return;
+    }
+
+    const existing = collapsed[existingIndex];
+    const existingCreatedAt = existing.created_at
+      ? Date.parse(existing.created_at)
+      : Number.NEGATIVE_INFINITY;
+    const candidateCreatedAt = run.created_at
+      ? Date.parse(run.created_at)
+      : Number.NEGATIVE_INFINITY;
+    if (candidateCreatedAt > existingCreatedAt) collapsed[existingIndex] = run;
+  });
+
+  return collapsed;
+};
+
 export const taskType = (run: RunResource) => {
   const explicit = run.task_type;
   if (explicit && explicit !== 'application') return explicit;

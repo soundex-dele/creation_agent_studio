@@ -430,7 +430,23 @@ class OrganizationRunsView(ProblemDetailsAPIView):
                     ),
                 )
             runs = runs.filter(source_type=source_type)
-        visible = [run for run in runs[:200] if _can_access_run(request, run)][:100]
+        collapse_conversations = (
+            request.query_params.get("collapse_conversations") == "true"
+        )
+        visible = []
+        seen_conversation_ids = set()
+        scan_limit = 2000 if collapse_conversations else 200
+        for run in runs[:scan_limit]:
+            if not _can_access_run(request, run):
+                continue
+            conversation_id = RunSerializer._conversation_id(run)
+            if collapse_conversations and conversation_id:
+                if conversation_id in seen_conversation_ids:
+                    continue
+                seen_conversation_ids.add(conversation_id)
+            visible.append(run)
+            if len(visible) == 100:
+                break
         return Response(RunSerializer(
             visible, many=True, context=_run_serializer_context(request, visible)
         ).data)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ApartmentOutlined, AppstoreOutlined, ArrowRightOutlined, ClockCircleOutlined,
-  DatabaseOutlined, ReloadOutlined, WarningOutlined,
+  CloseCircleOutlined, DatabaseOutlined, ReloadOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { Button, Empty, Spin, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import type { RunResource } from '@/services/applicationRuntime';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { collapseConversationRuns } from '@/pages/Tasks/taskCenterModel';
 import './HomePage.css';
 
 const ACTIVE_STATUSES = new Set([
@@ -56,8 +57,11 @@ export default function HomePage() {
     if (!organizationId) return;
     setLoading(true);
     try {
-      const response = await api.get<RunResource[]>(`${tenantApiRoot(organizationId)}/runs`);
-      setRuns(response.filter((run) => !run.parent_id));
+      const response = await api.get<RunResource[]>(
+        `${tenantApiRoot(organizationId)}/runs`,
+        { collapse_conversations: true },
+      );
+      setRuns(collapseConversationRuns(response.filter((run) => !run.parent_id)));
     } catch {
       setRuns([]);
     } finally {
@@ -89,7 +93,7 @@ export default function HomePage() {
       <button type="button" onClick={() => navigate('/tasks')}><ClockCircleOutlined /><span><small>执行中</small><strong>{summary.active}</strong></span></button>
       <button type="button" onClick={() => navigate('/tasks')}><WarningOutlined /><span><small>待我处理</small><strong>{summary.waiting}</strong></span></button>
       <button type="button" onClick={() => navigate('/tasks')}><span className="home-status-symbol">✓</span><span><small>已完成</small><strong>{summary.completed}</strong></span></button>
-      <button type="button" onClick={() => navigate('/tasks')}><WarningOutlined /><span><small>失败</small><strong>{summary.failed}</strong></span></button>
+      <button type="button" onClick={() => navigate('/tasks')}><CloseCircleOutlined /><span><small>失败</small><strong>{summary.failed}</strong></span></button>
     </section>
 
     <div className="home-dashboard-grid">
