@@ -35,6 +35,9 @@ from .models import (
     WeeklyQuiz,
 )
 from .serializers import (
+    AnswerCardCreateSerializer,
+    AnswerCardSerializer,
+    AnswerCardSubmitSerializer,
     AttemptInputSerializer,
     AttemptSerializer,
     EnrollmentSerializer,
@@ -57,6 +60,7 @@ from .serializers import (
 )
 from .services import (
     active_enrollment,
+    build_answer_card,
     build_weekly_report,
     build_weekly_quiz,
     complete_review,
@@ -66,10 +70,12 @@ from .services import (
     reschedule_overdue_tasks,
     resolve_curriculum_node,
     start_tutor_run,
+    submit_answer_card,
     submit_weekly_quiz,
 )
 from .strategies import get_subject_strategy
 from .catalog import catalog_payload
+from .teaching_data import TeachingDataError, public_curriculum_tree
 
 
 class StudyAPIView(APIView):
@@ -104,6 +110,30 @@ class CatalogView(StudyAPIView):
         if self.workspace(organization_id, application_id) is None:
             return Response({"detail": "应用尚未安装。"}, status=404)
         return Response(catalog_payload())
+
+
+class CurriculumView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        subject = request.query_params.get("subject", "")
+        curriculum_version = request.query_params.get("curriculum_version", "")
+        if not subject or not curriculum_version:
+            return Response(
+                {"detail": "subject 和 curriculum_version 为必填项。"}, status=400
+            )
+        if active_enrollment(profile, subject) is None:
+            return Response({"detail": "未启用该学科。"}, status=400)
+        try:
+            tree = public_curriculum_tree(
+                subject=subject, curriculum_id=curriculum_version
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except TeachingDataError as exc:
+            return Response({"detail": str(exc)}, status=503)
+        return Response(tree)
 
 
 class EnrollmentDetailView(StudyAPIView):
@@ -926,6 +956,61 @@ class QuizSubmitView(StudyAPIView):
         return Response(WeeklyQuizSerializer(quiz).data)
 
 
+class AnswerCardListView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        cards = profile.answer_cards.all()
+        subject = request.query_params.get("subject")
+        if subject:
+            cards = cards.filter(subject=subject)
+        return Response(AnswerCardSerializer(cards[:50], many=True).data)
+
+    def post(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        serializer = AnswerCardCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enrollment = active_enrollment(profile, serializer.validated_data["subject"])
+        if enrollment is None:
+            return Response({"detail": "未启用该学科。"}, status=400)
+        try:
+            card = build_answer_card(
+                profile,
+                enrollment,
+                curriculum_version=serializer.validated_data["curriculum_version"],
+                knowledge_point_code=serializer.validated_data["knowledge_point_code"],
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except TeachingDataError as exc:
+            return Response({"detail": str(exc)}, status=503)
+        return Response(AnswerCardSerializer(card).data, status=201)
+
+
+class AnswerCardSubmitView(StudyAPIView):
+    def post(self, request, organization_id, application_id, card_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        card = profile.answer_cards.filter(pk=card_id).first()
+        if card is None:
+            return Response({"detail": "答题卡不存在。"}, status=404)
+        if not isinstance(request.data.get("answers"), list):
+            return Response({"answers": "答案必须是列表。"}, status=400)
+        serializer = AnswerCardSubmitSerializer(
+            data=request.data["answers"], many=True
+        )
+        serializer.is_valid(raise_exception=True)
+        try:
+            card = submit_answer_card(card, serializer.validated_data)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(AnswerCardSerializer(card).data)
+
+
 class GuardianListView(StudyAPIView):
     def get(self, request, organization_id, application_id):
         profile, error = self.require_profile(request, organization_id, application_id)
@@ -1006,6 +1091,7 @@ class ExportView(StudyAPIView):
             ).data,
             "reports": WeeklyReportSerializer(profile.weekly_reports.all(), many=True).data,
             "quizzes": WeeklyQuizSerializer(profile.weekly_quizzes.all(), many=True).data,
+            "answer_cards": AnswerCardSerializer(profile.answer_cards.all(), many=True).data,
         })
 
 

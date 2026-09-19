@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/bulk-permissions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["agents_bulk_permissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/categories/": {
         parameters: {
             query?: never;
@@ -832,6 +848,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/study/answer-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_study_answer-cards_list"];
+        put?: never;
+        post: operations["applications_study_answer-cards_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/study/answer-cards/{card_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_study_answer-cards_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{application_id}/study/catalog": {
         parameters: {
             query?: never;
@@ -842,6 +895,24 @@ export interface paths {
             cookie?: never;
         };
         get: operations["applications_study_catalog_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/study/curriculum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_study_curriculum_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -955,6 +1026,24 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["applications_study_guardians_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/study/mistake-check-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_study_mistake-check-ins_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1284,6 +1373,23 @@ export interface paths {
         /** @description Read-only discovery surface; Catalog owns all Application writes. */
         get: operations["apps_list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/apps/bulk-permissions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Read-only discovery surface; Catalog owns all Application writes. */
+        put: operations["apps_bulk_permissions"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3691,6 +3797,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/study/answer-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_study_answer-cards_list"];
+        put?: never;
+        post: operations["organizations_applications_study_answer-cards_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/study/answer-cards/{card_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_study_answer-cards_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/study/catalog": {
         parameters: {
             query?: never;
@@ -3702,6 +3847,25 @@ export interface paths {
             cookie?: never;
         };
         get: operations["organizations_applications_study_catalog_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/study/curriculum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_study_curriculum_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3821,6 +3985,25 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["organizations_applications_study_guardians_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/study/mistake-check-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_study_mistake-check-ins_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5559,6 +5742,8 @@ export interface components {
             icon?: string;
             /** Category name */
             readonly category_name?: string;
+            /** Created by id */
+            readonly created_by_id?: string;
             /** Is public */
             is_public?: boolean;
             /** Is active */
@@ -7950,6 +8135,11 @@ export interface components {
                 "application/json": components["schemas"]["ResourcePermission"];
             };
         };
+        ApplicationList: {
+            content: {
+                "application/json": components["schemas"]["ApplicationList"];
+            };
+        };
         UserDetail: {
             content: {
                 "application/json": components["schemas"]["UserDetail"];
@@ -8072,6 +8262,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentWrite"];
+                };
+            };
+        };
+    };
+    agents_bulk_permissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AgentList"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentList"];
                 };
             };
         };
@@ -9456,7 +9665,84 @@ export interface operations {
             };
         };
     };
+    "applications_study_answer-cards_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_study_answer-cards_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_study_answer-cards_submit_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     applications_study_catalog_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_study_curriculum_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -9603,6 +9889,25 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_study_mistake-check-ins_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10126,6 +10431,25 @@ export interface operations {
             };
         };
     };
+    apps_bulk_permissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApplicationList"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationList"];
+                };
+            };
+        };
+    };
     apps_categories_list: {
         parameters: {
             query?: {
@@ -10396,11 +10720,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApplicationList"];
-            };
-        };
+        requestBody: components["requestBodies"]["ApplicationList"];
         responses: {
             201: {
                 headers: {
@@ -14844,7 +15164,88 @@ export interface operations {
             };
         };
     };
+    "organizations_applications_study_answer-cards_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_study_answer-cards_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_study_answer-cards_submit_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     organizations_applications_study_catalog_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_study_curriculum_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -14999,6 +15400,26 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_study_mistake-check-ins_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

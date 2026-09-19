@@ -53,6 +53,7 @@ datas += tree_data(
     "app_center",
     excluded_parts={"creation_master", "__pycache__"},
 )
+datas += tree_data(PROJECT_ROOT / "teaching_data", "teaching_data", excluded_parts={".git", "__pycache__"})
 datas += tree_data(BACKEND_ROOT / "static", "static", excluded_parts={"__pycache__"})
 datas += tree_data(BACKEND_ROOT / "staticfiles", "staticfiles", excluded_parts={"__pycache__"})
 datas += collect_data_files("django", include_py_files=False)

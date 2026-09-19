@@ -48,3 +48,11 @@ def test_package_install_is_idempotent_and_provisions_tutor():
     assert all("提示阶梯" in tutor.draft.content["system_prompt"] for tutor in tutors)
     assert CurriculumNode.objects.filter(code="math.function.monotonicity").exists()
     assert CurriculumNode.objects.filter(subject=Subject.PHYSICS).exists()
+    assert CurriculumNode.objects.filter(
+        curriculum_version="xj-math-current",
+        code="math.xj.required-1.sets-logic",
+    ).count() == 3
+    assert CurriculumNode.objects.filter(
+        curriculum_version="pep-history-current",
+        code="history.pep.outline-1.origins-qin-han",
+    ).count() == 3

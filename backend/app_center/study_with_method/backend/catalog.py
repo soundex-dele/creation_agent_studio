@@ -49,6 +49,10 @@ GRADE_CATALOG = [
 ]
 
 CURRICULUM_VERSIONS = ["通用高中课程", "人教版", "北师大版", "苏教版"]
+SUBJECT_CURRICULUM_VERSIONS = {
+    Subject.MATH: [{"id": "xj-math-current", "label": "湘教版（现行）"}],
+    Subject.HISTORY: [{"id": "pep-history-current", "label": "统编人教版（现行）"}],
+}
 
 
 def catalog_payload():
@@ -58,7 +62,14 @@ def catalog_payload():
             {
                 "value": value,
                 **config,
-                "curriculum_versions": CURRICULUM_VERSIONS,
+                "curriculum_versions": [
+                    item["id"] for item in SUBJECT_CURRICULUM_VERSIONS.get(
+                        value, [{"id": version, "label": version} for version in CURRICULUM_VERSIONS]
+                    )
+                ],
+                "curriculum_version_options": SUBJECT_CURRICULUM_VERSIONS.get(
+                    value, [{"id": version, "label": version} for version in CURRICULUM_VERSIONS]
+                ),
             }
             for value, config in SUBJECT_CATALOG.items()
         ],

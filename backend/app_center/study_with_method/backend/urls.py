@@ -7,6 +7,7 @@ app_name = "study_with_method"
 
 urlpatterns = [
     path("applications/<int:application_id>/study/catalog", views.CatalogView.as_view(), name="catalog"),
+    path("applications/<int:application_id>/study/curriculum", views.CurriculumView.as_view(), name="curriculum"),
     path("applications/<int:application_id>/study/dashboard", views.DashboardView.as_view(), name="dashboard"),
     path("applications/<int:application_id>/study/profile", views.ProfileView.as_view(), name="profile"),
     path("applications/<int:application_id>/study/enrollments/<str:subject>", views.EnrollmentDetailView.as_view(), name="enrollment-detail"),
@@ -27,6 +28,8 @@ urlpatterns = [
     path("applications/<int:application_id>/study/reports", views.ReportListView.as_view(), name="reports"),
     path("applications/<int:application_id>/study/quizzes", views.QuizListView.as_view(), name="quizzes"),
     path("applications/<int:application_id>/study/quizzes/<uuid:quiz_id>/submit", views.QuizSubmitView.as_view(), name="quiz-submit"),
+    path("applications/<int:application_id>/study/answer-cards", views.AnswerCardListView.as_view(), name="answer-cards"),
+    path("applications/<int:application_id>/study/answer-cards/<uuid:card_id>/submit", views.AnswerCardSubmitView.as_view(), name="answer-card-submit"),
     path("applications/<int:application_id>/study/guardians", views.GuardianListView.as_view(), name="guardians"),
     path("applications/<int:application_id>/study/guardians/<uuid:link_id>", views.GuardianDetailView.as_view(), name="guardian-detail"),
     path("applications/<int:application_id>/study/export", views.ExportView.as_view(), name="export"),

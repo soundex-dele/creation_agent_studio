@@ -69,6 +69,7 @@ def configure_environment() -> tuple[Path, Path]:
         "AGENT_WORKSPACE_ROOT": str(data_root / "agent-workspaces"),
         "APPLICATION_RUNTIME_ALLOWED_ROOTS": str(data_root),
         "APP_CENTER_ROOT": str(bundle_root / "app_center"),
+        "TEACHING_DATA_ROOT": str(bundle_root / "teaching_data"),
         "CREATION_STUDIO_FRONTEND_DIST": str(bundle_root / "frontend_dist"),
         "SECRET_KEY": _secret_key(data_root),
         "ALLOWED_HOSTS": "127.0.0.1,localhost",

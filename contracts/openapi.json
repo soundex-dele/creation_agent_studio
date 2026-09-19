@@ -107,6 +107,31 @@
             },
             "parameters": []
         },
+        "/agents/bulk-permissions/": {
+            "put": {
+                "operationId": "agents_bulk_permissions",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/AgentList"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentList"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "agents"
+                ]
+            },
+            "parameters": []
+        },
         "/agents/categories/": {
             "get": {
                 "operationId": "agents_categories_list",
@@ -1797,9 +1822,101 @@
                 }
             ]
         },
+        "/applications/{application_id}/study/answer-cards": {
+            "get": {
+                "operationId": "applications_study_answer-cards_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_study_answer-cards_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/study/answer-cards/{card_id}/submit": {
+            "post": {
+                "operationId": "applications_study_answer-cards_submit_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "card_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/study/catalog": {
             "get": {
                 "operationId": "applications_study_catalog_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/study/curriculum": {
+            "get": {
+                "operationId": "applications_study_curriculum_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -1985,6 +2102,30 @@
                 },
                 {
                     "name": "link_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/study/mistake-check-ins": {
+            "get": {
+                "operationId": "applications_study_mistake-check-ins_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -2628,6 +2769,31 @@
             },
             "parameters": []
         },
+        "/apps/bulk-permissions/": {
+            "put": {
+                "operationId": "apps_bulk_permissions",
+                "description": "Read-only discovery surface; Catalog owns all Application writes.",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ApplicationList"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApplicationList"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "apps"
+                ]
+            },
+            "parameters": []
+        },
         "/apps/categories/": {
             "get": {
                 "operationId": "apps_categories_list",
@@ -3002,14 +3168,7 @@
                 "operationId": "apps_compose_prompt",
                 "description": "Read-only discovery surface; Catalog owns all Application writes.",
                 "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ApplicationList"
-                            }
-                        }
-                    },
-                    "required": true
+                    "$ref": "#/components/requestBodies/ApplicationList"
                 },
                 "responses": {
                     "201": {
@@ -9091,9 +9250,125 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/study/answer-cards": {
+            "get": {
+                "operationId": "organizations_applications_study_answer-cards_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_study_answer-cards_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/study/answer-cards/{card_id}/submit": {
+            "post": {
+                "operationId": "organizations_applications_study_answer-cards_submit_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "card_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/study/catalog": {
             "get": {
                 "operationId": "organizations_applications_study_catalog_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/study/curriculum": {
+            "get": {
+                "operationId": "organizations_applications_study_curriculum_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -9335,6 +9610,38 @@
                 },
                 {
                     "name": "link_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/study/mistake-check-ins": {
+            "get": {
+                "operationId": "organizations_applications_study_mistake-check-ins_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -13706,6 +14013,16 @@
                 },
                 "required": true
             },
+            "ApplicationList": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApplicationList"
+                        }
+                    }
+                },
+                "required": true
+            },
             "UserDetail": {
                 "content": {
                     "application/json": {
@@ -13896,6 +14213,11 @@
                         "type": "string",
                         "readOnly": true,
                         "minLength": 1
+                    },
+                    "created_by_id": {
+                        "title": "Created by id",
+                        "type": "string",
+                        "readOnly": true
                     },
                     "is_public": {
                         "title": "Is public",

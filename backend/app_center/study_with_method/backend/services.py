@@ -18,6 +18,7 @@ from apps.conversations.services import attach_existing_image
 from modules.execution.application.start_runs import start_agent_run
 
 from .models import (
+    AnswerCard,
     Attempt,
     CurriculumNode,
     GradeStage,
@@ -34,6 +35,7 @@ from .models import (
     WeeklyQuiz,
 )
 from .strategies import get_subject_strategy
+from .teaching_data import get_knowledge_point
 
 
 REVIEW_INTERVALS = (1, 3, 7, 14)
@@ -378,6 +380,108 @@ def submit_weekly_quiz(quiz: WeeklyQuiz, answers: list[dict]):
         scheduled_for__lt=quiz.week_start + timedelta(days=7),
     ).update(status=StudyTask.Status.COMPLETED, completed_at=timezone.now())
     return quiz
+
+
+def build_answer_card(
+    profile: StudyProfile,
+    enrollment: SubjectEnrollment,
+    *,
+    curriculum_version: str,
+    knowledge_point_code: str,
+):
+    point = get_knowledge_point(
+        subject=enrollment.subject,
+        curriculum_id=curriculum_version,
+        code=knowledge_point_code,
+    )
+    node = CurriculumNode.objects.filter(
+        subject=enrollment.subject,
+        grade_stage=enrollment.grade_stage,
+        curriculum_version=curriculum_version,
+        code=knowledge_point_code,
+        node_type=CurriculumNode.NodeType.KNOWLEDGE_POINT,
+    ).first()
+    if node is None:
+        raise ValueError("知识点尚未同步，请先同步教学数据。")
+    return AnswerCard.objects.create(
+        organization=profile.organization,
+        profile=profile,
+        subject=enrollment.subject,
+        grade_stage=enrollment.grade_stage,
+        curriculum_version=curriculum_version,
+        knowledge_point=node,
+        knowledge_point_code=knowledge_point_code,
+        knowledge_point_name=point["name"],
+        questions=point["questions"],
+    )
+
+
+@transaction.atomic
+def submit_answer_card(card: AnswerCard, answers: list[dict]):
+    locked = AnswerCard.objects.select_for_update().get(pk=card.pk)
+    if locked.status == AnswerCard.Status.COMPLETED:
+        raise ValueError("答题卡已提交，不能重复交卷。")
+    question_by_id = {str(item["id"]): item for item in locked.questions}
+    if len(answers) != len(question_by_id):
+        raise ValueError("请完成答题卡中的全部题目。")
+    answer_by_id = {}
+    for answer in answers:
+        question_id = str(answer.get("question_id") or "")
+        selected_option_id = str(answer.get("selected_option_id") or "")
+        if question_id in answer_by_id:
+            raise ValueError("同一道题不能重复提交。")
+        question = question_by_id.get(question_id)
+        if question is None:
+            raise ValueError("答案中包含未知题目。")
+        option_ids = {str(option["id"]) for option in question["options"]}
+        if selected_option_id not in option_ids:
+            raise ValueError("所选选项不存在。")
+        answer_by_id[question_id] = selected_option_id
+    if set(answer_by_id) != set(question_by_id):
+        raise ValueError("请完成答题卡中的全部题目。")
+
+    details = []
+    correct = 0
+    for question_id, question in question_by_id.items():
+        selected = answer_by_id[question_id]
+        is_correct = selected == question["correct_option_id"]
+        correct += int(is_correct)
+        details.append({
+            "question_id": question_id,
+            "selected_option_id": selected,
+            "correct_option_id": question["correct_option_id"],
+            "is_correct": is_correct,
+            "explanation": question["explanation"],
+        })
+    locked.results = {
+        "answers": details,
+        "correct": correct,
+        "total": len(question_by_id),
+    }
+    locked.score = round(100 * correct / len(question_by_id)) if question_by_id else 0
+    locked.status = AnswerCard.Status.COMPLETED
+    locked.completed_at = timezone.now()
+    locked.save(update_fields=(
+        "results", "score", "status", "completed_at", "updated_at",
+    ))
+
+    if locked.knowledge_point_id:
+        mastery, _ = KnowledgeMastery.objects.get_or_create(
+            organization=locked.organization,
+            profile=locked.profile,
+            knowledge_point=locked.knowledge_point,
+            defaults={
+                "subject": locked.subject,
+                "grade_stage": locked.grade_stage,
+            },
+        )
+        mastery.attempts_count += len(question_by_id)
+        mastery.correct_count += correct
+        mastery.score = round(100 * mastery.correct_count / mastery.attempts_count)
+        mastery.save(update_fields=(
+            "attempts_count", "correct_count", "score", "updated_at",
+        ))
+    return locked
 
 
 def start_tutor_run(

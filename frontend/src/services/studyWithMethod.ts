@@ -23,6 +23,8 @@ import type {
   TutorRun,
   WeeklyReport,
   WeeklyQuiz,
+  AnswerCard,
+  CurriculumTree,
 } from '@/types/studyWithMethod';
 
 
@@ -266,6 +268,41 @@ export const submitWeeklyQuiz = (
   answers: Array<{ question_id: string; is_correct: boolean }>,
 ) => api.post<WeeklyQuiz>(
   `${studyRoot(organizationId, applicationId)}/quizzes/${quizId}/submit`,
+  { answers },
+);
+
+export const loadCurriculumTree = (
+  organizationId: string,
+  applicationId: string,
+  subject: StudySubject,
+  curriculumVersion: string,
+) => api.get<CurriculumTree>(
+  `${studyRoot(organizationId, applicationId)}/curriculum`,
+  { subject, curriculum_version: curriculumVersion },
+);
+
+export const listAnswerCards = (
+  organizationId: string,
+  applicationId: string,
+  subject?: StudySubject,
+) => api.get<AnswerCard[]>(
+  `${studyRoot(organizationId, applicationId)}/answer-cards`,
+  subject ? { subject } : undefined,
+);
+
+export const createAnswerCard = (
+  organizationId: string,
+  applicationId: string,
+  input: { subject: StudySubject; curriculum_version: string; knowledge_point_code: string },
+) => api.post<AnswerCard>(`${studyRoot(organizationId, applicationId)}/answer-cards`, input);
+
+export const submitAnswerCard = (
+  organizationId: string,
+  applicationId: string,
+  cardId: string,
+  answers: Array<{ question_id: string; selected_option_id: string }>,
+) => api.post<AnswerCard>(
+  `${studyRoot(organizationId, applicationId)}/answer-cards/${cardId}/submit`,
   { answers },
 );
 

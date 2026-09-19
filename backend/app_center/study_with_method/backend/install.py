@@ -8,6 +8,7 @@ from modules.catalog.services import publish_agent, switch_agent_deployment
 from .models import CurriculumNode, GradeStage, StudyWorkspace, Subject
 from .catalog import SUBJECT_CATALOG
 from .services import TUTOR_AGENT_SLUG
+from .teaching_data import sync_curriculum_nodes
 
 
 TUTOR_SYSTEM_PROMPT = """你是“学之有道”的高中学习辅导老师，首版只辅导高二数学。
@@ -97,6 +98,7 @@ def _seed_curriculum():
                         "order": order,
                     },
                 )
+    sync_curriculum_nodes()
 
 
 def _provision_tutor(organization):

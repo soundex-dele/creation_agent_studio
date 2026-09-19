@@ -5,6 +5,10 @@
 - Use a supported Linux host with Docker Engine and Docker Compose v2.
 - Clone with `--recurse-submodules`. Every enabled App Center submodule must be
   pinned to the commit recorded by this repository.
+- The `teaching_data` submodule is required by the Study With Method package.
+  Before deployment, run `backend/.venv/bin/python backend/manage.py
+  validate_teaching_data`; a missing or invalid dataset intentionally blocks
+  application synchronization.
 - Copy `backend/.env.example` to a secret-managed path outside the repository
   when possible. Pass it with `BACKEND_ENV_FILE`.
 - Generate independent random values for `SECRET_KEY`, `DB_ADMIN_PASSWORD`,

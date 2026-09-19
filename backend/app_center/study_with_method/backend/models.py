@@ -132,7 +132,9 @@ class SubjectEnrollment(TenantOwnedModel):
 class CurriculumNode(models.Model):
     class NodeType(models.TextChoices):
         MODULE = "module", "模块"
+        VOLUME = "volume", "册次"
         CHAPTER = "chapter", "章节"
+        SECTION = "section", "小节"
         KNOWLEDGE_POINT = "knowledge_point", "知识点"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -481,3 +483,39 @@ class WeeklyQuiz(TenantOwnedModel):
                 name="unique_study_weekly_quiz",
             )
         ]
+
+
+class AnswerCard(TenantOwnedModel):
+    class Status(models.TextChoices):
+        READY = "ready", "待提交"
+        COMPLETED = "completed", "已完成"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(
+        StudyProfile, on_delete=models.CASCADE, related_name="answer_cards"
+    )
+    subject = models.CharField(max_length=32, choices=Subject.choices, db_index=True)
+    grade_stage = models.CharField(max_length=32, choices=GradeStage.choices)
+    curriculum_version = models.CharField(max_length=120, db_index=True)
+    knowledge_point = models.ForeignKey(
+        CurriculumNode,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="answer_cards",
+    )
+    knowledge_point_code = models.CharField(max_length=180, db_index=True)
+    knowledge_point_name = models.CharField(max_length=160)
+    questions = models.JSONField(default=list)
+    results = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.READY, db_index=True
+    )
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "study_answer_cards"
+        ordering = ("-created_at",)

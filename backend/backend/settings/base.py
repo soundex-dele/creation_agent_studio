@@ -17,6 +17,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 APP_CENTER_ROOT = Path(config(
     'APP_CENTER_ROOT', default=str(BASE_DIR / 'app_center')
 )).resolve()
+TEACHING_DATA_ROOT = Path(config(
+    'TEACHING_DATA_ROOT', default=str(BASE_DIR.parent / 'teaching_data')
+)).resolve()
 APP_CENTER_REGISTRY_HASH = app_center_registry_hash(APP_CENTER_ROOT)
 
 # SECURITY WARNING: keep the secret key used in production secret!

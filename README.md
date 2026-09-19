@@ -14,6 +14,12 @@ For an existing checkout, run `git submodule update --init --recursive`.
 Its Qt client remains a standalone desktop process. Its React source stays in
 the submodule and is compiled directly into the main frontend bundle.
 
+The versioned high-school curriculum and answer-card bank is mounted as the
+`teaching_data` submodule. It currently contains the current Xiangjiao high-school
+mathematics curriculum and the unified PEP high-school history curriculum. Run
+`backend/.venv/bin/python backend/manage.py validate_teaching_data` after updating
+the pinned data revision.
+
 面向组织的通用智能体、应用与工作流平台。平台层提供统一的编排、执行与治理能力；具体场景能力由应用和智能体承载。项目只有一套执行实现：所有 Agent、Conversation、Application、Workflow 和 Media 任务都创建 `modules.execution.Run`，由统一 Coordinator、事件流和命令 API 驱动。
 
 当前架构及取舍见 [ARCHITECTURE_ANALYSIS.md](ARCHITECTURE_ANALYSIS.md)。仓库不再维护 V1/V2 两套设计文档或兼容协议。

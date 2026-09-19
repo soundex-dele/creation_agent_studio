@@ -15,9 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
 COPY --from=codex-cli /usr/local/bin/node /usr/local/bin/node
 COPY --from=codex-cli /usr/local/bin/codex /usr/local/bin/codex
 COPY --from=codex-cli /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY requirements/ /app/requirements/
+COPY backend/requirements/ /app/requirements/
 RUN pip install --no-cache-dir -r requirements/production.txt
-COPY --chown=agentstudio:agentstudio . /app
+COPY --chown=agentstudio:agentstudio backend/ /app
+COPY --chown=agentstudio:agentstudio teaching_data/ /teaching_data
 RUN mkdir -p /data/artifacts /data/agent-workspaces /data/media \
         /home/agentstudio/.codex /app/staticfiles \
     && chown -R agentstudio:agentstudio /data /home/agentstudio /app/staticfiles

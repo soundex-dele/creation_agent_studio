@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import (
+    AnswerCard,
     Attempt,
     GradeStage,
     GuardianLink,
@@ -390,3 +391,39 @@ class WeeklyQuizSerializer(serializers.ModelSerializer):
             "question_count", "results", "status", "score", "completed_at",
             "created_at", "updated_at",
         )
+
+
+class AnswerCardSerializer(serializers.ModelSerializer):
+    questions = serializers.SerializerMethodField()
+
+    def get_questions(self, obj):
+        return [
+            {
+                "id": question["id"],
+                "stem": question["stem"],
+                "options": question["options"],
+                "difficulty": question["difficulty"],
+                "tags": question.get("tags", []),
+            }
+            for question in (obj.questions or [])
+        ]
+
+    class Meta:
+        model = AnswerCard
+        fields = (
+            "id", "subject", "grade_stage", "curriculum_version",
+            "knowledge_point_code", "knowledge_point_name", "questions",
+            "results", "status", "score", "completed_at", "created_at",
+            "updated_at",
+        )
+
+
+class AnswerCardCreateSerializer(serializers.Serializer):
+    subject = serializers.ChoiceField(choices=Subject.choices)
+    curriculum_version = serializers.CharField(max_length=120)
+    knowledge_point_code = serializers.CharField(max_length=180)
+
+
+class AnswerCardSubmitSerializer(serializers.Serializer):
+    question_id = serializers.CharField(max_length=240)
+    selected_option_id = serializers.ChoiceField(choices=("A", "B", "C", "D"))

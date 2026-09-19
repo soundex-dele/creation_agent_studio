@@ -239,6 +239,72 @@ export interface StudyCatalogSubject {
   color: string;
   chapters: string[];
   curriculum_versions: string[];
+  curriculum_version_options: Array<{ id: string; label: string }>;
+}
+
+export interface CurriculumKnowledgePoint {
+  id: string;
+  name: string;
+  summary: string;
+  keywords: string[];
+}
+
+export interface CurriculumSection {
+  id: string;
+  name: string;
+  knowledge_points: CurriculumKnowledgePoint[];
+}
+
+export interface CurriculumChapter {
+  id: string;
+  name: string;
+  sections: CurriculumSection[];
+}
+
+export interface CurriculumVolume {
+  id: string;
+  name: string;
+  chapters: CurriculumChapter[];
+}
+
+export interface CurriculumTree {
+  id: string;
+  subject: StudySubject;
+  label: string;
+  publisher: string;
+  volumes: CurriculumVolume[];
+}
+
+export interface AnswerCardQuestion {
+  id: string;
+  stem: string;
+  options: Array<{ id: 'A' | 'B' | 'C' | 'D'; text: string }>;
+  difficulty: 'basic' | 'medium' | 'advanced';
+  tags: string[];
+}
+
+export interface AnswerCardResult {
+  question_id: string;
+  selected_option_id: string;
+  correct_option_id: string;
+  is_correct: boolean;
+  explanation: string;
+}
+
+export interface AnswerCard {
+  id: string;
+  subject: StudySubject;
+  grade_stage: GradeStage;
+  curriculum_version: string;
+  knowledge_point_code: string;
+  knowledge_point_name: string;
+  questions: AnswerCardQuestion[];
+  results: { answers?: AnswerCardResult[]; correct?: number; total?: number };
+  status: 'ready' | 'completed';
+  score: number | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface StudyCatalog {

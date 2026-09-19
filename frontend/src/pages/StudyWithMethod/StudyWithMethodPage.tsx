@@ -5,28 +5,32 @@ import {
 import { Button, Collapse, Empty, Input, message, Modal, Progress, Select, Skeleton, Slider, Tag } from 'antd';
 import {
   ArrowLeft, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
-  CircleUserRound, Clock3, Compass, Download, Flame, ImagePlus, ListChecks, MessageCircle,
+  CircleUserRound, Compass, Download, Flame, ImagePlus, ListChecks, MessageCircle,
   RefreshCcw, Send, Settings2,
   Sparkles, Trash2, UserRoundPlus,
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
+import remarkMath from 'remark-math';
 
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import {
   addGuardianLink, completeStudyReview, createTutorSession, deleteStudyData,
-  exportStudyData, generateWeeklyQuiz, generateWeeklyReport, getMistakeCheckInSummary,
+  createAnswerCard, exportStudyData, generateWeeklyReport, getMistakeCheckInSummary,
   getWeeklyReportSummary, importStudyMistake,
   listGuardianLinks, listStudyMistakes, listStudyReviews, listStudyTutors, listTutorSessions,
-  listWeeklyQuizzes, loadStudyCatalog, loadStudyDashboard, removeGuardianLink, saveStudyProfile,
-  submitStudyAttempt, submitWeeklyQuiz, updateStudyEnrollment, updateStudyTask,
+  loadCurriculumTree, loadStudyCatalog, loadStudyDashboard, removeGuardianLink, saveStudyProfile,
+  submitAnswerCard, submitStudyAttempt, updateStudyEnrollment, updateStudyTask,
 } from '@/services/studyWithMethod';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import type {
-  GradeStage, GuardianLink, StudyCatalog, StudyDashboard, StudyMistake,
+  AnswerCard, CurriculumTree, GradeStage, GuardianLink, StudyCatalog, StudyDashboard, StudyMistake,
   StudyMistakeCheckInSummary, StudyProblem,
   StudyReportSummary, StudyReview, StudySubject, StudyTutor, StudyTutorSession,
-  WeeklyReport, WeeklyQuiz,
+  WeeklyReport,
 } from '@/types/studyWithMethod';
+import { normalizeMarkdownMath } from '@/lib/markdownMath';
 import { calculateStudyImageOutput } from './studyImage';
 import {
   FlashcardDeck,
@@ -39,6 +43,7 @@ import type { ReviewMode } from './learningModules';
 import { MethodologyEntry, StudyMethodologyCenter } from './StudyMethodologyCenter';
 import StudyTutorChat from './StudyTutorChat';
 import { recommendStudyMethod, type StudyMethodAction } from './studyMethodology';
+import { answerCardCurricula, answeredQuestionCount, buildAnswerSubmission } from './answerCard';
 import './StudyWithMethodPage.css';
 
 type StudentTab = 'today' | 'tutor' | 'mistakes' | 'review' | 'me';
@@ -228,8 +233,6 @@ export default function StudyWithMethodPage() {
   const [mistakesLoading, setMistakesLoading] = useState(false);
   const [checkInSummary, setCheckInSummary] = useState<StudyMistakeCheckInSummary | null>(null);
   const [reviews, setReviews] = useState<StudyReview[]>([]);
-  const [quiz, setQuiz] = useState<WeeklyQuiz | null>(null);
-  const [quizAnswers, setQuizAnswers] = useState<Record<string, boolean>>({});
   const [reviewMode, setReviewMode] = useState<ReviewMode>('due');
   const [reportSummary, setReportSummary] = useState<StudyReportSummary | null>(null);
   const [guardians, setGuardians] = useState<GuardianLink[]>([]);
@@ -303,13 +306,10 @@ export default function StudyWithMethodPage() {
     }
     if (tab === 'review') void Promise.all([
       listStudyReviews(organizationId, applicationId, { dueOnly: false }),
-      listWeeklyQuizzes(organizationId, applicationId, activeSubject),
       listStudyMistakes(organizationId, applicationId),
-    ]).then(([nextReviews, quizzes, nextMistakes]) => {
+    ]).then(([nextReviews, nextMistakes]) => {
       setReviews(nextReviews);
-      setQuiz(quizzes[0] || null);
       setMistakes(nextMistakes);
-      setQuizAnswers({});
     });
     if (tab === 'me') void Promise.all([getWeeklyReportSummary(organizationId, applicationId), listGuardianLinks(organizationId, applicationId)]).then(([summary, links]) => { setReportSummary(summary); setGuardians(links); });
     return () => { cancelled = true; };
@@ -450,13 +450,13 @@ export default function StudyWithMethodPage() {
     <main className="swm-student-shell">
       <header className="swm-mobile-header"><div><span className="swm-eyebrow">{gradeLabels[dashboard.profile.grade_stage]} · {dashboard.profile.enrollments.length} 门学科</span><h1>{tab === 'today' ? `今天也稳稳向前，${dashboard.profile.display_name || dashboard.profile.student_name}` : navItems.find((item) => item.key === tab)?.label}</h1></div><div className="swm-logo"><Compass size={24} /></div></header>
       {tab === 'today' && <TodayView dashboard={dashboard} onTutor={openTutor} onReview={() => openReviewModule('due', dashboard.due_reviews[0]?.subject)} onOpenModule={openReviewModule} onMethodology={() => setMethodologyOpen(true)} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
-      {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
+      {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || answerCardCurricula[activeSubject] || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
       {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} reviews={reviews} setReviews={setReviews} filterMode={mistakeFilter} mistakeDate={mistakeDate} mistakeMonth={mistakeMonth} onFilterChange={changeMistakeFilter} onDateChange={changeMistakeDate} onMonthChange={changeMistakeMonth} loading={mistakesLoading} checkInSummary={checkInSummary} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
-      {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} quiz={quiz} setQuiz={setQuiz} quizAnswers={quizAnswers} setQuizAnswers={setQuizAnswers} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} />}
-      {tab === 'me' && <ProfileView dashboard={dashboard} reportSummary={reportSummary} setReportSummary={setReportSummary} guardians={guardians} setGuardians={setGuardians} organizationId={organizationId} applicationId={applicationId} setActiveSubject={setActiveSubject} onEditProfile={openProfileSettings} openEnrollment={(item) => { setActiveSubject(item.subject); setCurriculumVersion(item.curriculum_version || '通用高中课程'); setCurrentChapter(item.current_chapter); setEnrollmentOpen(true); }} reload={reload} />}
+      {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} />}
+      {tab === 'me' && <ProfileView dashboard={dashboard} reportSummary={reportSummary} setReportSummary={setReportSummary} guardians={guardians} setGuardians={setGuardians} organizationId={organizationId} applicationId={applicationId} setActiveSubject={setActiveSubject} onEditProfile={openProfileSettings} openEnrollment={(item) => { setActiveSubject(item.subject); setCurriculumVersion(item.curriculum_version || answerCardCurricula[item.subject] || '通用高中课程'); setCurrentChapter(item.current_chapter); setEnrollmentOpen(true); }} reload={reload} />}
     </main>
     <nav className="swm-bottom-nav" aria-label="学之有道功能导航">{navItems.map(({ key, label, icon: Icon }) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => changeTab(key)}><Icon size={21} /><span>{label}</span></button>)}</nav>
-    <Modal title={`完善${subjectLabels[activeSubject]}进度`} open={enrollmentOpen} okText="保存" cancelText="稍后再说" confirmLoading={busy === 'enrollment'} onOk={() => void saveEnrollment()} onCancel={() => setEnrollmentOpen(false)}><div className="swm-progress-form"><label>教材版本<Select value={curriculumVersion || undefined} placeholder="选择教材版本" options={(subjectConfig?.curriculum_versions || []).map((value) => ({ value, label: value }))} onChange={setCurriculumVersion} /></label><label>当前章节<Select value={currentChapter || undefined} placeholder="选择当前章节" options={(subjectConfig?.chapters || []).map((value) => ({ value, label: value }))} onChange={setCurrentChapter} /></label></div></Modal>
+    <Modal title={`完善${subjectLabels[activeSubject]}进度`} open={enrollmentOpen} okText="保存" cancelText="稍后再说" confirmLoading={busy === 'enrollment'} onOk={() => void saveEnrollment()} onCancel={() => setEnrollmentOpen(false)}><div className="swm-progress-form"><label>教材版本<Select value={curriculumVersion || undefined} placeholder="选择教材版本" options={(subjectConfig?.curriculum_version_options || []).map((item) => ({ value: item.id, label: item.label }))} onChange={setCurriculumVersion} /></label><label>当前章节<Select value={currentChapter || undefined} placeholder="选择当前章节" options={(subjectConfig?.chapters || []).map((value) => ({ value, label: value }))} onChange={setCurrentChapter} /></label></div></Modal>
     <Modal
       title="学习设置"
       open={profileSettingsOpen}
@@ -763,47 +763,95 @@ function MistakesView({
   </section>;
 }
 
-function QuickQuizPanel({ activeSubject, quiz, setQuiz, quizAnswers, setQuizAnswers, organizationId, applicationId }: { activeSubject: StudySubject; quiz: WeeklyQuiz | null; setQuiz: (quiz: WeeklyQuiz | null) => void; quizAnswers: Record<string, boolean>; setQuizAnswers: Dispatch<SetStateAction<Record<string, boolean>>>; organizationId: string; applicationId: string }) {
+function QuizMarkdown({ children }: { children: string }) {
+  return <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+    {normalizeMarkdownMath(children)}
+  </ReactMarkdown>;
+}
+
+function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId }: { activeSubject: StudySubject; organizationId: string; applicationId: string }) {
+  const curriculumVersion = answerCardCurricula[activeSubject];
+  const [tree, setTree] = useState<CurriculumTree | null>(null);
+  const [volumeId, setVolumeId] = useState('');
+  const [chapterId, setChapterId] = useState('');
+  const [sectionId, setSectionId] = useState('');
+  const [pointId, setPointId] = useState('');
+  const [card, setCard] = useState<AnswerCard | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [questionIndex, setQuestionIndex] = useState(0);
-  const currentQuiz = quiz?.subject === activeSubject ? quiz : null;
-  const currentQuestion = currentQuiz?.questions[questionIndex];
-  const answered = currentQuiz?.questions.filter((item) => item.id in quizAnswers).length || 0;
+  const [loadingCard, setLoadingCard] = useState(false);
 
-  useEffect(() => { setQuestionIndex(0); }, [activeSubject, currentQuiz?.id]);
+  useEffect(() => {
+    setTree(null); setVolumeId(''); setChapterId(''); setSectionId(''); setPointId('');
+    setCard(null); setAnswers({}); setQuestionIndex(0);
+    if (!curriculumVersion) return;
+    void loadCurriculumTree(organizationId, applicationId, activeSubject, curriculumVersion)
+      .then(setTree)
+      .catch((error) => message.error(errorText(error, '加载教材目录失败')));
+  }, [activeSubject, applicationId, curriculumVersion, organizationId]);
 
-  if (!currentQuiz) return <div className="swm-quiz-empty">
-    <Clock3 size={30} aria-hidden="true" />
-    <strong>用 3 分钟检查近期薄弱点</strong>
-    <span>题目来自你的错题记录，做完只需点选“会不会”。</span>
-    <Button type="primary" size="large" onClick={async () => {
-      try { setQuiz(await generateWeeklyQuiz(organizationId, applicationId, activeSubject)); }
-      catch (error) { message.info(errorText(error, '记录错题后即可生成小测')); }
-    }}>生成 3 分钟小测</Button>
+  if (!curriculumVersion) return <div className="swm-quiz-empty">
+    <BookOpenCheck size={30} aria-hidden="true" />
+    <strong>{subjectLabels[activeSubject]}题库建设中</strong>
+    <span>目前开放湘教版高中数学和统编人教版高中历史知识点答题卡。</span>
+  </div>;
+  if (!tree) return <div className="swm-quiz-empty"><Skeleton active paragraph={{ rows: 3 }} /></div>;
+
+  const volume = tree.volumes.find((item) => item.id === volumeId);
+  const chapter = volume?.chapters.find((item) => item.id === chapterId);
+  const section = chapter?.sections.find((item) => item.id === sectionId);
+  const question = card?.questions[questionIndex];
+  const answered = answeredQuestionCount(card, answers);
+
+  if (!card) return <div className="swm-answer-card-picker">
+    <div className="swm-section-title"><div><span className="swm-eyebrow">{tree.publisher}</span><h2>{tree.label}知识点答题卡</h2></div></div>
+    <p className="swm-muted">依次选择册次、章节、小节和知识点，每张答题卡包含 5 道四选一题。</p>
+    <div className="swm-answer-card-selectors">
+      <label>册次<Select value={volumeId || undefined} placeholder="选择册次" options={tree.volumes.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setVolumeId(value); setChapterId(''); setSectionId(''); setPointId(''); }} /></label>
+      <label>章节<Select disabled={!volume} value={chapterId || undefined} placeholder="选择章节" options={(volume?.chapters || []).map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setChapterId(value); setSectionId(''); setPointId(''); }} /></label>
+      <label>小节<Select disabled={!chapter} value={sectionId || undefined} placeholder="选择小节" options={(chapter?.sections || []).map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setSectionId(value); setPointId(''); }} /></label>
+      <label>知识点<Select disabled={!section} value={pointId || undefined} placeholder="选择知识点" options={(section?.knowledge_points || []).map((item) => ({ value: item.id, label: item.name }))} onChange={setPointId} /></label>
+    </div>
+    {pointId && <div className="swm-answer-point-summary"><QuizMarkdown>{section?.knowledge_points.find((item) => item.id === pointId)?.summary || ''}</QuizMarkdown></div>}
+    <Button type="primary" size="large" disabled={!pointId} loading={loadingCard} onClick={async () => {
+      setLoadingCard(true);
+      try {
+        setCard(await createAnswerCard(organizationId, applicationId, { subject: activeSubject, curriculum_version: curriculumVersion, knowledge_point_code: pointId }));
+        setAnswers({}); setQuestionIndex(0);
+      } catch (error) { message.error(errorText(error, '生成答题卡失败')); }
+      finally { setLoadingCard(false); }
+    }}>生成 5 题答题卡</Button>
   </div>;
 
-  if (currentQuiz.status === 'completed') return <div className="swm-quiz-result">
-    <Check size={28} aria-hidden="true" /><span className="swm-eyebrow">本周小测已完成</span>
-    <strong>{currentQuiz.score ?? 0} 分</strong><p>结果已计入学情，下周会根据新的错题重新出题。</p>
-  </div>;
+  if (card.status === 'completed') return <article className="swm-answer-card-result">
+    <div className="swm-quiz-result"><Check size={28} aria-hidden="true" /><span className="swm-eyebrow">答题卡已完成</span><strong>{card.score ?? 0} 分</strong><p>{card.knowledge_point_name}</p></div>
+    <div className="swm-answer-review-list">{card.questions.map((item, index) => {
+      const result = card.results.answers?.find((answer) => answer.question_id === item.id);
+      return <article key={item.id} className={result?.is_correct ? 'correct' : 'incorrect'}>
+        <strong>{index + 1}. <QuizMarkdown>{item.stem}</QuizMarkdown></strong>
+        <p>你的答案：{result?.selected_option_id || '-'} · 正确答案：{result?.correct_option_id || '-'}</p>
+        <div><QuizMarkdown>{result?.explanation || ''}</QuizMarkdown></div>
+      </article>;
+    })}</div>
+    <Button block onClick={() => { setCard(null); setAnswers({}); setQuestionIndex(0); }}>再选一个知识点</Button>
+  </article>;
 
-  if (!currentQuestion) return <Empty description="这次小测暂时没有题目" />;
-
-  const choose = (value: boolean) => {
-    setQuizAnswers((answers) => ({ ...answers, [currentQuestion.id]: value }));
-    if (questionIndex < currentQuiz.questions.length - 1) setQuestionIndex((index) => index + 1);
-  };
-
-  return <article className="swm-quick-quiz">
-    <div className="swm-module-progress"><span>{subjectLabels[activeSubject]} · 3 分钟小测</span><span>{answered} / {currentQuiz.questions.length}</span></div>
-    <Progress percent={Math.round((answered / currentQuiz.questions.length) * 100)} showInfo={false} />
-    <div className="swm-quick-question"><span>第 {questionIndex + 1} 题</span><p>{currentQuestion.prompt}</p><small>{currentQuestion.knowledge_point || '近期错题'}</small></div>
-    <div className="swm-quiz-self-check"><Button onClick={() => choose(false)}>没做出来</Button><Button onClick={() => choose(false)}>有点模糊</Button><Button type="primary" onClick={() => choose(true)}>做对了</Button></div>
-    <div className="swm-quiz-pagination">{currentQuiz.questions.map((question, index) => <button type="button" key={question.id} className={`${index === questionIndex ? 'active' : ''} ${question.id in quizAnswers ? 'answered' : ''}`} aria-label={`查看第 ${index + 1} 题`} aria-current={index === questionIndex ? 'step' : undefined} onClick={() => setQuestionIndex(index)}>{index + 1}</button>)}</div>
-    {answered === currentQuiz.questions.length && <Button type="primary" size="large" block onClick={async () => setQuiz(await submitWeeklyQuiz(organizationId, applicationId, currentQuiz.id, currentQuiz.questions.map((item) => ({ question_id: item.id, is_correct: quizAnswers[item.id] }))))}>提交小测结果</Button>}
+  if (!question) return <Empty description="答题卡没有可用题目" />;
+  return <article className="swm-quick-quiz swm-answer-card">
+    <div className="swm-module-progress"><span>{card.knowledge_point_name}</span><span>{answered} / {card.questions.length}</span></div>
+    <Progress percent={Math.round((answered / card.questions.length) * 100)} showInfo={false} />
+    <div className="swm-quick-question"><span>第 {questionIndex + 1} 题 · {question.difficulty === 'basic' ? '基础' : question.difficulty === 'medium' ? '中等' : '提高'}</span><QuizMarkdown>{question.stem}</QuizMarkdown></div>
+    <div className="swm-answer-options">{question.options.map((option) => <button type="button" key={option.id} className={answers[question.id] === option.id ? 'selected' : ''} onClick={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}><b>{option.id}</b><QuizMarkdown>{option.text}</QuizMarkdown></button>)}</div>
+    <div className="swm-quiz-pagination">{card.questions.map((item, index) => <button type="button" key={item.id} className={`${index === questionIndex ? 'active' : ''} ${answers[item.id] ? 'answered' : ''}`} aria-label={`查看第 ${index + 1} 题`} aria-current={index === questionIndex ? 'step' : undefined} onClick={() => setQuestionIndex(index)}>{index + 1}</button>)}</div>
+    <div className="swm-battle-actions"><Button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)}>上一题</Button>{questionIndex < card.questions.length - 1 && <Button type="primary" onClick={() => setQuestionIndex((value) => value + 1)}>下一题</Button>}</div>
+    {answered === card.questions.length && <Button type="primary" size="large" block onClick={async () => {
+      try { setCard(await submitAnswerCard(organizationId, applicationId, card.id, buildAnswerSubmission(card, answers))); }
+      catch (error) { message.error(errorText(error, '提交答题卡失败')); }
+    }}>提交答题卡</Button>}
   </article>;
 }
 
-function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setActiveSubject, reviews, setReviews, mistakes, quiz, setQuiz, quizAnswers, setQuizAnswers, reviewMode, setReviewMode, onTopicTutor, organizationId, applicationId }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; catalog: StudyCatalog; enabledSubjects: StudySubject[]; activeSubject: StudySubject; setActiveSubject: (value: StudySubject) => void; reviews: StudyReview[]; setReviews: Dispatch<SetStateAction<StudyReview[]>>; mistakes: StudyMistake[]; quiz: WeeklyQuiz | null; setQuiz: (quiz: WeeklyQuiz | null) => void; quizAnswers: Record<string, boolean>; setQuizAnswers: Dispatch<SetStateAction<Record<string, boolean>>>; reviewMode: ReviewMode; setReviewMode: (mode: ReviewMode) => void; onTopicTutor: (subject: StudySubject, topic: string) => void; organizationId: string; applicationId: string }) {
+function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setActiveSubject, reviews, setReviews, mistakes, reviewMode, setReviewMode, onTopicTutor, organizationId, applicationId }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; catalog: StudyCatalog; enabledSubjects: StudySubject[]; activeSubject: StudySubject; setActiveSubject: (value: StudySubject) => void; reviews: StudyReview[]; setReviews: Dispatch<SetStateAction<StudyReview[]>>; mistakes: StudyMistake[]; reviewMode: ReviewMode; setReviewMode: (mode: ReviewMode) => void; onTopicTutor: (subject: StudySubject, topic: string) => void; organizationId: string; applicationId: string }) {
   const filtered = reviews.filter((item) => (
     item.subject === activeSubject && new Date(item.next_review_at).getTime() <= Date.now()
   ));
@@ -819,7 +867,7 @@ function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setAct
     <SubjectChips catalog={catalog} selected={activeSubject} enabled={enabledSubjects} onChange={setActiveSubject} />
     <ReviewModulePicker active={reviewMode} dueCount={filtered.length} onChange={setReviewMode} />
     {reviewMode === 'due' && <div className="swm-module-content"><div className="swm-section-title"><div><span className="swm-eyebrow">1 · 3 · 7 · 14 天</span><h2>今天到期的复习</h2></div></div>{filtered.map((review) => <article className="swm-review-card" key={review.id}><span className="swm-eyebrow">第 {review.completed_reviews + 1} 次复习</span><p>{review.mistake.problem.confirmed_text || review.mistake.problem.original_text || '查看题图后再做一次'}</p><div><Button onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, false); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>还不会</Button><Button type="primary" onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, true); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>这次做对了</Button></div></article>)}{!filtered.length && <Empty description="今天没有到期复习" />}</div>}
-    {reviewMode === 'quiz' && <div className="swm-module-content"><QuickQuizPanel activeSubject={activeSubject} quiz={quiz} setQuiz={setQuiz} quizAnswers={quizAnswers} setQuizAnswers={setQuizAnswers} organizationId={organizationId} applicationId={applicationId} /></div>}
+    {reviewMode === 'quiz' && <div className="swm-module-content"><KnowledgeAnswerCardPanel activeSubject={activeSubject} organizationId={organizationId} applicationId={applicationId} /></div>}
     {reviewMode === 'cards' && <div className="swm-module-content"><FlashcardDeck subject={activeSubject} mistakes={mistakes} reviews={reviews} onRate={rateFlashcard} /></div>}
     {reviewMode === 'map' && <div className="swm-module-content"><KnowledgeMapPanel subject={activeSubject} enrollment={enrollment} masteries={dashboard.masteries} onPractice={(topic) => onTopicTutor(activeSubject, topic)} /></div>}
   </section>;

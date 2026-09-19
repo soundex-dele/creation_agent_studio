@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    AnswerCard,
     CurriculumNode,
     GuardianLink,
     MistakeRecord,
@@ -16,5 +17,6 @@ from .models import (
 
 admin.site.register(
     (StudyProfile, SubjectEnrollment, CurriculumNode, StudyTask, Problem,
-     MistakeRecord, ReviewSchedule, GuardianLink, WeeklyReport, WeeklyQuiz)
+     MistakeRecord, ReviewSchedule, GuardianLink, WeeklyReport, WeeklyQuiz,
+     AnswerCard)
 )

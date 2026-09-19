@@ -23,6 +23,7 @@ from modules.execution.models import Run
 
 from ..install import _seed_curriculum
 from ..models import (
+    AnswerCard,
     GradeStage,
     GuardianLink,
     MistakeCheckIn,
@@ -119,6 +120,20 @@ def create_profile(context):
     )
 
 
+def create_answer_card(context):
+    api = client(context["student"])
+    response = api.post(
+        f"{root(context)}/answer-cards",
+        {
+            "subject": "math",
+            "curriculum_version": "xj-math-current",
+            "knowledge_point_code": "math.xj.required-1.sets-logic",
+        },
+        format="json",
+    )
+    return api, response
+
+
 def deploy_subject_tutor(context, subject=Subject.MATH):
     definition = TUTOR_DEFINITION_BY_SUBJECT[subject]
     category, _ = AgentCategory.objects.get_or_create(
@@ -211,6 +226,113 @@ def test_catalog_lists_three_grades_and_nine_subjects(study_context):
     )
     assert all(item["chapters"] for item in response.data["subjects"])
     assert all(item["color"].startswith("#") for item in response.data["subjects"])
+    math = next(item for item in response.data["subjects"] if item["value"] == "math")
+    history = next(item for item in response.data["subjects"] if item["value"] == "history")
+    assert math["curriculum_version_options"] == [
+        {"id": "xj-math-current", "label": "湘教版（现行）"}
+    ]
+    assert history["curriculum_version_options"] == [
+        {"id": "pep-history-current", "label": "统编人教版（现行）"}
+    ]
+
+
+@pytest.mark.django_db
+def test_curriculum_tree_and_answer_card_server_side_grading(study_context):
+    assert create_profile(study_context).status_code == 200
+    api = client(study_context["student"])
+    tree = api.get(
+        f"{root(study_context)}/curriculum",
+        {"subject": "math", "curriculum_version": "xj-math-current"},
+    )
+    assert tree.status_code == 200, tree.data
+    assert tree.data["label"] == "湘教版（现行）"
+    assert len(tree.data["volumes"]) == 4
+    assert tree.data["volumes"][0]["chapters"][0]["sections"][0][
+        "knowledge_points"
+    ][0]["id"] == "math.xj.required-1.sets-logic"
+
+    api, created = create_answer_card(study_context)
+    assert created.status_code == 201, created.data
+    assert len(created.data["questions"]) == 5
+    assert created.data["results"] == {}
+    assert all("correct_option_id" not in item for item in created.data["questions"])
+    assert all("explanation" not in item for item in created.data["questions"])
+
+    stored = AnswerCard.objects.get(pk=created.data["id"])
+    answers = [
+        {
+            "question_id": question["id"],
+            "selected_option_id": question["correct_option_id"],
+        }
+        for question in stored.questions
+    ]
+    submitted = api.post(
+        f"{root(study_context)}/answer-cards/{stored.id}/submit",
+        {"answers": answers},
+        format="json",
+    )
+    assert submitted.status_code == 200, submitted.data
+    assert submitted.data["score"] == 100
+    assert submitted.data["status"] == "completed"
+    assert len(submitted.data["results"]["answers"]) == 5
+    assert all(item["explanation"] for item in submitted.data["results"]["answers"])
+
+
+@pytest.mark.django_db
+def test_answer_card_rejects_tampering_and_curriculum_mismatch(study_context):
+    assert create_profile(study_context).status_code == 200
+    api, created = create_answer_card(study_context)
+    assert created.status_code == 201, created.data
+    card = AnswerCard.objects.get(pk=created.data["id"])
+    invalid = api.post(
+        f"{root(study_context)}/answer-cards/{card.id}/submit",
+        {
+            "answers": [
+                {"question_id": item["id"], "selected_option_id": "A"}
+                for item in card.questions[:-1]
+            ]
+        },
+        format="json",
+    )
+    assert invalid.status_code == 400
+    assert invalid.data["detail"] == "请完成答题卡中的全部题目。"
+
+    duplicated_answers = [
+        {"question_id": item["id"], "selected_option_id": "A"}
+        for item in card.questions
+    ]
+    duplicated_answers[-1]["question_id"] = duplicated_answers[0]["question_id"]
+    duplicated = api.post(
+        f"{root(study_context)}/answer-cards/{card.id}/submit",
+        {"answers": duplicated_answers},
+        format="json",
+    )
+    assert duplicated.status_code == 400
+    assert duplicated.data["detail"] == "同一道题不能重复提交。"
+
+    mismatch = api.post(
+        f"{root(study_context)}/answer-cards",
+        {
+            "subject": "math",
+            "curriculum_version": "pep-history-current",
+            "knowledge_point_code": "history.pep.outline-1.origins-qin-han",
+        },
+        format="json",
+    )
+    assert mismatch.status_code == 400
+    assert mismatch.data["detail"] == "学科与教材版本不匹配。"
+
+
+@pytest.mark.django_db
+def test_curriculum_reports_missing_teaching_data_as_unavailable(study_context):
+    assert create_profile(study_context).status_code == 200
+    with TemporaryDirectory() as directory, override_settings(TEACHING_DATA_ROOT=directory):
+        response = client(study_context["student"]).get(
+            f"{root(study_context)}/curriculum",
+            {"subject": "math", "curriculum_version": "xj-math-current"},
+        )
+    assert response.status_code == 503
+    assert "无法读取教学数据" in response.data["detail"]
 
 
 @pytest.mark.django_db
