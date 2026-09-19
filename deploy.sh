@@ -20,7 +20,7 @@ Usage: ./deploy.sh
 Bootstrap and start the local Agent Studio stack:
   1. Apply Django migrations
   2. Create a superuser when one does not exist
-  3. Synchronize every App Center package
+  3. Synchronize the Study With Method App Center package
   4. Start the frontend, backend, and all execution worker pools
 
 Optional environment variables:
@@ -175,8 +175,9 @@ log "Applying database migrations."
 # a clean installation even though it is part of the initial bootstrap.
 create_superuser
 
-log "Synchronizing all App Center packages."
-"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center
+log "Synchronizing the Study With Method App Center package."
+"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center \
+  --package study-with-method
 
 start_service "frontend" \
   bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0' \

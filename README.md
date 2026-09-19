@@ -78,7 +78,7 @@ npm run dev
 
 浏览器访问 `http://localhost:3030`。Vite 将 `/api` 代理到 `http://localhost:8080`；产品 API 的稳定入口统一为 `/api/v1`。
 
-也可以从仓库根目录一键完成迁移、管理员初始化、全部 App Center 应用同步，
+也可以从仓库根目录一键完成迁移、管理员初始化、“学之有道”应用同步，
 并启动前端、后端和所有执行池 worker：
 
 ```makefile
