@@ -416,6 +416,128 @@ def build_answer_card(
     )
 
 
+def _upsert_answer_card_mistake(
+    card: AnswerCard,
+    question: dict,
+    selected_option_id: str,
+):
+    option_by_id = {
+        str(option["id"]): str(option["text"])
+        for option in question["options"]
+    }
+    question_text = "\n".join([
+        str(question["stem"]),
+        *(f"{option['id']}. {option['text']}" for option in question["options"]),
+    ])
+    correct_option_id = str(question["correct_option_id"])
+    correct_answer = (
+        f"{correct_option_id}. {option_by_id[correct_option_id]}\n"
+        f"解析：{question['explanation']}"
+    )
+    analysis = {
+        "answer_card_id": str(card.id),
+        "question_id": str(question["id"]),
+        "selected_option_id": selected_option_id,
+        "selected_option_text": option_by_id[selected_option_id],
+    }
+    problem = Problem.objects.filter(
+        organization=card.organization,
+        profile=card.profile,
+        source="answer_card",
+        analysis__question_id=str(question["id"]),
+    ).first()
+    if problem is None:
+        problem = Problem.objects.create(
+            organization=card.organization,
+            profile=card.profile,
+            subject=card.subject,
+            grade_stage=card.grade_stage,
+            knowledge_point=card.knowledge_point,
+            original_text=question_text,
+            confirmed_text=question_text,
+            source="answer_card",
+            status=Problem.Status.COMPLETED,
+            analysis=analysis,
+            answer_key={
+                "answer": correct_option_id,
+                "answer_text": option_by_id[correct_option_id],
+                "explanation": question["explanation"],
+            },
+        )
+    else:
+        problem.subject = card.subject
+        problem.grade_stage = card.grade_stage
+        problem.knowledge_point = card.knowledge_point
+        problem.original_text = question_text
+        problem.confirmed_text = question_text
+        problem.status = Problem.Status.COMPLETED
+        problem.analysis = analysis
+        problem.answer_key = {
+            "answer": correct_option_id,
+            "answer_text": option_by_id[correct_option_id],
+            "explanation": question["explanation"],
+        }
+        problem.save(update_fields=(
+            "subject", "grade_stage", "knowledge_point", "original_text",
+            "confirmed_text", "status", "analysis", "answer_key", "updated_at",
+        ))
+
+    mistake, created = MistakeRecord.objects.get_or_create(
+        organization=card.organization,
+        profile=card.profile,
+        problem=problem,
+        defaults={
+            "subject": card.subject,
+            "grade_stage": card.grade_stage,
+            "knowledge_point": card.knowledge_point,
+            "cause": MistakeRecord.Cause.CONCEPT,
+            "knowledge_summary": card.knowledge_point_name,
+            "notes": (
+                f"答题卡选择：{selected_option_id}. "
+                f"{option_by_id[selected_option_id]}"
+            ),
+            "correct_answer": correct_answer,
+            "similar_problem_types": question.get("tags", []),
+        },
+    )
+    if not created:
+        mistake.subject = card.subject
+        mistake.grade_stage = card.grade_stage
+        mistake.knowledge_point = card.knowledge_point
+        mistake.knowledge_summary = card.knowledge_point_name
+        mistake.notes = (
+            f"答题卡选择：{selected_option_id}. "
+            f"{option_by_id[selected_option_id]}"
+        )
+        mistake.correct_answer = correct_answer
+        mistake.similar_problem_types = question.get("tags", [])
+        mistake.mastery = max(0, mistake.mastery - 10)
+        mistake.save(update_fields=(
+            "subject", "grade_stage", "knowledge_point", "knowledge_summary",
+            "notes", "correct_answer", "similar_problem_types", "mastery",
+            "updated_at",
+        ))
+    ReviewSchedule.objects.update_or_create(
+        organization=card.organization,
+        profile=card.profile,
+        mistake=mistake,
+        defaults={
+            "subject": card.subject,
+            "grade_stage": card.grade_stage,
+            "interval_step": 0,
+            "last_result": "incorrect",
+            "next_review_at": timezone.now() + timedelta(days=REVIEW_INTERVALS[0]),
+        },
+    )
+    MistakeCheckIn.objects.get_or_create(
+        organization=card.organization,
+        profile=card.profile,
+        subject=card.subject,
+        checked_on=timezone.localdate(),
+    )
+    return mistake
+
+
 @transaction.atomic
 def submit_answer_card(card: AnswerCard, answers: list[dict]):
     locked = AnswerCard.objects.select_for_update().get(pk=card.pk)
@@ -446,13 +568,17 @@ def submit_answer_card(card: AnswerCard, answers: list[dict]):
         selected = answer_by_id[question_id]
         is_correct = selected == question["correct_option_id"]
         correct += int(is_correct)
-        details.append({
+        detail = {
             "question_id": question_id,
             "selected_option_id": selected,
             "correct_option_id": question["correct_option_id"],
             "is_correct": is_correct,
             "explanation": question["explanation"],
-        })
+        }
+        if not is_correct:
+            mistake = _upsert_answer_card_mistake(locked, question, selected)
+            detail["mistake_id"] = str(mistake.id)
+        details.append(detail)
     locked.results = {
         "answers": details,
         "correct": correct,

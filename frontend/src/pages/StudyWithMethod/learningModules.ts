@@ -1,4 +1,5 @@
 import type {
+  CurriculumTree,
   StudyDashboard,
   StudyMastery,
   StudyMistake,
@@ -29,7 +30,7 @@ export interface StudyFlashcard {
   reviewId?: string;
 }
 
-export type KnowledgeNodeStatus = 'needs-work' | 'learning' | 'mastered' | 'current';
+export type KnowledgeNodeStatus = 'unstarted' | 'needs-work' | 'learning' | 'mastered' | 'current';
 
 export interface KnowledgeMapNode {
   id: string;
@@ -37,6 +38,7 @@ export interface KnowledgeMapNode {
   score: number | null;
   status: KnowledgeNodeStatus;
   detail: string;
+  group?: string;
 }
 
 const subjectLabels: Record<StudySubject, string> = {
@@ -133,7 +135,44 @@ export function buildKnowledgeMapNodes(
   enrollment: SubjectEnrollment | undefined,
   subject: StudySubject,
   masteries: StudyMastery[],
+  curriculum?: CurriculumTree | null,
 ): KnowledgeMapNode[] {
+  const subjectMasteries = masteries.filter((mastery) => mastery.subject === subject);
+  if (curriculum) {
+    const masteryByCode = new Map(subjectMasteries.map((mastery) => [mastery.knowledge_point_code, mastery]));
+    const masteryByName = new Map(subjectMasteries.map((mastery) => [mastery.knowledge_point_name.trim(), mastery]));
+    const weakTopics = new Set((enrollment?.weak_topics || []).map((topic) => topic.trim()));
+    const currentChapter = enrollment?.current_chapter.trim();
+    const nodes: KnowledgeMapNode[] = [];
+
+    curriculum.volumes.forEach((volume) => {
+      volume.chapters.forEach((chapter) => {
+        chapter.sections.forEach((section) => {
+          section.knowledge_points.forEach((point) => {
+            const mastery = masteryByCode.get(point.id) || masteryByName.get(point.name.trim());
+            let status: KnowledgeNodeStatus = 'unstarted';
+            if (mastery) status = masteryStatus(mastery.score);
+            else if (weakTopics.has(point.name.trim())) status = 'needs-work';
+            else if (currentChapter && (
+              currentChapter === chapter.name || currentChapter === section.name || currentChapter === point.name
+            )) status = 'current';
+            nodes.push({
+              id: point.id,
+              label: point.name,
+              score: mastery?.score ?? null,
+              status,
+              detail: mastery
+                ? `${mastery.attempts_count} 次练习 · ${mastery.correct_count} 次正确`
+                : `${volume.name} · ${chapter.name} · ${section.name}`,
+              group: `${volume.name} · ${chapter.name}`,
+            });
+          });
+        });
+      });
+    });
+    return nodes;
+  }
+
   const seen = new Set<string>();
   const nodes: KnowledgeMapNode[] = [];
   if (enrollment?.current_chapter) {
@@ -146,8 +185,7 @@ export function buildKnowledgeMapNodes(
       detail: '当前学习章节',
     });
   }
-  masteries
-    .filter((mastery) => mastery.subject === subject)
+  subjectMasteries
     .sort((a, b) => a.score - b.score)
     .forEach((mastery) => {
       const normalized = mastery.knowledge_point_name.trim();

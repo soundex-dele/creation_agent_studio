@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  CurriculumTree,
   StudyDashboard,
   StudyMastery,
   StudyMistake,
@@ -78,5 +79,54 @@ describe('study learning modules', () => {
     const nodes = buildKnowledgeMapNodes(enrollment, 'math', masteries);
     expect(nodes.map((node) => node.label)).toEqual(['函数', '单调性']);
     expect(nodes[1]).toMatchObject({ status: 'needs-work', score: 45 });
+  });
+
+  it('shows every curriculum knowledge point and marks untouched points unstarted', () => {
+    const curriculum = {
+      id: 'xj-math-current',
+      subject: 'math',
+      label: '湘教版（现行）',
+      publisher: '湖南教育出版社',
+      volumes: [{
+        id: 'required-1',
+        name: '必修第一册',
+        chapters: [{
+          id: 'chapter-1',
+          name: '集合与逻辑',
+          sections: [{
+            id: 'section-1',
+            name: '集合',
+            knowledge_points: [
+              { id: 'math.xj.required-1.sets', name: '集合的概念', summary: '集合基础' },
+              { id: 'math.xj.required-1.operations', name: '集合的运算', summary: '集合运算' },
+            ],
+          }],
+        }],
+      }],
+    } as CurriculumTree;
+    const mastery = [{
+      id: 'mastery-1',
+      subject: 'math',
+      knowledge_point_code: 'math.xj.required-1.sets',
+      knowledge_point_name: '集合的概念',
+      score: 80,
+      attempts_count: 5,
+      correct_count: 4,
+    }] as StudyMastery[];
+
+    const nodes = buildKnowledgeMapNodes(undefined, 'math', mastery, curriculum);
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      id: 'math.xj.required-1.sets',
+      status: 'mastered',
+      score: 80,
+      group: '必修第一册 · 集合与逻辑',
+    });
+    expect(nodes[1]).toMatchObject({
+      id: 'math.xj.required-1.operations',
+      status: 'unstarted',
+      score: null,
+    });
   });
 });

@@ -452,7 +452,7 @@ export default function StudyWithMethodPage() {
       {tab === 'today' && <TodayView dashboard={dashboard} onTutor={openTutor} onReview={() => openReviewModule('due', dashboard.due_reviews[0]?.subject)} onOpenModule={openReviewModule} onMethodology={() => setMethodologyOpen(true)} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
       {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || answerCardCurricula[activeSubject] || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
       {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} reviews={reviews} setReviews={setReviews} filterMode={mistakeFilter} mistakeDate={mistakeDate} mistakeMonth={mistakeMonth} onFilterChange={changeMistakeFilter} onDateChange={changeMistakeDate} onMonthChange={changeMistakeMonth} loading={mistakesLoading} checkInSummary={checkInSummary} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
-      {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} />}
+      {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} setMistakes={setMistakes} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
       {tab === 'me' && <ProfileView dashboard={dashboard} reportSummary={reportSummary} setReportSummary={setReportSummary} guardians={guardians} setGuardians={setGuardians} organizationId={organizationId} applicationId={applicationId} setActiveSubject={setActiveSubject} onEditProfile={openProfileSettings} openEnrollment={(item) => { setActiveSubject(item.subject); setCurriculumVersion(item.curriculum_version || answerCardCurricula[item.subject] || '通用高中课程'); setCurrentChapter(item.current_chapter); setEnrollmentOpen(true); }} reload={reload} />}
     </main>
     <nav className="swm-bottom-nav" aria-label="学之有道功能导航">{navItems.map(({ key, label, icon: Icon }) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => changeTab(key)}><Icon size={21} /><span>{label}</span></button>)}</nav>
@@ -769,7 +769,7 @@ function QuizMarkdown({ children }: { children: string }) {
   </ReactMarkdown>;
 }
 
-function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId }: { activeSubject: StudySubject; organizationId: string; applicationId: string }) {
+function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId, onCompleted }: { activeSubject: StudySubject; organizationId: string; applicationId: string; onCompleted: () => Promise<void> }) {
   const curriculumVersion = answerCardCurricula[activeSubject];
   const [tree, setTree] = useState<CurriculumTree | null>(null);
   const [volumeId, setVolumeId] = useState('');
@@ -780,6 +780,7 @@ function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [questionIndex, setQuestionIndex] = useState(0);
   const [loadingCard, setLoadingCard] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setTree(null); setVolumeId(''); setChapterId(''); setSectionId(''); setPointId('');
@@ -844,14 +845,40 @@ function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId
     <div className="swm-answer-options">{question.options.map((option) => <button type="button" key={option.id} className={answers[question.id] === option.id ? 'selected' : ''} onClick={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}><b>{option.id}</b><QuizMarkdown>{option.text}</QuizMarkdown></button>)}</div>
     <div className="swm-quiz-pagination">{card.questions.map((item, index) => <button type="button" key={item.id} className={`${index === questionIndex ? 'active' : ''} ${answers[item.id] ? 'answered' : ''}`} aria-label={`查看第 ${index + 1} 题`} aria-current={index === questionIndex ? 'step' : undefined} onClick={() => setQuestionIndex(index)}>{index + 1}</button>)}</div>
     <div className="swm-battle-actions"><Button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)}>上一题</Button>{questionIndex < card.questions.length - 1 && <Button type="primary" onClick={() => setQuestionIndex((value) => value + 1)}>下一题</Button>}</div>
-    {answered === card.questions.length && <Button type="primary" size="large" block onClick={async () => {
-      try { setCard(await submitAnswerCard(organizationId, applicationId, card.id, buildAnswerSubmission(card, answers))); }
+    {answered === card.questions.length && <Button type="primary" size="large" block loading={submitting} onClick={async () => {
+      setSubmitting(true);
+      try {
+        const completed = await submitAnswerCard(organizationId, applicationId, card.id, buildAnswerSubmission(card, answers));
+        setCard(completed);
+        if ((completed.results.answers || []).some((answer) => !answer.is_correct)) {
+          message.success('答错的题已自动加入错题集');
+        }
+        try { await onCompleted(); }
+        catch (error) { message.warning(errorText(error, '答题结果已保存，但刷新学习数据失败')); }
+      }
       catch (error) { message.error(errorText(error, '提交答题卡失败')); }
+      finally { setSubmitting(false); }
     }}>提交答题卡</Button>}
   </article>;
 }
 
-function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setActiveSubject, reviews, setReviews, mistakes, reviewMode, setReviewMode, onTopicTutor, organizationId, applicationId }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; catalog: StudyCatalog; enabledSubjects: StudySubject[]; activeSubject: StudySubject; setActiveSubject: (value: StudySubject) => void; reviews: StudyReview[]; setReviews: Dispatch<SetStateAction<StudyReview[]>>; mistakes: StudyMistake[]; reviewMode: ReviewMode; setReviewMode: (mode: ReviewMode) => void; onTopicTutor: (subject: StudySubject, topic: string) => void; organizationId: string; applicationId: string }) {
+function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setActiveSubject, reviews, setReviews, mistakes, setMistakes, reviewMode, setReviewMode, onTopicTutor, organizationId, applicationId, reload }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; catalog: StudyCatalog; enabledSubjects: StudySubject[]; activeSubject: StudySubject; setActiveSubject: (value: StudySubject) => void; reviews: StudyReview[]; setReviews: Dispatch<SetStateAction<StudyReview[]>>; mistakes: StudyMistake[]; setMistakes: Dispatch<SetStateAction<StudyMistake[]>>; reviewMode: ReviewMode; setReviewMode: (mode: ReviewMode) => void; onTopicTutor: (subject: StudySubject, topic: string) => void; organizationId: string; applicationId: string; reload: () => Promise<void> }) {
+  const [mapCurriculum, setMapCurriculum] = useState<CurriculumTree | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const mapCurriculumVersion = answerCardCurricula[activeSubject];
+  useEffect(() => {
+    let cancelled = false;
+    setMapCurriculum(null);
+    setMapLoading(false);
+    if (reviewMode !== 'map' || !mapCurriculumVersion) return () => { cancelled = true; };
+    setMapLoading(true);
+    void loadCurriculumTree(organizationId, applicationId, activeSubject, mapCurriculumVersion)
+      .then((value) => { if (!cancelled) setMapCurriculum(value); })
+      .catch((error) => { if (!cancelled) message.error(errorText(error, '加载知识点地图失败')); })
+      .finally(() => { if (!cancelled) setMapLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeSubject, applicationId, mapCurriculumVersion, organizationId, reviewMode]);
+
   const filtered = reviews.filter((item) => (
     item.subject === activeSubject && new Date(item.next_review_at).getTime() <= Date.now()
   ));
@@ -863,13 +890,26 @@ function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setAct
     }
     message.success(rating === 'remembered' ? '已记住，复习间隔会自动延长' : '已加入近期巩固');
   };
+  const refreshAfterAnswerCard = async () => {
+    const subject = activeSubject;
+    const [nextReviews, nextMistakes] = await Promise.all([
+      listStudyReviews(organizationId, applicationId, { dueOnly: false }),
+      listStudyMistakes(organizationId, applicationId),
+    ]);
+    setReviews(nextReviews);
+    setMistakes(nextMistakes);
+    await reload();
+    setActiveSubject(subject);
+  };
   return <section className="swm-view">
     <SubjectChips catalog={catalog} selected={activeSubject} enabled={enabledSubjects} onChange={setActiveSubject} />
     <ReviewModulePicker active={reviewMode} dueCount={filtered.length} onChange={setReviewMode} />
     {reviewMode === 'due' && <div className="swm-module-content"><div className="swm-section-title"><div><span className="swm-eyebrow">1 · 3 · 7 · 14 天</span><h2>今天到期的复习</h2></div></div>{filtered.map((review) => <article className="swm-review-card" key={review.id}><span className="swm-eyebrow">第 {review.completed_reviews + 1} 次复习</span><p>{review.mistake.problem.confirmed_text || review.mistake.problem.original_text || '查看题图后再做一次'}</p><div><Button onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, false); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>还不会</Button><Button type="primary" onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, true); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>这次做对了</Button></div></article>)}{!filtered.length && <Empty description="今天没有到期复习" />}</div>}
-    {reviewMode === 'quiz' && <div className="swm-module-content"><KnowledgeAnswerCardPanel activeSubject={activeSubject} organizationId={organizationId} applicationId={applicationId} /></div>}
+    {reviewMode === 'quiz' && <div className="swm-module-content"><KnowledgeAnswerCardPanel activeSubject={activeSubject} organizationId={organizationId} applicationId={applicationId} onCompleted={refreshAfterAnswerCard} /></div>}
     {reviewMode === 'cards' && <div className="swm-module-content"><FlashcardDeck subject={activeSubject} mistakes={mistakes} reviews={reviews} onRate={rateFlashcard} /></div>}
-    {reviewMode === 'map' && <div className="swm-module-content"><KnowledgeMapPanel subject={activeSubject} enrollment={enrollment} masteries={dashboard.masteries} onPractice={(topic) => onTopicTutor(activeSubject, topic)} /></div>}
+    {reviewMode === 'map' && <div className="swm-module-content">{mapLoading
+      ? <Skeleton active paragraph={{ rows: 7 }} />
+      : <KnowledgeMapPanel subject={activeSubject} enrollment={enrollment} masteries={dashboard.masteries} curriculum={mapCurriculum} onPractice={(topic) => onTopicTutor(activeSubject, topic)} />}</div>}
   </section>;
 }
 

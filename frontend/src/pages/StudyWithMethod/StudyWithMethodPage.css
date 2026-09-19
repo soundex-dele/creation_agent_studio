@@ -1232,11 +1232,14 @@
 .swm-quiz-self-check .ant-btn,
 .swm-battle-actions .ant-btn { min-height: 48px; white-space: normal; }
 
-.swm-map-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.swm-map-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .swm-map-summary > div { display: grid; gap: 3px; padding: 14px; border-radius: 16px; text-align: center; background: var(--swm-soft); }
 .swm-map-summary strong { color: var(--swm-green-dark); font-size: 22px; font-variant-numeric: tabular-nums; }
 .swm-map-summary span { color: var(--swm-muted-text); font-size: 12px; }
 .swm-map-heading { margin-top: 24px; }
+.swm-map-groups { display: grid; gap: 22px; }
+.swm-map-group { display: grid; gap: 10px; }
+.swm-map-group-title { margin: 0; color: var(--swm-green-dark); font-size: 14px; font-weight: 750; }
 .swm-map-list { display: grid; gap: 10px; }
 .swm-map-list > button {
   display: grid;
@@ -1255,6 +1258,7 @@
 .swm-map-list > button:active { background: var(--swm-mint); }
 .swm-map-list > button > svg { color: var(--swm-green); }
 .swm-map-list > button.is-needs-work > svg { color: var(--swm-danger); }
+.swm-map-list > button.is-unstarted > svg { color: var(--swm-muted-text); }
 .swm-map-index { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: var(--swm-green-dark); background: var(--swm-soft); font-size: 12px; font-weight: 750; }
 .swm-map-copy { display: grid; min-width: 0; gap: 3px; }
 .swm-map-copy strong { color: var(--swm-ink); }
@@ -1359,6 +1363,7 @@ html.dark .swm-page .ant-btn-default { color: var(--swm-text); }
   .swm-action-grid > button { min-height: 96px; }
   .swm-module-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .swm-module-picker > button { min-height: 72px; }
+  .swm-map-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .swm-flashcard { min-height: 320px; padding: 20px; }
   .swm-flashcard-ratings,
   .swm-quiz-self-check,

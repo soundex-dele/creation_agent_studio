@@ -279,6 +279,90 @@ def test_curriculum_tree_and_answer_card_server_side_grading(study_context):
 
 
 @pytest.mark.django_db
+def test_wrong_answer_card_question_is_added_to_mistakes_idempotently(study_context):
+    assert create_profile(study_context).status_code == 200
+    api, created = create_answer_card(study_context)
+    assert created.status_code == 201, created.data
+    card = AnswerCard.objects.get(pk=created.data["id"])
+    first_question = card.questions[0]
+    wrong_option = next(
+        item["id"]
+        for item in first_question["options"]
+        if item["id"] != first_question["correct_option_id"]
+    )
+    answers = [
+        {
+            "question_id": question["id"],
+            "selected_option_id": (
+                wrong_option
+                if question["id"] == first_question["id"]
+                else question["correct_option_id"]
+            ),
+        }
+        for question in card.questions
+    ]
+
+    submitted = api.post(
+        f"{root(study_context)}/answer-cards/{card.id}/submit",
+        {"answers": answers},
+        format="json",
+    )
+
+    assert submitted.status_code == 200, submitted.data
+    assert submitted.data["score"] == 80
+    wrong_result = next(
+        item for item in submitted.data["results"]["answers"]
+        if not item["is_correct"]
+    )
+    mistake = MistakeRecord.objects.get(pk=wrong_result["mistake_id"])
+    assert mistake.problem.source == "answer_card"
+    assert mistake.problem.analysis["question_id"] == first_question["id"]
+    assert mistake.problem.answer_key["answer"] == first_question["correct_option_id"]
+    assert first_question["explanation"] in mistake.correct_answer
+    assert mistake.knowledge_summary == card.knowledge_point_name
+    assert ReviewSchedule.objects.filter(mistake=mistake).exists()
+    assert MistakeCheckIn.objects.filter(
+        profile=card.profile,
+        subject=card.subject,
+        checked_on=timezone.localdate(),
+    ).exists()
+    listed = api.get(f"{root(study_context)}/mistakes", {"subject": "math"})
+    assert listed.status_code == 200, listed.data
+    assert [item["id"] for item in listed.data] == [str(mistake.id)]
+    assert listed.data[0]["problem"]["confirmed_text"].startswith(
+        first_question["stem"]
+    )
+
+    _, second_created = create_answer_card(study_context)
+    second_card = AnswerCard.objects.get(pk=second_created.data["id"])
+    repeated_answers = [
+        {
+            "question_id": question["id"],
+            "selected_option_id": (
+                wrong_option
+                if question["id"] == first_question["id"]
+                else question["correct_option_id"]
+            ),
+        }
+        for question in second_card.questions
+    ]
+    repeated = api.post(
+        f"{root(study_context)}/answer-cards/{second_card.id}/submit",
+        {"answers": repeated_answers},
+        format="json",
+    )
+
+    assert repeated.status_code == 200, repeated.data
+    assert MistakeRecord.objects.filter(
+        profile=card.profile,
+        problem__source="answer_card",
+        problem__analysis__question_id=first_question["id"],
+    ).count() == 1
+    mistake.refresh_from_db()
+    assert mistake.mastery == 10
+
+
+@pytest.mark.django_db
 def test_answer_card_rejects_tampering_and_curriculum_mismatch(study_context):
     assert create_profile(study_context).status_code == 200
     api, created = create_answer_card(study_context)

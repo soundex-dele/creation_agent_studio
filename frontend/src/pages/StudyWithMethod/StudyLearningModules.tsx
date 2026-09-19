@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 import type {
+  CurriculumTree,
   StudyDashboard,
   StudyMastery,
   StudyMistake,
@@ -143,42 +144,55 @@ export function FlashcardDeck({ subject, mistakes, reviews, onRate }: {
 }
 
 const nodeMeta: Record<KnowledgeNodeStatus, { label: string; icon: typeof Check }> = {
+  unstarted: { label: '未开始', icon: CircleDotDashed },
   'needs-work': { label: '需巩固', icon: CircleAlert },
   learning: { label: '学习中', icon: CircleDotDashed },
   mastered: { label: '已掌握', icon: CircleCheck },
   current: { label: '当前章节', icon: Sparkles },
 };
 
-export function KnowledgeMapPanel({ subject, enrollment, masteries, onPractice }: {
+export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, onPractice }: {
   subject: StudySubject;
   enrollment?: SubjectEnrollment;
   masteries: StudyMastery[];
+  curriculum?: CurriculumTree | null;
   onPractice: (topic: string) => void;
 }) {
-  const nodes = buildKnowledgeMapNodes(enrollment, subject, masteries);
+  const nodes = buildKnowledgeMapNodes(enrollment, subject, masteries, curriculum);
   const mastered = nodes.filter((node) => node.status === 'mastered').length;
   const learning = nodes.filter((node) => node.status === 'learning' || node.status === 'current').length;
   const weak = nodes.filter((node) => node.status === 'needs-work').length;
+  const unstarted = nodes.filter((node) => node.status === 'unstarted').length;
+  const groups = Array.from(nodes.reduce((result, node) => {
+    const group = node.group || '';
+    result.set(group, [...(result.get(group) || []), node]);
+    return result;
+  }, new globalThis.Map<string, typeof nodes>()));
+  const nodeIndex = new globalThis.Map(nodes.map((node, index) => [node.id, index + 1]));
 
   return <section className="swm-knowledge-map" aria-labelledby="swm-map-title">
     <div className="swm-map-summary">
       <div><strong>{mastered}</strong><span>已掌握</span></div>
       <div><strong>{learning}</strong><span>学习中</span></div>
       <div><strong>{weak}</strong><span>需巩固</span></div>
+      <div><strong>{unstarted}</strong><span>未开始</span></div>
     </div>
     <div className="swm-section-title swm-map-heading">
-      <div><span className="swm-eyebrow">{enrollment?.current_chapter || '尚未选择章节'}</span><h2 id="swm-map-title">{subjectLabels[subject]}知识路径</h2></div>
+      <div><span className="swm-eyebrow">{curriculum?.label || enrollment?.current_chapter || '尚未选择章节'}</span><h2 id="swm-map-title">{subjectLabels[subject]}知识路径</h2></div>
     </div>
-    {nodes.length ? <div className="swm-map-list">{nodes.map((node, index) => {
-      const status = nodeMeta[node.status];
-      const Icon = status.icon;
-      return <button type="button" key={node.id} className={`is-${node.status}`} onClick={() => onPractice(node.label)}>
-        <span className="swm-map-index">{index + 1}</span>
-        <Icon size={20} aria-hidden="true" />
-        <span className="swm-map-copy"><strong>{node.label}</strong><small>{node.detail}</small></span>
-        <span className="swm-map-state">{node.score === null ? status.label : `${node.score}% · ${status.label}`}</span>
-        <ChevronRight size={18} aria-hidden="true" />
-      </button>;
-    })}</div> : <div className="swm-module-empty"><Brain size={28} aria-hidden="true" /><strong>知识地图会随着练习自动点亮</strong><span>先完成一道题或在学习设置中选择薄弱点。</span></div>}
+    {nodes.length ? <div className="swm-map-groups">{groups.map(([group, groupNodes]) => <section key={group || 'default'} className="swm-map-group">
+      {group && <h3 className="swm-map-group-title">{group}</h3>}
+      <div className="swm-map-list">{groupNodes.map((node) => {
+        const status = nodeMeta[node.status];
+        const Icon = status.icon;
+        return <button type="button" key={node.id} className={`is-${node.status}`} onClick={() => onPractice(node.label)}>
+          <span className="swm-map-index">{nodeIndex.get(node.id)}</span>
+          <Icon size={20} aria-hidden="true" />
+          <span className="swm-map-copy"><strong>{node.label}</strong><small>{node.detail}</small></span>
+          <span className="swm-map-state">{node.score === null ? status.label : `${node.score}% · ${status.label}`}</span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>;
+      })}</div>
+    </section>)}</div> : <div className="swm-module-empty"><Brain size={28} aria-hidden="true" /><strong>暂无可展示的知识点</strong><span>数学和历史会展示当前教材的完整知识点，其他学科将在题库上线后开放。</span></div>}
   </section>;
 }

@@ -289,6 +289,7 @@ export interface AnswerCardResult {
   correct_option_id: string;
   is_correct: boolean;
   explanation: string;
+  mistake_id?: string;
 }
 
 export interface AnswerCard {
