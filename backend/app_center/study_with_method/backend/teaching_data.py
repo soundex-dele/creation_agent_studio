@@ -131,7 +131,11 @@ def public_curriculum_tree(*, subject: str, curriculum_id: str) -> dict:
                                         "id": point_id,
                                         "name": points[point_id]["name"],
                                         "summary": points[point_id]["summary"],
+                                        "objectives": points[point_id]["objectives"],
+                                        "prerequisites": points[point_id]["prerequisites"],
+                                        "common_mistakes": points[point_id]["common_mistakes"],
                                         "keywords": points[point_id]["keywords"],
+                                        "competency_tags": points[point_id]["competency_tags"],
                                     }
                                     for point_id in section["knowledge_points"]
                                 ],

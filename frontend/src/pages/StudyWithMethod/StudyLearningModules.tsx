@@ -4,7 +4,11 @@ import {
   BookMarked, Brain, Check, ChevronRight, CircleAlert, CircleCheck,
   CircleDotDashed, Clock3, Map, RotateCcw, Sparkles,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
+import remarkMath from 'remark-math';
 
+import { normalizeMarkdownMath } from '@/lib/markdownMath';
 import type {
   CurriculumTree,
   StudyDashboard,
@@ -151,6 +155,12 @@ const nodeMeta: Record<KnowledgeNodeStatus, { label: string; icon: typeof Check 
   current: { label: '当前章节', icon: Sparkles },
 };
 
+function KnowledgePointMarkdown({ children }: { children: string }) {
+  return <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+    {normalizeMarkdownMath(children)}
+  </ReactMarkdown>;
+}
+
 export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, onPractice }: {
   subject: StudySubject;
   enrollment?: SubjectEnrollment;
@@ -185,13 +195,23 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
       <div className="swm-map-list">{groupNodes.map((node) => {
         const status = nodeMeta[node.status];
         const Icon = status.icon;
-        return <button type="button" key={node.id} className={`is-${node.status}`} onClick={() => onPractice(node.label)}>
-          <span className="swm-map-index">{nodeIndex.get(node.id)}</span>
-          <Icon size={20} aria-hidden="true" />
-          <span className="swm-map-copy"><strong>{node.label}</strong><small>{node.detail}</small></span>
-          <span className="swm-map-state">{node.score === null ? status.label : `${node.score}% · ${status.label}`}</span>
-          <ChevronRight size={18} aria-hidden="true" />
-        </button>;
+        return <details key={node.id} className={`is-${node.status}`}>
+          <summary>
+            <span className="swm-map-index">{nodeIndex.get(node.id)}</span>
+            <Icon size={20} aria-hidden="true" />
+            <span className="swm-map-copy"><strong>{node.label}</strong><small>{node.detail}</small></span>
+            <span className="swm-map-state">{node.score === null ? status.label : `${node.score}% · ${status.label}`}</span>
+            <ChevronRight className="swm-map-chevron" size={18} aria-hidden="true" />
+          </summary>
+          <div className="swm-map-details">
+            {node.summary && <section><h4>知识摘要</h4><KnowledgePointMarkdown>{node.summary}</KnowledgePointMarkdown></section>}
+            {!!node.objectives?.length && <section><h4>学习目标</h4><ul>{node.objectives.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}
+            {!!node.prerequisites?.length && <section><h4>前置知识</h4><ul>{node.prerequisites.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}
+            {!!node.commonMistakes?.length && <section className="swm-map-mistakes"><h4>易错提醒</h4><ul>{node.commonMistakes.map((item) => <li key={item}><KnowledgePointMarkdown>{item}</KnowledgePointMarkdown></li>)}</ul></section>}
+            {!!(node.keywords?.length || node.competencyTags?.length) && <section><h4>关键词与能力</h4><div className="swm-map-tags">{node.keywords?.map((item) => <Tag key={`keyword-${item}`}>{item}</Tag>)}{node.competencyTags?.map((item) => <Tag color="green" key={`competency-${item}`}>{item}</Tag>)}</div></section>}
+            <Button type="primary" onClick={() => onPractice(node.label)}>针对这个知识点练习</Button>
+          </div>
+        </details>;
       })}</div>
     </section>)}</div> : <div className="swm-module-empty"><Brain size={28} aria-hidden="true" /><strong>暂无可展示的知识点</strong><span>数学和历史会展示当前教材的完整知识点，其他学科将在题库上线后开放。</span></div>}
   </section>;

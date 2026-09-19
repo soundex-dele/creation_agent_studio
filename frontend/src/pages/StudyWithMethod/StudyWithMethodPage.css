@@ -1241,29 +1241,46 @@
 .swm-map-group { display: grid; gap: 10px; }
 .swm-map-group-title { margin: 0; color: var(--swm-green-dark); font-size: 14px; font-weight: 750; }
 .swm-map-list { display: grid; gap: 10px; }
-.swm-map-list > button {
+.swm-map-list > details {
+  overflow: hidden;
+  border: 1px solid var(--swm-border);
+  border-radius: 16px;
+  background: var(--swm-card);
+}
+.swm-map-list > details > summary {
   display: grid;
   grid-template-columns: 28px 22px minmax(0, 1fr) auto 18px;
   align-items: center;
   gap: 10px;
   min-height: 72px;
   padding: 12px 14px;
-  border: 1px solid var(--swm-border);
-  border-radius: 16px;
   color: var(--swm-text);
   text-align: left;
-  background: var(--swm-card);
   cursor: pointer;
+  list-style: none;
 }
-.swm-map-list > button:active { background: var(--swm-mint); }
-.swm-map-list > button > svg { color: var(--swm-green); }
-.swm-map-list > button.is-needs-work > svg { color: var(--swm-danger); }
-.swm-map-list > button.is-unstarted > svg { color: var(--swm-muted-text); }
+.swm-map-list > details > summary::-webkit-details-marker { display: none; }
+.swm-map-list > details > summary:active,
+.swm-map-list > details[open] > summary { background: var(--swm-soft); }
+.swm-map-list > details > summary > svg { color: var(--swm-green); }
+.swm-map-list > details.is-needs-work > summary > svg { color: var(--swm-danger); }
+.swm-map-list > details.is-unstarted > summary > svg { color: var(--swm-muted-text); }
+.swm-map-list > details[open] .swm-map-chevron { transform: rotate(90deg); }
+.swm-map-chevron { transition: transform .18s ease; }
 .swm-map-index { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: var(--swm-green-dark); background: var(--swm-soft); font-size: 12px; font-weight: 750; }
 .swm-map-copy { display: grid; min-width: 0; gap: 3px; }
 .swm-map-copy strong { color: var(--swm-ink); }
 .swm-map-copy small { color: var(--swm-muted-text); line-height: 1.4; }
 .swm-map-state { color: var(--swm-muted-text); font-size: 12px; white-space: nowrap; }
+.swm-map-details { display: grid; gap: 16px; padding: 18px 20px 20px 64px; border-top: 1px solid var(--swm-border); }
+.swm-map-details section { display: grid; gap: 7px; }
+.swm-map-details h4 { margin: 0; color: var(--swm-green-dark); font-size: 13px; }
+.swm-map-details p { margin: 0; color: var(--swm-text); line-height: 1.7; }
+.swm-map-details ul { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--swm-text); }
+.swm-map-details li p { display: inline; }
+.swm-map-mistakes { padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--swm-danger) 7%, var(--swm-card)); }
+.swm-map-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.swm-map-details > .ant-btn { justify-self: start; }
 
 .swm-quick-question {
   display: grid;
@@ -1368,9 +1385,10 @@ html.dark .swm-page .ant-btn-default { color: var(--swm-text); }
   .swm-flashcard-ratings,
   .swm-quiz-self-check,
   .swm-battle-actions { grid-template-columns: 1fr; }
-  .swm-map-list > button { grid-template-columns: 28px 22px minmax(0, 1fr) 18px; }
+  .swm-map-list > details > summary { grid-template-columns: 28px 22px minmax(0, 1fr) 18px; }
   .swm-map-state { grid-column: 3; white-space: normal; }
-  .swm-map-list > button > svg:last-child { grid-column: 4; grid-row: 1 / span 2; }
+  .swm-map-list > details > summary > svg:last-child { grid-column: 4; grid-row: 1 / span 2; }
+  .swm-map-details { padding: 16px; }
   .swm-tutor-entry-grid { grid-template-columns: 1fr; }
   .swm-tutor-entry-grid > button { min-height: 188px; }
   .swm-setup-banner { align-items: flex-start; }

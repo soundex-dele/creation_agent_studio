@@ -246,7 +246,11 @@ export interface CurriculumKnowledgePoint {
   id: string;
   name: string;
   summary: string;
+  objectives: string[];
+  prerequisites: string[];
+  common_mistakes: string[];
   keywords: string[];
+  competency_tags: string[];
 }
 
 export interface CurriculumSection {

@@ -97,8 +97,26 @@ describe('study learning modules', () => {
             id: 'section-1',
             name: '集合',
             knowledge_points: [
-              { id: 'math.xj.required-1.sets', name: '集合的概念', summary: '集合基础' },
-              { id: 'math.xj.required-1.operations', name: '集合的运算', summary: '集合运算' },
+              {
+                id: 'math.xj.required-1.sets',
+                name: '集合的概念',
+                summary: '理解集合、元素与表示方法。',
+                objectives: ['判断元素与集合的关系'],
+                prerequisites: ['初中代数基础'],
+                common_mistakes: ['混淆元素与集合'],
+                keywords: ['集合', '元素'],
+                competency_tags: ['数学抽象'],
+              },
+              {
+                id: 'math.xj.required-1.operations',
+                name: '集合的运算',
+                summary: '掌握交集、并集与补集。',
+                objectives: ['完成集合运算'],
+                prerequisites: ['集合的概念'],
+                common_mistakes: ['忽略全集范围'],
+                keywords: ['交集', '并集', '补集'],
+                competency_tags: ['逻辑推理'],
+              },
             ],
           }],
         }],
@@ -122,6 +140,9 @@ describe('study learning modules', () => {
       status: 'mastered',
       score: 80,
       group: '必修第一册 · 集合与逻辑',
+      summary: '理解集合、元素与表示方法。',
+      objectives: ['判断元素与集合的关系'],
+      commonMistakes: ['混淆元素与集合'],
     });
     expect(nodes[1]).toMatchObject({
       id: 'math.xj.required-1.operations',

@@ -247,9 +247,16 @@ def test_curriculum_tree_and_answer_card_server_side_grading(study_context):
     assert tree.status_code == 200, tree.data
     assert tree.data["label"] == "湘教版（现行）"
     assert len(tree.data["volumes"]) == 4
-    assert tree.data["volumes"][0]["chapters"][0]["sections"][0][
+    first_point = tree.data["volumes"][0]["chapters"][0]["sections"][0][
         "knowledge_points"
-    ][0]["id"] == "math.xj.required-1.sets-logic"
+    ][0]
+    assert first_point["id"] == "math.xj.required-1.sets-logic"
+    assert first_point["summary"]
+    assert first_point["objectives"]
+    assert first_point["prerequisites"]
+    assert first_point["common_mistakes"]
+    assert first_point["keywords"]
+    assert first_point["competency_tags"]
 
     api, created = create_answer_card(study_context)
     assert created.status_code == 201, created.data

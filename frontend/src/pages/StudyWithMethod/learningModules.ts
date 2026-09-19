@@ -39,6 +39,12 @@ export interface KnowledgeMapNode {
   status: KnowledgeNodeStatus;
   detail: string;
   group?: string;
+  summary?: string;
+  objectives?: string[];
+  prerequisites?: string[];
+  commonMistakes?: string[];
+  keywords?: string[];
+  competencyTags?: string[];
 }
 
 const subjectLabels: Record<StudySubject, string> = {
@@ -165,6 +171,12 @@ export function buildKnowledgeMapNodes(
                 ? `${mastery.attempts_count} 次练习 · ${mastery.correct_count} 次正确`
                 : `${volume.name} · ${chapter.name} · ${section.name}`,
               group: `${volume.name} · ${chapter.name}`,
+              summary: point.summary,
+              objectives: point.objectives,
+              prerequisites: point.prerequisites,
+              commonMistakes: point.common_mistakes,
+              keywords: point.keywords,
+              competencyTags: point.competency_tags,
             });
           });
         });
