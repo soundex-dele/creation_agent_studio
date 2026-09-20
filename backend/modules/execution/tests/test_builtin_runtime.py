@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -36,6 +37,49 @@ class _SuspendSink(_Sink):
     def request_input(self, **request):
         self.request = request
         raise RuntimeError("suspended")
+
+
+def test_creation_master_runtime_bootstraps_legacy_package_imports():
+    import creation_master
+
+    expected_root = Path(creation_master.__file__).resolve().parent.parent
+    assert str(expected_root) in sys.path
+    assert str(expected_root) in creation_master.__path__
+
+
+def test_creation_master_runtime_does_not_shadow_django_backend_package():
+    import backend.settings
+
+    django_backend_root = Path(backend.settings.__file__).resolve().parent.parent.parent
+    creation_master_root = Path(creation_master.__file__).resolve().parent.parent
+
+    assert django_backend_root != creation_master_root
+    assert sys.path.index(str(creation_master_root)) > sys.path.index(str(django_backend_root))
+
+
+def test_creation_master_headless_worker_does_not_load_qt_application():
+    from creation_master.workers.voiceover_cleanup_worker import (
+        VoiceoverCleanupWorker,
+    )
+
+    class Config:
+        def get(self, _key, default=None):
+            return default
+
+    worker = VoiceoverCleanupWorker(
+        voiceover_folder=".",
+        output_dir=".",
+        broll_dir=".",
+        config_manager=Config(),
+        assets_dir=creation_master._assets_dir(),
+        cleanup_engine="codex",
+    )
+    received = []
+    worker.log_message.connect(received.append)
+    worker.log_message.emit("headless")
+
+    assert received == ["headless"]
+    assert "creation_master.creation_master_app" not in sys.modules
 
 
 def test_creation_master_trim_decodes_ffmpeg_output_as_utf8(monkeypatch, tmp_path):
