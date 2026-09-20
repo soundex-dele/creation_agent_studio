@@ -599,7 +599,10 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
   };
   const createProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!current) return; const form = new FormData(event.currentTarget); setBusy(true);
-    try { const project = await requester<Project>(`${apiBasePath}/topics/${current.id}/create-project`, jsonInit('POST', { work_type: workType, description: form.get('description'), target_platforms: form.getAll('target_platforms') })); await refresh(); notify('项目已创建，可以开始保存文案和素材'); onProject(project.id); }
+    const description = String(form.get('description') || '').trim();
+    const payload: Record<string, unknown> = { work_type: workType, target_platforms: form.getAll('target_platforms') };
+    if (description) payload.description = description;
+    try { const project = await requester<Project>(`${apiBasePath}/topics/${current.id}/create-project`, jsonInit('POST', payload)); await refresh(); notify('项目已创建，可以开始保存文案和素材'); onProject(project.id); }
     catch (reason) { notify(errorText(reason, '创建工程失败')); }
     finally { setBusy(false); }
   };
@@ -623,6 +626,17 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
       await refresh();
       notify('子选题已创建');
     }
+    setBusy(false);
+  };
+  const saveTopicDetails = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!current) return;
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    await update(current, {
+      title: String(form.get('title') || '').trim(),
+      notes: String(form.get('notes') || ''),
+    }, '选题内容已保存');
     setBusy(false);
   };
   const copyTopic = async () => {
@@ -656,10 +670,14 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
       return <div className="ct-topic-family" key={parent.id}>{renderTopicRow(parent, collapseControl)}{!isCollapsed && children.length > 0 && <div className="ct-topic-children" id={`ct-topic-children-${parent.id}`}>{children.map((item) => renderTopicRow(item))}</div>}</div>;
     }) : <div className="ct-panel"><EmptyState icon={Search} title="没有符合条件的选题" detail="调整搜索或筛选条件后重试。" /></div>}</section>
       <aside className="ct-panel ct-topic-detail">{current ? <>
-        <header><div><span className="ct-kicker">TOPIC DETAIL</span><h2>{current.title}</h2>{current.parent && <button className="ct-parent-link" onClick={() => setCurrentId(current.parent || '')}><GitBranch />{current.parent_title}</button>}</div><button className="ct-icon-button danger" aria-label={current.project_count || current.child_count ? '归档选题' : '删除选题'} onClick={() => void remove(current)}>{current.project_count || current.child_count ? <Archive /> : <Trash2 />}</button></header>
+        <header><div><span className="ct-kicker">TOPIC DETAIL</span><h2>选题详情</h2>{current.parent && <button className="ct-parent-link" onClick={() => setCurrentId(current.parent || '')}><GitBranch />{current.parent_title}</button>}</div><button className="ct-icon-button danger" aria-label={current.project_count || current.child_count ? '归档选题' : '删除选题'} onClick={() => void remove(current)}>{current.project_count || current.child_count ? <Archive /> : <Trash2 />}</button></header>
         <div className="ct-detail-body">
+          <form key={`edit-${current.id}`} className="ct-topic-edit" onSubmit={saveTopicDetails}>
+            <label><span>选题标题</span><input name="title" required maxLength={200} defaultValue={current.title} /></label>
+            <label><span>补充内容</span><textarea name="notes" rows={6} defaultValue={current.notes} placeholder="补充创作角度、背景信息或内容要求；支持多行输入" /></label>
+            <button className="ct-button ghost wide" disabled={busy}><Save />保存修改</button>
+          </form>
           <label><span>状态</span><select value={current.status} onChange={(event) => void update(current, { status: event.target.value }, '状态已更新')}>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-          <p>{current.notes || '暂无创作角度或备注。'}</p>
           {current.source_url ? <a href={current.source_url} target="_blank" rel="noreferrer">{current.source_name || '查看来源'} ↗</a> : <small>来源：{current.source_name || '未记录'}</small>}
           <div className="ct-tags">{current.tags.map((value) => <i key={value}>{value}</i>)}</div>
           <button type="button" className="ct-button ghost wide" onClick={() => void copyTopic()}><ClipboardCopy />复制选题信息到外部工具</button>
@@ -669,7 +687,7 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
             <div><span className="ct-kicker">START CREATION</span><h3>选择作品类型</h3><small>项目名将自动生成为“选题-作品类型”</small></div>
             <div className="ct-work-type-grid">{workTypeOptions.map(({ key, label, detail, icon: Icon }) => <label key={key} className={workType === key ? 'active' : ''}><input type="radio" name="work_type" value={key} checked={workType === key} onChange={() => setWorkType(key)} /><Icon /><span><strong>{label}</strong><small>{detail}</small></span><Check /></label>)}</div>
             <p className="ct-project-name-preview">项目名：<strong>{current.title}-{workTypeLabels[workType]}</strong></p>
-            <textarea name="description" rows={3} defaultValue={current.notes} aria-label="项目简报" placeholder="可选：补充创作要求" />
+            <label className="ct-project-brief-field"><span>项目专项要求（可选）</span><textarea name="description" rows={3} placeholder="只填写当前作品额外要求；留空将沿用选题补充内容" /></label>
             <div className="ct-check-grid">{(Object.keys(platformLabels) as Platform[]).map((key) => <label key={key}><input type="checkbox" name="target_platforms" value={key} defaultChecked={current.target_platforms.includes(key)} />{platformLabels[key]}</label>)}</div>
             <button className="ct-button primary wide" disabled={busy}><GitBranch />创建项目</button>
           </form>

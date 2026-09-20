@@ -265,6 +265,15 @@ def test_parent_and_child_topics_can_each_create_projects(toolbox_context):
     listed_parent = next(item for item in topic_list.data if item["id"] == parent.data["id"])
     assert listed_parent["child_count"] == 2
 
+    edited_child = client.patch(
+        f"{root}/topics/{children[1]['id']}",
+        {"title": "AI 如何生成配图进阶", "notes": "第一行\n第二行"},
+        format="json",
+    )
+    assert edited_child.status_code == 200, edited_child.data
+    assert edited_child.data["title"] == "AI 如何生成配图进阶"
+    assert edited_child.data["notes"] == "第一行\n第二行"
+
     grandchild = client.post(
         f"{root}/topics",
         {"title": "不允许的三级选题", "parent": children[0]["id"]},
