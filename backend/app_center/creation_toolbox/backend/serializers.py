@@ -117,41 +117,39 @@ class TopicBulkUpdateSerializer(serializers.Serializer):
 
 
 class TopicCreateProjectSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=120)
+    work_type = serializers.ChoiceField(choices=CreationProject.WorkType.choices)
     description = serializers.CharField(required=False, allow_blank=True, max_length=4000)
     target_platforms = serializers.ListField(
         child=serializers.ChoiceField(choices=Platform.choices), required=False
     )
 
-    def validate_name(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("工程名称不能为空。")
-        return value
-
 
 class ProjectSerializer(serializers.ModelSerializer):
     asset_count = serializers.IntegerField(read_only=True, default=0)
+    copywriting_count = serializers.IntegerField(read_only=True, default=0)
     recording_count = serializers.IntegerField(read_only=True, default=0)
     script_count = serializers.IntegerField(read_only=True, default=0)
     deliverable_count = serializers.IntegerField(read_only=True, default=0)
     publication_count = serializers.IntegerField(read_only=True, default=0)
     topic_title = serializers.CharField(source="topic.title", read_only=True, default="")
     stage_label = serializers.CharField(source="get_stage_display", read_only=True)
+    work_type_label = serializers.CharField(source="get_work_type_display", read_only=True)
     owner_name = serializers.CharField(source="owner.username", read_only=True, default="")
     reviewer_name = serializers.CharField(source="reviewer.username", read_only=True, default="")
 
     class Meta:
         model = CreationProject
         fields = [
-            "id", "topic", "topic_title", "name", "description", "stage", "stage_label",
+            "id", "topic", "topic_title", "name", "description", "work_type",
+            "work_type_label", "stage", "stage_label",
             "owner", "owner_name", "reviewer", "reviewer_name", "planned_publish_at",
-            "target_platforms", "tags", "archived_at", "asset_count", "recording_count",
-            "script_count", "deliverable_count", "publication_count", "created_at", "updated_at",
+            "target_platforms", "tags", "archived_at", "asset_count", "copywriting_count",
+            "recording_count", "script_count", "deliverable_count", "publication_count",
+            "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "topic_title", "stage", "stage_label", "archived_at", "owner_name",
-            "reviewer_name", "created_at", "updated_at",
+            "id", "topic_title", "work_type_label", "stage", "stage_label",
+            "archived_at", "owner_name", "reviewer_name", "created_at", "updated_at",
         ]
 
     def validate_name(self, value):
@@ -335,6 +333,7 @@ class ScriptSerializer(serializers.ModelSerializer):
 
 class VideoDeliverableSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
     platform_label = serializers.CharField(source="get_platform_display", read_only=True)
     review_status_label = serializers.CharField(
         source="get_review_status_display", read_only=True
@@ -348,12 +347,12 @@ class VideoDeliverableSerializer(serializers.ModelSerializer):
         model = VideoDeliverable
         fields = [
             "id", "project", "name", "version_label", "platform", "platform_label",
-            "file", "file_url", "external_url", "duration_ms", "review_status",
+            "file", "file_url", "download_url", "external_url", "duration_ms", "review_status",
             "review_status_label", "review_note", "created_by", "created_by_name",
             "reviewed_by", "reviewed_by_name", "reviewed_at", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "project", "file_url", "platform_label", "review_status_label",
+            "id", "project", "file_url", "download_url", "platform_label", "review_status_label",
             "created_by", "created_by_name", "reviewed_by", "reviewed_by_name",
             "reviewed_at", "created_at", "updated_at",
         ]
@@ -361,6 +360,15 @@ class VideoDeliverableSerializer(serializers.ModelSerializer):
 
     def get_file_url(self, instance):
         return instance.file.url if instance.file else ""
+
+    def get_download_url(self, instance):
+        if not instance.file:
+            return ""
+        return signed_media_url(
+            instance.file.name,
+            filename=instance.name,
+            download=True,
+        )
 
     def validate(self, attrs):
         file_value = attrs.get("file", getattr(self.instance, "file", None))

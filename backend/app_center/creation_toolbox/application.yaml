@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: creation-toolbox
-  version: 2.0.0
+  version: 2.1.0
   name: 创作工具箱
-  description: 面向短视频创作者的选题沉淀、项目流程、素材、成片发布与数据复盘工作台。
+  description: 面向图文、公众号长文和短视频创作的选题、文案、素材与发布工作台。
   category:
     slug: creative
     name: 内容创作
@@ -13,7 +13,7 @@ metadata:
     order: 1
   icon: "创"
   color: "#EC4899"
-  tags: [短视频, 选题库, 项目管理, 发布数据, 数据复盘]
+  tags: [图文, 公众号, 短视频, 选题库, 项目管理, 发布复盘]
   developer: Agent Studio
 spec:
   application_kind: custom
@@ -45,7 +45,7 @@ spec:
     urlconf: app_center.creation_toolbox.backend.urls
   database:
     mode: django-migrations
-    schema_version: 3
+    schema_version: 4
     tenant_scoped: true
   install:
     scope: per-organization

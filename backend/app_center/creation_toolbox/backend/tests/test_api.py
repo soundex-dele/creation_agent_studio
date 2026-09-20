@@ -93,7 +93,10 @@ def test_project_asset_and_workspace_counts(toolbox_context):
 
     uploaded = client.post(
         f"{root}/projects/{project_id}/assets",
-        {"file": SimpleUploadedFile("cover.png", b"png-data", content_type="image/png")},
+        {
+            "folder_id": folder.data["id"],
+            "file": SimpleUploadedFile("cover.png", b"png-data", content_type="image/png"),
+        },
         format="multipart",
     )
     assert uploaded.status_code == 201, uploaded.data
@@ -108,6 +111,24 @@ def test_project_asset_and_workspace_counts(toolbox_context):
         'attachment; filename="cover.png"'
     )
     assert b"".join(downloaded.streaming_content) == b"png-data"
+    assert client.get(f"{root}/projects/{project_id}/assets").data == []
+    assert len(client.get(f"{root}/projects/{project_id}/assets?all=true").data) == 1
+
+    deliverable = client.post(
+        f"{root}/deliverables",
+        {
+            "project": project_id,
+            "name": "发布视频.mp4",
+            "file": SimpleUploadedFile("publish.mp4", b"video-data", content_type="video/mp4"),
+        },
+        format="multipart",
+    )
+    assert deliverable.status_code == 201, deliverable.data
+    assert deliverable.data["download_url"].startswith(media_url)
+    video = client.get(deliverable.data["download_url"])
+    assert video.status_code == 200
+    assert "attachment" in video["Content-Disposition"]
+    assert b"".join(video.streaming_content) == b"video-data"
 
     workspace = client.get(f"{root}/workspace")
     assert workspace.status_code == 200
@@ -189,15 +210,25 @@ def test_topic_duplicate_multi_project_and_delete_guard(toolbox_context):
 
     first = client.post(
         f"{root}/topics/{topic.data['id']}/create-project",
-        {"name": "知识库·抖音版", "target_platforms": ["douyin"]},
+        {"work_type": "image_text", "target_platforms": ["douyin"]},
         format="json",
     )
     second = client.post(
         f"{root}/topics/{topic.data['id']}/create-project",
-        {"name": "知识库·B站版", "target_platforms": ["bilibili"]},
+        {"work_type": "short_video", "target_platforms": ["bilibili"]},
         format="json",
     )
     assert first.status_code == second.status_code == 201
+    assert first.data["name"] == "普通人如何建立知识库-图文"
+    assert first.data["work_type"] == "image_text"
+    assert first.data["work_type_label"] == "图文"
+    assert second.data["name"] == "普通人如何建立知识库-短视频"
+    duplicate_project = client.post(
+        f"{root}/topics/{topic.data['id']}/create-project",
+        {"work_type": "image_text"},
+        format="json",
+    )
+    assert duplicate_project.status_code == 400
     detail = client.get(f"{root}/topics/{topic.data['id']}")
     assert detail.data["status"] == "adopted"
     assert len(detail.data["projects"]) == 2
@@ -239,6 +270,7 @@ def test_publication_metrics_stage_and_analytics(toolbox_context):
         format="json",
     )
     assert deliverable.status_code == 201, deliverable.data
+    assert deliverable.data["download_url"] == ""
     publication = client.post(
         f"{root}/publications",
         {

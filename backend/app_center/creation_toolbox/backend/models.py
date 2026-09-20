@@ -109,6 +109,11 @@ class TopicIdea(TenantOwnedModel):
 
 
 class CreationProject(TenantOwnedModel):
+    class WorkType(models.TextChoices):
+        IMAGE_TEXT = "image_text", "图文"
+        LONG_ARTICLE = "long_article", "长图文（公众号）"
+        SHORT_VIDEO = "short_video", "短视频"
+
     class Stage(models.TextChoices):
         PLANNING = "planning", "策划"
         SCRIPTING = "scripting", "脚本"
@@ -131,6 +136,12 @@ class CreationProject(TenantOwnedModel):
     )
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True)
+    work_type = models.CharField(
+        max_length=24,
+        choices=WorkType.choices,
+        default=WorkType.SHORT_VIDEO,
+        db_index=True,
+    )
     stage = models.CharField(
         max_length=24, choices=Stage.choices, default=Stage.PLANNING, db_index=True
     )

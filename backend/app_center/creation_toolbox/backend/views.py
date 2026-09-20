@@ -307,15 +307,21 @@ class TopicCreateProjectView(APIView):
             return _not_found("选题")
         serializer = TopicCreateProjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if workspace.projects.filter(name=serializer.validated_data["name"]).exists():
+        work_type = serializer.validated_data["work_type"]
+        work_type_label = CreationProject.WorkType(work_type).label
+        suffix = f"-{work_type_label}"
+        topic_name = topic.title[: 120 - len(suffix)].rstrip()
+        project_name = f"{topic_name}{suffix}"
+        if workspace.projects.filter(name=project_name).exists():
             return Response({"name": "同名工程已经存在。"}, status=400)
         with transaction.atomic():
             project = CreationProject.objects.create(
                 organization=request.organization,
                 workspace=workspace,
                 topic=topic,
-                name=serializer.validated_data["name"],
+                name=project_name,
                 description=serializer.validated_data.get("description", topic.notes),
+                work_type=work_type,
                 target_platforms=serializer.validated_data.get(
                     "target_platforms", topic.target_platforms
                 ),
@@ -326,7 +332,8 @@ class TopicCreateProjectView(APIView):
                 topic.status = TopicIdea.Status.ADOPTED
                 topic.updated_by = request.user
                 topic.save(update_fields=["status", "updated_by", "updated_at"])
-        project.asset_count = project.recording_count = project.script_count = 0
+        project.asset_count = project.copywriting_count = 0
+        project.recording_count = project.script_count = 0
         project.deliverable_count = project.publication_count = 0
         return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
@@ -343,6 +350,7 @@ class ProjectListView(APIView):
             projects = projects.filter(archived_at__isnull=True)
         projects = projects.annotate(
             asset_count=Count("assets", distinct=True),
+            copywriting_count=Count("copywritings", distinct=True),
             recording_count=Count("recordings", distinct=True),
             script_count=Count("scripts", distinct=True),
             deliverable_count=Count("deliverables", distinct=True),
@@ -380,6 +388,7 @@ class ProjectDetailView(APIView):
         if project is None:
             return _not_found("工程")
         project.asset_count = project.assets.count()
+        project.copywriting_count = project.copywritings.count()
         project.recording_count = project.recordings.count()
         project.script_count = project.scripts.count()
         project.deliverable_count = project.deliverables.count()
@@ -521,7 +530,11 @@ class AssetListView(APIView):
         if project is None:
             return _not_found("工程")
         folder_id = request.query_params.get("folder") or None
-        assets = project.assets.filter(folder_id=folder_id)
+        assets = (
+            project.assets.all()
+            if request.query_params.get("all") == "true"
+            else project.assets.filter(folder_id=folder_id)
+        )
         return Response(AssetSerializer(assets, many=True).data)
 
     def post(self, request, organization_id, application_id, project_id):
