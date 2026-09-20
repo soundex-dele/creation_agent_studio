@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import (
     AnswerCard,
     Attempt,
+    DiagnosticAssessment,
+    DiagnosticResult,
     GradeStage,
     GuardianLink,
     KnowledgeMastery,
@@ -11,6 +13,7 @@ from .models import (
     Problem,
     ReviewSchedule,
     StudyProfile,
+    StudyGoal,
     StudyTask,
     Subject,
     SubjectEnrollment,
@@ -51,6 +54,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = StudyProfile
         fields = (
             "id", "student_name", "display_name", "region", "daily_minutes",
+            "weekly_minutes", "exam_date",
             "primary_subject", "grade_stage", "latest_score", "target_score",
             "onboarding_completed", "focus_subjects", "last_tutor_subject",
             "enrollment", "enrollments",
@@ -73,6 +77,10 @@ class ProfileInputSerializer(serializers.Serializer):
     display_name = serializers.CharField(max_length=80, required=False, allow_blank=True)
     region = serializers.CharField(max_length=120, required=False, allow_blank=True)
     daily_minutes = serializers.IntegerField(min_value=15, max_value=240, default=45)
+    weekly_minutes = serializers.IntegerField(
+        min_value=60, max_value=1680, required=False
+    )
+    exam_date = serializers.DateField(required=False, allow_null=True)
     latest_score = serializers.DecimalField(
         max_digits=5, decimal_places=1, min_value=0, max_value=150,
         required=False, allow_null=True,
@@ -118,6 +126,9 @@ class ProfileInputSerializer(serializers.Serializer):
         attrs["subjects"] = subjects
         attrs["focus_subjects"] = focus_subjects
         attrs["subject"] = subjects[0]
+        attrs["weekly_minutes"] = attrs.get(
+            "weekly_minutes", attrs["daily_minutes"] * 7
+        )
         if (
             attrs.get("latest_score") is not None
             and attrs.get("target_score") is not None
@@ -274,6 +285,7 @@ class MistakeUpdateSerializer(serializers.Serializer):
         max_length=20,
         required=False,
     )
+    is_archived = serializers.BooleanField(required=False)
 
     def validate_similar_problem_types(self, value):
         return list(dict.fromkeys(item.strip() for item in value if item.strip()))
@@ -298,7 +310,7 @@ class MistakeSerializer(serializers.ModelSerializer):
         fields = (
             "id", "subject", "grade_stage", "problem", "cause", "cause_label",
             "knowledge_summary", "notes", "correct_answer", "similar_problem_types",
-            "mastery", "next_review_at", "created_at", "updated_at",
+            "mastery", "is_archived", "next_review_at", "created_at", "updated_at",
         )
 
 
@@ -310,6 +322,9 @@ class MistakeListQuerySerializer(serializers.Serializer):
     )
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
+    cause = serializers.ChoiceField(choices=MistakeRecord.Cause.choices, required=False)
+    archived = serializers.BooleanField(required=False, default=False)
+    search = serializers.CharField(max_length=160, required=False, allow_blank=True)
 
     def validate(self, attrs):
         has_range = attrs.get("start_date") or attrs.get("end_date")
@@ -339,7 +354,8 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = ReviewSchedule
         fields = (
             "id", "subject", "grade_stage", "mistake", "interval_step",
-            "next_review_at", "last_result", "completed_reviews", "updated_at",
+            "next_review_at", "last_result", "completed_reviews", "repetition_streak",
+            "lapse_count", "difficulty", "last_reviewed_at", "updated_at",
         )
 
 
@@ -352,6 +368,48 @@ class MasterySerializer(serializers.ModelSerializer):
         fields = (
             "id", "subject", "grade_stage", "knowledge_point_code",
             "knowledge_point_name", "score", "attempts_count", "correct_count", "updated_at",
+            "confidence", "last_evidence_at",
+        )
+
+
+class StudyGoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudyGoal
+        fields = (
+            "id", "subject", "exam_date", "target_score", "weekly_minutes",
+            "focus_chapters", "is_active", "created_at", "updated_at",
+        )
+
+
+class DiagnosticResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DiagnosticResult
+        fields = (
+            "id", "subject", "knowledge_point_code", "knowledge_point_name",
+            "score", "confidence", "responses", "created_at",
+        )
+
+
+class DiagnosticAssessmentSerializer(serializers.ModelSerializer):
+    questions = serializers.SerializerMethodField()
+    results = DiagnosticResultSerializer(many=True, read_only=True)
+
+    def get_questions(self, obj):
+        return [{
+            "id": item["id"],
+            "subject": item["subject"],
+            "knowledge_point_code": item.get("knowledge_point_code", ""),
+            "knowledge_point_name": item.get("knowledge_point_name", ""),
+            "question_type": item["question_type"],
+            "stem": item["stem"],
+            "options": item.get("options", []),
+        } for item in (obj.questions or [])]
+
+    class Meta:
+        model = DiagnosticAssessment
+        fields = (
+            "id", "subjects", "questions", "status", "results",
+            "completed_at", "created_at", "updated_at",
         )
 
 
@@ -380,9 +438,23 @@ class WeeklyReportSerializer(serializers.ModelSerializer):
 
 class WeeklyQuizSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()
+    questions = serializers.SerializerMethodField()
 
     def get_question_count(self, obj):
         return len(obj.questions or [])
+
+    def get_questions(self, obj):
+        return [{
+            "id": item["id"],
+            "prompt": item["prompt"],
+            "knowledge_point": item.get("knowledge_point", ""),
+            "source_problem_id": item["source_problem_id"],
+            "question_type": item.get("question_type", "self_review"),
+            "options": item.get("options", []),
+            "reference_answer": item.get("reference_answer", "")
+                if item.get("question_type") != "objective" else "",
+            "validation_status": item.get("validation_status", "self_assessment"),
+        } for item in (obj.questions or [])]
 
     class Meta:
         model = WeeklyQuiz

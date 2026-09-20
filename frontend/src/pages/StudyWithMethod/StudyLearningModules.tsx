@@ -189,11 +189,13 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
   onPractice: (topic: string) => void;
 }) {
   const nodes = buildKnowledgeMapNodes(enrollment, subject, masteries, curriculum);
+  const [filter, setFilter] = useState<'all' | KnowledgeNodeStatus>('all');
+  const visibleNodes = filter === 'all' ? nodes : nodes.filter((node) => node.status === filter);
   const mastered = nodes.filter((node) => node.status === 'mastered').length;
   const learning = nodes.filter((node) => node.status === 'learning' || node.status === 'current').length;
   const weak = nodes.filter((node) => node.status === 'needs-work').length;
   const unstarted = nodes.filter((node) => node.status === 'unstarted').length;
-  const groups = Array.from(nodes.reduce((result, node) => {
+  const groups = Array.from(visibleNodes.reduce((result, node) => {
     const group = node.group || '';
     result.set(group, [...(result.get(group) || []), node]);
     return result;
@@ -210,7 +212,10 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
     <div className="swm-section-title swm-map-heading">
       <div><span className="swm-eyebrow">{curriculum?.label || enrollment?.current_chapter || '尚未选择章节'}</span><h2 id="swm-map-title">{subjectLabels[subject]}知识路径</h2></div>
     </div>
-    {nodes.length ? <div className="swm-map-groups">{groups.map(([group, groupNodes]) => <section key={group || 'default'} className="swm-map-group">
+    <div className="swm-map-filters" role="group" aria-label="筛选知识点状态">{([
+      ['all', '全部'], ['needs-work', '需巩固'], ['learning', '学习中'], ['mastered', '已掌握'], ['unstarted', '未开始'],
+    ] as Array<['all' | KnowledgeNodeStatus, string]>).map(([value, label]) => <button type="button" key={value} className={filter === value ? 'active' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>
+    {visibleNodes.length ? <div className="swm-map-groups">{groups.map(([group, groupNodes]) => <section key={group || 'default'} className="swm-map-group">
       {group && <h3 className="swm-map-group-title">{group}</h3>}
       <div className="swm-map-list">{groupNodes.map((node) => {
         const status = nodeMeta[node.status];
@@ -242,6 +247,6 @@ export function KnowledgeMapPanel({ subject, enrollment, masteries, curriculum, 
           </div>
         </details>;
       })}</div>
-    </section>)}</div> : <div className="swm-module-empty"><Brain size={28} aria-hidden="true" /><strong>暂无可展示的知识点</strong><span>数学和历史会展示当前教材的完整知识点，其他学科将在题库上线后开放。</span></div>}
+    </section>)}</div> : <div className="swm-module-empty"><Brain size={28} aria-hidden="true" /><strong>{nodes.length ? '当前筛选下没有知识点' : '暂无可展示的知识点'}</strong><span>{nodes.length ? '切换其他状态继续查看。' : '数学和历史会展示当前教材的完整知识点，其他学科将在题库上线后开放。'}</span></div>}
   </section>;
 }

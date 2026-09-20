@@ -24,8 +24,10 @@ from modules.execution.models import Run
 from ..install import _seed_curriculum
 from ..models import (
     AnswerCard,
+    DiagnosticAssessment,
     GradeStage,
     GuardianLink,
+    KnowledgeMastery,
     MistakeCheckIn,
     MistakeRecord,
     Problem,
@@ -668,7 +670,7 @@ def test_problem_hint_mistake_and_review_flow(study_context):
     review.save(update_fields=("next_review_at",))
     completed = student.post(
         f"{root(study_context)}/reviews/{review.id}/complete",
-        {"is_correct": True},
+        {"rating": "good"},
         format="json",
     )
     assert completed.status_code == 200
@@ -679,18 +681,20 @@ def test_problem_hint_mistake_and_review_flow(study_context):
     )
     assert quiz.status_code == 201, quiz.data
     assert quiz.data["question_count"] == 1
-    submitted = student.post(
-        f"{root(study_context)}/quizzes/{quiz.data['id']}/submit",
-        {
-            "answers": [{
-                "question_id": quiz.data["questions"][0]["id"],
-                "is_correct": True,
-            }]
-        },
-        format="json",
-    )
+    quiz_answers = {
+        "answers": [{
+            "question_id": quiz.data["questions"][0]["id"],
+            "rating": "good",
+        }]
+    }
+    submit_url = f"{root(study_context)}/quizzes/{quiz.data['id']}/submit"
+    submitted = student.post(submit_url, quiz_answers, format="json")
     assert submitted.status_code == 200
     assert submitted.data["score"] == 100
+    attempt_count = mistake.problem.attempts.count()
+    repeated = student.post(submit_url, quiz_answers, format="json")
+    assert repeated.status_code == 400
+    assert mistake.problem.attempts.count() == attempt_count
 
 
 @pytest.mark.django_db
@@ -1029,6 +1033,89 @@ def test_guardian_email_lookup_excludes_student_with_same_email(study_context):
     assert response.status_code == 201, response.data
     link = GuardianLink.objects.get(profile__student=study_context["student"])
     assert link.guardian == study_context["guardian"]
+
+
+@pytest.mark.django_db
+def test_diagnostic_updates_mastery_and_rebuilds_adaptive_plan(study_context):
+    profile_response = client(study_context["student"]).put(
+        f"{root(study_context)}/profile",
+        {
+            "grade_stage": GradeStage.HIGH_2,
+            "subjects": [Subject.MATH],
+            "focus_subjects": [Subject.MATH],
+            "daily_minutes": 45,
+            "weekly_minutes": 300,
+            "target_score": 120,
+        },
+        format="json",
+    )
+    assert profile_response.status_code == 200, profile_response.data
+    student = client(study_context["student"])
+    created = student.post(
+        f"{root(study_context)}/diagnostics",
+        {"subjects": [Subject.MATH]},
+        format="json",
+    )
+    assert created.status_code == 201, created.data
+    assessment = DiagnosticAssessment.objects.get(pk=created.data["id"])
+    answers = [{
+        "question_id": item["id"],
+        "selected_option_id": item["correct_option_id"],
+    } for item in assessment.questions]
+    submitted = student.post(
+        f"{root(study_context)}/diagnostics/{assessment.id}/submit",
+        {"answers": answers},
+        format="json",
+    )
+    assert submitted.status_code == 200, submitted.data
+    assert submitted.data["status"] == "completed"
+    assert all(item["score"] == 100 for item in submitted.data["results"])
+    assert KnowledgeMastery.objects.filter(
+        profile=assessment.profile, confidence__gt=0
+    ).exists()
+    dashboard = student.get(f"{root(study_context)}/dashboard")
+    assert dashboard.data["diagnostic"]["status"] == "completed"
+    assert dashboard.data["recommended_action"]["reason"]
+    assert set(dashboard.data["trends"]) == {"seven_day", "thirty_day"}
+
+
+@pytest.mark.django_db
+def test_review_ratings_produce_distinct_intervals(study_context):
+    assert create_profile(study_context).status_code == 200
+    profile = StudyProfile.objects.get(student=study_context["student"])
+    problem = Problem.objects.create(
+        organization=study_context["organization"],
+        profile=profile,
+        subject=Subject.MATH,
+        grade_stage=GradeStage.HIGH_2,
+        original_text="复习题",
+        confirmed_text="复习题",
+        status=Problem.Status.COMPLETED,
+    )
+    mistake = MistakeRecord.objects.create(
+        organization=study_context["organization"],
+        profile=profile,
+        problem=problem,
+        subject=Subject.MATH,
+        grade_stage=GradeStage.HIGH_2,
+    )
+    intervals = {}
+    for rating in ("again", "hard", "good"):
+        review = ReviewSchedule.objects.create(
+            organization=study_context["organization"],
+            profile=profile,
+            mistake=mistake,
+            subject=Subject.MATH,
+            grade_stage=GradeStage.HIGH_2,
+            next_review_at=timezone.now(),
+        )
+        study_services.complete_review(review, rating)
+        intervals[rating] = review.next_review_at - review.last_reviewed_at
+        review.delete()
+    assert intervals["again"] < intervals["hard"] < intervals["good"]
+    assert intervals["again"] == timedelta(days=1)
+    assert intervals["hard"] == timedelta(days=2)
+    assert intervals["good"] == timedelta(days=3)
 
 
 @dataclass(frozen=True)

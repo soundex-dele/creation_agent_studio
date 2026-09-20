@@ -74,6 +74,8 @@ class StudyProfile(TenantOwnedModel):
         max_length=32, choices=GradeStage.choices, default=GradeStage.HIGH_2, db_index=True
     )
     daily_minutes = models.PositiveSmallIntegerField(default=45)
+    weekly_minutes = models.PositiveSmallIntegerField(default=315)
+    exam_date = models.DateField(null=True, blank=True)
     focus_subjects = models.JSONField(default=list, blank=True)
     last_tutor_subject = models.CharField(
         max_length=32, choices=Subject.choices, blank=True, default=""
@@ -93,6 +95,89 @@ class StudyProfile(TenantOwnedModel):
         constraints = [
             models.UniqueConstraint(
                 fields=("workspace", "student"), name="unique_study_profile_student"
+            )
+        ]
+
+
+class StudyGoal(TenantOwnedModel):
+    """A concrete, per-subject target used by the adaptive planner."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(
+        StudyProfile, on_delete=models.CASCADE, related_name="goals"
+    )
+    subject = models.CharField(max_length=32, choices=Subject.choices, db_index=True)
+    exam_date = models.DateField(null=True, blank=True)
+    target_score = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True
+    )
+    weekly_minutes = models.PositiveSmallIntegerField(default=315)
+    focus_chapters = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "study_goals"
+        ordering = ("exam_date", "subject")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("profile", "subject"), name="unique_study_goal_subject"
+            )
+        ]
+
+
+class DiagnosticAssessment(TenantOwnedModel):
+    class Status(models.TextChoices):
+        IN_PROGRESS = "in_progress", "进行中"
+        COMPLETED = "completed", "已完成"
+        SKIPPED = "skipped", "已跳过"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(
+        StudyProfile, on_delete=models.CASCADE, related_name="diagnostics"
+    )
+    subjects = models.JSONField(default=list)
+    questions = models.JSONField(default=list)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.IN_PROGRESS, db_index=True
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "study_diagnostic_assessments"
+        ordering = ("-created_at",)
+
+
+class DiagnosticResult(TenantOwnedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assessment = models.ForeignKey(
+        DiagnosticAssessment, on_delete=models.CASCADE, related_name="results"
+    )
+    profile = models.ForeignKey(
+        StudyProfile, on_delete=models.CASCADE, related_name="diagnostic_results"
+    )
+    subject = models.CharField(max_length=32, choices=Subject.choices, db_index=True)
+    knowledge_point = models.ForeignKey(
+        "CurriculumNode", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="diagnostic_results",
+    )
+    knowledge_point_code = models.CharField(max_length=180, blank=True)
+    knowledge_point_name = models.CharField(max_length=160, blank=True)
+    score = models.PositiveSmallIntegerField(default=0)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    responses = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "study_diagnostic_results"
+        ordering = ("subject", "score")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("assessment", "subject", "knowledge_point_code"),
+                name="unique_study_diagnostic_result",
             )
         ]
 
@@ -323,6 +408,7 @@ class MistakeRecord(TenantOwnedModel):
     correct_answer = models.TextField(blank=True)
     similar_problem_types = models.JSONField(default=list, blank=True)
     mastery = models.PositiveSmallIntegerField(default=20)
+    is_archived = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -367,6 +453,10 @@ class ReviewSchedule(TenantOwnedModel):
     next_review_at = models.DateTimeField(db_index=True)
     last_result = models.CharField(max_length=20, blank=True)
     completed_reviews = models.PositiveSmallIntegerField(default=0)
+    repetition_streak = models.PositiveSmallIntegerField(default=0)
+    lapse_count = models.PositiveSmallIntegerField(default=0)
+    difficulty = models.PositiveSmallIntegerField(default=5)
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -388,6 +478,8 @@ class KnowledgeMastery(TenantOwnedModel):
     score = models.PositiveSmallIntegerField(default=0)
     attempts_count = models.PositiveIntegerField(default=0)
     correct_count = models.PositiveIntegerField(default=0)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    last_evidence_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

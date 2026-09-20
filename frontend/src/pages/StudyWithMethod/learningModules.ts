@@ -159,6 +159,11 @@ export function buildKnowledgeMapNodes(
   curriculum?: CurriculumTree | null,
 ): KnowledgeMapNode[] {
   const subjectMasteries = masteries.filter((mastery) => mastery.subject === subject);
+  const masteryDetail = (mastery: StudyMastery) => (
+    `${mastery.attempts_count} 次练习 · ${mastery.correct_count} 次正确 · ${
+      mastery.confidence < 50 ? '数据较少' : `可信度 ${mastery.confidence}%`
+    }`
+  );
   if (curriculum) {
     const masteryByCode = new Map(subjectMasteries.map((mastery) => [mastery.knowledge_point_code, mastery]));
     const masteryByName = new Map(subjectMasteries.map((mastery) => [mastery.knowledge_point_name.trim(), mastery]));
@@ -183,7 +188,7 @@ export function buildKnowledgeMapNodes(
               score: mastery?.score ?? null,
               status,
               detail: mastery
-                ? `${mastery.attempts_count} 次练习 · ${mastery.correct_count} 次正确`
+                ? masteryDetail(mastery)
                 : `${volume.name} · ${chapter.name} · ${section.name}`,
               group: `${volume.name} · ${chapter.name}`,
               summary: point.summary,
@@ -224,7 +229,7 @@ export function buildKnowledgeMapNodes(
         label: normalized,
         score: mastery.score,
         status: masteryStatus(mastery.score),
-        detail: `${mastery.attempts_count} 次练习 · ${mastery.correct_count} 次正确`,
+        detail: masteryDetail(mastery),
       });
     });
   (enrollment?.weak_topics || []).forEach((topic) => {

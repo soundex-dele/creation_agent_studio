@@ -21,12 +21,14 @@ from apps.conversations.serializers import ConversationListSerializer
 from modules.catalog.models import AgentDeployment
 
 from .models import (
+    DiagnosticAssessment,
     GuardianLink,
     CurriculumNode,
     MistakeRecord,
     Problem,
     ReviewSchedule,
     StudyProfile,
+    StudyGoal,
     StudyTask,
     StudyWorkspace,
     Subject,
@@ -40,6 +42,7 @@ from .serializers import (
     AnswerCardSubmitSerializer,
     AttemptInputSerializer,
     AttemptSerializer,
+    DiagnosticAssessmentSerializer,
     EnrollmentSerializer,
     GuardianLinkSerializer,
     ManualMistakeInputSerializer,
@@ -55,6 +58,7 @@ from .serializers import (
     ProfileSerializer,
     ReviewSerializer,
     StudyTaskSerializer,
+    StudyGoalSerializer,
     WeeklyReportSerializer,
     WeeklyQuizSerializer,
 )
@@ -64,6 +68,7 @@ from .services import (
     build_weekly_report,
     build_weekly_quiz,
     complete_review,
+    create_diagnostic_assessment,
     generate_week_plan,
     generate_multi_subject_week_plan,
     record_attempt,
@@ -71,6 +76,7 @@ from .services import (
     resolve_curriculum_node,
     start_tutor_run,
     submit_answer_card,
+    submit_diagnostic_assessment,
     submit_weekly_quiz,
 )
 from .strategies import get_subject_strategy
@@ -277,18 +283,27 @@ class TutorSessionListView(StudyAPIView):
             "subject": subject,
             "grade_stage": profile.grade_stage,
             "source_image": request.data.get("source_image"),
+            "problem_text": request.data.get("problem_text", ""),
             "source": "camera",
         })
         serializer.is_valid(raise_exception=True)
+        confirmed_text = serializer.validated_data.get("problem_text", "").strip()
+        strategy = get_subject_strategy(subject)
         problem = Problem.objects.create(
             organization=request.organization,
             profile=profile,
             subject=subject,
             grade_stage=profile.grade_stage,
             source_image=serializer.validated_data["source_image"],
+            original_text=confirmed_text,
+            confirmed_text=confirmed_text,
             source="camera",
-            status=Problem.Status.NEEDS_CONFIRMATION,
-            analysis={"recognition": "conversation"},
+            status=Problem.Status.READY if confirmed_text else Problem.Status.NEEDS_CONFIRMATION,
+            knowledge_point=(
+                resolve_curriculum_node(subject, strategy.detect_topic(confirmed_text), profile.grade_stage)
+                if confirmed_text else None
+            ),
+            analysis={"recognition": "confirmed_before_upload" if confirmed_text else "conversation"},
         )
         try:
             run = start_tutor_run(
@@ -335,6 +350,60 @@ def _report_summary(reports):
     return {"overall_metrics": overall, "subjects": subject_reports}
 
 
+def _learning_trend(profile, days):
+    end = timezone.localdate() + timedelta(days=1)
+    start = end - timedelta(days=days)
+    tasks = profile.tasks.filter(scheduled_for__gte=start, scheduled_for__lt=end)
+    attempts = profile.attempts.filter(created_at__date__gte=start, created_at__date__lt=end)
+    task_total = tasks.count()
+    attempt_total = attempts.count()
+    completed = tasks.filter(status=StudyTask.Status.COMPLETED).count()
+    correct = attempts.filter(is_correct=True).count()
+    return {
+        "days": days,
+        "task_total": task_total,
+        "task_completed": completed,
+        "completion_rate": round(100 * completed / task_total) if task_total else 0,
+        "attempt_total": attempt_total,
+        "correct_rate": round(100 * correct / attempt_total) if attempt_total else 0,
+        "reviews_completed": profile.review_schedules.filter(
+            last_reviewed_at__date__gte=start,
+            last_reviewed_at__date__lt=end,
+        ).count(),
+        "mastered_count": profile.masteries.filter(score__gte=80, confidence__gte=50).count(),
+    }
+
+
+def _recommended_action(profile, tasks, reviews):
+    if reviews.exists():
+        first = reviews.first()
+        return {
+            "kind": "review",
+            "subject": first.subject,
+            "title": "先完成到期复习",
+            "reason": "按记忆节奏及时复习，能减少重复遗忘。",
+        }
+    prioritized = sorted(
+        tasks,
+        key=lambda item: 0 if (item.metadata or {}).get("priority") == "must_do" else 1,
+    )
+    if prioritized:
+        task = prioritized[0]
+        return {
+            "kind": "task",
+            "subject": task.subject,
+            "task_id": str(task.id),
+            "title": task.title,
+            "reason": (task.metadata or {}).get("recommendation_reason", "跟进今日学习计划。"),
+        }
+    return {
+        "kind": "diagnostic",
+        "subject": profile.primary_subject,
+        "title": "做一次学习诊断",
+        "reason": "补充学习证据后，计划会更准确。",
+    }
+
+
 class DashboardView(StudyAPIView):
     def get(self, request, organization_id, application_id):
         workspace = self.workspace(organization_id, application_id)
@@ -354,6 +423,10 @@ class DashboardView(StudyAPIView):
                 return Response({
                     "mode": "guardian",
                     "reports": WeeklyReportSerializer(reports, many=True).data,
+                    "trends": [{
+                        "student_name": item.profile.display_name or item.profile.student.username,
+                        "seven_day": _learning_trend(item.profile, 7),
+                    } for item in links.select_related("profile", "profile__student")],
                 })
             return Response({
                 "mode": "onboarding",
@@ -365,9 +438,10 @@ class DashboardView(StudyAPIView):
             reschedule_overdue_tasks(profile)
             generate_multi_subject_week_plan(profile)
         today = timezone.localdate()
-        tasks = profile.tasks.filter(scheduled_for=today)
+        tasks = list(profile.tasks.filter(scheduled_for=today))
         reviews = profile.review_schedules.filter(next_review_at__lte=timezone.now())
         latest_report = profile.weekly_reports.first()
+        latest_diagnostic = profile.diagnostics.first()
         return Response({
             "mode": "student",
             "profile": ProfileSerializer(profile, context={"request": request}).data,
@@ -377,17 +451,26 @@ class DashboardView(StudyAPIView):
             "due_reviews": ReviewSerializer(reviews[:5], many=True, context={"request": request}).data,
             "due_review_count": reviews.count(),
             "mistake_count": profile.mistakes.count(),
-            "masteries": MasterySerializer(profile.masteries.order_by("score")[:5], many=True).data,
+            "masteries": MasterySerializer(profile.masteries.order_by("score")[:500], many=True).data,
             "latest_report": WeeklyReportSerializer(latest_report).data if latest_report else None,
+            "diagnostic": (
+                DiagnosticAssessmentSerializer(latest_diagnostic).data
+                if latest_diagnostic else {"status": "not_started"}
+            ),
+            "recommended_action": _recommended_action(profile, tasks, reviews),
+            "trends": {
+                "seven_day": _learning_trend(profile, 7),
+                "thirty_day": _learning_trend(profile, 30),
+            },
             "stats_by_subject": [
                 {
                     "subject": enrollment.subject,
                     "subject_label": enrollment.get_subject_display(),
-                    "task_count": tasks.filter(subject=enrollment.subject).count(),
-                    "completed_count": tasks.filter(
-                        subject=enrollment.subject,
-                        status=StudyTask.Status.COMPLETED,
-                    ).count(),
+                    "task_count": sum(item.subject == enrollment.subject for item in tasks),
+                    "completed_count": sum(
+                        item.subject == enrollment.subject and item.status == StudyTask.Status.COMPLETED
+                        for item in tasks
+                    ),
                     "mistake_count": profile.mistakes.filter(subject=enrollment.subject).count(),
                 }
                 for enrollment in enrollments
@@ -439,6 +522,8 @@ class ProfileView(StudyAPIView):
                     "primary_subject": data["subjects"][0],
                     "grade_stage": data["grade_stage"],
                     "daily_minutes": data["daily_minutes"],
+                    "weekly_minutes": data["weekly_minutes"],
+                    "exam_date": data.get("exam_date"),
                     "focus_subjects": data["focus_subjects"],
                     "last_tutor_subject": data["subjects"][0],
                     "latest_score": data.get(
@@ -470,6 +555,24 @@ class ProfileView(StudyAPIView):
                         "is_active": True,
                     },
                 )
+                StudyGoal.objects.update_or_create(
+                    organization=request.organization,
+                    profile=profile,
+                    subject=subject,
+                    defaults={
+                        "exam_date": data.get("exam_date"),
+                        "target_score": data.get("target_score"),
+                        "weekly_minutes": max(
+                            60, data["weekly_minutes"] // len(data["subjects"])
+                        ),
+                        "focus_chapters": (
+                            [data.get("current_chapter")]
+                            if index == 0 and data.get("current_chapter") else []
+                        ),
+                        "is_active": True,
+                    },
+                )
+            profile.goals.exclude(subject__in=data["subjects"]).update(is_active=False)
             generate_multi_subject_week_plan(profile, replace_pending=True)
         return Response(ProfileSerializer(profile, context={"request": request}).data)
 
@@ -705,6 +808,16 @@ class MistakeListView(StudyAPIView):
         query.is_valid(raise_exception=True)
         if subject := query.validated_data.get("subject"):
             mistakes = mistakes.filter(subject=subject)
+        mistakes = mistakes.filter(is_archived=query.validated_data["archived"])
+        if cause := query.validated_data.get("cause"):
+            mistakes = mistakes.filter(cause=cause)
+        if search := query.validated_data.get("search", "").strip():
+            mistakes = mistakes.filter(
+                Q(problem__confirmed_text__icontains=search)
+                | Q(problem__original_text__icontains=search)
+                | Q(knowledge_summary__icontains=search)
+                | Q(notes__icontains=search)
+            )
         if recorded_on := query.validated_data.get("date"):
             mistakes = mistakes.filter(created_at__date=recorded_on)
         if month := query.validated_data.get("month"):
@@ -804,7 +917,7 @@ class MistakeDetailView(StudyAPIView):
             return Response({"cause": "该错因不适用于当前学科。"}, status=400)
         for field in (
             "cause", "knowledge_summary", "notes", "correct_answer",
-            "similar_problem_types",
+            "similar_problem_types", "is_archived",
         ):
             if field in data:
                 setattr(mistake, field, data[field])
@@ -870,10 +983,85 @@ class ReviewCompleteView(StudyAPIView):
         review = profile.review_schedules.select_related("mistake").filter(pk=review_id).first()
         if review is None:
             return Response({"detail": "复习任务不存在。"}, status=404)
-        if not isinstance(request.data.get("is_correct"), bool):
-            return Response({"is_correct": "请标记本次复习是否正确。"}, status=400)
-        complete_review(review, request.data["is_correct"])
+        rating = request.data.get("rating")
+        if rating not in ("again", "hard", "good"):
+            return Response({"rating": "请选择 again、hard 或 good。"}, status=400)
+        complete_review(review, rating)
         return Response(ReviewSerializer(review, context={"request": request}).data)
+
+
+class GoalListView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        return Response(StudyGoalSerializer(profile.goals.filter(is_active=True), many=True).data)
+
+    def put(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        subject = request.data.get("subject")
+        enrollment = active_enrollment(profile, subject)
+        if enrollment is None:
+            return Response({"subject": "未启用该学科。"}, status=400)
+        serializer = StudyGoalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        goal, _ = StudyGoal.objects.update_or_create(
+            organization=request.organization,
+            profile=profile,
+            subject=subject,
+            defaults={
+                "exam_date": data.get("exam_date"),
+                "target_score": data.get("target_score"),
+                "weekly_minutes": data.get("weekly_minutes", profile.weekly_minutes),
+                "focus_chapters": data.get("focus_chapters", []),
+                "is_active": data.get("is_active", True),
+            },
+        )
+        generate_multi_subject_week_plan(profile, replace_pending=True)
+        return Response(StudyGoalSerializer(goal).data)
+
+
+class DiagnosticListView(StudyAPIView):
+    def get(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        return Response(DiagnosticAssessmentSerializer(profile.diagnostics.all()[:20], many=True).data)
+
+    def post(self, request, organization_id, application_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        try:
+            assessment = create_diagnostic_assessment(
+                profile,
+                request.data.get("subjects"),
+                skip=bool(request.data.get("skip", False)),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(DiagnosticAssessmentSerializer(assessment).data, status=201)
+
+
+class DiagnosticSubmitView(StudyAPIView):
+    def post(self, request, organization_id, application_id, assessment_id):
+        profile, error = self.require_profile(request, organization_id, application_id)
+        if error:
+            return error
+        assessment = profile.diagnostics.filter(pk=assessment_id).first()
+        if assessment is None:
+            return Response({"detail": "诊断不存在。"}, status=404)
+        answers = request.data.get("answers")
+        if not isinstance(answers, list):
+            return Response({"answers": "答案必须是列表。"}, status=400)
+        try:
+            assessment = submit_diagnostic_assessment(assessment, answers)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(DiagnosticAssessmentSerializer(assessment).data)
 
 
 class ReportListView(StudyAPIView):
@@ -950,7 +1138,7 @@ class QuizSubmitView(StudyAPIView):
         if not isinstance(answers, list):
             return Response({"answers": "答案必须是列表。"}, status=400)
         try:
-            submit_weekly_quiz(quiz, answers)
+            quiz = submit_weekly_quiz(quiz, answers)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=400)
         return Response(WeeklyQuizSerializer(quiz).data)
@@ -1088,6 +1276,18 @@ class ExportView(StudyAPIView):
             ).data,
             "mistake_check_ins": MistakeCheckInSerializer(
                 profile.mistake_check_ins.all(), many=True
+            ).data,
+            "goals": StudyGoalSerializer(profile.goals.all(), many=True).data,
+            "diagnostics": DiagnosticAssessmentSerializer(
+                profile.diagnostics.prefetch_related("results"), many=True
+            ).data,
+            "masteries": MasterySerializer(profile.masteries.all(), many=True).data,
+            "reviews": ReviewSerializer(
+                profile.review_schedules.select_related(
+                    "mistake", "mistake__problem", "mistake__knowledge_point"
+                ),
+                many=True,
+                context={"request": request},
             ).data,
             "reports": WeeklyReportSerializer(profile.weekly_reports.all(), many=True).data,
             "quizzes": WeeklyQuizSerializer(profile.weekly_quizzes.all(), many=True).data,

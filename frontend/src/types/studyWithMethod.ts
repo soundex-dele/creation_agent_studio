@@ -2,6 +2,7 @@ export type StudySubject =
   | 'chinese' | 'math' | 'english' | 'physics' | 'chemistry'
   | 'biology' | 'politics' | 'history' | 'geography';
 export type GradeStage = 'high_1' | 'high_2' | 'high_3';
+export type ReviewRating = 'again' | 'hard' | 'good';
 
 export interface SubjectEnrollment {
   id: string;
@@ -26,6 +27,8 @@ export interface StudyProfile {
   primary_subject: StudySubject;
   grade_stage: GradeStage;
   daily_minutes: number;
+  weekly_minutes: number;
+  exam_date: string | null;
   latest_score: string | null;
   target_score: string | null;
   onboarding_completed: boolean;
@@ -95,6 +98,7 @@ export interface StudyMistake {
   correct_answer: string;
   similar_problem_types: string[];
   mastery: number;
+  is_archived: boolean;
   next_review_at: string | null;
   created_at: string;
   updated_at: string;
@@ -133,6 +137,10 @@ export interface StudyReview {
   next_review_at: string;
   last_result: string;
   completed_reviews: number;
+  repetition_streak: number;
+  lapse_count: number;
+  difficulty: number;
+  last_reviewed_at: string | null;
   updated_at: string;
 }
 
@@ -145,6 +153,8 @@ export interface StudyMastery {
   score: number;
   attempts_count: number;
   correct_count: number;
+  confidence: number;
+  last_evidence_at: string | null;
   updated_at: string;
 }
 
@@ -182,6 +192,9 @@ export interface WeeklyQuizQuestion {
   knowledge_point: string;
   source_problem_id: string;
   validation_status: string;
+  question_type: 'objective' | 'self_review';
+  options: Array<{ id: string; text: string }>;
+  reference_answer: string;
 }
 
 export interface WeeklyQuiz {
@@ -197,9 +210,58 @@ export interface WeeklyQuiz {
   completed_at: string | null;
 }
 
+export interface StudyTrend {
+  days: number;
+  task_total: number;
+  task_completed: number;
+  completion_rate: number;
+  attempt_total: number;
+  correct_rate: number;
+  reviews_completed: number;
+  mastered_count: number;
+}
+
+export interface StudyGoal {
+  id: string;
+  subject: StudySubject;
+  exam_date: string | null;
+  target_score: string | null;
+  weekly_minutes: number;
+  focus_chapters: string[];
+  is_active: boolean;
+}
+
+export interface DiagnosticQuestion {
+  id: string;
+  subject: StudySubject;
+  knowledge_point_code: string;
+  knowledge_point_name: string;
+  question_type: 'objective' | 'self_rating';
+  stem: string;
+  options: Array<{ id: string; text: string }>;
+}
+
+export interface DiagnosticResult {
+  id: string;
+  subject: StudySubject;
+  knowledge_point_code: string;
+  knowledge_point_name: string;
+  score: number;
+  confidence: number;
+}
+
+export interface DiagnosticAssessment {
+  id: string;
+  subjects: StudySubject[];
+  questions: DiagnosticQuestion[];
+  status: 'in_progress' | 'completed' | 'skipped';
+  results: DiagnosticResult[];
+  completed_at: string | null;
+}
+
 export type StudyDashboard =
   | { mode: 'onboarding'; enabled_subjects: StudySubject[] }
-  | { mode: 'guardian'; reports: WeeklyReport[] }
+  | { mode: 'guardian'; reports: WeeklyReport[]; trends: Array<{ student_name: string; seven_day: StudyTrend }> }
   | {
       mode: 'student';
       profile: StudyProfile;
@@ -211,6 +273,15 @@ export type StudyDashboard =
       mistake_count: number;
       masteries: StudyMastery[];
       latest_report: WeeklyReport | null;
+      diagnostic: DiagnosticAssessment | { status: 'not_started' };
+      recommended_action: {
+        kind: 'review' | 'task' | 'diagnostic';
+        subject: StudySubject;
+        task_id?: string;
+        title: string;
+        reason: string;
+      };
+      trends: { seven_day: StudyTrend; thirty_day: StudyTrend };
       stats_by_subject: Array<{
         subject: StudySubject;
         subject_label: string;
@@ -224,6 +295,10 @@ export interface StudyProfileInput {
   display_name?: string;
   region?: string;
   daily_minutes: number;
+  weekly_minutes?: number;
+  exam_date?: string | null;
+  latest_score?: number | null;
+  target_score?: number | null;
   subjects: StudySubject[];
   focus_subjects: StudySubject[];
   grade_stage: GradeStage;

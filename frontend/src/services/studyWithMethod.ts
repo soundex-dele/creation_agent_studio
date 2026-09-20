@@ -25,6 +25,9 @@ import type {
   WeeklyQuiz,
   AnswerCard,
   CurriculumTree,
+  DiagnosticAssessment,
+  ReviewRating,
+  StudyGoal,
 } from '@/types/studyWithMethod';
 
 
@@ -64,13 +67,14 @@ export const listTutorSessions = (organizationId: string, applicationId: string)
 export const createTutorSession = (
   organizationId: string,
   applicationId: string,
-  input: { mode: 'photo' | 'chat'; subject: StudySubject; agentId: number; image?: Blob },
+  input: { mode: 'photo' | 'chat'; subject: StudySubject; agentId: number; image?: Blob; problemText?: string },
 ) => {
   const data = new FormData();
   data.set('mode', input.mode);
   data.set('subject', input.subject);
   data.set('agent_id', String(input.agentId));
   if (input.image) data.set('source_image', input.image, 'study-question.jpg');
+  if (input.problemText?.trim()) data.set('problem_text', input.problemText.trim());
   return api.post<StudyTutorSessionCreateResult>(
     `${studyRoot(organizationId, applicationId)}/tutor-sessions`,
     data,
@@ -164,6 +168,9 @@ export const listStudyMistakes = (
     month?: string;
     start_date?: string;
     end_date?: string;
+    cause?: string;
+    archived?: boolean;
+    search?: string;
   },
 ) => api.get<StudyMistake[]>(
   `${studyRoot(organizationId, applicationId)}/mistakes`,
@@ -213,6 +220,7 @@ export const updateStudyMistake = (
     notes?: string;
     correct_answer?: string;
     similar_problem_types?: string[];
+    is_archived?: boolean;
   },
 ) => api.patch<StudyMistake>(
   `${studyRoot(organizationId, applicationId)}/mistakes/${mistakeId}`,
@@ -235,10 +243,47 @@ export const completeStudyReview = (
   organizationId: string,
   applicationId: string,
   reviewId: string,
-  isCorrect: boolean,
+  rating: ReviewRating,
 ) => api.post<StudyReview>(
   `${studyRoot(organizationId, applicationId)}/reviews/${reviewId}/complete`,
-  { is_correct: isCorrect },
+  { rating },
+);
+
+export const listStudyGoals = (organizationId: string, applicationId: string) =>
+  api.get<StudyGoal[]>(`${studyRoot(organizationId, applicationId)}/goals`);
+
+export const saveStudyGoal = (
+  organizationId: string,
+  applicationId: string,
+  input: Pick<StudyGoal, 'subject' | 'exam_date' | 'weekly_minutes' | 'focus_chapters'>
+    & { target_score: number | null },
+) => api.put<StudyGoal>(`${studyRoot(organizationId, applicationId)}/goals`, input);
+
+export const listDiagnostics = (organizationId: string, applicationId: string) =>
+  api.get<DiagnosticAssessment[]>(`${studyRoot(organizationId, applicationId)}/diagnostics`);
+
+export const createDiagnostic = (
+  organizationId: string,
+  applicationId: string,
+  subjects: StudySubject[],
+  skip = false,
+) => api.post<DiagnosticAssessment>(
+  `${studyRoot(organizationId, applicationId)}/diagnostics`,
+  { subjects, skip },
+);
+
+export const submitDiagnostic = (
+  organizationId: string,
+  applicationId: string,
+  assessmentId: string,
+  answers: Array<{
+    question_id: string;
+    selected_option_id?: string;
+    self_rating?: number;
+  }>,
+) => api.post<DiagnosticAssessment>(
+  `${studyRoot(organizationId, applicationId)}/diagnostics/${assessmentId}/submit`,
+  { answers },
 );
 
 export const listWeeklyReports = (organizationId: string, applicationId: string) =>
@@ -265,7 +310,11 @@ export const submitWeeklyQuiz = (
   organizationId: string,
   applicationId: string,
   quizId: string,
-  answers: Array<{ question_id: string; is_correct: boolean }>,
+  answers: Array<{
+    question_id: string;
+    selected_option_id?: string;
+    rating?: ReviewRating;
+  }>,
 ) => api.post<WeeklyQuiz>(
   `${studyRoot(organizationId, applicationId)}/quizzes/${quizId}/submit`,
   { answers },

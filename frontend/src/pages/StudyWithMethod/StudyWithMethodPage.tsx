@@ -4,9 +4,9 @@ import {
 } from 'react';
 import { Button, Collapse, Empty, Input, message, Modal, Progress, Select, Skeleton, Slider, Tag } from 'antd';
 import {
-  ArrowLeft, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
+  Archive, ArrowLeft, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
   CircleUserRound, Compass, Download, Flame, ImagePlus, ListChecks, MessageCircle,
-  RefreshCcw, Send, Settings2,
+  RefreshCcw, RotateCcw, Search, Send, Settings2,
   Sparkles, Trash2, UserRoundPlus,
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -21,7 +21,7 @@ import {
   getWeeklyReportSummary, importStudyMistake,
   listGuardianLinks, listStudyMistakes, listStudyReviews, listStudyTutors, listTutorSessions,
   loadCurriculumTree, loadStudyCatalog, loadStudyDashboard, removeGuardianLink, saveStudyProfile,
-  submitAnswerCard, submitStudyAttempt, updateStudyEnrollment, updateStudyTask,
+  submitAnswerCard, submitStudyAttempt, updateStudyEnrollment, updateStudyMistake, updateStudyTask,
 } from '@/services/studyWithMethod';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import type {
@@ -42,6 +42,7 @@ import {
 import type { ReviewMode } from './learningModules';
 import { MethodologyEntry, StudyMethodologyCenter } from './StudyMethodologyCenter';
 import StudyTutorChat from './StudyTutorChat';
+import { DiagnosticPanel, StudyTrendSummary, WeeklyQuizPanel } from './StudyAssessmentModules';
 import { recommendStudyMethod, type StudyMethodAction } from './studyMethodology';
 import { answerCardCurricula, answeredQuestionCount, buildAnswerSubmission } from './answerCard';
 import './StudyWithMethodPage.css';
@@ -56,7 +57,7 @@ const subjectLabels: Record<StudySubject, string> = {
   biology: '生物', politics: '思想政治', history: '历史', geography: '地理',
 };
 const gradeLabels: Record<GradeStage, string> = { high_1: '高一', high_2: '高二', high_3: '高三' };
-const quickReplies = ['我没思路', '再提示一点', '检查这一步', '换个讲法', '给我完整解析', '出一道同类题'];
+const quickReplies = ['我没思路', '再提示一点', '检查这一步', '换个讲法', '给我完整解析', '出一道同类题', '答案可能有误，请重新核验'];
 const causeOptions = [
   ['concept', '概念不清'], ['formula', '公式遗忘'], ['memory', '记忆不牢'],
   ['reading', '审题错误'], ['calculation', '计算错误'], ['method', '方法选择'],
@@ -132,7 +133,7 @@ function currentWeekDateKeys() {
   });
 }
 
-async function compressStudyImage(file: File) {
+async function compressStudyImage(file: File, rotation = 0) {
   const url = URL.createObjectURL(file);
   try {
     const image = new Image();
@@ -141,13 +142,21 @@ async function compressStudyImage(file: File) {
       image.onload = () => resolve();
       image.onerror = () => reject(new Error('无法读取图片'));
     });
-    const size = calculateStudyImageOutput(image.naturalWidth, image.naturalHeight, 0, 100);
+    const size = calculateStudyImageOutput(image.naturalWidth, image.naturalHeight, rotation, 100);
     const canvas = document.createElement('canvas');
     canvas.width = size.width;
     canvas.height = size.height;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('无法处理图片');
-    context.drawImage(image, 0, 0, size.width, size.height);
+    context.translate(size.width / 2, size.height / 2);
+    context.rotate(size.radians);
+    context.drawImage(
+      image,
+      -image.naturalWidth * size.scale / 2,
+      -image.naturalHeight * size.scale / 2,
+      image.naturalWidth * size.scale,
+      image.naturalHeight * size.scale,
+    );
     return await new Promise<Blob>((resolve, reject) => canvas.toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error('无法生成图片')),
       'image/jpeg', 0.86,
@@ -226,6 +235,8 @@ export default function StudyWithMethodPage() {
   const [draftRequest, setDraftRequest] = useState<{ id: number; text: string } | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState('');
+  const [photoRotation, setPhotoRotation] = useState(0);
+  const [photoProblemText, setPhotoProblemText] = useState('');
   const [mistakes, setMistakes] = useState<StudyMistake[]>([]);
   const [mistakeFilter, setMistakeFilter] = useState<MistakeFilterMode>(() => mistakeFilterFromSearch(searchParams));
   const [mistakeDate, setMistakeDate] = useState(() => mistakeDateFromSearch(searchParams));
@@ -242,11 +253,15 @@ export default function StudyWithMethodPage() {
   const [profileSubjects, setProfileSubjects] = useState<StudySubject[]>(['math']);
   const [profileFocus, setProfileFocus] = useState<StudySubject[]>(['math']);
   const [profileMinutes, setProfileMinutes] = useState(45);
+  const [profileWeeklyMinutes, setProfileWeeklyMinutes] = useState(315);
+  const [profileExamDate, setProfileExamDate] = useState('');
+  const [profileTargetScore, setProfileTargetScore] = useState('');
   const [curriculumVersion, setCurriculumVersion] = useState('');
   const [currentChapter, setCurrentChapter] = useState('');
   const [mistakeOpen, setMistakeOpen] = useState(false);
-  const [mistakeFile, setMistakeFile] = useState<File | null>(null);
+  const [mistakeFiles, setMistakeFiles] = useState<File[]>([]);
   const [mistakeUrl, setMistakeUrl] = useState('');
+  const [mistakeRotation, setMistakeRotation] = useState(0);
   const [mistakeCause, setMistakeCause] = useState('concept');
   const [mistakeText, setMistakeText] = useState('');
   const [mistakeNotes, setMistakeNotes] = useState('');
@@ -351,10 +366,10 @@ export default function StudyWithMethodPage() {
     }, { replace: true });
   }, [setSearchParams]);
 
-  const saveProfile = async (value: { grade: GradeStage; subjects: StudySubject[]; focus: StudySubject[]; minutes: number }) => {
+  const saveProfile = async (value: { grade: GradeStage; subjects: StudySubject[]; focus: StudySubject[]; minutes: number; weeklyMinutes?: number; examDate?: string; targetScore?: number | null }) => {
     if (!organizationId || !applicationId) return false;
     setSaving(true);
-    try { await saveStudyProfile(organizationId, applicationId, { grade_stage: value.grade, subjects: value.subjects, focus_subjects: value.focus, daily_minutes: value.minutes }); message.success('学习设置已保存'); await reload(); return true; }
+    try { await saveStudyProfile(organizationId, applicationId, { grade_stage: value.grade, subjects: value.subjects, focus_subjects: value.focus, daily_minutes: value.minutes, weekly_minutes: value.weeklyMinutes || value.minutes * 7, exam_date: value.examDate || null, target_score: value.targetScore ?? null }); message.success('学习设置已保存，未来计划已重新计算'); await reload(); return true; }
     catch (error) { message.error(errorText(error, '保存学习档案失败')); return false; } finally { setSaving(false); }
   };
 
@@ -380,6 +395,9 @@ export default function StudyWithMethodPage() {
     setProfileSubjects(studentDashboard.profile.enrollments.map((item) => item.subject));
     setProfileFocus(studentDashboard.profile.focus_subjects);
     setProfileMinutes(studentDashboard.profile.daily_minutes);
+    setProfileWeeklyMinutes(studentDashboard.profile.weekly_minutes || studentDashboard.profile.daily_minutes * 7);
+    setProfileExamDate(studentDashboard.profile.exam_date || '');
+    setProfileTargetScore(studentDashboard.profile.target_score || '');
     setProfileSettingsOpen(true);
   };
   const startChat = async (tutor: StudyTutor) => {
@@ -388,11 +406,11 @@ export default function StudyWithMethodPage() {
     try { const result = await createTutorSession(organizationId, applicationId, { mode: 'chat', subject: tutor.subject, agentId: tutor.id }); setActiveSubject(tutor.subject); setConversationId(result.conversation?.id ? String(result.conversation.id) : null); setTutorMode('chat'); }
     catch (error) { message.error(errorText(error, '创建辅导对话失败')); } finally { setBusy(''); }
   };
-  const choosePhoto = (file?: File) => { if (!file) return; if (photoUrl) URL.revokeObjectURL(photoUrl); setPhotoFile(file); setPhotoUrl(URL.createObjectURL(file)); };
+  const choosePhoto = (file?: File) => { if (!file) return; if (photoUrl) URL.revokeObjectURL(photoUrl); setPhotoFile(file); setPhotoRotation(0); setPhotoUrl(URL.createObjectURL(file)); };
   const startPhoto = async () => {
     if (!organizationId || !applicationId || !photoFile || !activeTutor) return;
     setBusy('photo');
-    try { const image = await compressStudyImage(photoFile); const result = await createTutorSession(organizationId, applicationId, { mode: 'photo', subject: activeSubject, agentId: activeTutor.id, image }); setConversationId(result.conversation?.id ? String(result.conversation.id) : null); setActiveProblem(result.problem || null); setTutorMode('chat'); setPhotoFile(null); setPhotoUrl(''); }
+    try { const image = await compressStudyImage(photoFile, photoRotation); const result = await createTutorSession(organizationId, applicationId, { mode: 'photo', subject: activeSubject, agentId: activeTutor.id, image, problemText: photoProblemText }); setConversationId(result.conversation?.id ? String(result.conversation.id) : null); setActiveProblem(result.problem || null); setTutorMode('chat'); setPhotoFile(null); setPhotoUrl(''); setPhotoRotation(0); setPhotoProblemText(''); }
     catch (error) { message.error(errorText(error, '发起拍照辅导失败')); } finally { setBusy(''); }
   };
   const recordPhotoResult = async (isCorrect: boolean) => {
@@ -415,20 +433,24 @@ export default function StudyWithMethodPage() {
     catch (error) { message.error(errorText(error, '更新学科进度失败')); } finally { setBusy(''); }
   };
   const saveMistake = async () => {
-    if (!organizationId || !applicationId || (!mistakeFile && !mistakeText.trim())) return;
+    if (!organizationId || !applicationId || (!mistakeFiles.length && !mistakeText.trim())) return;
     setBusy('mistake');
     try {
-      const image = mistakeFile ? await compressStudyImage(mistakeFile) : undefined;
-      const created = await importStudyMistake(organizationId, applicationId, { problemText: mistakeText.trim(), image, knowledgeSummary: '', cause: mistakeCause, notes: mistakeNotes.trim(), correctAnswer: '', similarProblemTypes: [] }, activeSubject, studentDashboard?.profile.grade_stage || 'high_2');
+      const inputs = mistakeFiles.length ? mistakeFiles : [null];
+      const created = [] as StudyMistake[];
+      for (const file of inputs) {
+        const image = file ? await compressStudyImage(file, mistakeRotation) : undefined;
+        created.push(await importStudyMistake(organizationId, applicationId, { problemText: mistakeText.trim(), image, knowledgeSummary: '', cause: mistakeCause, notes: mistakeNotes.trim(), correctAnswer: '', similarProblemTypes: [] }, activeSubject, studentDashboard?.profile.grade_stage || 'high_2'));
+      }
       const today = localDateKey();
       const visibleInCurrentFilter = mistakeFilter === 'all'
         || mistakeFilter === 'week'
         || (mistakeFilter === 'date' && mistakeDate === today)
         || (mistakeFilter === 'month' && mistakeMonth === today.slice(0, 7));
-      if (visibleInCurrentFilter) setMistakes((items) => [created, ...items]);
+      if (visibleInCurrentFilter) setMistakes((items) => [...created, ...items]);
       setCheckInSummary(await getMistakeCheckInSummary(organizationId, applicationId, activeSubject));
-      setMistakeOpen(false); setMistakeFile(null); setMistakeUrl(''); setMistakeText(''); setMistakeNotes('');
-      message.success('错题已收好，今日打卡完成');
+      setMistakeOpen(false); setMistakeFiles([]); setMistakeUrl(''); setMistakeRotation(0); setMistakeText(''); setMistakeNotes('');
+      message.success(created.length > 1 ? `已批量录入 ${created.length} 道错题` : '错题已收好，今日打卡完成');
       await reload();
     }
     catch (error) { message.error(errorText(error, '录入错题失败')); } finally { setBusy(''); }
@@ -443,15 +465,15 @@ export default function StudyWithMethodPage() {
   if (!organizationId || !applicationId) return <Empty description="请选择组织后打开学之有道" />;
   if (loading || !dashboard || !catalog) return <div className="swm-page swm-loading"><Skeleton active paragraph={{ rows: 7 }} /></div>;
   if (dashboard.mode === 'onboarding') return <Onboarding catalog={catalog} saving={saving} onSave={saveProfile} />;
-  if (dashboard.mode === 'guardian') return <main className="swm-page swm-guardian"><span className="swm-eyebrow">家长只读视图</span><h1>看见进步，不打扰过程</h1><p>这里只展示学习趋势与建议，不公开题目图片、对话和逐题操作。</p>{dashboard.reports.map((report: WeeklyReport) => <article className="swm-subject-report" key={report.id}><Tag>{subjectLabels[report.subject]}</Tag><strong>{report.summary}</strong><p>{report.next_week_advice}</p></article>)}</main>;
+  if (dashboard.mode === 'guardian') return <main className="swm-page swm-guardian"><span className="swm-eyebrow">家长只读视图</span><h1>看见进步，不打扰过程</h1><p>这里只展示学习趋势与建议，不公开题目图片、对话和逐题操作。</p><div className="swm-guardian-trends">{dashboard.trends.map((item) => <article key={item.student_name}><strong>{item.student_name}</strong><span>近 7 日完成 {item.seven_day.completion_rate}%</span><span>练习正确 {item.seven_day.correct_rate}%</span><span>完成复习 {item.seven_day.reviews_completed} 次</span></article>)}</div>{dashboard.reports.map((report: WeeklyReport) => <article className="swm-subject-report" key={report.id}><Tag>{subjectLabels[report.subject]}</Tag><strong>{report.summary}</strong><p>{report.next_week_advice}</p></article>)}</main>;
 
   return <div className="swm-page">
     {showApplicationHeader && <header className="swm-platform-header"><Button type="text" icon={<ArrowLeft size={18} />} onClick={() => navigate('/apps')}>应用中心</Button><div className="swm-wordmark"><Compass size={20} />学之有道</div></header>}
     <main className="swm-student-shell">
       <header className="swm-mobile-header"><div><span className="swm-eyebrow">{gradeLabels[dashboard.profile.grade_stage]} · {dashboard.profile.enrollments.length} 门学科</span><h1>{tab === 'today' ? `今天也稳稳向前，${dashboard.profile.display_name || dashboard.profile.student_name}` : navItems.find((item) => item.key === tab)?.label}</h1></div><div className="swm-logo"><Compass size={24} /></div></header>
       {tab === 'today' && <TodayView dashboard={dashboard} onTutor={openTutor} onReview={() => openReviewModule('due', dashboard.due_reviews[0]?.subject)} onOpenModule={openReviewModule} onMethodology={() => setMethodologyOpen(true)} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
-      {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || answerCardCurricula[activeSubject] || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
-      {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} reviews={reviews} setReviews={setReviews} filterMode={mistakeFilter} mistakeDate={mistakeDate} mistakeMonth={mistakeMonth} onFilterChange={changeMistakeFilter} onDateChange={changeMistakeDate} onMonthChange={changeMistakeMonth} loading={mistakesLoading} checkInSummary={checkInSummary} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
+      {tab === 'tutor' && <TutorView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} activeEnrollment={activeEnrollment} activeTutor={activeTutor} tutors={tutors} sessions={sessions} tutorMode={tutorMode} setTutorMode={setTutorMode} conversationId={conversationId} setConversationId={setConversationId} activeProblem={activeProblem} busy={busy} photoUrl={photoUrl} photoRotation={photoRotation} setPhotoRotation={setPhotoRotation} photoProblemText={photoProblemText} setPhotoProblemText={setPhotoProblemText} photoInput={photoInput} choosePhoto={choosePhoto} startPhoto={startPhoto} startChat={startChat} recordPhotoResult={recordPhotoResult} draftRequest={draftRequest} setDraftRequest={setDraftRequest} openEnrollment={() => { setCurriculumVersion(activeEnrollment?.curriculum_version || answerCardCurricula[activeSubject] || '通用高中课程'); setCurrentChapter(activeEnrollment?.current_chapter || ''); setEnrollmentOpen(true); }} />}
+      {tab === 'mistakes' && <MistakesView catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} mistakes={mistakes} setMistakes={setMistakes} reviews={reviews} setReviews={setReviews} filterMode={mistakeFilter} mistakeDate={mistakeDate} mistakeMonth={mistakeMonth} onFilterChange={changeMistakeFilter} onDateChange={changeMistakeDate} onMonthChange={changeMistakeMonth} loading={mistakesLoading} checkInSummary={checkInSummary} open={() => setMistakeOpen(true)} onTutor={(subject) => openTutor('chat', subject)} organizationId={organizationId} applicationId={applicationId} />}
       {tab === 'review' && <ReviewView dashboard={dashboard} catalog={catalog} enabledSubjects={enabledSubjects} activeSubject={activeSubject} setActiveSubject={setActiveSubject} reviews={reviews} setReviews={setReviews} mistakes={mistakes} setMistakes={setMistakes} reviewMode={reviewMode} setReviewMode={setReviewMode} onTopicTutor={openTopicTutor} organizationId={organizationId} applicationId={applicationId} reload={reload} />}
       {tab === 'me' && <ProfileView dashboard={dashboard} reportSummary={reportSummary} setReportSummary={setReportSummary} guardians={guardians} setGuardians={setGuardians} organizationId={organizationId} applicationId={applicationId} setActiveSubject={setActiveSubject} onEditProfile={openProfileSettings} openEnrollment={(item) => { setActiveSubject(item.subject); setCurriculumVersion(item.curriculum_version || answerCardCurricula[item.subject] || '通用高中课程'); setCurrentChapter(item.current_chapter); setEnrollmentOpen(true); }} reload={reload} />}
     </main>
@@ -466,7 +488,7 @@ export default function StudyWithMethodPage() {
       okButtonProps={{ disabled: profileSubjects.length < 1 || profileFocus.length < 1 }}
       onCancel={() => setProfileSettingsOpen(false)}
       onOk={async () => {
-        const saved = await saveProfile({ grade: profileGrade, subjects: profileSubjects, focus: profileFocus, minutes: profileMinutes });
+        const saved = await saveProfile({ grade: profileGrade, subjects: profileSubjects, focus: profileFocus, minutes: profileMinutes, weeklyMinutes: profileWeeklyMinutes, examDate: profileExamDate, targetScore: profileTargetScore ? Number(profileTargetScore) : null });
         if (saved) setProfileSettingsOpen(false);
       }}
     >
@@ -475,9 +497,14 @@ export default function StudyWithMethodPage() {
         <fieldset><legend>在学科目</legend><div className="swm-modal-subject-grid">{catalog.subjects.map((item) => <button type="button" key={item.value} className={profileSubjects.includes(item.value) ? 'active' : ''} onClick={() => { setProfileSubjects((current) => current.includes(item.value) ? current.length > 1 ? current.filter((value) => value !== item.value) : current : [...current, item.value]); setProfileFocus((current) => current.filter((value) => value !== item.value)); }}>{item.label}</button>)}</div></fieldset>
         <fieldset><legend>重点科（1–3 门）</legend><div className="swm-modal-choice-row">{profileSubjects.map((subject) => <button type="button" key={subject} className={profileFocus.includes(subject) ? 'active' : ''} onClick={() => setProfileFocus((current) => current.includes(subject) ? current.length > 1 ? current.filter((value) => value !== subject) : current : current.length < 3 ? [...current, subject] : current)}>{subjectLabels[subject]}</button>)}</div></fieldset>
         <fieldset><legend>每日全科总时长：{profileMinutes} 分钟</legend><Slider min={15} max={120} step={5} value={profileMinutes} onChange={setProfileMinutes} /></fieldset>
+        <fieldset><legend>每周可投入：{profileWeeklyMinutes} 分钟</legend><Slider min={60} max={840} step={15} value={profileWeeklyMinutes} onChange={setProfileWeeklyMinutes} /></fieldset>
+        <div className="swm-goal-fields">
+          <label htmlFor="swm-exam-date"><span>目标考试日期</span><input id="swm-exam-date" type="date" value={profileExamDate} min={localDateKey()} onChange={(event) => setProfileExamDate(event.target.value)} /></label>
+          <label htmlFor="swm-target-score"><span>目标分数</span><Input id="swm-target-score" type="number" min={0} max={150} value={profileTargetScore} placeholder="例如 120" onChange={(event) => setProfileTargetScore(event.target.value)} /></label>
+        </div>
       </div>
     </Modal>
-    <Modal title={`录入${subjectLabels[activeSubject]}错题`} open={mistakeOpen} okText="保存并安排复习" cancelText="取消" confirmLoading={busy === 'mistake'} okButtonProps={{ disabled: !mistakeFile && !mistakeText.trim() }} onOk={() => void saveMistake()} onCancel={() => setMistakeOpen(false)}><div className="swm-mistake-form">{mistakeUrl ? <div className="swm-mistake-preview"><img src={mistakeUrl} alt="待录入错题" /><Button onClick={() => mistakeInput.current?.click()}>重新选择</Button></div> : <button type="button" className="swm-upload-tile" onClick={() => mistakeInput.current?.click()}><ImagePlus /><strong>拍照或选择题图</strong><small>可使用相机，也可从相册选择</small></button>}<input ref={mistakeInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { if (mistakeUrl) URL.revokeObjectURL(mistakeUrl); setMistakeFile(file); setMistakeUrl(URL.createObjectURL(file)); } event.target.value = ''; }} /><div><strong>主要错因</strong><div className="swm-cause-grid">{causeOptions.map(([value, label]) => <button type="button" key={value} className={mistakeCause === value ? 'active' : ''} onClick={() => setMistakeCause(value)}>{label}</button>)}</div></div><Collapse ghost items={[{ key: 'more', label: '没有题图或想补充说明', children: <div className="swm-extra-fields"><label>题目文字<Input.TextArea value={mistakeText} onChange={(event) => setMistakeText(event.target.value)} rows={3} /></label><label>补充说明<Input.TextArea value={mistakeNotes} onChange={(event) => setMistakeNotes(event.target.value)} rows={2} /></label></div> }]} /></div></Modal>
+    <Modal title={`录入${subjectLabels[activeSubject]}错题`} open={mistakeOpen} okText="保存并安排复习" cancelText="取消" confirmLoading={busy === 'mistake'} okButtonProps={{ disabled: !mistakeFiles.length && !mistakeText.trim() }} onOk={() => void saveMistake()} onCancel={() => setMistakeOpen(false)}><div className="swm-mistake-form">{mistakeUrl ? <div className="swm-mistake-preview"><img src={mistakeUrl} alt="待录入错题" style={{ transform: `rotate(${mistakeRotation}deg)` }} /><span>{mistakeFiles.length > 1 ? `已选择 ${mistakeFiles.length} 张，将批量录入` : '已选择 1 张'}</span><div><Button icon={<RotateCcw size={16} />} onClick={() => setMistakeRotation((value) => (value + 90) % 360)}>旋转 90°</Button><Button onClick={() => mistakeInput.current?.click()}>重新选择</Button></div></div> : <button type="button" className="swm-upload-tile" onClick={() => mistakeInput.current?.click()}><ImagePlus /><strong>拍照或批量选择题图</strong><small>支持 JPG、PNG、WebP，可一次选择多张</small></button>}<input ref={mistakeInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(event) => { const files = Array.from(event.target.files || []); if (files.length) { if (mistakeUrl) URL.revokeObjectURL(mistakeUrl); setMistakeFiles(files); setMistakeRotation(0); setMistakeUrl(URL.createObjectURL(files[0])); } event.target.value = ''; }} /><div><strong>主要错因</strong><div className="swm-cause-grid">{causeOptions.map(([value, label]) => <button type="button" key={value} className={mistakeCause === value ? 'active' : ''} onClick={() => setMistakeCause(value)}>{label}</button>)}</div></div><Collapse ghost items={[{ key: 'more', label: '没有题图或想补充说明', children: <div className="swm-extra-fields"><label>题目文字<Input.TextArea value={mistakeText} onChange={(event) => setMistakeText(event.target.value)} rows={3} /></label><label>补充说明<Input.TextArea value={mistakeNotes} onChange={(event) => setMistakeNotes(event.target.value)} rows={2} /></label></div> }]} /></div></Modal>
     <Modal title="学习方法" open={methodologyOpen} footer={null} width={760} getContainer={false} rootClassName="swm-methodology-modal" onCancel={() => setMethodologyOpen(false)}>
       <StudyMethodologyCenter
         storageKey={`study-methodology:${dashboard.profile.id}`}
@@ -490,7 +517,23 @@ export default function StudyWithMethodPage() {
 
 function TodayView({ dashboard, onTutor, onReview, onOpenModule, onMethodology, organizationId, applicationId, reload }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; onTutor: (mode: 'photo' | 'chat', subject?: StudySubject) => void; onReview: () => void; onOpenModule: (mode: ReviewMode, subject?: StudySubject) => void; onMethodology: () => void; organizationId: string; applicationId: string; reload: () => Promise<void> }) {
   const resolvedCount = dashboard.tasks.filter((item) => item.status !== 'pending').length;
-  return <section className="swm-view"><article className="swm-hero-card"><div><span>今日进度</span><h2>{resolvedCount} / {dashboard.tasks.length} 项</h2><p>重点科：{dashboard.profile.focus_subjects.map((item) => subjectLabels[item]).join('、')}</p></div><Progress type="circle" size={82} strokeColor="#e9c46a" trailColor="rgba(255,255,255,.18)" percent={dashboard.tasks.length ? Math.round(100 * resolvedCount / dashboard.tasks.length) : 0} /></article>{dashboard.due_review_count > 0 && <button type="button" className="swm-due-review" onClick={onReview}><RefreshCcw aria-hidden="true" /><span><strong>先复习到期错题</strong><small>{dashboard.due_review_count} 道题已到复习时间，完成后再开始新任务</small></span><ChevronRight aria-hidden="true" /></button>}<div className="swm-quick-start"><button type="button" onClick={() => onTutor('photo')}><span><Camera size={24} /></span><div><strong>拍题问老师</strong><small>拍下题目，直接开始辅导</small></div><ChevronRight /></button><button type="button" onClick={() => onTutor('chat')}><span><MessageCircle size={24} /></span><div><strong>和老师聊聊</strong><small>选一位学科老师自由提问</small></div><ChevronRight /></button></div><LearningActionCards dashboard={dashboard} onOpen={onOpenModule} /><MethodologyEntry mistakeCount={dashboard.mistake_count} dueReviewCount={dashboard.due_review_count} onOpen={onMethodology} /><div className="swm-section-title"><div><span className="swm-eyebrow">按重点科优先轮换</span><h2>今日学习</h2></div><Tag>{dashboard.tasks.reduce((sum, item) => sum + item.duration_minutes, 0)} 分钟</Tag></div><div className="swm-task-list">{dashboard.tasks.map((task) => <article className={`swm-task ${task.status !== 'pending' ? 'is-done' : ''}`} key={task.id}><button type="button" className="swm-task-check" aria-label={`${task.status === 'completed' ? '已完成' : task.status === 'skipped' ? '已跳过' : '完成'}${task.title}`} disabled={task.status !== 'pending'} onClick={async () => { await updateStudyTask(organizationId, applicationId, task.id, 'completed'); await reload(); }}>{task.status === 'completed' && <Check size={17} />}</button><div><span>{subjectLabels[task.subject]} · {task.duration_minutes} 分钟{task.status === 'skipped' ? ' · 已跳过' : ''}</span><h3>{task.title}</h3></div><div className="swm-task-actions">{task.status === 'pending' && <button type="button" className="swm-task-skip" onClick={async () => { await updateStudyTask(organizationId, applicationId, task.id, 'skipped'); await reload(); }}>跳过</button>}<button type="button" className="swm-task-start" aria-label={`开始${task.title}`} onClick={() => onTutor('chat', task.subject)}><ChevronRight size={19} /></button></div></article>)}</div><div className="swm-insights"><article><BookOpenCheck /><strong>{dashboard.mistake_count}</strong><span>累计错题</span></article><article><RefreshCcw /><strong>{dashboard.due_review_count}</strong><span>到期复习</span></article><article><Sparkles /><strong>{dashboard.masteries[0]?.score ?? 0}%</strong><span>薄弱点掌握</span></article></div></section>;
+  const diagnosticDone = dashboard.diagnostic.status === 'completed';
+  const sortedTasks = [...dashboard.tasks].sort((a, b) => (
+    (a.metadata.priority === 'must_do' ? 0 : 1) - (b.metadata.priority === 'must_do' ? 0 : 1)
+  ));
+  return <section className="swm-view">
+    <article className="swm-hero-card"><div><span>今日进度</span><h2>{resolvedCount} / {dashboard.tasks.length} 项</h2><p>重点科：{dashboard.profile.focus_subjects.map((item) => subjectLabels[item]).join('、')}</p></div><Progress type="circle" size={82} strokeColor="#e9c46a" trailColor="rgba(255,255,255,.18)" percent={dashboard.tasks.length ? Math.round(100 * resolvedCount / dashboard.tasks.length) : 0} /></article>
+    <article className="swm-recommendation-card"><span className="swm-eyebrow">系统建议下一步</span><h2>{dashboard.recommended_action.title}</h2><p>{dashboard.recommended_action.reason}</p><Button type="primary" onClick={() => dashboard.recommended_action.kind === 'review' ? onReview() : dashboard.recommended_action.kind === 'diagnostic' ? document.getElementById('swm-diagnostic-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : onTutor('chat', dashboard.recommended_action.subject)}>现在开始</Button></article>
+    {!diagnosticDone && <DiagnosticPanel initial={dashboard.diagnostic} subjects={dashboard.profile.focus_subjects} organizationId={organizationId} applicationId={applicationId} onCompleted={reload} />}
+    {dashboard.due_review_count > 0 && <button type="button" className="swm-due-review" onClick={onReview}><RefreshCcw aria-hidden="true" /><span><strong>先复习到期错题</strong><small>{dashboard.due_review_count} 道题已到复习时间，完成后再开始新任务</small></span><ChevronRight aria-hidden="true" /></button>}
+    <div className="swm-quick-start"><button type="button" onClick={() => onTutor('photo')}><span><Camera size={24} aria-hidden="true" /></span><div><strong>拍题问老师</strong><small>拍下题目，直接开始辅导</small></div><ChevronRight aria-hidden="true" /></button><button type="button" onClick={() => onTutor('chat')}><span><MessageCircle size={24} aria-hidden="true" /></span><div><strong>和老师聊聊</strong><small>选一位学科老师自由提问</small></div><ChevronRight aria-hidden="true" /></button></div>
+    <LearningActionCards dashboard={dashboard} onOpen={onOpenModule} />
+    <MethodologyEntry mistakeCount={dashboard.mistake_count} dueReviewCount={dashboard.due_review_count} onOpen={onMethodology} />
+    <div className="swm-section-title"><div><span className="swm-eyebrow">必须完成优先，其余量力而行</span><h2>今日学习</h2></div><Tag>{dashboard.tasks.reduce((sum, item) => sum + item.duration_minutes, 0)} 分钟</Tag></div>
+    <div className="swm-task-list">{sortedTasks.map((task) => <article className={`swm-task ${task.status !== 'pending' ? 'is-done' : ''}`} key={task.id}><button type="button" className="swm-task-check" aria-label={`${task.status === 'completed' ? '已完成' : task.status === 'skipped' ? '已跳过' : '完成'}${task.title}`} disabled={task.status !== 'pending'} onClick={async () => { await updateStudyTask(organizationId, applicationId, task.id, 'completed'); await reload(); }}>{task.status === 'completed' && <Check size={17} aria-hidden="true" />}</button><div><span>{subjectLabels[task.subject]} · {task.duration_minutes} 分钟 · {task.metadata.priority === 'must_do' ? '今日必须' : '有余力再做'}{task.status === 'skipped' ? ' · 已跳过' : ''}</span><h3>{task.title}</h3><small>{String(task.metadata.recommendation_reason || '')}</small></div><div className="swm-task-actions">{task.status === 'pending' && <button type="button" className="swm-task-skip" onClick={async () => { await updateStudyTask(organizationId, applicationId, task.id, 'skipped'); await reload(); }}>跳过</button>}<button type="button" className="swm-task-start" aria-label={`开始${task.title}`} onClick={() => task.task_type === 'weekly_quiz' ? onOpenModule('quiz', task.subject) : onTutor('chat', task.subject)}><ChevronRight size={19} aria-hidden="true" /></button></div></article>)}</div>
+    <StudyTrendSummary sevenDay={dashboard.trends.seven_day} thirtyDay={dashboard.trends.thirty_day} />
+    <div className="swm-insights"><article><BookOpenCheck aria-hidden="true" /><strong>{dashboard.mistake_count}</strong><span>累计错题</span></article><article><RefreshCcw aria-hidden="true" /><strong>{dashboard.due_review_count}</strong><span>到期复习</span></article><article><Sparkles aria-hidden="true" /><strong>{dashboard.masteries[0]?.score ?? 0}%</strong><span>薄弱点掌握</span></article></div>
+  </section>;
 }
 
 function TutorView(props: {
@@ -509,6 +552,10 @@ function TutorView(props: {
   activeProblem: StudyProblem | null;
   busy: string;
   photoUrl: string;
+  photoRotation: number;
+  setPhotoRotation: Dispatch<SetStateAction<number>>;
+  photoProblemText: string;
+  setPhotoProblemText: Dispatch<SetStateAction<string>>;
   photoInput: MutableRefObject<HTMLInputElement | null>;
   choosePhoto: (file?: File) => void;
   startPhoto: () => Promise<void>;
@@ -544,8 +591,10 @@ function TutorView(props: {
   if (p.tutorMode === 'photo') {
     content = <div className="swm-photo-flow">
       {p.photoUrl ? <>
-        <div className="swm-photo-preview"><img src={p.photoUrl} alt="待发送题目" /></div>
+        <div className="swm-photo-preview"><img src={p.photoUrl} alt="待发送题目" style={{ transform: `rotate(${p.photoRotation}deg)` }} /></div>
+        <label className="swm-photo-text"><span>题目文字（可选）</span><Input.TextArea rows={3} value={p.photoProblemText} placeholder="可粘贴 OCR 结果或手动确认题干，能减少识别误差" onChange={(event) => p.setPhotoProblemText(event.target.value)} /></label>
         <div className="swm-photo-actions">
+          <Button icon={<RotateCcw size={16} />} onClick={() => p.setPhotoRotation((value) => (value + 90) % 360)}>旋转 90°</Button>
           <Button onClick={() => p.photoInput.current?.click()}>重新选择</Button>
           <Button
             type="primary"
@@ -659,7 +708,7 @@ function TutorView(props: {
 }
 
 function MistakesView({
-  catalog, enabledSubjects, activeSubject, setActiveSubject, mistakes, reviews, setReviews,
+  catalog, enabledSubjects, activeSubject, setActiveSubject, mistakes, setMistakes, reviews, setReviews,
   filterMode, mistakeDate, mistakeMonth, onFilterChange, onDateChange, onMonthChange,
   loading, checkInSummary, open, onTutor, organizationId, applicationId,
 }: {
@@ -668,6 +717,7 @@ function MistakesView({
   activeSubject: StudySubject;
   setActiveSubject: (value: StudySubject) => void;
   mistakes: StudyMistake[];
+  setMistakes: Dispatch<SetStateAction<StudyMistake[]>>;
   reviews: StudyReview[];
   setReviews: Dispatch<SetStateAction<StudyReview[]>>;
   filterMode: MistakeFilterMode;
@@ -685,7 +735,13 @@ function MistakesView({
 }) {
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [masteredIds, setMasteredIds] = useState<string[]>([]);
-  const filtered = mistakes.filter((item) => item.subject === activeSubject && !masteredIds.includes(item.id));
+  const [search, setSearch] = useState('');
+  const [cause, setCause] = useState('');
+  const filtered = mistakes.filter((item) => item.subject === activeSubject
+    && !masteredIds.includes(item.id)
+    && (!cause || item.cause === cause)
+    && (!search.trim() || [item.problem.confirmed_text, item.problem.original_text, item.knowledge_summary, item.notes]
+      .some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))));
   const today = localDateKey();
   const activeCheckInSummary = checkInSummary?.subject === activeSubject ? checkInSummary : null;
   const weekDates = currentWeekDateKeys();
@@ -698,7 +754,7 @@ function MistakesView({
   const markMastered = async (mistake: StudyMistake) => {
     const review = reviews.find((item) => item.mistake.id === mistake.id);
     if (review) {
-      await completeStudyReview(organizationId, applicationId, review.id, true);
+      await completeStudyReview(organizationId, applicationId, review.id, 'good');
       setReviews((items) => items.filter((item) => item.id !== review.id));
     }
     setMasteredIds((items) => [...items, mistake.id]);
@@ -708,6 +764,7 @@ function MistakesView({
     <SubjectChips catalog={catalog} selected={activeSubject} enabled={enabledSubjects} onChange={(subject) => { setActiveSubject(subject); setOpenedId(null); }} />
     <div className="swm-section-title"><div><span className="swm-eyebrow">错题不是终点</span><h2>错题再战</h2></div><Button type="primary" icon={<Camera size={17} />} onClick={open}>拍照录入</Button></div>
     <p className="swm-section-description">新增一道错题即完成当天打卡；先遮住解析再做一次，逐步把错题变成会做的题。</p>
+    <div className="swm-mistake-search"><Input allowClear prefix={<Search size={17} aria-hidden="true" />} aria-label="搜索错题" placeholder="搜索题干、知识点或笔记" value={search} onChange={(event) => setSearch(event.target.value)} /><Select aria-label="按错因筛选" value={cause || undefined} allowClear placeholder="全部错因" options={causeOptions.map(([value, label]) => ({ value, label }))} onChange={(value) => setCause(value || '')} /></div>
     <article className="swm-week-check-in" aria-label={`本周已打卡 ${checkedThisWeek} 天`}>
       <div className="swm-week-check-in-heading">
         <span className="swm-check-in-icon"><Flame size={22} aria-hidden="true" /></span>
@@ -752,6 +809,7 @@ function MistakesView({
           <div className="swm-answer-panel"><span className="swm-eyebrow">解析与复盘要点</span><p>{answer || '这道题暂时没有文字解析，可以继续问老师，或根据题图回忆正确步骤。'}</p></div>
           <div className="swm-battle-actions">
             <Button onClick={() => onTutor(mistake.subject)}>继续问老师</Button>
+            <Button icon={<Archive size={16} />} onClick={async () => { await updateStudyMistake(organizationId, applicationId, mistake.id, { is_archived: true }); setMistakes((items) => items.filter((item) => item.id !== mistake.id)); message.success('已归档，可通过接口按归档状态查询'); }}>归档</Button>
             <Button onClick={() => { setOpenedId(null); message.info('已保留在错题再战列表'); }}>还不会</Button>
             <Button type="primary" onClick={() => void markMastered(mistake)}>已经会做</Button>
           </div>
@@ -842,7 +900,7 @@ function KnowledgeAnswerCardPanel({ activeSubject, organizationId, applicationId
     <div className="swm-module-progress"><span>{card.knowledge_point_name}</span><span>{answered} / {card.questions.length}</span></div>
     <Progress percent={Math.round((answered / card.questions.length) * 100)} showInfo={false} />
     <div className="swm-quick-question"><span>第 {questionIndex + 1} 题 · {question.difficulty === 'basic' ? '基础' : question.difficulty === 'medium' ? '中等' : '提高'}</span><QuizMarkdown>{question.stem}</QuizMarkdown></div>
-    <div className="swm-answer-options">{question.options.map((option) => <button type="button" key={option.id} className={answers[question.id] === option.id ? 'selected' : ''} onClick={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}><b>{option.id}</b><QuizMarkdown>{option.text}</QuizMarkdown></button>)}</div>
+    <div className="swm-answer-options">{question.options.map((option) => <button type="button" key={option.id} className={answers[question.id] === option.id ? 'selected' : ''} aria-pressed={answers[question.id] === option.id} onClick={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}><b>{option.id}</b><QuizMarkdown>{option.text}</QuizMarkdown></button>)}</div>
     <div className="swm-quiz-pagination">{card.questions.map((item, index) => <button type="button" key={item.id} className={`${index === questionIndex ? 'active' : ''} ${answers[item.id] ? 'answered' : ''}`} aria-label={`查看第 ${index + 1} 题`} aria-current={index === questionIndex ? 'step' : undefined} onClick={() => setQuestionIndex(index)}>{index + 1}</button>)}</div>
     <div className="swm-battle-actions"><Button disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)}>上一题</Button>{questionIndex < card.questions.length - 1 && <Button type="primary" onClick={() => setQuestionIndex((value) => value + 1)}>下一题</Button>}</div>
     {answered === card.questions.length && <Button type="primary" size="large" block loading={submitting} onClick={async () => {
@@ -885,7 +943,12 @@ function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setAct
   const enrollment = dashboard.profile.enrollments.find((item) => item.subject === activeSubject);
   const rateFlashcard = async (_mistakeId: string, reviewId: string | undefined, rating: FlashcardRating) => {
     if (reviewId) {
-      await completeStudyReview(organizationId, applicationId, reviewId, rating === 'remembered');
+      await completeStudyReview(
+        organizationId,
+        applicationId,
+        reviewId,
+        rating === 'remembered' ? 'good' : rating === 'vague' ? 'hard' : 'again',
+      );
       setReviews((items) => items.filter((item) => item.id !== reviewId));
     }
     message.success(rating === 'remembered' ? '已记住，复习间隔会自动延长' : '已加入近期巩固');
@@ -904,8 +967,8 @@ function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setAct
   return <section className="swm-view">
     <SubjectChips catalog={catalog} selected={activeSubject} enabled={enabledSubjects} onChange={setActiveSubject} />
     <ReviewModulePicker active={reviewMode} dueCount={filtered.length} onChange={setReviewMode} />
-    {reviewMode === 'due' && <div className="swm-module-content"><div className="swm-section-title"><div><span className="swm-eyebrow">1 · 3 · 7 · 14 天</span><h2>今天到期的复习</h2></div></div>{filtered.map((review) => <article className="swm-review-card" key={review.id}><span className="swm-eyebrow">第 {review.completed_reviews + 1} 次复习</span><p>{review.mistake.problem.confirmed_text || review.mistake.problem.original_text || '查看题图后再做一次'}</p><div><Button onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, false); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>还不会</Button><Button type="primary" onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, true); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>这次做对了</Button></div></article>)}{!filtered.length && <Empty description="今天没有到期复习" />}</div>}
-    {reviewMode === 'quiz' && <div className="swm-module-content"><KnowledgeAnswerCardPanel activeSubject={activeSubject} organizationId={organizationId} applicationId={applicationId} onCompleted={refreshAfterAnswerCard} /></div>}
+    {reviewMode === 'due' && <div className="swm-module-content"><div className="swm-section-title"><div><span className="swm-eyebrow">根据每次表现动态安排</span><h2>今天到期的复习</h2></div></div>{filtered.map((review) => <article className="swm-review-card" key={review.id}><span className="swm-eyebrow">第 {review.completed_reviews + 1} 次复习 · 难度 {review.difficulty}/10</span><p>{review.mistake.problem.confirmed_text || review.mistake.problem.original_text || '查看题图后再做一次'}</p><div><Button onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, 'again'); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>不会</Button><Button onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, 'hard'); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>模糊</Button><Button type="primary" onClick={async () => { await completeStudyReview(organizationId, applicationId, review.id, 'good'); setReviews((items) => items.filter((item) => item.id !== review.id)); }}>会了</Button></div></article>)}{!filtered.length && <Empty description="今天没有到期复习" />}</div>}
+    {reviewMode === 'quiz' && <div className="swm-module-content swm-quiz-stack"><WeeklyQuizPanel subject={activeSubject} organizationId={organizationId} applicationId={applicationId} onCompleted={refreshAfterAnswerCard} /><div className="swm-section-title"><div><span className="swm-eyebrow">按知识点专项练习</span><h2>知识点答题卡</h2></div></div><KnowledgeAnswerCardPanel activeSubject={activeSubject} organizationId={organizationId} applicationId={applicationId} onCompleted={refreshAfterAnswerCard} /></div>}
     {reviewMode === 'cards' && <div className="swm-module-content"><FlashcardDeck subject={activeSubject} mistakes={mistakes} reviews={reviews} onRate={rateFlashcard} /></div>}
     {reviewMode === 'map' && <div className="swm-module-content">{mapLoading
       ? <Skeleton active paragraph={{ rows: 7 }} />
@@ -914,5 +977,5 @@ function ReviewView({ dashboard, catalog, enabledSubjects, activeSubject, setAct
 }
 
 function ProfileView({ dashboard, reportSummary, setReportSummary, guardians, setGuardians, organizationId, applicationId, onEditProfile, openEnrollment, reload }: { dashboard: Extract<StudyDashboard, { mode: 'student' }>; reportSummary: StudyReportSummary | null; setReportSummary: (value: StudyReportSummary | null) => void; guardians: GuardianLink[]; setGuardians: Dispatch<SetStateAction<GuardianLink[]>>; organizationId: string; applicationId: string; setActiveSubject: (value: StudySubject) => void; onEditProfile: () => void; openEnrollment: (item: Extract<StudyDashboard, { mode: 'student' }>['profile']['enrollments'][number]) => void; reload: () => Promise<void> }) {
-  return <section className="swm-view"><article className="swm-profile-card"><div className="swm-avatar">{(dashboard.profile.display_name || dashboard.profile.student_name).slice(0, 1)}</div><div><h2>{dashboard.profile.display_name || dashboard.profile.student_name}</h2><p>{gradeLabels[dashboard.profile.grade_stage]} · 每日 {dashboard.profile.daily_minutes} 分钟 · {dashboard.profile.enrollments.length} 科</p></div><Button onClick={onEditProfile}>学习设置</Button></article><div className="swm-section-title"><div><span className="swm-eyebrow">本周回顾</span><h2>学习周报</h2></div><Button onClick={async () => setReportSummary(await generateWeeklyReport(organizationId, applicationId))}>更新周报</Button></div>{reportSummary ? <ReportOverview summary={reportSummary} /> : <Empty description="开始学习后，这里会出现周报" />}<div className="swm-section-title"><div><span className="swm-eyebrow">渐进完善</span><h2>学科进度</h2></div></div><div className="swm-enrollment-list">{dashboard.profile.enrollments.map((item) => <button type="button" key={item.id} onClick={() => openEnrollment(item)}><span><strong>{item.subject_label}</strong><small>{item.current_chapter || '尚未选择当前章节'}</small></span><Tag color={item.setup_completed ? 'green' : 'default'}>{item.setup_completed ? '已完善' : '待完善'}</Tag><ChevronRight /></button>)}</div><div className="swm-section-title"><div><span className="swm-eyebrow">隐私友好的陪伴</span><h2>家长只读账号</h2></div><Button icon={<UserRoundPlus size={17} />} onClick={() => { let identifier = ''; Modal.confirm({ title: '关联家长账号', content: <Input aria-label="家长用户名或邮箱" placeholder="家长用户名或邮箱" onChange={(event) => { identifier = event.target.value; }} />, okText: '关联', cancelText: '取消', onOk: async () => { if (!identifier.trim()) throw new Error('请输入账号'); const link = await addGuardianLink(organizationId, applicationId, identifier.trim()); setGuardians((items) => [link, ...items.filter((item) => item.id !== link.id)]); } }); }}>添加</Button></div><div className="swm-guardian-list">{guardians.map((guardian) => <div key={guardian.id}><span><strong>{guardian.guardian_name}</strong><small>{guardian.guardian_email}</small></span><Button type="text" danger aria-label={`移除家长 ${guardian.guardian_name}`} icon={<Trash2 size={17} />} onClick={async () => { await removeGuardianLink(organizationId, applicationId, guardian.id); setGuardians((items) => items.filter((item) => item.id !== guardian.id)); }} /></div>)}</div><div className="swm-data-actions"><Button icon={<Download size={17} />} onClick={async () => { const data = await exportStudyData(organizationId, applicationId); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `学之有道-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); }}>导出学习数据</Button><Button danger icon={<Trash2 size={17} />} onClick={() => Modal.confirm({ title: '删除全部学习数据？', content: '学习档案、题图、计划、错题和周报将永久删除。', okText: '确认删除', okButtonProps: { danger: true }, onOk: async () => { await deleteStudyData(organizationId, applicationId); await reload(); } })}>删除我的数据</Button></div></section>;
+  return <section className="swm-view"><article className="swm-profile-card"><div className="swm-avatar">{(dashboard.profile.display_name || dashboard.profile.student_name).slice(0, 1)}</div><div><h2>{dashboard.profile.display_name || dashboard.profile.student_name}</h2><p>{gradeLabels[dashboard.profile.grade_stage]} · 每日 {dashboard.profile.daily_minutes} 分钟 · {dashboard.profile.enrollments.length} 科</p>{dashboard.profile.exam_date && <small>目标考试：{formatDate(dashboard.profile.exam_date)}{dashboard.profile.target_score ? ` · 目标 ${dashboard.profile.target_score} 分` : ''}</small>}</div><Button onClick={onEditProfile}>学习设置</Button></article><StudyTrendSummary sevenDay={dashboard.trends.seven_day} thirtyDay={dashboard.trends.thirty_day} /><div className="swm-section-title"><div><span className="swm-eyebrow">本周回顾</span><h2>学习周报</h2></div><Button onClick={async () => setReportSummary(await generateWeeklyReport(organizationId, applicationId))}>更新周报</Button></div>{reportSummary ? <ReportOverview summary={reportSummary} /> : <Empty description="开始学习后，这里会出现周报" />}<div className="swm-section-title"><div><span className="swm-eyebrow">渐进完善</span><h2>学科进度</h2></div></div><div className="swm-enrollment-list">{dashboard.profile.enrollments.map((item) => <button type="button" key={item.id} onClick={() => openEnrollment(item)}><span><strong>{item.subject_label}</strong><small>{item.current_chapter || '尚未选择当前章节'}</small></span><Tag color={item.setup_completed ? 'green' : 'default'}>{item.setup_completed ? '已完善' : '待完善'}</Tag><ChevronRight /></button>)}</div><div className="swm-section-title"><div><span className="swm-eyebrow">隐私友好的陪伴</span><h2>家长只读账号</h2></div><Button icon={<UserRoundPlus size={17} />} onClick={() => { let identifier = ''; Modal.confirm({ title: '关联家长账号', content: <Input aria-label="家长用户名或邮箱" placeholder="家长用户名或邮箱" onChange={(event) => { identifier = event.target.value; }} />, okText: '关联', cancelText: '取消', onOk: async () => { if (!identifier.trim()) throw new Error('请输入账号'); const link = await addGuardianLink(organizationId, applicationId, identifier.trim()); setGuardians((items) => [link, ...items.filter((item) => item.id !== link.id)]); } }); }}>添加</Button></div><div className="swm-guardian-list">{guardians.map((guardian) => <div key={guardian.id}><span><strong>{guardian.guardian_name}</strong><small>{guardian.guardian_email}</small></span><Button type="text" danger aria-label={`移除家长 ${guardian.guardian_name}`} icon={<Trash2 size={17} />} onClick={async () => { await removeGuardianLink(organizationId, applicationId, guardian.id); setGuardians((items) => items.filter((item) => item.id !== guardian.id)); }} /></div>)}</div><div className="swm-data-actions"><Button icon={<Download size={17} />} onClick={async () => { const data = await exportStudyData(organizationId, applicationId); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `学之有道-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); }}>导出学习数据</Button><Button danger icon={<Trash2 size={17} />} onClick={() => Modal.confirm({ title: '删除全部学习数据？', content: '学习档案、题图、计划、错题和周报将永久删除。', okText: '确认删除', okButtonProps: { danger: true }, onOk: async () => { await deleteStudyData(organizationId, applicationId); await reload(); } })}>删除我的数据</Button></div></section>;
 }
