@@ -322,6 +322,8 @@ function EmptyState({ icon: Icon, title, detail, action }: {
 export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, onBack }: CreationToolboxAppProps) {
   const [view, setView] = useState<ViewKey>('overview');
   const [mobileNav, setMobileNav] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [topics, setTopics] = useState<TopicIdea[]>([]);
@@ -344,6 +346,43 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
   const [folderStack, setFolderStack] = useState<FolderItem[]>([]);
   const currentFolder = folderStack[folderStack.length - 1] ?? null;
   const activeProjects = useMemo(() => projects.filter((item) => !item.archived_at), [projects]);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [view]);
+
+  useEffect(() => {
+    if (!mobileNav) return;
+    const media = window.matchMedia('(max-width: 960px)');
+    const sidebar = sidebarRef.current;
+    const main = mainRef.current;
+    if (!media.matches || !sidebar || !main) {
+      setMobileNav(false);
+      return;
+    }
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const wasInert = main.inert;
+    main.inert = true;
+    sidebar.querySelector<HTMLElement>('.ct-mobile-close')?.focus({ preventScroll: true });
+    const closeOnDesktop = () => { if (!media.matches) setMobileNav(false); };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setMobileNav(false); }
+      if (event.key !== 'Tab') return;
+      const buttons = Array.from(sidebar.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    media.addEventListener('change', closeOnDesktop);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      main.inert = wasInert;
+      media.removeEventListener('change', closeOnDesktop);
+      window.removeEventListener('keydown', handleKey);
+      if (media.matches) previous?.focus({ preventScroll: true });
+    };
+  }, [mobileNav]);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -469,17 +508,17 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
   }
 
   return (
-    <div className="ct-app">
-      <aside className={`ct-sidebar ${mobileNav ? 'is-open' : ''}`}>
+    <div className={`ct-app ${mobileNav ? 'ct-nav-open' : ''}`}>
+      <aside ref={sidebarRef} id="ct-navigation" className={`ct-sidebar ${mobileNav ? 'is-open' : ''}`} aria-label="创作工具箱导航">
         <div className="ct-brand"><span className="ct-brand-mark"><Clapperboard /></span><div><strong>创作工具箱</strong><small>CREATION STUDIO</small></div><button className="ct-icon-button ct-mobile-close" aria-label="关闭导航" onClick={() => setMobileNav(false)}><X /></button></div>
         <nav aria-label="创作工具导航">
-          {navItems.map(({ key, label, icon: Icon }) => <button key={key} className={view === key ? 'active' : ''} onClick={() => { setView(key); setMobileNav(false); }}><Icon aria-hidden="true" /><span>{label}</span>{key === 'projects' && projects.length > 0 && <b>{projects.length}</b>}</button>)}
+          {navItems.map(({ key, label, icon: Icon }) => <button key={key} className={view === key ? 'active' : ''} aria-current={view === key ? 'page' : undefined} onClick={() => { setView(key); setMobileNav(false); }}><Icon aria-hidden="true" /><span>{label}</span>{key === 'projects' && projects.length > 0 && <b>{projects.length}</b>}</button>)}
         </nav>
         <div className="ct-sidebar-status"><span><i /> 服务已连接</span><small>数据由 Agent Studio 安全托管</small></div>
       </aside>
       {mobileNav && <button className="ct-nav-scrim" aria-label="关闭导航" onClick={() => setMobileNav(false)} />}
-      <main className="ct-main">
-        <div className="ct-mobile-bar"><button className="ct-icon-button" aria-label="打开导航" onClick={() => setMobileNav(true)}><Menu /></button><span>创作工具箱</span></div>
+      <main ref={mainRef} className="ct-main">
+        <div className="ct-mobile-bar"><button className="ct-icon-button" aria-label="打开导航" aria-expanded={mobileNav} aria-controls="ct-navigation" onClick={() => setMobileNav(true)}><Menu /></button><span>{navItems.find((item) => item.key === view)?.label || '创作工具箱'}</span>{showHeader && <button className="ct-icon-button" aria-label="返回应用中心" onClick={onBack}><ArrowLeft /></button>}<button className="ct-icon-button" aria-label="刷新" onClick={() => void refreshAll()}><RefreshCw /></button></div>
         {showHeader && <header className="ct-app-header"><button className="ct-back" onClick={onBack}><ArrowLeft />应用中心</button><div /><button className="ct-icon-button" aria-label="刷新" onClick={() => void refreshAll()}><RefreshCw /></button></header>}
         <div className="ct-content">
           {error ? <EmptyState icon={Gauge} title="工作区暂时不可用" detail={error} action={<button className="ct-button primary" onClick={() => void refreshAll()}>重新加载</button>} /> : <>
@@ -536,6 +575,8 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
   const [selected, setSelected] = useState<string[]>([]);
   const [collapsedParents, setCollapsedParents] = useState<string[]>([]);
   const [currentId, setCurrentId] = useState(topics[0]?.id ?? '');
+  const topicListRef = useRef<HTMLElement>(null);
+  const topicDetailRef = useRef<HTMLElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [workType, setWorkType] = useState<WorkType>('image_text');
@@ -650,9 +691,18 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
       ? ids.filter((id) => id !== parentId)
       : [...ids, parentId]);
   };
+  const openTopic = (id: string) => {
+    setCurrentId(id);
+    if (window.matchMedia('(max-width: 960px)').matches) {
+      window.requestAnimationFrame(() => {
+        topicDetailRef.current?.scrollIntoView({ block: 'start' });
+        topicDetailRef.current?.focus({ preventScroll: true });
+      });
+    }
+  };
   const renderTopicRow = (item: TopicIdea, action?: ReactNode) => <article key={item.id} className={`${topicRowStateClassName(item.id, current?.id || '', selected)} ${item.parent ? 'child' : 'parent'}`.trim()}>
     <label className="ct-check"><input type="checkbox" aria-label={`选择选题：${item.title}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((ids) => toggleTopicSelection(ids, item.id, event.target.checked))} /><span aria-hidden="true" /></label>
-    <button className="ct-topic-main" onClick={() => setCurrentId(item.id)}><div><span className={`ct-status ${item.status}`}>{item.status_label}</span><strong>{item.title}</strong></div><p>{item.notes || '暂无创作角度或备注'}</p><footer><span>{item.source_name || '自主选题'}</span><span>{item.project_count} 个项目</span><span>{formatDate(item.updated_at)}</span></footer><div className="ct-tags">{item.tags.map((value) => <i key={value}>{value}</i>)}</div></button>
+    <button className="ct-topic-main" onClick={() => openTopic(item.id)}><div><span className={`ct-status ${item.status}`}>{item.status_label}</span><strong>{item.title}</strong></div><p>{item.notes || '暂无创作角度或备注'}</p><footer><span>{item.source_name || '自主选题'}</span><span>{item.project_count} 个项目</span><span>{formatDate(item.updated_at)}</span></footer><div className="ct-tags">{item.tags.map((value) => <i key={value}>{value}</i>)}</div></button>
     {action}
   </article>;
   const relatedProjects = current ? projects.filter((item) => item.topic === current.id) : [];
@@ -662,14 +712,14 @@ function TopicsView({ apiBasePath, requester, topics, recentTags, projects, publ
     <form className="ct-panel ct-quick-topic" onSubmit={create}><div><Lightbulb /><input name="title" required maxLength={240} aria-label="选题标题" placeholder="快速记录一个有价值的选题…" /><button type="button" className="ct-text-button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>{expanded ? '收起' : '补充详情'}</button><button className="ct-button primary" disabled={busy}><Plus />记录</button></div>{expanded && <section><label><span>创作角度 / 备注</span><textarea name="notes" rows={3} /></label><label><span>所属父选题</span><select name="parent"><option value="">新建父选题</option>{rootTopics.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label><span>来源名称</span><input name="source_name" /></label><label><span>来源链接</span><input name="source_url" type="url" /></label><label><span>标签（逗号分隔）</span><input name="tags" list="ct-recent-tags" /><datalist id="ct-recent-tags">{recentTags.map((item) => <option key={item} value={item} />)}</datalist></label><fieldset><legend>目标平台</legend><div className="ct-check-grid">{(Object.keys(platformLabels) as Platform[]).map((key) => <label key={key}><input type="checkbox" name="platforms" value={key} />{platformLabels[key]}</label>)}</div></fieldset></section>}</form>
     <div className="ct-filterbar"><label><Search /><input list="ct-topic-suggestions" value={search} onChange={(event) => dispatchFilters({ type: 'search', value: event.target.value })} placeholder="搜索标题、来源、备注或标签" /><datalist id="ct-topic-suggestions">{topics.slice(0, 20).map((item) => <option key={item.id} value={item.title} />)}</datalist></label><select aria-label="按状态筛选" value={status} onChange={(event) => dispatchFilters({ type: 'status', value: event.target.value as TopicStatus | '' })}><option value="">全部状态</option>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><select aria-label="按标签筛选" value={tag} onChange={(event) => dispatchFilters({ type: 'tag', value: event.target.value })}><option value="">全部标签</option>{recentTags.map((item) => <option key={item}>{item}</option>)}</select><div className="ct-segmented"><button className={layout === 'list' ? 'active' : ''} onClick={() => dispatchFilters({ type: 'layout', value: 'list' })}>列表</button><button className={layout === 'cards' ? 'active' : ''} onClick={() => dispatchFilters({ type: 'layout', value: 'cards' })}>卡片</button></div></div>
     {selected.length > 0 && <div className="ct-bulkbar"><strong>已选 {selected.length} 项</strong><select defaultValue="" aria-label="批量更改状态" onChange={(event) => { if (event.target.value) void bulk({ status: event.target.value }); }}><option value="">更改状态…</option>{Object.entries(topicStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><form onSubmit={(event) => { event.preventDefault(); const value = String(new FormData(event.currentTarget).get('tag') || '').trim(); if (value) void bulk({ add_tags: [value] }); }}><input name="tag" placeholder="添加标签" /><button className="ct-button small"><Tags />添加</button></form><button className="ct-text-button" onClick={() => setSelected([])}>取消选择</button></div>}
-    <div className="ct-topic-layout"><section className={`ct-topic-results ${layout}`}>{visibleRoots.length ? visibleRoots.map((parent) => {
+    <div className="ct-topic-layout"><section ref={topicListRef} tabIndex={-1} aria-label="选题列表" className={`ct-topic-results ${layout}`}>{visibleRoots.length ? visibleRoots.map((parent) => {
       const children = topics.filter((item) => item.parent === parent.id && visibleTopicIds.has(item.id));
       const forcedOpen = Boolean(search || status || tag);
       const isCollapsed = collapsedParents.includes(parent.id) && !forcedOpen;
       const collapseControl = children.length ? <button type="button" className={`ct-topic-collapse ${isCollapsed ? '' : 'open'}`} aria-label={isCollapsed ? `展开 ${parent.title} 的子选题` : `折叠 ${parent.title} 的子选题`} aria-expanded={!isCollapsed} aria-controls={`ct-topic-children-${parent.id}`} disabled={forcedOpen} onClick={() => toggleChildren(parent.id)}><ChevronRight aria-hidden="true" /><span>{children.length}</span></button> : null;
       return <div className="ct-topic-family" key={parent.id}>{renderTopicRow(parent, collapseControl)}{!isCollapsed && children.length > 0 && <div className="ct-topic-children" id={`ct-topic-children-${parent.id}`}>{children.map((item) => renderTopicRow(item))}</div>}</div>;
     }) : <div className="ct-panel"><EmptyState icon={Search} title="没有符合条件的选题" detail="调整搜索或筛选条件后重试。" /></div>}</section>
-      <aside className="ct-panel ct-topic-detail">{current ? <>
+      <aside ref={topicDetailRef} tabIndex={-1} aria-label="选题详情" className="ct-panel ct-topic-detail"><button className="ct-button ghost ct-mobile-only ct-topic-return" onClick={() => { topicListRef.current?.scrollIntoView({ block: 'start' }); topicListRef.current?.focus({ preventScroll: true }); }}><ArrowLeft />返回选题列表</button>{current ? <>
         <header><div><span className="ct-kicker">TOPIC DETAIL</span><h2>选题详情</h2>{current.parent && <button className="ct-parent-link" onClick={() => setCurrentId(current.parent || '')}><GitBranch />{current.parent_title}</button>}</div><button className="ct-icon-button danger" aria-label={current.project_count || current.child_count ? '归档选题' : '删除选题'} onClick={() => void remove(current)}>{current.project_count || current.child_count ? <Archive /> : <Trash2 />}</button></header>
         <div className="ct-detail-body">
           <form key={`edit-${current.id}`} className="ct-topic-edit" onSubmit={saveTopicDetails}>
