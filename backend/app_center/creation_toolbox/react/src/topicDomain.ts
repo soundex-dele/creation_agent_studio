@@ -12,6 +12,7 @@ export type TopicFilterAction =
   | { type: 'status'; value: TopicFilterStatus }
   | { type: 'tag'; value: string }
   | { type: 'layout'; value: 'list' | 'cards' }
+  | { type: 'reveal-created' }
   | { type: 'reset' };
 
 export const defaultTopicFilters: TopicFilterState = {
@@ -20,6 +21,7 @@ export const defaultTopicFilters: TopicFilterState = {
 
 export function topicFilterReducer(state: TopicFilterState, action: TopicFilterAction): TopicFilterState {
   if (action.type === 'reset') return defaultTopicFilters;
+  if (action.type === 'reveal-created') return { ...state, search: '', status: '', tag: '' };
   return { ...state, [action.type]: action.value };
 }
 
@@ -54,4 +56,25 @@ export function topicMatchesFilters(topic: SearchableTopic, filters: TopicFilter
   return matchesQuery
     && (!filters.status || topic.status === filters.status)
     && (!filters.tag || topic.tags.includes(filters.tag));
+}
+
+export function prependCreatedTopic<T extends { id: string }>(topics: T[], created: T): T[] {
+  return [created, ...topics.filter((topic) => topic.id !== created.id)];
+}
+
+export function toggleTopicSelection(selected: string[], topicId: string, checked: boolean): string[] {
+  if (checked) return selected.includes(topicId) ? selected : [...selected, topicId];
+  return selected.filter((id) => id !== topicId);
+}
+
+export function retainVisibleTopicSelection(selected: string[], visibleIds: string[]): string[] {
+  const visible = new Set(visibleIds);
+  const next = selected.filter((id) => visible.has(id));
+  return next.length === selected.length ? selected : next;
+}
+
+export function topicRowStateClassName(topicId: string, currentId: string, selected: string[]): string {
+  return [topicId === currentId ? 'active' : '', selected.includes(topicId) ? 'selected' : '']
+    .filter(Boolean)
+    .join(' ');
 }

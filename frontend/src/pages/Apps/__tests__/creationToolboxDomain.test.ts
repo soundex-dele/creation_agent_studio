@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultTopicFilters,
+  prependCreatedTopic,
+  retainVisibleTopicSelection,
   restoreTopicFilters,
+  toggleTopicSelection,
   topicFilterReducer,
   topicMatchesFilters,
+  topicRowStateClassName,
 } from '@creation-toolbox/topicDomain';
 
 const topic = {
@@ -28,5 +32,33 @@ describe('creation toolbox topic domain', () => {
     });
     expect(restoreTopicFilters('broken')).toBe(defaultTopicFilters);
     expect(topicFilterReducer(defaultTopicFilters, { type: 'tag', value: '效率' }).tag).toBe('效率');
+  });
+
+  it('clears visibility filters after creating a topic while preserving the layout', () => {
+    expect(topicFilterReducer({
+      search: '旧关键词', status: 'ready', tag: '效率', layout: 'cards',
+    }, { type: 'reveal-created' })).toEqual({
+      search: '', status: '', tag: '', layout: 'cards',
+    });
+  });
+
+  it('prepends the created topic to local state without duplicating it', () => {
+    const oldTopic = { id: 'old', title: '旧选题' };
+    const created = { id: 'created', title: '刚记录的选题' };
+    expect(prependCreatedTopic([oldTopic], created)).toEqual([created, oldTopic]);
+    expect(prependCreatedTopic([created, oldTopic], created)).toEqual([created, oldTopic]);
+  });
+
+  it('keeps every checked topic selected and exposes selection separately from the current row', () => {
+    const first = toggleTopicSelection([], 'first', true);
+    const both = toggleTopicSelection(first, 'second', true);
+    expect(both).toEqual(['first', 'second']);
+    expect(topicRowStateClassName('first', 'first', both)).toBe('active selected');
+    expect(topicRowStateClassName('second', 'first', both)).toBe('selected');
+    expect(toggleTopicSelection(both, 'first', false)).toEqual(['second']);
+  });
+
+  it('drops hidden topic selections when filters change', () => {
+    expect(retainVisibleTopicSelection(['visible', 'hidden'], ['visible'])).toEqual(['visible']);
   });
 });
