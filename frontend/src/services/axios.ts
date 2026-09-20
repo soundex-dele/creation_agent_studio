@@ -16,6 +16,11 @@ const axiosInstance = axios.create({
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      // A JSON content type makes Axios serialize files as empty objects.
+      // Let the transport generate the multipart header and its boundary.
+      config.headers.delete('Content-Type');
+    }
     const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
