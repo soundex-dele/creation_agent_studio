@@ -152,9 +152,10 @@ class TopicListView(APIView):
         workspace = _workspace(organization_id, application_id)
         if workspace is None:
             return _not_found("创作工作区")
-        topics = workspace.topics.select_related("created_by").annotate(
+        topics = workspace.topics.select_related("created_by", "parent").annotate(
             project_count=Count("projects", distinct=True),
             publication_count=Count("projects__publications", distinct=True),
+            child_count=Count("children", distinct=True),
         )
         search = request.query_params.get("search", "").strip()
         if search:
@@ -176,7 +177,7 @@ class TopicListView(APIView):
         workspace = _workspace(organization_id, application_id)
         if workspace is None:
             return _not_found("创作工作区")
-        serializer = TopicSerializer(data=request.data)
+        serializer = TopicSerializer(data=request.data, context={"workspace": workspace})
         serializer.is_valid(raise_exception=True)
         normalized = _normalize_title(serializer.validated_data["title"])
         duplicate = workspace.topics.exclude(status=TopicIdea.Status.ARCHIVED).filter(
@@ -186,7 +187,9 @@ class TopicListView(APIView):
             return Response({
                 "code": "duplicate_topic",
                 "detail": "选题库中已有相同标题。",
-                "existing": TopicSerializer(duplicate).data,
+                "existing": TopicSerializer(
+                    duplicate, context={"workspace": workspace}
+                ).data,
             }, status=status.HTTP_409_CONFLICT)
         topic = serializer.save(
             organization=request.organization,
@@ -195,7 +198,11 @@ class TopicListView(APIView):
             created_by=request.user,
             updated_by=request.user,
         )
-        return Response(TopicSerializer(topic).data, status=status.HTTP_201_CREATED)
+        topic.child_count = 0
+        return Response(
+            TopicSerializer(topic, context={"workspace": workspace}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class TopicDetailView(APIView):
@@ -211,6 +218,7 @@ class TopicDetailView(APIView):
             return _not_found("选题")
         topic.project_count = topic.projects.count()
         topic.publication_count = Publication.objects.filter(project__topic=topic).count()
+        topic.child_count = topic.children.count()
         projects = topic.projects.annotate(
             asset_count=Count("assets", distinct=True),
             recording_count=Count("recordings", distinct=True),
@@ -227,7 +235,9 @@ class TopicDetailView(APIView):
         topic = self._topic(workspace, topic_id)
         if topic is None:
             return _not_found("选题")
-        serializer = TopicSerializer(topic, data=request.data, partial=True)
+        serializer = TopicSerializer(
+            topic, data=request.data, partial=True, context={"workspace": workspace}
+        )
         serializer.is_valid(raise_exception=True)
         title = serializer.validated_data.get("title", topic.title)
         normalized = _normalize_title(title)
@@ -237,7 +247,7 @@ class TopicDetailView(APIView):
         if duplicate is not None and not request.data.get("allow_duplicate"):
             return Response({
                 "code": "duplicate_topic", "detail": "选题库中已有相同标题。",
-                "existing": TopicSerializer(duplicate).data,
+                "existing": TopicSerializer(duplicate, context={"workspace": workspace}).data,
             }, status=status.HTTP_409_CONFLICT)
         serializer.save(normalized_title=normalized, updated_by=request.user)
         return Response(serializer.data)
@@ -249,6 +259,11 @@ class TopicDetailView(APIView):
         if topic.projects.exists():
             return Response(
                 {"detail": "已关联工程的选题不能删除，请改为归档。"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if topic.children.exists():
+            return Response(
+                {"detail": "已有子选题的父选题不能删除，请先处理子选题。"},
                 status=status.HTTP_409_CONFLICT,
             )
         topic.delete()

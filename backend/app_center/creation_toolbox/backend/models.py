@@ -77,6 +77,13 @@ class TopicIdea(TenantOwnedModel):
     workspace = models.ForeignKey(
         CreationWorkspace, on_delete=models.CASCADE, related_name="topics"
     )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="children",
+    )
     title = models.CharField(max_length=200)
     normalized_title = models.CharField(max_length=200, db_index=True)
     notes = models.TextField(blank=True)

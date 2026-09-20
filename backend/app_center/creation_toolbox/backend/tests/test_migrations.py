@@ -86,14 +86,30 @@ def test_full_lifecycle_migration_preserves_existing_creation_data(settings, tmp
     executor.migrate([("creation_toolbox", "0001_initial_compacted")])
     executor = MigrationExecutor(connection)
     executor.migrate([("creation_toolbox", "0004_creationproject_work_type")])
-    apps = executor.loader.project_state(
+    apps_0004 = executor.loader.project_state(
         [("creation_toolbox", "0004_creationproject_work_type")]
+    ).apps
+    topic = apps_0004.get_model("creation_toolbox", "TopicIdea").objects.create(
+        organization_id=organization.id,
+        workspace_id=workspace.id,
+        title="既有选题",
+        normalized_title="既有选题",
+        created_by_id=owner.id,
+    )
+    executor = MigrationExecutor(connection)
+    executor.migrate([("creation_toolbox", "0005_topicidea_parent")])
+    apps = executor.loader.project_state(
+        [("creation_toolbox", "0005_topicidea_parent")]
     ).apps
 
     MigratedProject = apps.get_model("creation_toolbox", "CreationProject")
     migrated = MigratedProject.objects.get(name="既有工程")
     assert migrated.stage == "planning"
     assert migrated.work_type == "short_video"
+    migrated_topic = apps.get_model("creation_toolbox", "TopicIdea").objects.get(
+        id=topic.id
+    )
+    assert migrated_topic.parent_id is None
     assert apps.get_model("creation_toolbox", "Copywriting").objects.filter(
         title="既有文案", content="原样保留"
     ).exists()

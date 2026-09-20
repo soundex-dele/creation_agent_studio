@@ -45,7 +45,7 @@ spec:
     urlconf: app_center.creation_toolbox.backend.urls
   database:
     mode: django-migrations
-    schema_version: 4
+    schema_version: 5
     tenant_scoped: true
   install:
     scope: per-organization

@@ -24,6 +24,7 @@ describe('creation toolbox topic domain', () => {
     expect(topicMatchesFilters(topic, { ...defaultTopicFilters, search: '知识库' })).toBe(true);
     expect(topicMatchesFilters(topic, { ...defaultTopicFilters, search: '访谈', status: 'ready' })).toBe(true);
     expect(topicMatchesFilters(topic, { ...defaultTopicFilters, tag: '效率', status: 'pending' })).toBe(false);
+    expect(topicMatchesFilters({ ...topic, title: '子方向', parent_title: '知识库系列' }, { ...defaultTopicFilters, search: '知识库系列' })).toBe(true);
   });
 
   it('restores safe persisted filters and reducer updates one domain field', () => {

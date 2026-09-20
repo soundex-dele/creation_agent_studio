@@ -71,19 +71,40 @@ class TopicSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     project_count = serializers.IntegerField(read_only=True, default=0)
     publication_count = serializers.IntegerField(read_only=True, default=0)
+    child_count = serializers.IntegerField(read_only=True, default=0)
+    parent_title = serializers.CharField(source="parent.title", read_only=True, default="")
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
 
     class Meta:
         model = TopicIdea
         fields = [
-            "id", "title", "notes", "source_name", "source_url", "target_platforms",
+            "id", "parent", "parent_title", "child_count", "title", "notes", "source_name", "source_url", "target_platforms",
             "tags", "status", "status_label", "project_count", "publication_count",
             "created_by", "created_by_name", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "status_label", "project_count", "publication_count", "created_by",
+            "id", "parent_title", "child_count", "status_label", "project_count", "publication_count", "created_by",
             "created_by_name", "created_at", "updated_at",
         ]
+
+    def validate_parent(self, value):
+        if value is None:
+            return value
+        workspace = self.context.get("workspace")
+        if workspace is None or value.workspace_id != workspace.id:
+            raise serializers.ValidationError("父选题不属于当前工作区。")
+        if value.parent_id is not None:
+            raise serializers.ValidationError("只能在父选题下创建一层子选题。")
+        if self.instance is not None and value.id == self.instance.id:
+            raise serializers.ValidationError("不能将选题自身设为父选题。")
+        return value
+
+    def validate(self, attrs):
+        if self.instance is not None and "parent" in attrs:
+            parent = attrs["parent"]
+            if parent is not None and self.instance.children.exists():
+                raise serializers.ValidationError({"parent": "已有子选题的父选题不能改为子选题。"})
+        return attrs
 
     def validate_title(self, value):
         value = " ".join(value.split())

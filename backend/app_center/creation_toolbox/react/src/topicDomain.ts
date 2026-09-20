@@ -45,13 +45,14 @@ export interface SearchableTopic {
   title: string;
   notes: string;
   source_name: string;
+  parent_title?: string;
   tags: string[];
   status: Exclude<TopicFilterStatus, ''>;
 }
 
 export function topicMatchesFilters(topic: SearchableTopic, filters: TopicFilterState): boolean {
   const query = filters.search.trim().toLocaleLowerCase();
-  const matchesQuery = !query || [topic.title, topic.notes, topic.source_name, ...topic.tags]
+  const matchesQuery = !query || [topic.title, topic.notes, topic.source_name, topic.parent_title || '', ...topic.tags]
     .some((value) => value.toLocaleLowerCase().includes(query));
   return matchesQuery
     && (!filters.status || topic.status === filters.status)

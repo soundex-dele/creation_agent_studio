@@ -236,6 +236,81 @@ def test_topic_duplicate_multi_project_and_delete_guard(toolbox_context):
 
 
 @pytest.mark.django_db
+def test_parent_and_child_topics_can_each_create_projects(toolbox_context):
+    client = _client(toolbox_context["developer"])
+    root = _root(toolbox_context)
+    parent = client.post(
+        f"{root}/topics",
+        {"title": "AI 创作效率", "notes": "系列选题"},
+        format="json",
+    )
+    assert parent.status_code == 201, parent.data
+    assert parent.data["parent"] is None
+    assert parent.data["child_count"] == 0
+
+    children = []
+    for title in ("AI 如何辅助选题", "AI 如何生成配图"):
+        child = client.post(
+            f"{root}/topics",
+            {"title": title, "parent": parent.data["id"]},
+            format="json",
+        )
+        assert child.status_code == 201, child.data
+        assert str(child.data["parent"]) == parent.data["id"]
+        assert child.data["parent_title"] == "AI 创作效率"
+        children.append(child.data)
+
+    topic_list = client.get(f"{root}/topics")
+    assert topic_list.status_code == 200, topic_list.data
+    listed_parent = next(item for item in topic_list.data if item["id"] == parent.data["id"])
+    assert listed_parent["child_count"] == 2
+
+    grandchild = client.post(
+        f"{root}/topics",
+        {"title": "不允许的三级选题", "parent": children[0]["id"]},
+        format="json",
+    )
+    assert grandchild.status_code == 400
+    assert "只能在父选题下创建一层子选题" in str(grandchild.data["parent"])
+
+    self_parent = client.patch(
+        f"{root}/topics/{parent.data['id']}",
+        {"parent": parent.data["id"]},
+        format="json",
+    )
+    assert self_parent.status_code == 400
+    assert "不能将选题自身设为父选题" in str(self_parent.data["parent"])
+
+    parent_project = client.post(
+        f"{root}/topics/{parent.data['id']}/create-project",
+        {"work_type": "long_article"},
+        format="json",
+    )
+    child_project = client.post(
+        f"{root}/topics/{children[0]['id']}/create-project",
+        {"work_type": "short_video"},
+        format="json",
+    )
+    assert parent_project.status_code == 201, parent_project.data
+    assert parent_project.data["name"] == "AI 创作效率-长图文（公众号）"
+    assert child_project.status_code == 201, child_project.data
+    assert child_project.data["name"] == "AI 如何辅助选题-短视频"
+
+    protected_parent = client.post(
+        f"{root}/topics", {"title": "待拆解父选题"}, format="json"
+    )
+    protected_child = client.post(
+        f"{root}/topics",
+        {"title": "待拆解子选题", "parent": protected_parent.data["id"]},
+        format="json",
+    )
+    assert protected_child.status_code == 201, protected_child.data
+    blocked_delete = client.delete(f"{root}/topics/{protected_parent.data['id']}")
+    assert blocked_delete.status_code == 409
+    assert "已有子选题" in blocked_delete.data["detail"]
+
+
+@pytest.mark.django_db
 def test_publication_metrics_stage_and_analytics(toolbox_context):
     client = _client(toolbox_context["developer"])
     root = _root(toolbox_context)
