@@ -61,7 +61,7 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
-    navigate(applicationPath(app));
+    window.open(applicationPath(app), '_blank', 'noopener,noreferrer');
   };
 
   return (

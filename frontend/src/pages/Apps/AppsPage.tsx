@@ -9,7 +9,6 @@ import {
   StarFilled,
   StarOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { applicationPath } from '@/lib/applicationCatalog';
@@ -30,7 +29,6 @@ interface ApplicationPreferences {
 const EMPTY_PREFERENCES: ApplicationPreferences = { favorites: [], recent: {} };
 
 const AppsPage: React.FC = () => {
-  const navigate = useNavigate();
   const userId = useAuthStore((state) => state.user?.id || 'anonymous');
   const {
     apps,
@@ -110,7 +108,7 @@ const AppsPage: React.FC = () => {
       ...preferences,
       recent: { ...preferences.recent, [id]: Date.now() },
     });
-    navigate(path);
+    window.open(path, '_blank', 'noopener,noreferrer');
   };
 
   const visibleApps = useMemo(() => {
@@ -172,6 +170,7 @@ const AppsPage: React.FC = () => {
         }
       }}
       role="link"
+      aria-label={`${app.name}（在新窗口中打开）`}
       tabIndex={0}
     >
       {renderFavorite(app.id, app.name)}
@@ -290,6 +289,7 @@ const AppsPage: React.FC = () => {
                 }
               }}
               role="link"
+              aria-label="对话（在新窗口中打开）"
               tabIndex={0}
             >
               {renderFavorite(CONVERSATION_ID, '对话')}

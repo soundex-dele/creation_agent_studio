@@ -20,7 +20,6 @@
       "@/*": ["src/*"],
       "@creation-master/*": ["../backend/app_center/creation_master/react/src/*"],
       "@creation-toolbox/*": ["../backend/app_center/creation_toolbox/react/src/*"],
-      "@newmedia-workbench/*": ["../backend/app_center/newmedia_workbench/react/src/*"],
       "@phosphor-icons/react": ["node_modules/@phosphor-icons/react"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
       "react": ["node_modules/@types/react/index.d.ts"],
@@ -34,6 +33,6 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../backend/app_center/creation_master/react/src", "../backend/app_center/creation_toolbox/react/src", "../backend/app_center/newmedia_workbench/react/src"],
+  "include": ["src", "../backend/app_center/creation_master/react/src", "../backend/app_center/creation_toolbox/react/src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

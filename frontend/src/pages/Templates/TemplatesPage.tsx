@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Button, Empty, Input, Spin } from 'antd';
+import { Empty, Input, Spin } from 'antd';
 import {
   ArrowRightOutlined,
-  ArrowLeftOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   SearchOutlined,
@@ -56,14 +55,6 @@ const TemplatesPage: React.FC = () => {
 
   return (
     <div className="templates-page animate-fade-in">
-      {showApplicationHeader && <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/apps')}
-        className="template-library-back"
-      >
-        返回应用
-      </Button>}
       {showApplicationHeader && <div className="page-header case-library-header">
         <div>
           <h1 className="page-title">案例库</h1>

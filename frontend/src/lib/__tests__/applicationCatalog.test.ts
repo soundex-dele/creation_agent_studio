@@ -17,12 +17,6 @@ describe('application renderer registry', () => {
     })).toBe('/applications/18/creation-toolbox?entry=apps');
   });
 
-  it('opens the new media workbench in its dedicated runtime', () => {
-    expect(applicationPath({
-      id: 'newmedia-workbench', applicationId: 19, kind: 'custom', rendererKey: 'newmedia-workbench',
-    })).toBe('/applications/19/newmedia-workbench?entry=apps');
-  });
-
   it('opens Skill-backed generators as guided chat applications', () => {
     [
       'wechat-html-optimizer',
@@ -61,9 +55,6 @@ describe('application renderer registry', () => {
     expect(applicationPath({
       id: 'writer', applicationId: 12, kind: 'chat', rendererKey: 'chat',
     })).toBe('/applications/12/chat?slug=writer&entry=apps');
-    expect(applicationPath({
-      id: 'contacts', applicationId: 13, kind: 'custom', rendererKey: 'contacts',
-    })).toBe('/applications/13/contacts?entry=apps');
     expect(applicationPath({
       id: 'transcribe', applicationId: 14, kind: 'task', rendererKey: 'batch-transcribe',
     })).toBe('/applications/14/run?entry=apps');

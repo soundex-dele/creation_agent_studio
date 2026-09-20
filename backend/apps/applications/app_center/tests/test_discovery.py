@@ -2,17 +2,21 @@ from pathlib import Path
 
 from django.conf import settings
 
-from apps.applications.app_center.discovery import discover_packages
+from apps.applications.app_center.discovery import (
+    discover_django_apps,
+    discover_executor_adapters,
+    discover_packages,
+)
 
 
-def test_bundled_contacts_package_is_valid():
+def test_bundled_creation_toolbox_package_is_valid():
     packages, errors = discover_packages(settings.APP_CENTER_ROOT, strict=True)
 
     assert not errors
-    contacts = next(package for package in packages if package.manifest.metadata.id == "contacts")
-    assert contacts.manifest.spec.database.mode == "django-migrations"
-    assert contacts.manifest.spec.backend.django_app.endswith("ContactsConfig")
-    assert len(contacts.content_hash) == 64
+    toolbox = next(package for package in packages if package.manifest.metadata.id == "creation-toolbox")
+    assert toolbox.manifest.spec.database.mode == "django-migrations"
+    assert toolbox.manifest.spec.backend.django_app.endswith("CreationToolboxConfig")
+    assert len(toolbox.content_hash) == 64
 
 
 def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
@@ -20,13 +24,10 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     package_ids = {package.manifest.metadata.id for package in packages}
 
     assert {
-        "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
+        "article-html-illustrator", "case-library",
         "gzh-design", "html-cover-generator", "wechat-html-optimizer",
-        "wechat-viral-article", "newmedia-workbench", "tool-share-topic-expert",
+        "wechat-viral-article", "tool-share-topic-expert",
     } <= package_ids
-    assert settings.EXECUTION_CHILD_ADAPTERS["media"]["batch-transcribe"] == (
-        "app_center.batch_transcribe.runtime.execute_batch_transcribe"
-    )
     chat_packages = {
         package.manifest.metadata.id: package
         for package in packages
@@ -59,6 +60,18 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     else:
         assert "creation-master" not in package_ids
         assert "creation-master" not in settings.EXECUTION_CHILD_ADAPTERS["media"]
+
+def test_retired_applications_are_not_discovered_or_registered():
+    packages, _ = discover_packages(settings.APP_CENTER_ROOT, strict=True)
+    package_ids = {package.manifest.metadata.id for package in packages}
+    adapters = discover_executor_adapters(settings.APP_CENTER_ROOT)
+
+    assert package_ids.isdisjoint({"batch-transcribe", "newmedia-workbench", "contacts"})
+    assert "batch-transcribe" not in adapters.get("media", {})
+    assert "app_center.contacts.backend.apps.ContactsConfig" not in discover_django_apps(
+        settings.APP_CENTER_ROOT,
+    )
+
 
 def test_invalid_package_is_quarantined(tmp_path: Path):
     package = tmp_path / "broken_app"

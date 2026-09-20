@@ -18,12 +18,11 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   DeleteOutlined,
   FolderOpenOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import {
   ApplicationRuntimeProvider,
@@ -184,7 +183,6 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
   showApplicationHeader: boolean;
 }) {
   const runtime = useApplicationRuntime();
-  const navigate = useNavigate();
   const [inputText, setInputText] = useState('{}');
   const [run, setRun] = useState<RunResource | null>(null);
   const [starting, setStarting] = useState(false);
@@ -244,9 +242,6 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       {showApplicationHeader && (
         <div>
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
-            返回应用
-          </Button>
           <Typography.Title level={2} style={{ margin: '12px 0 20px' }}>
             {descriptor.name}
           </Typography.Title>

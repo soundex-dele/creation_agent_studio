@@ -13,7 +13,6 @@ export default defineConfig({
         ? path.resolve(__dirname, './src/stubs/creation-master')
         : path.resolve(__dirname, '../backend/app_center/creation_master/react/src'),
       '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
-      '@newmedia-workbench': path.resolve(__dirname, '../backend/app_center/newmedia_workbench/react/src'),
       '@phosphor-icons/react': path.resolve(__dirname, './node_modules/@phosphor-icons/react'),
       'lucide-react': path.resolve(__dirname, './node_modules/lucide-react/dist/esm/lucide-react.js'),
     },

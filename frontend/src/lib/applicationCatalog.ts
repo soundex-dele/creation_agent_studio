@@ -13,7 +13,6 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
 /** Platform-owned renderer keys. Manifests select a key; they cannot inject JS. */
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
   'case-library': (_app, entry) => withEntry('/apps/case-library', entry),
-  contacts: (app, entry) => withEntry(`/applications/${app.applicationId}/contacts`, entry),
   'study-with-method': (app, entry) => withEntry(
     `/applications/${app.applicationId}/study-with-method`, entry,
   ),
@@ -22,9 +21,6 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   ),
   'creation-toolbox': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-toolbox`, entry,
-  ),
-  'newmedia-workbench': (app, entry) => withEntry(
-    `/applications/${app.applicationId}/newmedia-workbench`, entry,
   ),
   chat: (app, entry) => withEntry(
     `/applications/${app.applicationId}/chat`,

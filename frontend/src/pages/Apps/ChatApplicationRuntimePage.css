@@ -9,7 +9,7 @@
 
 .chat-app-header {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(0, 800px) minmax(120px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 20px;
   padding: 14px 24px;
@@ -24,7 +24,7 @@
   right: 18px;
 }
 
-.chat-app-header > :last-child {
+.chat-app-header > button {
   justify-self: end;
 }
 
@@ -165,7 +165,6 @@
 .chat-app-error { display: grid; min-height: 360px; place-items: center; padding: 32px; }
 
 @media (max-width: 980px) {
-  .chat-app-header { grid-template-columns: auto 1fr auto; }
   .chat-app-builder { grid-template-columns: minmax(0, 720px); }
   .chat-app-preview-card { position: static; }
 }

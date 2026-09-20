@@ -133,7 +133,7 @@ queued → running → succeeded
 
 ### Media
 
-批量转录通过 `media/batch-transcribe` adapter 执行，直接使用 `faster-whisper`，不再经过旧 `creation_core` 翻译层。目录在浏览接口和子进程 adapter 两处校验允许根路径。转录结果通过统一 Artifact 消息交给 Coordinator 原子落盘、计算 SHA-256 并登记 `RunArtifact`，不再只返回 Worker 本地路径。
+批量转录独立应用已下架，创作大师的转录操作继续复用 `app_center.batch_transcribe.runtime`，直接使用 `faster-whisper`。目录在浏览接口和运行时两处校验允许根路径。转录结果通过统一 Artifact 消息交给 Coordinator 原子落盘、计算 SHA-256 并登记 `RunArtifact`，不再只返回 Worker 本地路径。
 
 ## 4. 前端架构
 

@@ -29,9 +29,6 @@ export function workflowApplicationPath(
     });
     return `/applications/${applicationId}/chat?${query.toString()}`;
   }
-  if (application.renderer_key === 'contacts') {
-    return `/applications/${applicationId}/contacts${embeddedQuery ? `?${embeddedQuery}` : ''}`;
-  }
   if (application.renderer_key === 'study-with-method') {
     return `/applications/${applicationId}/study-with-method${
       embeddedQuery ? `?${embeddedQuery}` : ''

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { CreationToolboxApp } from '@creation-toolbox/main';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
@@ -10,7 +10,6 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
 export default function CreationToolboxPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
@@ -33,8 +32,6 @@ export default function CreationToolboxPage() {
       apiBasePath={`${tenantApiRoot(organizationId)}/applications/${applicationId}/creation-toolbox`}
       requester={requester}
       showHeader={showApplicationHeader}
-      onBack={showApplicationHeader ? () => navigate('/apps') : undefined}
     />
   );
 }
-

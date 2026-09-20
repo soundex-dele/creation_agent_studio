@@ -27,11 +27,9 @@ const WorkflowRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowRunnerPa
 const WorkflowManualRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowManualRunnerPage'));
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
-const ContactsPage = lazy(() => import('@/pages/Contacts/ContactsPage'));
 const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWithMethodPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
-const NewMediaWorkbenchPage = lazy(() => import('@/pages/Apps/NewMediaWorkbenchPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 const AccountManagementPage = lazy(() => import('@/pages/Settings/AccountManagementPage'));
@@ -218,16 +216,6 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: '/applications/:applicationId/contacts',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell>
-          {page(<ContactsPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: '/applications/:applicationId/study-with-method',
     element: (
       <ProtectedRoute>
@@ -264,16 +252,6 @@ const router = createBrowserRouter([
         <MainLayout hideSidebar>
           {page(<KnowledgePage />)}
         </MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/newmedia-workbench',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<NewMediaWorkbenchPage />)}
-        </ApplicationShell>
       </ProtectedRoute>
     ),
   },

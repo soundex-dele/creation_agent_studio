@@ -50,21 +50,25 @@ def test_sync_installs_all_packages_and_activates_deployments():
         slug="content-creation-expert",
     )
     assert set(applications.values_list("slug", flat=True)) >= {
-        "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
+        "article-html-illustrator", "case-library",
         "creation-master", "gzh-design", "html-cover-generator",
-        "newmedia-workbench", "wechat-html-optimizer", "wechat-viral-article",
+        "wechat-html-optimizer", "wechat-viral-article",
         "wechat-viral-topics", "tool-share-topic-expert",
     }
     for application in applications.filter(
         slug__in=(
-            "article-html-illustrator", "batch-transcribe", "case-library", "contacts",
+            "article-html-illustrator", "case-library",
             "creation-master", "gzh-design", "html-cover-generator",
-            "newmedia-workbench", "wechat-html-optimizer", "wechat-viral-article",
+            "wechat-html-optimizer", "wechat-viral-article",
             "wechat-viral-topics", "tool-share-topic-expert",
         )
     ):
         assert application.revisions.count() == 1
         assert application.deployments.count() == 1
+
+    assert not applications.filter(slug="newmedia-workbench").exists()
+    assert not applications.filter(slug="batch-transcribe").exists()
+    assert not applications.filter(slug="contacts").exists()
 
     for application_slug, expected in CHAT_SKILL_APPS.items():
         application = applications.get(slug=application_slug)

@@ -4,12 +4,12 @@ import {
 } from 'react';
 import { Button, Collapse, Empty, Input, message, Modal, Progress, Select, Skeleton, Slider, Tag } from 'antd';
 import {
-  Archive, ArrowLeft, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
+  Archive, BookOpenCheck, CalendarDays, Camera, Check, CheckCircle2, ChevronRight,
   CircleUserRound, Compass, Download, Flame, ImagePlus, ListChecks, MessageCircle,
   RefreshCcw, RotateCcw, Search, Send, Settings2,
   Sparkles, Trash2, UserRoundPlus,
 } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
@@ -217,7 +217,6 @@ export default function StudyWithMethodPage() {
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
-  const navigate = useNavigate();
   const photoInput = useRef<HTMLInputElement | null>(null);
   const mistakeInput = useRef<HTMLInputElement>(null);
   const [dashboard, setDashboard] = useState<StudyDashboard | null>(null);
@@ -468,7 +467,7 @@ export default function StudyWithMethodPage() {
   if (dashboard.mode === 'guardian') return <main className="swm-page swm-guardian"><span className="swm-eyebrow">家长只读视图</span><h1>看见进步，不打扰过程</h1><p>这里只展示学习趋势与建议，不公开题目图片、对话和逐题操作。</p><div className="swm-guardian-trends">{dashboard.trends.map((item) => <article key={item.student_name}><strong>{item.student_name}</strong><span>近 7 日完成 {item.seven_day.completion_rate}%</span><span>练习正确 {item.seven_day.correct_rate}%</span><span>完成复习 {item.seven_day.reviews_completed} 次</span></article>)}</div>{dashboard.reports.map((report: WeeklyReport) => <article className="swm-subject-report" key={report.id}><Tag>{subjectLabels[report.subject]}</Tag><strong>{report.summary}</strong><p>{report.next_week_advice}</p></article>)}</main>;
 
   return <div className="swm-page">
-    {showApplicationHeader && <header className="swm-platform-header"><Button type="text" icon={<ArrowLeft size={18} />} onClick={() => navigate('/apps')}>应用中心</Button><div className="swm-wordmark"><Compass size={20} />学之有道</div></header>}
+    {showApplicationHeader && <header className="swm-platform-header"><div className="swm-wordmark"><Compass size={20} />学之有道</div></header>}
     <main className="swm-student-shell">
       <header className="swm-mobile-header"><div><span className="swm-eyebrow">{gradeLabels[dashboard.profile.grade_stage]} · {dashboard.profile.enrollments.length} 门学科</span><h1>{tab === 'today' ? `今天也稳稳向前，${dashboard.profile.display_name || dashboard.profile.student_name}` : navItems.find((item) => item.key === tab)?.label}</h1></div><div className="swm-logo"><Compass size={24} /></div></header>
       {tab === 'today' && <TodayView dashboard={dashboard} onTutor={openTutor} onReview={() => openReviewModule('due', dashboard.due_reviews[0]?.subject)} onOpenModule={openReviewModule} onMethodology={() => setMethodologyOpen(true)} organizationId={organizationId} applicationId={applicationId} reload={reload} />}

@@ -309,43 +309,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/applications/{application_id}/contacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_contacts_list"];
-        put?: never;
-        post: operations["applications_contacts_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/contacts/{contact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_contacts_read"];
-        put?: never;
-        post?: never;
-        delete: operations["applications_contacts_delete"];
-        options?: never;
-        head?: never;
-        patch: operations["applications_contacts_partial_update"];
-        trace?: never;
-    };
     "/applications/{application_id}/creation-master/directories": {
         parameters: {
             query?: never;
@@ -3543,45 +3506,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/contacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_contacts_list"];
-        put?: never;
-        post: operations["organizations_applications_contacts_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/contacts/{contact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_contacts_read"];
-        put?: never;
-        post?: never;
-        delete: operations["organizations_applications_contacts_delete"];
-        options?: never;
-        head?: never;
-        patch: operations["organizations_applications_contacts_partial_update"];
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/creation-master/directories": {
@@ -8632,6 +8556,8 @@ export interface components {
             order?: number;
             /** Config */
             config?: Record<string, never>;
+            /** Input mapping */
+            input_mapping?: Record<string, never>;
             /** Depends on */
             depends_on?: Record<string, never>;
             /** Condition */
@@ -8659,6 +8585,8 @@ export interface components {
              * @enum {string}
              */
             execution_mode?: "manual" | "automatic";
+            /** Input schema */
+            input_schema?: Record<string, never>;
             /** Output mapping */
             output_mapping?: Record<string, never>;
             /** Is public */
@@ -8682,6 +8610,8 @@ export interface components {
              * @enum {string}
              */
             execution_mode?: "manual" | "automatic";
+            /** Input schema */
+            input_schema?: Record<string, never>;
             /** Output mapping */
             output_mapping?: Record<string, never>;
             /** Is public */
@@ -9401,104 +9331,6 @@ export interface operations {
             header?: never;
             path: {
                 application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_contacts_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_contacts_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_contacts_read: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_contacts_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    applications_contacts_partial_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-                contact_id: string;
             };
             cookie?: never;
         };
@@ -15405,109 +15237,6 @@ export interface operations {
             path: {
                 organization_id: string;
                 application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_contacts_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_contacts_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_contacts_read: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_contacts_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    organizations_applications_contacts_partial_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-                contact_id: string;
             };
             cookie?: never;
         };

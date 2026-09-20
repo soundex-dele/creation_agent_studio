@@ -8,8 +8,8 @@ import {
   Spin,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, RocketOutlined } from '@ant-design/icons';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { EditOutlined, RocketOutlined } from '@ant-design/icons';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import ChatContainer from '@/components/Chat/ChatContainer';
 import { guidedPromptIdentifier } from '@/lib/guidedPrompts';
@@ -48,7 +48,6 @@ export default function ChatApplicationRuntimePage() {
   const manualWorkflowId = searchParams.get('workflowId');
   const manualRunId = searchParams.get('manualRunId');
   const workflowStepKey = searchParams.get('workflowStepKey');
-  const navigate = useNavigate();
   const loadApp = useAppStore((state) => state.loadApp);
   const [application, setApplication] = useState<AppItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,9 +163,6 @@ export default function ChatApplicationRuntimePage() {
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
       {showApplicationHeader && (
         <header className="chat-app-header">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>
-            返回应用
-          </Button>
           <div className="chat-app-heading">
             <span className="chat-app-icon">{application.icon || '✦'}</span>
             <div>
