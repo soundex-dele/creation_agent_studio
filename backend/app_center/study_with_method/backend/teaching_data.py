@@ -20,6 +20,8 @@ class TeachingDataError(RuntimeError):
 @dataclass(frozen=True)
 class TeachingDataBundle:
     manifest: dict
+    canonical_knowledge: dict[str, dict]
+    question_banks: dict[str, dict]
     curricula: dict[str, dict]
 
 
@@ -49,26 +51,134 @@ def _validate(validator, value, label: str):
 @lru_cache(maxsize=8)
 def _load_bundle(root_value: str, data_version: str) -> TeachingDataBundle:
     root = Path(root_value)
+    manifest_validator = Draft202012Validator(
+        _read_schema(root, "manifest.schema.json")
+    )
     catalog_validator = Draft202012Validator(_read_schema(root, "catalog.schema.json"))
-    point_validator = Draft202012Validator(_read_schema(root, "knowledge-point.schema.json"))
+    knowledge_validator = Draft202012Validator(
+        _read_schema(root, "canonical-knowledge.schema.json")
+    )
+    mapping_validator = Draft202012Validator(
+        _read_schema(root, "curriculum-mapping.schema.json")
+    )
+    bank_validator = Draft202012Validator(
+        _read_schema(root, "question-bank.schema.json")
+    )
     manifest = _read_yaml(root / "manifest.yaml")
+    _validate(manifest_validator, manifest, str(root / "manifest.yaml"))
     if str(manifest.get("data_version")) != data_version:
         raise TeachingDataError("教学数据版本在读取过程中发生变化，请重试。")
+    canonical_knowledge = {}
+    for domain in manifest.get("knowledge_domains") or []:
+        filenames = sorted(
+            glob.glob(str(root / domain["knowledge_glob"]), recursive=True)
+        )
+        if not filenames:
+            raise TeachingDataError(
+                f"通用知识目录未匹配到文件：{domain['knowledge_glob']}"
+            )
+        for filename in filenames:
+            path = Path(filename)
+            point = _read_yaml(path)
+            _validate(knowledge_validator, point, str(path))
+            point_id = point["id"]
+            if point_id in canonical_knowledge:
+                raise TeachingDataError(f"通用知识点 ID 重复：{point_id}")
+            if point["subject"] != domain["subject"]:
+                raise TeachingDataError(f"通用知识点学科与目录不一致：{point_id}")
+            if point["education_stage"] != domain["education_stage"]:
+                raise TeachingDataError(f"通用知识点学段与目录不一致：{point_id}")
+            canonical_knowledge[point_id] = point
+
+    question_banks = {}
+    global_question_ids = set()
+    for bank_entry in manifest.get("question_banks") or []:
+        filenames = sorted(
+            glob.glob(str(root / bank_entry["question_glob"]), recursive=True)
+        )
+        if not filenames:
+            raise TeachingDataError(
+                f"题库目录未匹配到文件：{bank_entry['question_glob']}"
+            )
+        for filename in filenames:
+            path = Path(filename)
+            bank = _read_yaml(path)
+            _validate(bank_validator, bank, str(path))
+            bank_id = bank["id"]
+            if bank_id in question_banks:
+                raise TeachingDataError(f"题库 ID 重复：{bank_id}")
+            if bank["subject"] != bank_entry["subject"]:
+                raise TeachingDataError(f"题库学科与目录不一致：{bank_id}")
+            if bank["education_stage"] != bank_entry["education_stage"]:
+                raise TeachingDataError(f"题库学段与目录不一致：{bank_id}")
+            missing = set(bank["canonical_knowledge_ids"]) - set(canonical_knowledge)
+            if missing:
+                raise TeachingDataError(f"题库引用了不存在的通用知识点：{sorted(missing)}")
+            for question in bank["questions"]:
+                if question["id"] in global_question_ids:
+                    raise TeachingDataError(f"题目 ID 重复：{question['id']}")
+                global_question_ids.add(question["id"])
+            question_banks[bank_id] = bank
+
     curricula = {}
-    global_point_ids = set()
+    global_mapping_ids = set()
     for entry in manifest.get("curricula") or []:
         catalog_path = root / entry["catalog"]
         catalog = _read_yaml(catalog_path)
         _validate(catalog_validator, catalog, str(catalog_path))
         points = {}
-        for filename in sorted(glob.glob(str(root / entry["knowledge_glob"]))):
+        filenames = sorted(
+            glob.glob(str(root / entry["knowledge_mapping_glob"]), recursive=True)
+        )
+        if not filenames:
+            raise TeachingDataError(
+                f"教材映射目录未匹配到文件：{entry['knowledge_mapping_glob']}"
+            )
+        for filename in filenames:
             path = Path(filename)
-            point = _read_yaml(path)
-            _validate(point_validator, point, str(path))
-            point_id = point["id"]
-            if point_id in global_point_ids:
-                raise TeachingDataError(f"知识点 ID 重复：{point_id}")
-            global_point_ids.add(point_id)
+            mapping = _read_yaml(path)
+            _validate(mapping_validator, mapping, str(path))
+            point_id = mapping["id"]
+            if point_id in global_mapping_ids:
+                raise TeachingDataError(f"教材知识点映射 ID 重复：{point_id}")
+            global_mapping_ids.add(point_id)
+            if mapping["curriculum_id"] != entry["id"]:
+                raise TeachingDataError(f"教材知识点映射版本不一致：{point_id}")
+            if mapping["subject"] != entry["subject"]:
+                raise TeachingDataError(f"教材知识点映射学科不一致：{point_id}")
+            canonical = canonical_knowledge.get(mapping["canonical_id"])
+            if canonical is None:
+                raise TeachingDataError(
+                    f"教材知识点映射引用不存在：{mapping['canonical_id']}"
+                )
+            if canonical["subject"] != mapping["subject"]:
+                raise TeachingDataError(f"教材知识点映射与通用知识点学科不一致：{point_id}")
+            questions = []
+            for bank_id in mapping["question_bank_ids"]:
+                bank = question_banks.get(bank_id)
+                if bank is None:
+                    raise TeachingDataError(f"教材知识点映射引用的题库不存在：{bank_id}")
+                if entry["id"] not in bank["curriculum_scopes"]:
+                    raise TeachingDataError(f"题库不适用于教材版本：{bank_id}")
+                if mapping["canonical_id"] not in bank["canonical_knowledge_ids"]:
+                    raise TeachingDataError(f"题库不适用于通用知识点：{bank_id}")
+                if mapping["education_stage"] != bank["education_stage"]:
+                    raise TeachingDataError(f"题库与教材映射学段不一致：{bank_id}")
+                if not set(mapping["grade_scope"]).issubset(set(bank["grade_scope"])):
+                    raise TeachingDataError(f"题库未覆盖教材映射年级：{bank_id}")
+                questions.extend(bank["questions"])
+            point = {
+                **canonical,
+                "id": point_id,
+                "canonical_id": canonical["id"],
+                "curriculum_id": mapping["curriculum_id"],
+                "name": mapping["display_name"],
+                "grade_scope": mapping["grade_scope"],
+                "semester_scope": mapping["semester_scope"],
+                "reference": mapping["reference"],
+                "question_bank_ids": mapping["question_bank_ids"],
+                "questions": questions,
+            }
             points[point_id] = point
         referenced = {
             point_id
@@ -88,7 +198,12 @@ def _load_bundle(root_value: str, data_version: str) -> TeachingDataBundle:
             "catalog": catalog,
             "points": points,
         }
-    return TeachingDataBundle(manifest=manifest, curricula=curricula)
+    return TeachingDataBundle(
+        manifest=manifest,
+        canonical_knowledge=canonical_knowledge,
+        question_banks=question_banks,
+        curricula=curricula,
+    )
 
 
 def load_teaching_data() -> TeachingDataBundle:
@@ -129,7 +244,11 @@ def public_curriculum_tree(*, subject: str, curriculum_id: str) -> dict:
                                 "knowledge_points": [
                                     {
                                         "id": point_id,
+                                        "canonical_id": points[point_id]["canonical_id"],
                                         "name": points[point_id]["name"],
+                                        "education_stage": points[point_id]["education_stage"],
+                                        "grade_scope": points[point_id]["grade_scope"],
+                                        "semester_scope": points[point_id]["semester_scope"],
                                         "summary": points[point_id]["summary"],
                                         "objectives": points[point_id]["objectives"],
                                         "prerequisites": points[point_id]["prerequisites"],
@@ -226,6 +345,11 @@ def sync_curriculum_nodes() -> int:
                                     "order": point_order,
                                     "metadata": {
                                         "active": True,
+                                        "canonical_id": point["canonical_id"],
+                                        "education_stage": point["education_stage"],
+                                        "grade_scope": point["grade_scope"],
+                                        "semester_scope": point["semester_scope"],
+                                        "question_bank_ids": point["question_bank_ids"],
                                         "summary": point["summary"],
                                         "keywords": point["keywords"],
                                         "knowledge_items": point["knowledge_items"],
