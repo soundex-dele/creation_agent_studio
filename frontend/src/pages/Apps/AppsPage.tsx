@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { applicationPath } from '@/lib/applicationCatalog';
 import type { AppItem } from '@/types';
 import './AppsPage.css';
@@ -30,6 +31,10 @@ const EMPTY_PREFERENCES: ApplicationPreferences = { favorites: [], recent: {} };
 
 const AppsPage: React.FC = () => {
   const userId = useAuthStore((state) => state.user?.id || 'anonymous');
+  const layoutMode = usePreferencesStore((state) => state.layoutMode);
+  const conversationPath = layoutMode === 'left-right'
+    ? '/chat?entry=apps&standalone=1'
+    : '/chat';
   const {
     apps,
     isLoading,
@@ -281,11 +286,11 @@ const AppsPage: React.FC = () => {
             <article
               className="app-card app-card--conversation"
               style={{ '--app-accent': '#6d5dfc' } as CSSProperties}
-              onClick={() => openApplication(CONVERSATION_ID, '/chat')}
+              onClick={() => openApplication(CONVERSATION_ID, conversationPath)}
               onKeyDown={(event) => {
                 if (event.currentTarget === event.target && (event.key === 'Enter' || event.key === ' ')) {
                   event.preventDefault();
-                  openApplication(CONVERSATION_ID, '/chat');
+                  openApplication(CONVERSATION_ID, conversationPath);
                 }
               }}
               role="link"
