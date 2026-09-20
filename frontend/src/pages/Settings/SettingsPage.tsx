@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@/stores/useThemeStore';
 import {
   usePreferencesStore,
+  type LayoutMode,
   type NavigationIconMode,
 } from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -39,6 +40,7 @@ export default function SettingsPage() {
   const userRole = useAuthStore((state) => state.user?.role);
   const { theme, setTheme } = useThemeStore();
   const {
+    layoutMode, setLayoutMode,
     sendShortcut, defaultPermissionMode, setSendShortcut,
     navigationIconMode, navigationIcons, setDefaultPermissionMode,
     setNavigationIconMode, setNavigationIcon,
@@ -65,6 +67,21 @@ export default function SettingsPage() {
 
       <div className="settings-grid">
         <Card className="settings-appearance-card" title={<><BgColorsOutlined /> 外观</>}>
+          <div className="settings-row settings-layout-row">
+            <div>
+              <strong>界面布局</strong>
+              <p>上下布局使用顶部导航；左右布局使用左侧导航，工作台应用横向排列。窄屏自动适配。</p>
+            </div>
+            <Segmented
+              value={layoutMode}
+              aria-label="界面布局"
+              options={[
+                { value: 'top-bottom', label: '上下布局' },
+                { value: 'left-right', label: '左右布局' },
+              ]}
+              onChange={(value) => setLayoutMode(value as LayoutMode)}
+            />
+          </div>
           <div className="settings-theme-intro">
             <strong>界面主题</strong>
             <p>选择适合当前环境的配色，设置会保存在当前浏览器中。</p>
@@ -114,7 +131,7 @@ export default function SettingsPage() {
           <div className="settings-icon-config">
             <div className="settings-icon-config-heading">
               <div>
-                <strong>顶部导航图标</strong>
+                <strong>主导航图标</strong>
                 <p>选择导航图标的显示方式，线稿模式还可逐项自定义。</p>
               </div>
             </div>
@@ -122,7 +139,7 @@ export default function SettingsPage() {
               <strong>显示模式</strong>
               <Segmented
                 value={navigationIconMode}
-                aria-label="顶部导航图标显示模式"
+                aria-label="主导航图标显示模式"
                 options={[
                   { value: 'outline', label: '黑白线稿' },
                   { value: 'emoji', label: 'Emoji' },
@@ -165,7 +182,7 @@ export default function SettingsPage() {
               <div className="settings-icon-mode-note">
                 {navigationIconMode === 'emoji'
                   ? '导航将使用对应的 Emoji 图标，文字标签保持不变。'
-                  : '导航将只显示文字标签，为顶部栏腾出更多空间。'}
+                  : '导航将只显示文字标签，为导航栏腾出更多空间。'}
               </div>
             )}
           </div>
@@ -247,8 +264,8 @@ export default function SettingsPage() {
 
       <Card className="settings-reset-card" title="重置偏好">
         <div className="settings-row">
-          <div><strong>恢复默认设置</strong><p>只重置当前浏览器中的主题和对话偏好，不会删除账号或业务数据。</p></div>
-          <Popconfirm title="恢复默认设置？" description="主题、导航图标和对话偏好将被重置。" onConfirm={reset}>
+          <div><strong>恢复默认设置</strong><p>只重置当前浏览器中的主题、布局、导航图标和对话偏好，不会删除账号或业务数据。</p></div>
+          <Popconfirm title="恢复默认设置？" description="主题、布局、导航图标和对话偏好将被重置。" onConfirm={reset}>
             <Button icon={<ReloadOutlined />}>恢复默认</Button>
           </Popconfirm>
         </div>

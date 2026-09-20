@@ -10,8 +10,11 @@ import {
 export type SendShortcut = 'enter' | 'mod-enter';
 export type PermissionMode = 'default' | 'allow_all';
 export type NavigationIconMode = 'outline' | 'emoji' | 'hidden';
+export type LayoutMode = 'top-bottom' | 'left-right';
 
 interface PreferencesState {
+  layoutMode: LayoutMode;
+  setLayoutMode: (value: LayoutMode) => void;
   sendShortcut: SendShortcut;
   defaultPermissionMode: PermissionMode;
   navigationIconMode: NavigationIconMode;
@@ -25,6 +28,7 @@ interface PreferencesState {
 }
 
 const defaults = {
+  layoutMode: 'top-bottom' as LayoutMode,
   sendShortcut: 'enter' as SendShortcut,
   defaultPermissionMode: 'default' as PermissionMode,
   navigationIconMode: 'outline' as NavigationIconMode,
@@ -35,6 +39,7 @@ export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set) => ({
       ...defaults,
+      setLayoutMode: (layoutMode) => set({ layoutMode }),
       setSendShortcut: (sendShortcut) => set({ sendShortcut }),
       setDefaultPermissionMode: (defaultPermissionMode) => set({ defaultPermissionMode }),
       setNavigationIconMode: (navigationIconMode) => set({ navigationIconMode }),
@@ -47,8 +52,9 @@ export const usePreferencesStore = create<PreferencesState>()(
     {
       name: 'agent-studio-preferences',
       partialize: ({
-        sendShortcut, defaultPermissionMode, navigationIconMode, navigationIcons,
+        layoutMode, sendShortcut, defaultPermissionMode, navigationIconMode, navigationIcons,
       }) => ({
+        layoutMode,
         sendShortcut,
         defaultPermissionMode,
         navigationIconMode,

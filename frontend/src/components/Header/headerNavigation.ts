@@ -69,6 +69,22 @@ export const isHeaderNavigationItemActive = (
 };
 
 export type HeaderNavigationItemId = typeof HEADER_NAV_ITEMS[number]['id'];
+export const SIDE_NAVIGATION_GROUPS: Partial<Record<HeaderNavigationItemId, readonly {
+  path: string;
+  label: string;
+}[]>> = {
+  build: [
+    { path: '/delegates', label: 'AI 分身' },
+    { path: '/workflows', label: '工作流' },
+    { path: '/automations', label: '自动化' },
+  ],
+  resources: [
+    { path: '/agents', label: '智能体' },
+    { path: '/skills', label: '技能' },
+    { path: '/knowledge', label: '知识库' },
+  ],
+};
+
 export type NavigationIconPreferences = Record<HeaderNavigationItemId, NavigationIconId>;
 
 export const DEFAULT_NAVIGATION_ICONS = Object.fromEntries(

@@ -5,6 +5,8 @@
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .settings-grid .ant-card-head-title { display: flex; align-items: center; gap: 8px; }
 .settings-appearance-card { grid-column: 1 / -1; }
+.settings-layout-row { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--color-border); }
+.settings-layout-row .ant-segmented { flex-shrink: 0; }
 .settings-theme-intro { margin-bottom: 16px; }
 .settings-theme-intro strong { color: var(--color-text); }
 .settings-theme-intro p { margin: 4px 0 0; color: var(--color-text-sec); }

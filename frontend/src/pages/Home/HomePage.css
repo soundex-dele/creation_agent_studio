@@ -36,6 +36,40 @@
   font-size: 15px;
 }
 
+.home-applications { max-width: 1180px; margin-top: 28px; }
+
+.home-applications .home-app-sidebar {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 20px;
+  padding: 0;
+}
+
+.home-applications .home-app-sidebar-head { grid-area: 1 / 1; align-items: center; justify-content: flex-start; gap: 16px; padding: 0; }
+.home-applications .home-app-list {
+  grid-area: 2 / 1 / 3 / -1;
+  min-width: 0;
+  flex-direction: row;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+}
+
+.home-applications .home-app-item {
+  flex: 0 0 210px;
+  width: 210px;
+  min-height: 64px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+}
+
+.home-applications .home-app-item:hover { border-color: var(--color-primary); }
+.home-applications .home-all-apps { grid-area: 1 / 2; align-self: center; width: auto; margin: 0; }
+.home-applications .home-app-sidebar-state { grid-area: 2 / 1 / 3 / -1; padding: 8px; }
+.home-applications .home-app-item:focus-visible,
+.home-applications .home-all-apps:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
 .home-overview {
   display: grid;
   max-width: 1180px;

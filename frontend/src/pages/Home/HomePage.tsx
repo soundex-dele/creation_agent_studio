@@ -4,13 +4,16 @@ import {
   CloseCircleOutlined, DatabaseOutlined, ReloadOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { Button, Empty, Spin, Tag } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
+import useMediaQuery from '@/hooks/useMediaQuery';
+import HomeApplicationsSidebar from '@/components/Sidebar/HomeApplicationsSidebar';
 import { collapseConversationRuns } from '@/pages/Tasks/taskCenterModel';
 import './HomePage.css';
 
@@ -45,6 +48,11 @@ const taskTitle = (run: RunResource) => run.task_title
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const layoutMode = usePreferencesStore((state) => state.layoutMode);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const showInlineApps = layoutMode === 'left-right' && !isMobile
+    && new URLSearchParams(location.search).get('embedded') !== '1';
   const username = useAuthStore((state) => state.user?.username);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const loadOrganizations = useOrganizationStore((state) => state.loadOrganizations);
@@ -88,6 +96,12 @@ export default function HomePage() {
       </div>
       <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void loadRuns()}>刷新</Button>
     </header>
+
+    {showInlineApps && (
+      <section className="home-applications" aria-label="我的应用">
+        <HomeApplicationsSidebar />
+      </section>
+    )}
 
     <section className="home-overview" aria-label="任务概览">
       <button type="button" onClick={() => navigate('/tasks')}><ClockCircleOutlined /><span><small>执行中</small><strong>{summary.active}</strong></span></button>

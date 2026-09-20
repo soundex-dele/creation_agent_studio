@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import type { AppItem } from '@/types';
 
 interface HomeApplicationPreferences {
@@ -33,6 +34,9 @@ const CONVERSATION_APP: AppItem = {
 const HomeApplicationsSidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const layoutMode = usePreferencesStore((state) => state.layoutMode);
+  const openInNewWindow = layoutMode === 'left-right'
+    && (location.pathname === '/' || location.pathname === '');
   const userId = useAuthStore((state) => state.user?.id || 'anonymous');
   const { apps, isLoading, loadApps, setSearchQuery } = useAppStore();
   const [isConfiguring, setIsConfiguring] = useState(false);
@@ -74,6 +78,19 @@ const HomeApplicationsSidebar: React.FC = () => {
     ? '/chat?entry=home'
     : applicationPath(app, 'home');
 
+  const openApplication = (app: AppItem) => {
+    const path = homeApplicationPath(app);
+    if (openInNewWindow) {
+      const url = new URL(path, window.location.origin);
+      // Separate windows use the application's own navigation, like catalog launches.
+      url.searchParams.set('entry', 'apps');
+      url.searchParams.set('standalone', '1');
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigate(path);
+  };
+
   const isActiveApplication = (app: AppItem) => {
     const runtimePath = homeApplicationPath(app).split('?')[0];
     return location.pathname === runtimePath || location.pathname.startsWith(`${runtimePath}/`);
@@ -105,7 +122,7 @@ const HomeApplicationsSidebar: React.FC = () => {
       <div className="home-app-sidebar-head">
         <div>
           <div className="sidebar-title">我的应用</div>
-          <p>选择应用即可开始</p>
+          <p>{openInNewWindow ? '选择应用将在新窗口打开' : '选择应用即可开始'}</p>
         </div>
         <Button
           type="text"
@@ -126,11 +143,13 @@ const HomeApplicationsSidebar: React.FC = () => {
         <div className="home-app-list">
           {visibleApps.map((app) => (
             <button
+              type="button"
               key={app.id}
               className={`home-app-item ${isActiveApplication(app) ? 'active' : ''}`}
               style={{ '--app-accent': app.color || 'var(--color-primary)' } as CSSProperties}
               aria-current={isActiveApplication(app) ? 'page' : undefined}
-              onClick={() => navigate(homeApplicationPath(app))}
+              aria-label={openInNewWindow ? `${app.name}（在新窗口打开）` : undefined}
+              onClick={() => openApplication(app)}
             >
               <span className="home-app-icon">
                 {app.id === CONVERSATION_APP_ID ? <MessageOutlined /> : app.icon || <AppstoreOutlined />}
@@ -151,7 +170,7 @@ const HomeApplicationsSidebar: React.FC = () => {
         onCancel={() => setIsConfiguring(false)}
         footer={<Button type="primary" onClick={() => setIsConfiguring(false)}>完成</Button>}
       >
-        <p className="home-app-config-help">选择要在首页侧边栏显示的应用，并调整顺序。配置仅对当前用户生效。</p>
+        <p className="home-app-config-help">选择要在工作台显示的应用，并调整顺序。配置仅对当前用户生效。</p>
         <div className="home-app-config-list">
           {orderedApps.map((app, index) => (
             <div className="home-app-config-item" key={app.id}>

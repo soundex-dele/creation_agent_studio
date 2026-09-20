@@ -32,11 +32,9 @@ const Sidebar = () => {
         <ConversationHistory
           activeConversationId={new URLSearchParams(location.search).get('conversation')}
           onConversationSelect={(id: string) => {
-            const params = new URLSearchParams();
+            const params = new URLSearchParams(location.search);
             if (id) params.set('conversation', id);
-            if (new URLSearchParams(location.search).get('entry') === 'home') {
-              params.set('entry', 'home');
-            }
+            else params.delete('conversation');
             const query = params.toString();
             navigate(query ? `/chat?${query}` : '/chat');
           }}
