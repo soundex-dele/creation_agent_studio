@@ -73,6 +73,7 @@ export interface BaseApplicationRuntime {
   application_color?: string;
   renderer_key: string;
   executor_key?: string;
+  input_schema?: WorkflowInputSchema;
   default_config: Record<string, unknown>;
 }
 
@@ -121,12 +122,55 @@ export type ApplicationDefinition =
   | ChatApplicationDefinition
   | StandardApplicationDefinition;
 
+export type WorkflowInputValue = string | string[] | number | boolean;
+
+export type WorkflowInputFieldType = 'string' | 'number' | 'integer' | 'boolean' | 'array';
+
+export interface WorkflowInputProperty {
+  type: WorkflowInputFieldType;
+  title?: string;
+  description?: string;
+  default?: WorkflowInputValue;
+  enum?: Array<string | number>;
+  items?: { type: 'string'; enum?: string[] };
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  'x-control'?: 'text' | 'textarea';
+  'x-placeholder'?: string;
+}
+
+export interface WorkflowInputSchema {
+  type?: 'object';
+  properties?: Record<string, WorkflowInputProperty>;
+  required?: string[];
+  additionalProperties?: boolean;
+}
+
+export interface WorkflowRunInputField {
+  key: string;
+  label: string;
+  description?: string;
+  placeholder?: string;
+  type: WorkflowInputFieldType;
+  required: boolean;
+  defaultValue?: WorkflowInputValue;
+  options?: Array<{ value: string | number; label: string }>;
+  multiline?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+}
+
 export interface WorkflowStep {
   id: string;
   key: string;
   name?: string;
   order: number;
   config: Record<string, unknown>;
+  input_mapping?: Record<string, { from: string } | { value: unknown }>;
   depends_on: string[];
   condition: Record<string, unknown>;
   max_attempts: number;
@@ -140,6 +184,7 @@ export interface Workflow {
   description?: string;
   icon?: string;
   execution_mode: 'manual' | 'automatic';
+  input_schema?: WorkflowInputSchema;
   output_mapping?: Record<string, { from: string } | string>;
   is_public: boolean;
   can_delete?: boolean;

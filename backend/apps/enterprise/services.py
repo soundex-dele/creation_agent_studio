@@ -482,6 +482,7 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
                 input_data=payload,
                 priority=0,
                 idempotency_key=f'automation:{trigger.id}:{occurrence_key}',
+                input_schema=workflow.input_schema,
                 output_mapping=workflow.output_mapping,
             )
             run_input = dict(run.input or {})

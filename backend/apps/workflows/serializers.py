@@ -6,6 +6,10 @@ from apps.applications.models import Application
 from core.resource_access import accessible_resources
 from apps.applications.serializers import ApplicationRuntimeSerializer
 from apps.enterprise.models import Membership
+from .input_schema import (
+    validate_workflow_input_schema,
+    workflow_input_properties,
+)
 from .models import Workflow, WorkflowStep
 
 
@@ -30,8 +34,8 @@ class WorkflowStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowStep
         fields = [
-            'id', 'key', 'name', 'order', 'config', 'depends_on', 'condition',
-            'max_attempts', 'application_id', 'application',
+            'id', 'key', 'name', 'order', 'config', 'input_mapping', 'depends_on',
+            'condition', 'max_attempts', 'application_id', 'application',
         ]
 
 
@@ -54,8 +58,9 @@ class WorkflowDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'output_mapping',
-                  'is_public', 'steps', 'can_delete', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'input_schema',
+                  'output_mapping', 'is_public', 'steps', 'can_delete', 'created_at',
+                  'updated_at']
 
     def get_can_delete(self, obj):
         return _can_delete_workflow(obj, self.context.get('request'))
@@ -66,9 +71,16 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'output_mapping',
-                  'is_public', 'steps']
+        fields = ['id', 'name', 'description', 'icon', 'execution_mode', 'input_schema',
+                  'output_mapping', 'is_public', 'steps']
         read_only_fields = ['id']
+
+    def validate_input_schema(self, value):
+        try:
+            validate_workflow_input_schema(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value
 
     def validate_steps(self, value):
         orders = [item['order'] for item in value]
@@ -100,6 +112,10 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
                     f"步骤 {item['key']} 引用了不存在的依赖：{', '.join(sorted(missing))}。"
                 )
             graph[item['key']] = dependency_set
+            if not isinstance(item.get('input_mapping') or {}, dict):
+                raise serializers.ValidationError(
+                    f"步骤 {item['key']} 的 input_mapping 必须是对象。"
+                )
             self._validate_condition(
                 item['key'], item.get('condition') or {}, known_keys, dependency_set
             )
@@ -132,6 +148,10 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        input_schema = attrs.get(
+            'input_schema', getattr(self.instance, 'input_schema', {})
+        ) or {}
+        input_properties = workflow_input_properties(input_schema)
         mapping = attrs.get(
             'output_mapping', getattr(self.instance, 'output_mapping', {})
         ) or {}
@@ -162,7 +182,64 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'output_mapping': f'{name} 引用了不存在的步骤。'
                 })
+        if input_properties:
+            steps_to_validate = steps
+            if steps_to_validate is None and self.instance:
+                steps_to_validate = [
+                    {
+                        'key': step.key,
+                        'config': step.config,
+                        'input_mapping': step.input_mapping,
+                        'condition': step.condition,
+                    }
+                    for step in self.instance.steps.all()
+                ]
+            for step in steps_to_validate or []:
+                self._validate_input_references(step, input_properties)
         return attrs
+
+    @staticmethod
+    def _validate_input_references(step, input_properties):
+        step_key = step['key']
+        condition = step.get('condition') or {}
+        if condition.get('source') == 'input':
+            input_key = str(condition.get('path') or '').partition('.')[0]
+            if input_key not in input_properties:
+                raise serializers.ValidationError({
+                    'input_schema': (
+                        f'步骤 {step_key} 的条件引用了不存在的输入字段 {input_key}。'
+                    )
+                })
+        automation = (step.get('config') or {}).get('automation') or {}
+        answers = automation.get('answers') or {}
+        if not isinstance(answers, dict):
+            answers = {}
+        for binding in answers.values():
+            if not isinstance(binding, dict):
+                continue
+            source = str(binding.get('from') or '')
+            if not source.startswith('workflow.input.'):
+                continue
+            input_key = source.removeprefix('workflow.input.').partition('.')[0]
+            if input_key not in input_properties:
+                raise serializers.ValidationError({
+                    'input_schema': (
+                        f'步骤 {step_key} 引用了不存在的输入字段 {input_key}。'
+                    )
+                })
+        for binding in (step.get('input_mapping') or {}).values():
+            if not isinstance(binding, dict):
+                continue
+            source = str(binding.get('from') or '')
+            if not source.startswith('workflow.input.'):
+                continue
+            input_key = source.removeprefix('workflow.input.').partition('.')[0]
+            if input_key not in input_properties:
+                raise serializers.ValidationError({
+                    'input_schema': (
+                        f'步骤 {step_key} 引用了不存在的输入字段 {input_key}。'
+                    )
+                })
 
     @staticmethod
     def _validate_condition(step_key, condition, known_keys, dependencies):
@@ -222,6 +299,7 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
                 key=item['key'],
                 name=item.get('name', ''),
                 config=item.get('config', {}),
+                input_mapping=item.get('input_mapping', {}),
                 depends_on=item.get('depends_on', []),
                 condition=item.get('condition', {}),
                 max_attempts=item.get('max_attempts', 1),

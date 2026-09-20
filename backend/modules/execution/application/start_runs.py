@@ -821,16 +821,23 @@ def start_supervisor_run(
 
 def start_workflow_run(
     *, organization, workflow_id, workflow_name, steps, actor,
-    input_data, priority, idempotency_key, output_mapping=None, initial_results=None,
+    input_data, priority, idempotency_key, input_schema=None, output_mapping=None,
+    initial_results=None,
 ):
     """Create the canonical durable representation of a Workflow execution."""
     if not idempotency_key or len(idempotency_key) > 160:
         raise ValueError("Idempotency-Key must contain between 1 and 160 characters")
+    if not isinstance(input_data, dict):
+        raise InvalidExecutionDefinition("Workflow input must be an object")
+    public_input = dict(input_data)
+    public_input.pop("working_directory", None)
+    _validate_input({"input_schema": input_schema or {}}, public_input)
     fingerprint = hashlib.sha256(json.dumps({
         "workflow_id": str(workflow_id),
         "steps": steps,
         "input": input_data,
         "priority": priority,
+        "input_schema": input_schema or {},
         "output_mapping": output_mapping or {},
         "initial_results": initial_results or {},
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -897,6 +904,7 @@ def start_workflow_run(
                 "workflow_id": str(workflow_id),
                 "workflow_name": workflow_name,
                 "workflow_steps": frozen_steps,
+                "input_schema": input_schema or {},
                 "output_mapping": output_mapping or {},
                 "initial_results": initial_results or {},
                 "governance": governance,

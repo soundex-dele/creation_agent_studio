@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tag, message } from 'antd';
+import {
+  Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Switch,
+  Tag, message,
+} from 'antd';
 import {
   AppstoreOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined,
   PlusOutlined,
@@ -7,7 +10,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { api } from '@/services/api';
-import type { GuidedPrompt, GuidedQuestion, Workflow } from '@/types';
+import type {
+  GuidedPrompt, Workflow, WorkflowInputValue, WorkflowRunInputField,
+} from '@/types';
+import {
+  validateWorkflowInput,
+  workflowInputDefaults,
+  workflowInputFields,
+} from '@/lib/workflowInputSchema';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -20,14 +30,22 @@ const wait = (milliseconds: number) => new Promise((resolve) => {
   window.setTimeout(resolve, milliseconds);
 });
 
-type WorkflowAnswer = string | string[] | number;
-
-const promptDefaults = (prompt: GuidedPrompt): Record<string, WorkflowAnswer> => (
-  Object.fromEntries(prompt.questions.flatMap((question) => (
-    question.default_value === undefined || question.default_value === null
-      ? []
-      : [[question.key, question.default_value as WorkflowAnswer]]
-  )))
+const promptFields = (prompt: GuidedPrompt): WorkflowRunInputField[] => (
+  prompt.questions.map((question) => ({
+    key: question.key,
+    label: question.label,
+    description: question.help_text,
+    placeholder: question.placeholder,
+    type: question.type === 'multi_choice' ? 'array'
+      : question.type === 'number' ? 'number' : 'string',
+    required: question.required,
+    defaultValue: question.default_value as WorkflowInputValue | undefined,
+    options: question.options.map((option) => ({
+      value: option.value,
+      label: option.label,
+    })),
+    multiline: question.type === 'text',
+  }))
 );
 
 const WorkflowsPage = () => {
@@ -40,7 +58,9 @@ const WorkflowsPage = () => {
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
   const [runWorkflow, setRunWorkflow] = useState<Workflow | null>(null);
   const [runPrompt, setRunPrompt] = useState<GuidedPrompt | null>(null);
-  const [runAnswers, setRunAnswers] = useState<Record<string, WorkflowAnswer>>({});
+  const [runFields, setRunFields] = useState<WorkflowRunInputField[]>([]);
+  const [runAnswers, setRunAnswers] = useState<Record<string, WorkflowInputValue>>({});
+  const [runErrors, setRunErrors] = useState<Record<string, string>>({});
   const [preparingRunId, setPreparingRunId] = useState<string | null>(null);
   const [startingRun, setStartingRun] = useState(false);
 
@@ -64,7 +84,7 @@ const WorkflowsPage = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const launch = async (workflow: Workflow, input: Record<string, WorkflowAnswer>) => {
+  const launch = async (workflow: Workflow, input: Record<string, WorkflowInputValue>) => {
     setStartingRun(true);
     try {
       const run = await api.post<{ id: string }>(
@@ -74,6 +94,8 @@ const WorkflowsPage = () => {
       );
       setRunWorkflow(null);
       setRunPrompt(null);
+      setRunFields([]);
+      setRunErrors({});
       navigate(`/runs/${run.id}`);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '工作流启动失败');
@@ -90,6 +112,15 @@ const WorkflowsPage = () => {
     setPreparingRunId(workflow.id);
     try {
       const detail = await api.get<Workflow>(`/workflows/${workflow.id}/`);
+      const schemaFields = workflowInputFields(detail.input_schema);
+      if (schemaFields.length) {
+        setRunWorkflow(detail);
+        setRunPrompt(null);
+        setRunFields(schemaFields);
+        setRunAnswers(workflowInputDefaults(schemaFields));
+        setRunErrors({});
+        return;
+      }
       const entryStep = [...(detail.steps || [])]
         .sort((left, right) => left.order - right.order)
         .find((step) => step.depends_on.length === 0 && step.application.kind === 'chat');
@@ -109,7 +140,10 @@ const WorkflowsPage = () => {
       }
       setRunWorkflow(detail);
       setRunPrompt(prompt);
-      setRunAnswers(promptDefaults(prompt));
+      const fields = promptFields(prompt);
+      setRunFields(fields);
+      setRunAnswers(workflowInputDefaults(fields));
+      setRunErrors({});
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '读取工作流输入配置失败');
     } finally {
@@ -117,22 +151,25 @@ const WorkflowsPage = () => {
     }
   };
 
-  const setRunAnswer = (question: GuidedQuestion, value: WorkflowAnswer | null) => {
+  const setRunAnswer = (key: string, value: WorkflowInputValue | null) => {
     setRunAnswers((current) => ({
       ...current,
-      [question.key]: value === null ? '' : value,
+      [key]: value === null ? '' : value,
     }));
+    setRunErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   };
 
   const submitAutomaticRun = async () => {
-    if (!runWorkflow || !runPrompt) return;
-    const missing = runPrompt.questions.filter((question) => {
-      if (!question.required) return false;
-      const value = runAnswers[question.key];
-      return value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
-    });
-    if (missing.length) {
-      message.warning(`请填写：${missing.map((question) => question.label).join('、')}`);
+    if (!runWorkflow) return;
+    const errors = validateWorkflowInput(runFields, runAnswers);
+    if (Object.keys(errors).length) {
+      setRunErrors(errors);
+      message.warning('请检查工作流输入');
       return;
     }
     await launch(runWorkflow, runAnswers);
@@ -306,7 +343,7 @@ const WorkflowsPage = () => {
       )}
       <Modal
         title={runPrompt?.title || `运行 ${runWorkflow?.name || '工作流'}`}
-        open={Boolean(runWorkflow && runPrompt)}
+        open={Boolean(runWorkflow && runFields.length)}
         okText="开始自动运行"
         cancelText="取消"
         width={680}
@@ -316,43 +353,80 @@ const WorkflowsPage = () => {
           if (startingRun) return;
           setRunWorkflow(null);
           setRunPrompt(null);
+          setRunFields([]);
+          setRunErrors({});
         }}
       >
-        {runPrompt?.description && <p className="workflow-run-form-description">{runPrompt.description}</p>}
+        <p className="workflow-run-form-description">
+          {runPrompt?.description || '填写本次运行输入；映射到该字段的应用会收到相同内容。'}
+        </p>
         <div className="workflow-run-form">
-          {runPrompt?.questions.map((question) => (
-            <label className="workflow-run-field" key={question.id || question.key}>
-              <span>{question.label}{question.required && <b>*</b>}</span>
-              {question.help_text && <small>{question.help_text}</small>}
-              {question.type === 'single_choice' || question.type === 'multi_choice' ? (
+          {runFields.map((field) => {
+            const errorId = `workflow-input-${field.key}-error`;
+            return (
+            <label className={`workflow-run-field${runErrors[field.key] ? ' has-error' : ''}`} key={field.key}>
+              <span>{field.label}{field.required && <b>*</b>}</span>
+              {field.description && <small>{field.description}</small>}
+              {field.options?.length ? (
                 <Select
-                  mode={question.type === 'multi_choice' ? 'multiple' : undefined}
-                  value={runAnswers[question.key] || undefined}
-                  placeholder={question.placeholder}
-                  options={question.options.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                    title: option.description,
-                  }))}
-                  onChange={(value) => setRunAnswer(question, value)}
+                  id={`workflow-input-${field.key}`}
+                  aria-describedby={runErrors[field.key] ? errorId : undefined}
+                  status={runErrors[field.key] ? 'error' : undefined}
+                  mode={field.type === 'array' ? 'multiple' : undefined}
+                  value={runAnswers[field.key] ?? undefined}
+                  placeholder={field.placeholder}
+                  options={field.options}
+                  onChange={(value) => setRunAnswer(field.key, value)}
                   allowClear
                 />
-              ) : question.type === 'number' ? (
+              ) : field.type === 'number' || field.type === 'integer' ? (
                 <InputNumber
-                  value={runAnswers[question.key] as number | undefined}
-                  placeholder={question.placeholder}
-                  onChange={(value) => setRunAnswer(question, value)}
+                  id={`workflow-input-${field.key}`}
+                  aria-describedby={runErrors[field.key] ? errorId : undefined}
+                  status={runErrors[field.key] ? 'error' : undefined}
+                  value={runAnswers[field.key] as number | undefined}
+                  placeholder={field.placeholder}
+                  min={field.minimum}
+                  max={field.maximum}
+                  onChange={(value) => setRunAnswer(field.key, value)}
+                />
+              ) : field.type === 'boolean' ? (
+                <Switch
+                  id={`workflow-input-${field.key}`}
+                  aria-describedby={runErrors[field.key] ? errorId : undefined}
+                  checked={Boolean(runAnswers[field.key])}
+                  onChange={(value) => setRunAnswer(field.key, value)}
+                />
+              ) : !field.multiline ? (
+                <Input
+                  id={`workflow-input-${field.key}`}
+                  aria-describedby={runErrors[field.key] ? errorId : undefined}
+                  status={runErrors[field.key] ? 'error' : undefined}
+                  value={(runAnswers[field.key] as string | undefined) || ''}
+                  placeholder={field.placeholder}
+                  maxLength={field.maxLength}
+                  onChange={(event) => setRunAnswer(field.key, event.target.value)}
                 />
               ) : (
                 <Input.TextArea
-                  value={(runAnswers[question.key] as string | undefined) || ''}
-                  placeholder={question.placeholder}
-                  autoSize={{ minRows: question.key === 'source' ? 3 : 2, maxRows: 8 }}
-                  onChange={(event) => setRunAnswer(question, event.target.value)}
+                  id={`workflow-input-${field.key}`}
+                  aria-describedby={runErrors[field.key] ? errorId : undefined}
+                  status={runErrors[field.key] ? 'error' : undefined}
+                  value={(runAnswers[field.key] as string | undefined) || ''}
+                  placeholder={field.placeholder}
+                  maxLength={field.maxLength}
+                  autoSize={{ minRows: 4, maxRows: 10 }}
+                  onChange={(event) => setRunAnswer(field.key, event.target.value)}
                 />
               )}
+              {runErrors[field.key] && (
+                <small id={errorId} className="workflow-run-field-error" role="alert">
+                  {runErrors[field.key]}
+                </small>
+              )}
             </label>
-          ))}
+            );
+          })}
         </div>
       </Modal>
     </div>

@@ -200,6 +200,9 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
             "application_id": 1, "application_revision_id": "revision-1",
             "application_content_hash": "a" * 64,
             "executor_kind": "media", "executor_key": "batch-transcribe",
+            "input_mapping": {
+                "payload": {"from": "workflow.input.topic"},
+            },
             "content": {"retry_policy": {"retry_safe": True}},
             "effective_config": {},
         },
@@ -254,6 +257,7 @@ def test_durable_workflow_creates_reusable_child_runs(monkeypatch):
     second = root.child_runs.get(node_key="second")
     assert first.executor_kind == Run.ExecutorKind.MEDIA
     assert first.max_attempts == 2
+    assert first.input["payload"] == "durable"
     assert first.input["working_directory"] == "/managed/workflows/dag-1"
     assert second.executor_kind == Run.ExecutorKind.AGENT
     assert second.input["working_directory"] == "/managed/workflows/dag-1"

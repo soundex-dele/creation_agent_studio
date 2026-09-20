@@ -283,8 +283,14 @@ def _create_or_load_step_run(root, step, workflow_input, dependency_results, gov
         if child is not None:
             return child, False
         retry_policy = (step.get("content") or {}).get("retry_policy") or {}
+        input_mapping = step.get("input_mapping") or {}
+        mapped_input = {
+            key: _resolve_automation_value(binding, workflow_input, dependency_results)
+            for key, binding in input_mapping.items()
+        }
         child_input = {
             **workflow_input,
+            **mapped_input,
             **dict(step.get("runtime_input") or {}),
             "dependency_outputs": {
                 key: value.get("output", {})

@@ -205,6 +205,7 @@ def _start_target_run(automation, invocation, payload):
         input_data=merged_input,
         priority=0,
         idempotency_key=idempotency_key,
+        input_schema=workflow.input_schema,
         output_mapping=workflow.output_mapping,
     )
     run_input = dict(run.input or {})

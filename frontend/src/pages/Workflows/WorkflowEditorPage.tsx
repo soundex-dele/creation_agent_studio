@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Card, Empty, Input, InputNumber, Modal, Segmented, Select, Spin, message } from 'antd';
+import {
+  Button, Card, Checkbox, Empty, Input, InputNumber, Modal, Segmented, Select, Spin,
+  message,
+} from 'antd';
 import type { InputRef } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
 import type { ApplicationRuntime, AppItem, Workflow, WorkflowStep } from '@/types';
+import {
+  emptyWorkflowInputSchema,
+  workflowInputFields,
+  workflowInputProperty,
+  workflowInputSourceOptions,
+} from '@/lib/workflowInputSchema';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -37,6 +46,7 @@ const WorkflowEditorPage = () => {
         description: '',
         icon: '🔀',
         execution_mode: 'manual',
+        input_schema: emptyWorkflowInputSchema(),
         output_mapping: {},
         is_public: false,
         steps: [],
@@ -69,6 +79,7 @@ const WorkflowEditorPage = () => {
         name: app.name,
         order: current.length,
         config: {},
+        input_mapping: {},
         depends_on: current.length ? [current[current.length - 1].key] : [],
         condition: {},
         max_attempts: 1,
@@ -115,10 +126,159 @@ const WorkflowEditorPage = () => {
     setWorkflow({ ...workflow, output_mapping: current });
   };
 
+  const updateStepInputMapping = (
+    stepKey: string,
+    targetKey: string,
+    binding?: { from: string } | { value: unknown },
+  ) => {
+    setSteps((current) => current.map((step) => {
+      if (step.key !== stepKey) return step;
+      const inputMapping = { ...(step.input_mapping || {}) };
+      if (binding === undefined) delete inputMapping[targetKey];
+      else inputMapping[targetKey] = binding;
+      return { ...step, input_mapping: inputMapping };
+    }));
+  };
+
+  const addWorkflowInput = () => {
+    const schema = workflow.input_schema || emptyWorkflowInputSchema();
+    const properties = { ...(schema.properties || {}) };
+    let key = 'text';
+    let suffix = 2;
+    while (properties[key]) {
+      key = `text_${suffix}`;
+      suffix += 1;
+    }
+    properties[key] = {
+      ...workflowInputProperty('textarea', properties.text ? `文本 ${suffix - 1}` : '原始文本'),
+      description: '运行工作流时填写，可映射到多个应用并行处理。',
+      'x-placeholder': '请输入需要处理的文本',
+    };
+    setWorkflow({
+      ...workflow,
+      input_schema: {
+        ...schema,
+        type: 'object',
+        properties,
+        required: [...new Set([...(schema.required || []), key])],
+        additionalProperties: false,
+      },
+    });
+  };
+
+  const updateWorkflowInput = (
+    fieldKey: string,
+    patch: { key?: string; title?: string; description?: string; placeholder?: string;
+      control?: 'text' | 'textarea' | 'number' | 'boolean'; required?: boolean },
+  ) => {
+    const schema = workflow.input_schema || emptyWorkflowInputSchema();
+    const properties = { ...(schema.properties || {}) };
+    const current = properties[fieldKey];
+    if (!current) return;
+    const nextKey = patch.key ?? fieldKey;
+    if (nextKey !== fieldKey && properties[nextKey]) {
+      message.warning(`输入字段 ${nextKey} 已存在`);
+      return;
+    }
+    const currentControl = (
+      current.type === 'number' || current.type === 'integer' ? 'number'
+        : current.type === 'boolean' ? 'boolean'
+          : current['x-control'] === 'textarea' ? 'textarea' : 'text'
+    );
+    const control = patch.control || currentControl;
+    const nextProperty = {
+      ...(patch.control && patch.control !== currentControl
+        ? workflowInputProperty(control, patch.title ?? current.title ?? nextKey)
+        : { ...current, title: patch.title ?? current.title ?? nextKey }),
+      ...(patch.description !== undefined
+        ? { description: patch.description } : current.description ? { description: current.description } : {}),
+      ...(patch.placeholder !== undefined
+        ? { 'x-placeholder': patch.placeholder }
+        : current['x-placeholder'] ? { 'x-placeholder': current['x-placeholder'] } : {}),
+    };
+    const nextProperties = Object.fromEntries(Object.entries(properties).map(([key, value]) => (
+      key === fieldKey ? [nextKey, nextProperty] : [key, value]
+    )));
+    const wasRequired = (schema.required || []).includes(fieldKey);
+    const required = (schema.required || []).filter((key) => key !== fieldKey);
+    if (patch.required ?? wasRequired) required.push(nextKey);
+
+    if (nextKey !== fieldKey) {
+      const previousSource = `workflow.input.${fieldKey}`;
+      const nextSource = `workflow.input.${nextKey}`;
+      setSteps((currentSteps) => currentSteps.map((step) => {
+        const config = { ...(step.config || {}) };
+        const automation = { ...((config.automation as Record<string, any>) || {}) };
+        const answers = { ...((automation.answers as Record<string, any>) || {}) };
+        Object.entries(answers).forEach(([answerKey, binding]) => {
+          if (binding?.from === previousSource) answers[answerKey] = { ...binding, from: nextSource };
+        });
+        const inputMapping = { ...(step.input_mapping || {}) };
+        Object.entries(inputMapping).forEach(([targetKey, binding]) => {
+          if ('from' in binding && binding.from === previousSource) {
+            inputMapping[targetKey] = { from: nextSource };
+          }
+        });
+        automation.answers = answers;
+        config.automation = automation;
+        const condition = step.condition?.source === 'input'
+          && step.condition.path === fieldKey
+          ? { ...step.condition, path: nextKey } : step.condition;
+        return { ...step, config, input_mapping: inputMapping, condition };
+      }));
+    }
+    setWorkflow({
+      ...workflow,
+      input_schema: { ...schema, properties: nextProperties, required },
+    });
+  };
+
+  const removeWorkflowInput = (fieldKey: string) => {
+    const schema = workflow.input_schema || emptyWorkflowInputSchema();
+    const properties = { ...(schema.properties || {}) };
+    delete properties[fieldKey];
+    const source = `workflow.input.${fieldKey}`;
+    setSteps((current) => current.map((step) => {
+      const config = { ...(step.config || {}) };
+      const automation = { ...((config.automation as Record<string, any>) || {}) };
+      const answers = { ...((automation.answers as Record<string, any>) || {}) };
+      Object.entries(answers).forEach(([answerKey, binding]) => {
+        if (binding?.from === source) delete answers[answerKey];
+      });
+      const inputMapping = { ...(step.input_mapping || {}) };
+      Object.entries(inputMapping).forEach(([targetKey, binding]) => {
+        if ('from' in binding && binding.from === source) delete inputMapping[targetKey];
+      });
+      automation.answers = answers;
+      config.automation = automation;
+      return {
+        ...step,
+        config,
+        input_mapping: inputMapping,
+        condition: step.condition?.source === 'input' && step.condition.path === fieldKey
+          ? {} : step.condition,
+      };
+    }));
+    setWorkflow({
+      ...workflow,
+      input_schema: {
+        ...schema,
+        properties,
+        required: (schema.required || []).filter((key) => key !== fieldKey),
+      },
+    });
+  };
+
   const save = async () => {
     if (!workflow.name.trim()) {
       message.warning('请填写工作流名称');
       nameInputRef.current?.focus();
+      return;
+    }
+    const inputKeys = Object.keys(workflow.input_schema?.properties || {});
+    const invalidInputKey = inputKeys.find((key) => !key.trim() || key.includes('.'));
+    if (invalidInputKey !== undefined) {
+      message.warning('输入字段 key 不能为空或包含点号');
       return;
     }
     setSaving(true);
@@ -128,6 +288,7 @@ const WorkflowEditorPage = () => {
         description: workflow.description || '',
         icon: workflow.icon || '🔀',
         execution_mode: workflow.execution_mode,
+        input_schema: workflow.input_schema || emptyWorkflowInputSchema(),
         output_mapping: workflow.output_mapping || {},
         is_public: workflow.is_public,
         steps: steps.map((step, order) => ({
@@ -136,6 +297,7 @@ const WorkflowEditorPage = () => {
           name: step.name || step.application.application_name,
           order,
           config: step.config || {},
+          input_mapping: step.input_mapping || {},
           depends_on: step.depends_on || [],
           condition: step.condition || {},
           max_attempts: step.max_attempts || 1,
@@ -189,6 +351,91 @@ const WorkflowEditorPage = () => {
           {id ? '保存工作流' : '创建工作流'}
         </Button>
       </div>
+      {workflow.execution_mode === 'automatic' && (
+        <Card
+          title="工作流输入"
+          className="workflow-input-schema"
+          extra={<Button icon={<PlusOutlined />} onClick={addWorkflowInput}>添加输入</Button>}
+        >
+          <p>定义一次运行需要填写的内容；同一个输入可映射给多个无依赖应用并行处理。</p>
+          {Object.entries(workflow.input_schema?.properties || {}).length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="尚未定义输入，运行时将直接启动工作流"
+            >
+              <Button type="primary" icon={<PlusOutlined />} onClick={addWorkflowInput}>
+                添加文本输入
+              </Button>
+            </Empty>
+          ) : (
+            <div className="workflow-input-fields">
+              {Object.entries(workflow.input_schema?.properties || {}).map(([fieldKey, field]) => {
+                const control = field.type === 'number' || field.type === 'integer' ? 'number'
+                  : field.type === 'boolean' ? 'boolean'
+                    : field['x-control'] === 'textarea' ? 'textarea' : 'text';
+                return (
+                  <div className="workflow-input-field" key={fieldKey}>
+                    <label>
+                      <span>字段 key</span>
+                      <Input
+                        value={fieldKey}
+                        aria-label={`${field.title || fieldKey}的字段 key`}
+                        onChange={(event) => updateWorkflowInput(fieldKey, { key: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>显示名称</span>
+                      <Input
+                        value={field.title || ''}
+                        onChange={(event) => updateWorkflowInput(fieldKey, { title: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>输入类型</span>
+                      <Select
+                        value={control}
+                        options={[
+                          { value: 'textarea', label: '长文本' },
+                          { value: 'text', label: '单行文本' },
+                          { value: 'number', label: '数字' },
+                          { value: 'boolean', label: '开关' },
+                        ]}
+                        onChange={(value) => updateWorkflowInput(fieldKey, {
+                          control: value as 'text' | 'textarea' | 'number' | 'boolean',
+                        })}
+                      />
+                    </label>
+                    <label className="workflow-input-field-placeholder">
+                      <span>输入提示</span>
+                      <Input
+                        value={field['x-placeholder'] || ''}
+                        onChange={(event) => updateWorkflowInput(
+                          fieldKey, { placeholder: event.target.value },
+                        )}
+                      />
+                    </label>
+                    <Checkbox
+                      checked={(workflow.input_schema?.required || []).includes(fieldKey)}
+                      onChange={(event) => updateWorkflowInput(
+                        fieldKey, { required: event.target.checked },
+                      )}
+                    >
+                      必填
+                    </Checkbox>
+                    <Button
+                      danger
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      aria-label={`删除输入字段 ${field.title || fieldKey}`}
+                      onClick={() => removeWorkflowInput(fieldKey)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
       <div className="workflow-add-actions">
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAppPickerOpen(true)}>
           添加应用
@@ -290,10 +537,11 @@ const WorkflowEditorPage = () => {
                                     value={selected}
                                     options={[
                                       { value: 'default', label: '应用默认值' },
-                                      {
+                                      ...(workflowInputSourceOptions(workflow.input_schema).length
+                                        ? workflowInputSourceOptions(workflow.input_schema) : [{
                                         value: `from:workflow.input.${question.key}`,
                                         label: `启动输入 · ${question.label}`,
-                                      },
+                                      }]),
                                       ...step.depends_on.map((dependency) => ({
                                         value: `from:steps.${dependency}.output.result`,
                                         label: `节点输出 · ${steps.find((item) => item.key === dependency)?.name || dependency}`,
@@ -328,6 +576,57 @@ const WorkflowEditorPage = () => {
                           </div>
                         );
                       })()}
+                    {step.application.kind !== 'chat'
+                      && workflowInputFields(step.application.input_schema).length > 0 && (
+                      <div className="workflow-step-mapping">
+                        <strong>应用输入映射</strong>
+                        {workflowInputFields(step.application.input_schema).map((target) => {
+                          const binding = step.input_mapping?.[target.key];
+                          const selected = binding && 'from' in binding
+                            ? `from:${binding.from}`
+                            : binding && 'value' in binding ? 'fixed' : 'default';
+                          return (
+                            <div className="workflow-mapping-row" key={target.key}>
+                              <span>{target.label}</span>
+                              <Select
+                                value={selected}
+                                options={[
+                                  { value: 'default', label: '同名输入或应用默认值' },
+                                  ...workflowInputSourceOptions(workflow.input_schema),
+                                  ...step.depends_on.map((dependency) => ({
+                                    value: `from:steps.${dependency}.output.result`,
+                                    label: `节点输出 · ${steps.find((item) => (
+                                      item.key === dependency
+                                    ))?.name || dependency}`,
+                                  })),
+                                  { value: 'fixed', label: '固定值' },
+                                ]}
+                                onChange={(value) => {
+                                  if (value === 'default') {
+                                    updateStepInputMapping(step.key, target.key, undefined);
+                                  } else if (value === 'fixed') {
+                                    updateStepInputMapping(step.key, target.key, { value: '' });
+                                  } else {
+                                    updateStepInputMapping(step.key, target.key, {
+                                      from: value.replace(/^from:/, ''),
+                                    });
+                                  }
+                                }}
+                              />
+                              {selected === 'fixed' && (
+                                <Input
+                                  value={String(binding && 'value' in binding ? binding.value : '')}
+                                  placeholder="固定输入值"
+                                  onChange={(event) => updateStepInputMapping(
+                                    step.key, target.key, { value: event.target.value },
+                                  )}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

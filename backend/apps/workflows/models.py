@@ -26,6 +26,7 @@ class Workflow(models.Model):
         choices=ExecutionMode.choices,
         default=ExecutionMode.AUTOMATIC,
     )
+    input_schema = models.JSONField(default=dict, blank=True)
     output_mapping = models.JSONField(default=dict, blank=True)
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -53,6 +54,7 @@ class WorkflowStep(models.Model):
     name = models.CharField(max_length=200, blank=True)
     key = models.SlugField(max_length=100)
     config = models.JSONField(default=dict, blank=True)
+    input_mapping = models.JSONField(default=dict, blank=True)
     depends_on = models.JSONField(default=list, blank=True)
     condition = models.JSONField(default=dict, blank=True)
     max_attempts = models.PositiveSmallIntegerField(default=1)

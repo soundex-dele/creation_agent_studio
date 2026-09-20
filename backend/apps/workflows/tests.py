@@ -139,6 +139,113 @@ class WorkflowApiTest(TestCase):
         run.refresh_from_db()
         self.assertEqual(len(run.definition_snapshot["workflow_steps"]), 2)
 
+    def test_workflow_input_schema_is_mapped_frozen_and_validated(self):
+        input_schema = {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "title": "原始文本",
+                    "minLength": 1,
+                    "x-control": "textarea",
+                },
+            },
+            "required": ["text"],
+            "additionalProperties": False,
+        }
+        response = self.client.post("/api/v1/workflows/", {
+            "name": "Parallel text flow",
+            "input_schema": input_schema,
+            "steps": [
+                {
+                    "key": "first", "application_id": self.applications[0].id,
+                    "name": "First", "order": 0, "depends_on": [],
+                    "input_mapping": {
+                        "payload": {"from": "workflow.input.text"},
+                    },
+                    "config": {
+                        "automation": {
+                            "answers": {
+                                "source": {"from": "workflow.input.text"},
+                            },
+                        },
+                    },
+                },
+                {
+                    "key": "second", "application_id": self.applications[1].id,
+                    "name": "Second", "order": 1, "depends_on": [],
+                    "input_mapping": {
+                        "content": {"from": "workflow.input.text"},
+                    },
+                    "config": {
+                        "automation": {
+                            "answers": {
+                                "content": {"from": "workflow.input.text"},
+                            },
+                        },
+                    },
+                },
+            ],
+        }, format="json", **self.headers)
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["input_schema"], input_schema)
+        workflow_id = response.data["id"]
+
+        rejected = self.client.post(
+            f"/api/v1/workflows/{workflow_id}/start/",
+            {"input": {}}, format="json",
+            HTTP_IDEMPOTENCY_KEY="missing-workflow-input",
+            **self.headers,
+        )
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+        self.assertIn("input_schema", rejected.data["detail"])
+        self.assertEqual(Run.objects.filter(source_type="workflow").count(), 0)
+
+        started = self.client.post(
+            f"/api/v1/workflows/{workflow_id}/start/",
+            {"input": {"text": "同一段文本"}}, format="json",
+            HTTP_IDEMPOTENCY_KEY="valid-workflow-input",
+            **self.headers,
+        )
+        self.assertEqual(started.status_code, 202, started.data)
+        run = Run.objects.get(pk=started.data["id"])
+        self.assertEqual(run.definition_snapshot["input_schema"], input_schema)
+        self.assertEqual(run.input["text"], "同一段文本")
+        self.assertEqual(
+            [step["depends_on"] for step in run.definition_snapshot["workflow_steps"]],
+            [[], []],
+        )
+        self.assertEqual(
+            run.definition_snapshot["workflow_steps"][0]["input_mapping"],
+            {"payload": {"from": "workflow.input.text"}},
+        )
+
+    def test_rejects_unknown_workflow_input_mapping(self):
+        response = self.client.post("/api/v1/workflows/", {
+            "name": "Invalid input mapping",
+            "input_schema": {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": [],
+                "additionalProperties": False,
+            },
+            "steps": [{
+                "key": "first", "application_id": self.applications[0].id,
+                "name": "First", "order": 0, "depends_on": [],
+                "config": {
+                    "automation": {
+                        "answers": {
+                            "source": {"from": "workflow.input.missing"},
+                        },
+                    },
+                },
+            }],
+        }, format="json", **self.headers)
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("不存在的输入字段 missing", str(response.data))
+
     def test_retry_step_reuses_successful_unaffected_outputs(self):
         response = self.client.post("/api/v1/workflows/", {
             "name": "Retry flow",

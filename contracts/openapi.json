@@ -20355,6 +20355,10 @@
                         "title": "Config",
                         "type": "object"
                     },
+                    "input_mapping": {
+                        "title": "Input mapping",
+                        "type": "object"
+                    },
                     "depends_on": {
                         "title": "Depends on",
                         "type": "object"
@@ -20413,6 +20417,10 @@
                             "automatic"
                         ]
                     },
+                    "input_schema": {
+                        "title": "Input schema",
+                        "type": "object"
+                    },
                     "output_mapping": {
                         "title": "Output mapping",
                         "type": "object"
@@ -20463,6 +20471,10 @@
                             "manual",
                             "automatic"
                         ]
+                    },
+                    "input_schema": {
+                        "title": "Input schema",
+                        "type": "object"
                     },
                     "output_mapping": {
                         "title": "Output mapping",

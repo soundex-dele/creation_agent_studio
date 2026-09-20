@@ -21,7 +21,10 @@ from apps.projects.services.workspace_paths import workflow_working_directory
 from modules.catalog.models import ApplicationDeployment
 from modules.catalog.services import canonical_content_hash
 from modules.execution.api.serializers import RunSerializer
-from modules.execution.application.errors import IdempotencyKeyReused
+from modules.execution.application.errors import (
+    IdempotencyKeyReused,
+    InvalidExecutionDefinition,
+)
 from modules.execution.application.start_runs import start_workflow_run
 from modules.execution.models import Run, RunEvent
 from core.resource_access import accessible_resources, can_access_resource
@@ -173,6 +176,7 @@ def build_workflow_step_snapshots(workflow, actor):
             "id": str(step.id),
             "key": step.key,
             "name": step.name or step.application.name,
+            "input_mapping": step.input_mapping,
             "depends_on": step.depends_on,
             "condition": step.condition,
             "max_attempts": step.max_attempts,
@@ -451,6 +455,9 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=409)
         try:
+            input_data = request.data.get("input", {})
+            if input_data is None:
+                input_data = {}
             with transaction.atomic():
                 run, replayed = start_workflow_run(
                     organization=workflow.organization,
@@ -458,9 +465,10 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     workflow_name=workflow.name,
                     steps=snapshots,
                     actor=request.user,
-                    input_data=request.data.get("input") or {},
+                    input_data=input_data,
                     priority=int(request.data.get("priority") or 0),
                     idempotency_key=idempotency_key,
+                    input_schema=workflow.input_schema,
                     output_mapping=workflow.output_mapping,
                 )
                 working_directory = workflow_working_directory(
@@ -471,6 +479,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     run_input["working_directory"] = working_directory
                     Run.objects.filter(pk=run.pk).update(input=run_input)
                     run.input = run_input
+        except InvalidExecutionDefinition as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except IdempotencyKeyReused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         body = RunSerializer(run).data
@@ -545,6 +555,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     input_data=previous.input,
                     priority=previous.priority,
                     idempotency_key=idempotency_key,
+                    input_schema=workflow.input_schema,
                     output_mapping=workflow.output_mapping,
                     initial_results=initial_results,
                 )
