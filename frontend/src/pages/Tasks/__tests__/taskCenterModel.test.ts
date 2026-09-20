@@ -108,8 +108,7 @@ describe('task center relationships', () => {
     });
 
     expect(taskType(applicationRun)).toBe('execution');
-    expect(buildTaskRelation(applicationRun, [applicationRun]).map((node) => node.type))
-      .toEqual(['application', 'execution']);
+    expect(buildTaskRelation(applicationRun, [applicationRun])).toEqual([]);
   });
 
   it('opens a conversation task at its exact conversation page', () => {
@@ -121,15 +120,14 @@ describe('task center relationships', () => {
       application_id: '9',
     });
 
-    expect(buildTaskRelation(conversationRun, [conversationRun]).map((node) => node.type))
-      .toEqual(['application', 'conversation']);
+    expect(buildTaskRelation(conversationRun, [conversationRun])).toEqual([]);
     expect(taskDestination(conversationRun)).toEqual({
       path: '/chat?conversation=conversation%2042',
       label: '打开对话',
     });
   });
 
-  it('builds automation to workflow to application to conversation', () => {
+  it('shows only the direct parent with its workflow name', () => {
     const automationRun = run({
       id: 'automation-run',
       task_type: 'automation',
@@ -137,6 +135,8 @@ describe('task center relationships', () => {
       source_id: '3',
       workflow_id: '3',
       automation_id: 8,
+      task_title: '每天执行',
+      definition_snapshot: { workflow_name: '公众号创作流程' },
     });
     const conversationRun = run({
       id: 'conversation-run',
@@ -147,8 +147,47 @@ describe('task center relationships', () => {
       conversation_id: '33',
     });
 
-    expect(buildTaskRelation(automationRun, [automationRun, conversationRun])
-      .map((node) => node.type))
-      .toEqual(['automation', 'workflow', 'application', 'conversation']);
+    expect(buildTaskRelation(automationRun, [automationRun, conversationRun])).toEqual([]);
+    expect(buildTaskRelation(conversationRun, [automationRun, conversationRun]))
+      .toEqual([{ type: 'workflow', name: '公众号创作流程', run: automationRun }]);
+  });
+
+  it('excludes grandparents, siblings and children from the parent list', () => {
+    const grandparent = run({ id: 'root', source_type: 'workflow' });
+    const parent = run({
+      id: 'parent', parent_id: grandparent.id, source_type: 'application', source_id: '12',
+      task_title: '一段对话标题', definition_snapshot: { application_name: '公众号排版引擎' },
+    });
+    const current = run({ id: 'current', parent_id: parent.id });
+    const sibling = run({ id: 'sibling', parent_id: parent.id });
+    const child = run({ id: 'child', parent_id: current.id });
+    expect(buildTaskRelation(current, [child, grandparent, sibling, parent, current]))
+      .toEqual([{ type: 'application', name: '公众号排版引擎', run: parent }]);
+  });
+
+  it('uses the named application step for a workflow-step parent', () => {
+    const parent = run({ id: 'parent', source_type: 'workflow_step', definition_snapshot: { workflow_step_name: 'HTML 封面生成器' } });
+    const current = run({ parent_id: parent.id });
+    expect(buildTaskRelation(current, [parent])[0].name).toBe('HTML 封面生成器');
+  });
+
+  it('does not substitute another task when the parent is absent or self-referencing', () => {
+    expect(buildTaskRelation(run({ parent_id: 'missing' }), [run({ id: 'other' })])).toEqual([]);
+    const current = run({ parent_id: 'run-1' });
+    expect(buildTaskRelation(current, [current])).toEqual([]);
+  });
+
+  it('opens the current workflow execution even when triggered by automation', () => {
+    const current = run({ id: 'current-workflow', parent_id: 'parent-run', task_type: 'automation', source_type: 'workflow', automation_id: 8 });
+    expect(taskDestination(current)).toEqual({ path: '/runs/current-workflow', label: '打开工作流任务' });
+  });
+
+  it('opens the current application execution conversation instead of its parent or application', () => {
+    const current = run({ id: 'current', parent_id: 'parent-workflow', task_type: 'execution', source_type: 'workflow_step', application_id: '9', conversation_id: 'current conversation' });
+    expect(taskDestination(current)).toEqual({ path: '/chat?conversation=current%20conversation', label: '打开对话' });
+  });
+
+  it('does not redirect a task without a conversation or workflow to a resource definition', () => {
+    expect(taskDestination(run({ task_type: 'automation', source_type: 'application', application_id: '9', automation_id: 8 }))).toBeNull();
   });
 });

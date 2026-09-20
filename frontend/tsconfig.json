@@ -21,6 +21,7 @@
       "@creation-master/*": ["../backend/app_center/creation_master/react/src/*"],
       "@creation-toolbox/*": ["../backend/app_center/creation_toolbox/react/src/*"],
       "@newmedia-workbench/*": ["../backend/app_center/newmedia_workbench/react/src/*"],
+      "@phosphor-icons/react": ["node_modules/@phosphor-icons/react"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
       "react": ["node_modules/@types/react/index.d.ts"],
       "react/*": ["node_modules/@types/react/*"],

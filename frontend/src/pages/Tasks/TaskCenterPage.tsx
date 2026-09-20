@@ -11,7 +11,7 @@ import {
   ExportOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined,
   RobotOutlined, SearchOutlined, UnorderedListOutlined, WarningOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
@@ -97,6 +97,7 @@ export default function TaskCenterPage() {
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const loadOrganizations = useOrganizationStore((state) => state.loadOrganizations);
   const [runs, setRuns] = useState<RunResource[]>([]);
+  const [parents, setParents] = useState<RunResource[]>([]);
   const [children, setChildren] = useState<RunResource[]>([]);
   const [selected, setSelected] = useState<RunResource | null>(null);
   const [treeRoot, setTreeRoot] = useState<RunResource | null>(null);
@@ -135,6 +136,29 @@ export default function TaskCenterPage() {
     ).then(setChildren).catch(() => setChildren([]));
   }, [organizationId, selected]);
 
+  useEffect(() => {
+    setParents([]);
+    if (!organizationId) return;
+    let cancelled = false;
+    const known = new Set([...runs, ...children].map((run) => run.id));
+    const missing = [...new Set([...runs, ...children].flatMap((run) => (
+      run.parent_id && !known.has(run.parent_id) ? [run.parent_id] : []
+    )))];
+    void Promise.allSettled(missing.map((id) => api.get<RunResource>(
+      `${tenantApiRoot(organizationId)}/runs/${id}`,
+    ))).then((results) => {
+      if (!cancelled) setParents(results.flatMap((result) => (
+        result.status === 'fulfilled' ? [result.value] : []
+      )));
+    });
+    return () => { cancelled = true; };
+  }, [organizationId, runs, children]);
+
+  const relationSource = useMemo(() => {
+    const merged = new Map([...parents, ...runs, ...children].map((run) => [run.id, run]));
+    return [...merged.values()];
+  }, [children, parents, runs]);
+
   const taskRuns = useMemo(() => collapseConversationRuns(runs), [runs]);
   const runsWithChildren = useMemo(() => new Set(
     taskRuns.flatMap((run) => run.parent_id ? [run.parent_id] : []),
@@ -163,13 +187,13 @@ export default function TaskCenterPage() {
     if (statusFilter === 'completed' && !COMPLETED_STATUSES.has(run.status)) return false;
     const keyword = query.trim().toLowerCase();
     if (!keyword) return true;
-    const relationship = buildTaskRelation(run, runs)
-      .map((node) => typeMeta[node.type]?.label || node.type).join(' ');
+    const relationship = buildTaskRelation(run, relationSource)
+      .map((node) => `${typeMeta[node.type]?.label || node.type} ${node.name}`).join(' ');
     return `${taskTitle(run)} ${typeMeta[type]?.label || ''} ${relationship} ${run.status}`
       .toLowerCase().includes(keyword);
-  }), [query, runs, statusFilter, taskRuns, typeFilter]);
+  }), [query, relationSource, statusFilter, taskRuns, typeFilter]);
 
-  const openDestination = (run: RunResource, requestedType = taskType(run)) => {
+  const openDestination = (run: RunResource, requestedType?: string) => {
     const destination = taskDestination(run, requestedType);
     if (destination) navigate(destination.path);
   };
@@ -192,29 +216,21 @@ export default function TaskCenterPage() {
     }
   };
 
-  const renderRelationship = (run: RunResource, source = runs) => {
+  const renderRelationship = (run: RunResource, source = relationSource) => {
     const nodes = buildTaskRelation(run, source);
-    return <div className="task-relation-chain" aria-label="任务关联关系">
-      {nodes.map((node, index) => {
+    if (!run.parent_id) return <span className="task-relation-empty">无父级</span>;
+    if (!nodes.length) return <Link to={`/runs/${run.parent_id}`}>查看父级任务</Link>;
+    return <ul className="task-relation-list" aria-label="关联任务">
+      {nodes.map((node) => {
         const meta = typeMeta[node.type] || { ...fallbackTypeMeta, label: node.type };
-        const destination = taskDestination(node.run, node.type);
-        return <span className="task-relation-part" key={`${node.type}-${index}`}>
-          {index > 0 && <span className="task-relation-arrow">→</span>}
-          <button
-            type="button"
-            className={node.type === taskType(run) ? 'current' : ''}
-            disabled={!destination}
-            title={destination?.label || meta.label}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (destination) navigate(destination.path);
-            }}
-          >
-            <span aria-hidden="true">{meta.icon}</span>{meta.label}
-          </button>
-        </span>;
+        const destination = taskDestination(node.run);
+        return <li className="task-relation-part" key={node.run.id}>
+          <Link className="task-relation-link" to={destination?.path || `/runs/${node.run.id}`} title={`打开关联任务：${node.name}`}>
+            <span aria-hidden="true">{meta.icon}</span><span className="task-relation-type">{meta.label}</span><span className="task-relation-name">{node.name}</span>
+          </Link>
+        </li>;
       })}
-    </div>;
+    </ul>;
   };
 
   const columns: ColumnsType<RunResource> = [
@@ -228,7 +244,7 @@ export default function TaskCenterPage() {
       },
     },
     {
-      title: '关联关系', key: 'relationship', width: 330,
+      title: '关联任务', key: 'relationship', width: 330,
       render: (_, run) => renderRelationship(run),
     },
     {
@@ -243,7 +259,7 @@ export default function TaskCenterPage() {
         return <Space size={4}>
           <Button size="small" onClick={() => setSelected(run)}>详情</Button>
           {runsWithChildren.has(run.id) && <Button size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
-          {destination && taskType(run) !== 'conversation' && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>
+          {destination && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>
             打开
           </Button>}
         </Space>;
@@ -251,11 +267,6 @@ export default function TaskCenterPage() {
     },
   ];
 
-  const relationSource = useMemo(() => {
-    const merged = new Map(runs.map((run) => [run.id, run]));
-    children.forEach((run) => merged.set(run.id, run));
-    return [...merged.values()];
-  }, [children, runs]);
   const treeNodes = useMemo(() => {
     if (!treeRoot) return [];
     const merged = new Map<string, RunResource>([[treeRoot.id, treeRoot]]);
@@ -359,7 +370,7 @@ export default function TaskCenterPage() {
             setTreeRoot(null);
             setSelected(run);
           }}>详情</Button>
-          {destination && taskType(run) !== 'conversation' && <Button
+          {destination && <Button
             type="link" size="small" icon={<ExportOutlined />}
             onClick={() => openDestination(run)}
           >打开</Button>}
@@ -440,8 +451,8 @@ export default function TaskCenterPage() {
             ]}
           />
           <Input
-            allowClear prefix={<SearchOutlined />} placeholder="搜索任务名称或关联类型"
-            aria-label="搜索任务名称或关联类型"
+            allowClear prefix={<SearchOutlined />} placeholder="搜索任务或父级名称"
+            aria-label="搜索任务或父级名称"
             value={query} onChange={(event) => setQuery(event.target.value)}
           />
         </div>
@@ -477,7 +488,7 @@ export default function TaskCenterPage() {
               <div>
                 <Button type="text" size="small" onClick={() => setSelected(run)}>查看详情</Button>
                 {runsWithChildren.has(run.id) && <Button type="text" size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
-                {destination && taskType(run) !== 'conversation' && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>打开</Button>}
+                {destination && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>打开</Button>}
               </div>
             </footer>
           </article>;
@@ -528,11 +539,8 @@ export default function TaskCenterPage() {
           <span>开始于 {formatTime(selected.created_at)}</span>
         </div>
         <section className="task-detail-relation">
-          <div className="task-section-heading"><h3>任务关系</h3><span>从来源到当前任务的完整链路</span></div>
+          <div className="task-section-heading"><h3>关联任务</h3><span>当前任务的直接父级</span></div>
           {renderRelationship(selected, relationSource)}
-          <Typography.Paragraph type="secondary">
-            应用是任务来源而不是任务类型；自动化可触发工作流或应用，应用产生的对话会作为任务展示。
-          </Typography.Paragraph>
         </section>
         <section className="task-detail-card">
           <div className="task-section-heading"><h3>基本信息</h3><span>任务标识、类型与执行时间</span></div>

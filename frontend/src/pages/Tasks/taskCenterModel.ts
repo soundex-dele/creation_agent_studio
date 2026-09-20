@@ -87,8 +87,15 @@ export interface TaskDestination {
 
 export const taskDestination = (
   run: RunResource,
-  requestedType = taskType(run),
+  requestedType?: string,
 ): TaskDestination | null => {
+  // The default action opens this execution's conversation or workflow run.
+  // Opening a resource definition is only available when explicitly requested.
+  requestedType ??= taskConversationId(run)
+    ? 'conversation'
+    : run.source_type === 'workflow' || taskType(run) === 'workflow'
+      ? 'workflow'
+      : '';
   if (requestedType === 'automation' && run.automation_id) {
     return { path: `/automations/${run.automation_id}`, label: '打开自动化' };
   }
@@ -111,6 +118,7 @@ export const taskDestination = (
 };
 
 export interface TaskRelationNode {
+  name: string;
   type: string;
   run: RunResource;
 }
@@ -151,48 +159,24 @@ export const flattenTaskTree = (nodes: TaskTreeNode[]): RunResource[] => nodes.f
   (node) => [node.run, ...flattenTaskTree(node.children)],
 );
 
-/** Build a compact type chain such as 自动化 → 工作流 → 应用 → 对话. */
+/** Only the direct parent belongs in a task's relationship list. */
 export const buildTaskRelation = (
   run: RunResource,
   allRuns: RunResource[],
 ): TaskRelationNode[] => {
-  const byId = new Map(allRuns.map((item) => [item.id, item]));
-  const byParent = new Map<string, RunResource[]>();
-  allRuns.forEach((item) => {
-    if (!item.parent_id) return;
-    byParent.set(item.parent_id, [...(byParent.get(item.parent_id) || []), item]);
-  });
-  const lineage: RunResource[] = [];
-  const seenRunIds = new Set<string>();
-  let cursor: RunResource | undefined = run;
-  while (cursor && !seenRunIds.has(cursor.id)) {
-    lineage.unshift(cursor);
-    seenRunIds.add(cursor.id);
-    cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
-  }
-
-  const nodes: TaskRelationNode[] = [];
-  const seenTypes = new Set<string>();
-  const add = (type: string | null, item: RunResource) => {
-    if (!type || seenTypes.has(type)) return;
-    seenTypes.add(type);
-    nodes.push({ type, run: item });
-  };
-  const visit = (item: RunResource) => {
-    const type = taskType(item);
-    if (type !== 'automation' && taskApplicationId(item)) add('application', item);
-    add(type, item);
-    if (type === 'automation') add(sourceRelationType(item), item);
-    (byParent.get(item.id) || []).forEach(visit);
-    if (type !== 'conversation' && taskConversationId(item)) add('conversation', item);
-  };
-
-  lineage.forEach((item, index) => {
-    if (index === lineage.length - 1) visit(item);
-    else {
-      add(taskType(item), item);
-      if (taskType(item) === 'automation') add(sourceRelationType(item), item);
-    }
-  });
-  return nodes;
+  if (!run.parent_id || run.parent_id === run.id) return [];
+  const parent = allRuns.find((item) => item.id === run.parent_id);
+  if (!parent) return [];
+  const type = sourceRelationType(parent) || taskType(parent);
+  const snapshot = parent.definition_snapshot || {};
+  const name = type === 'workflow'
+    ? snapshot.workflow_name
+    : type === 'application'
+      ? snapshot.application_name || snapshot.workflow_step_name
+      : null;
+  return [{
+    type,
+    run: parent,
+    name: String(name || parent.task_title || `父级任务 #${parent.id.slice(0, 8)}`),
+  }];
 };

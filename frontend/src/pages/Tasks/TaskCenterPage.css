@@ -297,7 +297,7 @@
 
 .task-title-button:focus-visible,
 .task-mobile-title:focus-visible,
-.task-relation-part button:focus-visible,
+.task-relation-link:focus-visible,
 .task-tree-toggle:focus-visible,
 .task-tree-title:focus-visible,
 .task-child-list button:focus-visible {
@@ -381,54 +381,57 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--task-status-color) 12%, transparent);
 }
 
-.task-relation-chain {
-  display: flex;
+.task-relation-list {
+  display: grid;
   min-width: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-relation-empty {
+  color: var(--color-text-dim);
+  font-size: 12px;
 }
 
 .task-relation-part {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  min-width: 0;
 }
 
-.task-relation-arrow {
-  color: var(--color-text-dim);
-  font-size: 11px;
-}
-
-.task-relation-part button {
-  display: inline-flex;
-  min-height: 28px;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-bg-elevated);
+.task-relation-link {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  min-height: 32px;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
   color: var(--color-text-sec);
   font: inherit;
   font-size: 12px;
+  text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
-.task-relation-part button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--color-primary) 44%, var(--color-border));
+.task-relation-link:hover .task-relation-name {
   color: var(--color-primary);
 }
 
-.task-relation-part button.current {
-  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg-elevated));
-  color: var(--color-primary);
+.task-relation-type {
+  white-space: nowrap;
 }
 
-.task-relation-part button:disabled {
-  cursor: default;
-  opacity: 1;
+.task-relation-name {
+  min-width: 0;
+  color: var(--color-text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .task-mobile-list {
@@ -928,12 +931,11 @@
   }
 
   .task-mobile-title,
-  .task-relation-part button {
+  .task-relation-link {
     min-height: 44px;
   }
 
-  .task-relation-chain,
-  .task-relation-part {
+  .task-relation-list {
     gap: 8px;
   }
 
