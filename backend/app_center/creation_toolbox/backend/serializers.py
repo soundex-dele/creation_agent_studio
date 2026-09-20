@@ -2,6 +2,8 @@ from pathlib import Path
 
 from rest_framework import serializers
 
+from core.storage import signed_media_url
+
 from .models import (
     Copywriting,
     CreationProject,
@@ -203,6 +205,7 @@ class FolderSerializer(serializers.ModelSerializer):
 
 class AssetSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
     project_id = serializers.UUIDField(read_only=True)
     folder_id = serializers.UUIDField(read_only=True, allow_null=True)
 
@@ -210,15 +213,24 @@ class AssetSerializer(serializers.ModelSerializer):
         model = MediaAsset
         fields = [
             "id", "project_id", "folder_id", "name", "kind", "mime_type", "size",
-            "file_url", "created_at", "updated_at",
+            "file_url", "download_url", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "project_id", "kind", "mime_type", "size", "file_url", "created_at",
-            "updated_at",
+            "id", "project_id", "kind", "mime_type", "size", "file_url",
+            "download_url", "created_at", "updated_at",
         ]
 
     def get_file_url(self, instance):
         return instance.file.url if instance.file else ""
+
+    def get_download_url(self, instance):
+        if not instance.file:
+            return ""
+        return signed_media_url(
+            instance.file.name,
+            filename=instance.name,
+            download=True,
+        )
 
     def validate_name(self, value):
         value = Path(value).name.strip()

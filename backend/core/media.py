@@ -32,6 +32,10 @@ def private_media(request):
             max_age=settings.MEDIA_ACCESS_TTL_SECONDS,
         )
         name = _safe_storage_name(payload.get("name"))
+        download = payload.get("download") is True
+        requested_filename = PurePosixPath(
+            str(payload.get("filename") or name).replace("\\", "/")
+        ).name
     except (signing.BadSignature, signing.SignatureExpired, ValueError, AttributeError):
         return JsonResponse({"detail": "Media URL is invalid or expired."}, status=403)
 
@@ -39,17 +43,17 @@ def private_media(request):
         return JsonResponse({"detail": "Media object not found."}, status=404)
 
     content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
-    filename = PurePosixPath(name).name
+    filename = requested_filename or PurePosixPath(name).name
     if settings.MEDIA_X_ACCEL_REDIRECT:
         response = HttpResponse(content_type=content_type)
         response["X-Accel-Redirect"] = "/_protected_media/" + quote(name, safe="/")
         response["Content-Length"] = str(default_storage.size(name))
-        response["Content-Disposition"] = content_disposition_header(False, filename)
+        response["Content-Disposition"] = content_disposition_header(download, filename)
     else:
         response = FileResponse(
             default_storage.open(name, "rb"),
             content_type=content_type,
-            as_attachment=False,
+            as_attachment=download,
             filename=filename,
         )
     response["Cache-Control"] = "private, max-age=300"

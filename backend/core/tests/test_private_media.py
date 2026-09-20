@@ -4,7 +4,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage, storages
 from django.utils.functional import empty
 
-from core.storage import MEDIA_TOKEN_SALT
+from core.storage import MEDIA_TOKEN_SALT, signed_media_url
 
 
 @pytest.fixture
@@ -42,6 +42,23 @@ def test_private_media_rejects_tampered_or_unsafe_names(client, private_media_se
         {"name": "../secret.txt"}, salt=MEDIA_TOKEN_SALT, compress=True
     )
     assert client.get(f"/api/v1/media/?token={unsafe}").status_code == 403
+
+
+def test_signed_download_uses_attachment_and_original_filename(
+    client, private_media_settings
+):
+    name = default_storage.save("org/generated-name.mp4", ContentFile(b"video"))
+
+    response = client.get(
+        signed_media_url(name, filename="旅行素材.mp4", download=True)
+    )
+
+    assert response.status_code == 200
+    assert response["Content-Disposition"].startswith("attachment;")
+    assert "filename*=utf-8''%E6%97%85%E8%A1%8C%E7%B4%A0%E6%9D%90.mp4" in response[
+        "Content-Disposition"
+    ]
+    assert b"".join(response.streaming_content) == b"video"
 
 
 def test_nginx_acceleration_uses_internal_location(

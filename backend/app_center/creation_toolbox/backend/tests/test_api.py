@@ -2,6 +2,7 @@ import pytest
 from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -98,6 +99,15 @@ def test_project_asset_and_workspace_counts(toolbox_context):
     assert uploaded.status_code == 201, uploaded.data
     assert uploaded.data["kind"] == MediaAsset.Kind.IMAGE
     assert uploaded.data["size"] == 8
+    media_url = f"{reverse('private-media')}?token="
+    assert uploaded.data["download_url"].startswith(media_url)
+
+    downloaded = client.get(uploaded.data["download_url"])
+    assert downloaded.status_code == 200
+    assert downloaded["Content-Disposition"].startswith(
+        'attachment; filename="cover.png"'
+    )
+    assert b"".join(downloaded.streaming_content) == b"png-data"
 
     workspace = client.get(f"{root}/workspace")
     assert workspace.status_code == 200

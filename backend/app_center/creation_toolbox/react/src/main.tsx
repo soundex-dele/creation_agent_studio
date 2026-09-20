@@ -163,6 +163,7 @@ interface Asset {
   mime_type: string;
   size: number;
   file_url: string;
+  download_url: string;
   created_at: string;
 }
 
@@ -313,6 +314,7 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  const [uploadStatus, setUploadStatus] = useState('');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
   const [modal, setModal] = useState<'project' | 'folder' | null>(null);
@@ -434,18 +436,20 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
 
   const uploadAssets = async (files: FileList | null) => {
     if (!selectedProjectId || !files?.length) return;
+    const selectedFiles = Array.from(files);
     setBusy('assets');
     try {
-      for (const file of Array.from(files)) {
+      for (const [index, file] of selectedFiles.entries()) {
+        setUploadStatus(`正在上传 ${index + 1} / ${selectedFiles.length}：${file.name}`);
         const data = new FormData();
         data.append('file', file);
         if (currentFolder) data.append('folder_id', currentFolder.id);
         await requester(`${apiBasePath}/projects/${selectedProjectId}/assets`, { method: 'POST', body: data });
       }
       await Promise.all([loadAssets(selectedProjectId, currentFolder?.id ?? null), refreshAll()]);
-      notify(`已上传 ${files.length} 个素材`);
+      notify(`已上传 ${selectedFiles.length} 个素材`);
     } catch (reason) { notify(errorText(reason, '上传素材失败')); }
-    finally { setBusy(''); }
+    finally { setBusy(''); setUploadStatus(''); }
   };
 
   const removeAsset = async (asset: Asset) => {
@@ -479,7 +483,7 @@ export function CreationToolboxApp({ apiBasePath, requester, showHeader = true, 
             {view === 'overview' && <Overview workspace={workspace} projects={activeProjects} topics={topics} deliverables={deliverables} publications={publications} analytics={analytics} setView={setView} openProject={() => setModal('project')} />}
             {view === 'topics' && <TopicsView apiBasePath={apiBasePath} requester={requester} topics={topics} recentTags={topicTags} projects={projects} publications={publications} refresh={refreshAll} onCreated={registerCreatedTopic} notify={notify} errorText={errorText} onProject={(id) => { setSelectedProjectId(id); setView('projects'); }} />}
             {view === 'projects' && <ProjectFlowView apiBasePath={apiBasePath} requester={requester} projects={projects} recordings={recordings} copywritings={copywritings} scripts={scripts} deliverables={deliverables} publications={publications} selectedProjectId={selectedProjectId} selectProject={setSelectedProjectId} openSection={setView} refresh={refreshAll} notify={notify} errorText={errorText} openProject={() => setModal('project')} />}
-            {view === 'capture' && <CaptureView projectsView={<ProjectsView projects={activeProjects} selectedProjectId={selectedProjectId} selectProject={(id) => { setSelectedProjectId(id); setFolderStack([]); }} folderStack={folderStack} enterFolder={(folder) => setFolderStack((items) => [...items, folder])} goUp={() => setFolderStack((items) => items.slice(0, -1))} folders={folders} assets={assets} busy={busy === 'assets'} openProject={() => setModal('project')} openFolder={() => setModal('folder')} uploadAssets={uploadAssets} removeAsset={removeAsset} />} recordingsView={<RecordingsView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} recordings={recordings} refresh={refreshAll} notify={notify} errorText={errorText} />} />}
+            {view === 'capture' && <CaptureView projectsView={<ProjectsView projects={activeProjects} selectedProjectId={selectedProjectId} selectProject={(id) => { setSelectedProjectId(id); setFolderStack([]); }} folderStack={folderStack} enterFolder={(folder) => setFolderStack((items) => [...items, folder])} goUp={() => setFolderStack((items) => items.slice(0, -1))} folders={folders} assets={assets} busy={busy === 'assets'} uploadStatus={uploadStatus} openProject={() => setModal('project')} openFolder={() => setModal('folder')} uploadAssets={uploadAssets} removeAsset={removeAsset} />} recordingsView={<RecordingsView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} recordings={recordings} refresh={refreshAll} notify={notify} errorText={errorText} />} />}
             {view === 'content' && <ContentView copyView={<CopywritingView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} items={copywritings} refresh={refreshAll} notify={notify} errorText={errorText} />} scriptsView={<ScriptsView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} scripts={scripts} assets={assets} refresh={refreshAll} notify={notify} errorText={errorText} />} />}
             {view === 'publishing' && <PublishingView apiBasePath={apiBasePath} requester={requester} projects={activeProjects} deliverables={deliverables} publications={publications} refresh={refreshAll} notify={notify} errorText={errorText} />}
             {view === 'analytics' && <AnalyticsView apiBasePath={apiBasePath} requester={requester} data={analytics} notify={notify} errorText={errorText} />}
@@ -678,15 +682,16 @@ function AssetIcon({ kind }: { kind: Asset['kind'] }) {
   return <Icon aria-hidden="true" />;
 }
 
-function ProjectsView({ projects, selectedProjectId, selectProject, folderStack, enterFolder, goUp, folders, assets, busy, openProject, openFolder, uploadAssets, removeAsset }: {
-  projects: Project[]; selectedProjectId: string | null; selectProject: (id: string) => void; folderStack: FolderItem[]; enterFolder: (folder: FolderItem) => void; goUp: () => void; folders: FolderItem[]; assets: Asset[]; busy: boolean; openProject: () => void; openFolder: () => void; uploadAssets: (files: FileList | null) => void; removeAsset: (asset: Asset) => void;
+function ProjectsView({ projects, selectedProjectId, selectProject, folderStack, enterFolder, goUp, folders, assets, busy, uploadStatus, openProject, openFolder, uploadAssets, removeAsset }: {
+  projects: Project[]; selectedProjectId: string | null; selectProject: (id: string) => void; folderStack: FolderItem[]; enterFolder: (folder: FolderItem) => void; goUp: () => void; folders: FolderItem[]; assets: Asset[]; busy: boolean; uploadStatus: string; openProject: () => void; openFolder: () => void; uploadAssets: (files: FileList | null) => void; removeAsset: (asset: Asset) => void;
 }) {
   const selected = projects.find((item) => item.id === selectedProjectId);
   return <>
-    <PageTitle eyebrow="PROJECT LIBRARY" title="工程与素材" detail="按项目归档图片、视频、音频和创作文档。" actions={<><button className="ct-button ghost" onClick={openFolder} disabled={!selected}><FolderPlus />新建文件夹</button><label className={`ct-button ghost ${busy || !selected ? 'disabled' : ''}`}><Upload />{busy ? '上传中…' : '上传素材'}<input type="file" multiple hidden disabled={busy || !selected} onChange={(event) => { void uploadAssets(event.target.files); event.target.value = ''; }} /></label><button className="ct-button primary" onClick={openProject}><Plus />新建工程</button></>} />
+    <PageTitle eyebrow="PROJECT LIBRARY" title="工程与素材" detail="按项目归档图片、视频、音频和创作文档；手机端可直接从相册或文件中上传，并随时下载。" actions={<><button className="ct-button ghost" onClick={openFolder} disabled={!selected}><FolderPlus />新建文件夹</button><label className={`ct-button ghost ${busy || !selected ? 'disabled' : ''}`} htmlFor="ct-material-upload"><Upload />{busy ? '上传中…' : '上传素材'}<input id="ct-material-upload" className="ct-file-input" type="file" multiple disabled={busy || !selected} accept="image/*,video/*,audio/*,.pdf,.txt,.md,.srt,.doc,.docx" onChange={(event) => { void uploadAssets(event.target.files); event.target.value = ''; }} /></label><button className="ct-button primary" onClick={openProject}><Plus />新建工程</button></>} />
+    {uploadStatus && <div className="ct-upload-status" role="status" aria-live="polite"><LoaderCircle className="ct-spin" aria-hidden="true" /><span>{uploadStatus}</span></div>}
     {!projects.length ? <div className="ct-panel"><EmptyState icon={Folder} title="建立你的第一个视频工程" detail="工程会把素材、录音、文案和脚本组织在一起。" action={<button className="ct-button primary" onClick={openProject}>创建工程</button>} /></div> : <div className="ct-project-layout">
       <aside className="ct-project-list"><span className="ct-kicker">PROJECTS · {projects.length}</span>{projects.map((project) => <button key={project.id} className={project.id === selectedProjectId ? 'active' : ''} onClick={() => selectProject(project.id)}><span><Folder /></span><div><strong>{project.name}</strong><small>{project.asset_count} 素材 · {project.script_count} 脚本</small></div><ChevronRight /></button>)}</aside>
-      <section className="ct-panel ct-assets"><header><div><span className="ct-kicker">MATERIALS</span><h2>{selected?.name}</h2><p className="ct-breadcrumb">{folderStack.length ? <><button onClick={goUp}>返回上一级</button><span>/</span>{folderStack.map((folder) => <span key={folder.id}>{folder.name}</span>)}</> : selected?.description || '这个工程还没有说明。'}</p></div><b>{folders.length + assets.length} 项</b></header>{!folders.length && !assets.length ? <EmptyState icon={Upload} title="素材区还是空的" detail="上传图片、视频、音频或文档，开始搭建内容素材库。" /> : <div className="ct-asset-grid">{folders.map((folder) => <button className="ct-folder-card" key={folder.id} onClick={() => enterFolder(folder)}><span><Folder /></span><strong>{folder.name}</strong><small>{folder.item_count} 项</small></button>)}{assets.map((asset) => <article className="ct-asset-card" key={asset.id}>{asset.kind === 'image' ? <div className="ct-asset-preview"><img src={asset.file_url} alt={asset.name} loading="lazy" /></div> : <div className={`ct-asset-preview ${asset.kind}`}><AssetIcon kind={asset.kind} /></div>}<div><strong title={asset.name}>{asset.name}</strong><small>{formatSize(asset.size)} · {formatDate(asset.created_at)}</small></div><button aria-label={`删除 ${asset.name}`} onClick={() => void removeAsset(asset)}><Trash2 /></button></article>)}</div>}</section>
+      <section className="ct-panel ct-assets"><header><div><span className="ct-kicker">MATERIALS</span><h2>{selected?.name}</h2><p className="ct-breadcrumb">{folderStack.length ? <><button onClick={goUp}>返回上一级</button><span>/</span>{folderStack.map((folder) => <span key={folder.id}>{folder.name}</span>)}</> : selected?.description || '这个工程还没有说明。'}</p></div><b>{folders.length + assets.length} 项</b></header>{!folders.length && !assets.length ? <EmptyState icon={Upload} title="素材区还是空的" detail="上传图片、视频、音频或文档，开始搭建内容素材库。" /> : <div className="ct-asset-grid">{folders.map((folder) => <button className="ct-folder-card" key={folder.id} onClick={() => enterFolder(folder)}><span><Folder /></span><strong>{folder.name}</strong><small>{folder.item_count} 项</small></button>)}{assets.map((asset) => <article className="ct-asset-card" key={asset.id}>{asset.kind === 'image' ? <div className="ct-asset-preview"><img src={asset.file_url} alt={asset.name} loading="lazy" /></div> : <div className={`ct-asset-preview ${asset.kind}`}><AssetIcon kind={asset.kind} /></div>}<div className="ct-asset-meta"><strong title={asset.name}>{asset.name}</strong><small>{formatSize(asset.size)} · {formatDate(asset.created_at)}</small></div><div className="ct-asset-actions"><a href={asset.download_url} download={asset.name} aria-label={`下载 ${asset.name}`} title="下载素材"><Download aria-hidden="true" /></a><button aria-label={`删除 ${asset.name}`} title="删除素材" onClick={() => void removeAsset(asset)}><Trash2 aria-hidden="true" /></button></div></article>)}</div>}</section>
     </div>}
   </>;
 }
