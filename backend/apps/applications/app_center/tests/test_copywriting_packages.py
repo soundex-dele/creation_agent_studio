@@ -14,6 +14,7 @@ from modules.catalog.guided_prompts import compose_guided_prompt
     ("write-image-text-copy", "write-image-text-copy"),
     ("write-short-video-copy", "write-short-video-copy"),
     ("markdown-to-html", "baoyu-markdown-to-html"),
+    ("html-to-paged-cards", "html-to-paged-cards"),
 ])
 def test_skill_app_sync_exposes_guided_runtime_without_duplicate_revisions(
     application_slug, skill_slug, settings, tmp_path,

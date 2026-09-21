@@ -1,0 +1,117 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: html-to-paged-cards
+  version: 1.0.0
+  name: HTML 分页图文
+  description: 将已有文章 HTML 拆成多页图文，保留正文顺序与样式，生成独立页面、预览索引和校验报告。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "📑"
+  color: "#0d9488"
+  tags: [HTML, 图文卡片, 文章分页, 公众号]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: paginate-html}
+    chat_profile:
+      welcome_message: 提供已有 HTML 文件，选择画幅与分页策略，预览提示词后生成多页图文。
+      input_placeholder: 继续调整画幅、正文范围、页面留白或导出格式…
+      empty_state_title: 将文章 HTML 拆成多页图文
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-html-to-paged-cards, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: paginate-html
+        title: 填写 HTML 分页设置
+        description: 保留已有内容与样式，根据页面实际高度分页。
+        icon: "📑"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 html-to-paged-cards Skill 将已有文章 HTML 拆成多页图文。
+
+          HTML 文件路径：{source}
+          页面画幅：{aspect}
+          超大内容处理：{size_policy}
+          导出格式：{export_format}
+          PNG 清晰度倍率：{scale}
+          正文选择器：{selector}
+          输出目录：{output_directory}
+          补充要求：{requirements}
+
+          用户已通过表单确认以上设置，请直接执行，不重复询问已有信息。先读取 HTML 和 Skill 的 references/pagination.md，再使用 Node.js 执行 Skill 自带的 scripts/paginate.mjs。输入必须是已渲染的静态 HTML；仅有 Markdown 时请用户提供转换后的 HTML，不擅自重写文案或重新执行 Markdown 转换。正文选择器为空时按 #output、#nice、article、main、body 的顺序自动识别；有导航或编辑器界面时选取唯一正文范围，明确的选择器通过 --selector 传入。
+          将中文选项映射为参数：画幅「3:4 竖版」→ --width 360 --height 480，「9:16 竖版」→ --width 360 --height 640，「1:1 方形」→ --width 480 --height 480，「4:3 横版」→ --width 640 --height 480，「16:9 横版」→ --width 640 --height 360。这些是逻辑 CSS 像素，保留原稿字号、颜色和装饰，默认内边距 24。补充要求明确指定自定义尺寸时优先遵循，并检查尺寸有效性。
+          超大内容处理选择「允许完整加高页」时不传 --strict-size，必须标明加高页改变了标准比例；选择「所有页面固定尺寸」时传 --strict-size，超大块失败时停止成品交付，报告具体限制，不自动退回加高模式。必要的语义重组只写入新 HTML 并对照原文核验，绝不裁字、删句或缩成不可读字号。
+          导出格式选择「仅分页 HTML」时不传 --png；选择「分页 HTML 和 PNG」表示用户明确要求导出图片，此时添加 --png，并将倍率通过 --scale 传入。未导出 PNG 时倍率不改变 HTML 页面尺寸。输出目录为空时沿用原文旁带时间戳的新目录；否则通过 --out 指定，目录非空时换新目录，不覆盖或清空已有文件。不得修改输入文件。
+          必须以 DOM 内容块为边界，用 Playwright 和 Chromium 的实际布局高度分页，不按字数估算或固定像素裁切。保留原文顺序、链接、强调和图片，标题与后续内容同页。脚本未渲染图表、iframe、音视频和加载失败的图片不能静默丢弃，应报告并按 Skill 处理。
+          检查退出码与 report.json：只有 status 为 complete、正文字符与顺序一致、每块只分配一次、图片加载与所有页面边界检查通过才报告完成。使用普通浏览器或独立 Playwright 检查预览索引中的首页、最密集页、尾页及全部加高页，不得使用 Codex 内置浏览器。失败产物只能作为诊断，修复后用新输出目录重跑。
+          交付 index.html、分页 HTML 目录和 report.json 的可访问路径，说明页数、常规尺寸与加高页编号。仅在实际导出成功时附 PNG。页面仍依赖原始资源地址，提醒保留素材，不称为已打包的离线资源包。
+        questions:
+          - {key: source, label: HTML 文件路径, type: text, placeholder: 填写工作目录内已生成的文章 .html 文件路径, help_text: 可直接使用 Markdown 转 HTML 应用的输出；请保留原图片和样式资源。, required: true, default_value: null, order: 0}
+          - key: aspect
+            label: 页面画幅
+            type: single_choice
+            required: true
+            default_value: "3:4"
+            order: 1
+            options:
+              - {value: "3:4", label: "3:4 竖版", description: "360×480，适合图文卡片", order: 0}
+              - {value: "9:16", label: "9:16 竖版", description: "360×640，适合竖屏阅读", order: 1}
+              - {value: "1:1", label: "1:1 方形", description: "480×480", order: 2}
+              - {value: "4:3", label: "4:3 横版", description: "640×480", order: 3}
+              - {value: "16:9", label: "16:9 横版", description: "640×360", order: 4}
+          - key: size_policy
+            label: 超大内容处理
+            type: single_choice
+            required: true
+            default_value: extend
+            order: 2
+            options:
+              - {value: extend, label: 允许完整加高页, description: 放不下的完整内容块生成加高页，优先保留内容, order: 0}
+              - {value: strict, label: 所有页面固定尺寸, description: 超大内容块无法容纳时报告限制，绝不裁剪, order: 1}
+          - key: export_format
+            label: 导出格式
+            type: single_choice
+            required: true
+            default_value: html
+            order: 3
+            options:
+              - {value: html, label: 仅分页 HTML, description: 独立页面、预览索引与校验报告, order: 0}
+              - {value: html-png, label: 分页 HTML 和 PNG, description: 同时导出每页图片, order: 1}
+          - key: scale
+            label: PNG 清晰度倍率
+            help_text: 仅导出 PNG 时生效。3 倍时，标准 3:4 页面导出为 1080×1440 图片；加高页另计。
+            type: single_choice
+            required: true
+            default_value: "3"
+            order: 4
+            options:
+              - {value: "1", label: "1", order: 0}
+              - {value: "2", label: "2", order: 1}
+              - {value: "3", label: "3", order: 2}
+              - {value: "4", label: "4", order: 3}
+          - {key: selector, label: 正文选择器, type: text, placeholder: "留空自动识别，例如 #output、#nice 或 article", help_text: 仅在需要指定正文范围时填写，选择器应唯一匹配文章内容。, required: false, default_value: "", order: 5}
+          - {key: output_directory, label: 输出目录, type: text, placeholder: 留空则在原文旁新建带时间戳的目录, help_text: 指定目录必须为空，不覆盖已有文件。, required: false, default_value: "", order: 6}
+          - {key: requirements, label: 补充要求, type: text, placeholder: 例如：自定义尺寸 400×600；内边距 32；保留原稿字体, required: false, default_value: "", order: 7}
+  backend:
+    definition_factory: app_center.html_to_paged_cards.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}

@@ -1,0 +1,1 @@
+"""Guided HTML pagination application."""
