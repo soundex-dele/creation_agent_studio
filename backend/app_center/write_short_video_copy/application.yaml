@@ -1,0 +1,107 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: write-short-video-copy
+  version: 1.0.0
+  name: 短视频文案
+  description: 将主题或素材转成口播、旁白、字幕或拍摄脚本，配套标题、封面短句与预计时长。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "🎬"
+  color: "#7c5cdb"
+  tags: [短视频, 口播, 分镜, 发布文案]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: write-short-video-copy}
+    chat_profile:
+      welcome_message: 填写主题、素材与目标时长，预览提示词后生成适合录制或拍摄的文案。
+      input_placeholder: 继续调整开场、口播、时长、分镜或发布配文…
+      empty_state_title: 创作一条短视频文案
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-write-short-video-copy, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: write-short-video-copy
+        title: 填写短视频文案需求
+        description: 按交付范围、视频形式和目标时长组织内容。
+        icon: "🎬"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 write-short-video-copy Skill 完成下面的短视频文案任务。
+
+          交付范围：{task}
+          主题、素材、原稿或文件路径：
+          {source}
+
+          发布平台：{platform}
+          视频形式：{format}
+          目标成片时长：{duration}
+          目标观众：{audience}
+          语气、素材条件与补充要求：{requirements}
+
+          用户已通过应用表单确认以上设置，请直接执行，不重复询问已有信息。交付范围优先：完整文案包含推荐标题和 2 个备选、封面短句、连续可读的正文、预计时长与发布配文；只要正文时不强加标题和分镜；拍摄脚本按建议成片时间段对应画面、说话内容、必要上屏文字和声音。纯字幕按屏组织文字与停留时间，不套口播字速。指定平台时读取平台适配参考；需要复杂结构或精确时间轴时读取相应参考。
+          中文口播可按每分钟约 180–240 字起稿，只计算需说出的正文，另考虑停顿和演示；无实际录音时标明预计时长，不声称实测。原素材时间码与成片时间段分开。不能读取视频或录音时如实说明。不得编造经历、数据、效果或平台算法；关键事实缺失时只问必要问题，未定稿明确标为草稿。仅交付文案，不自动合成配音、生成视频、剪辑或发布。
+        questions:
+          - key: task
+            label: 交付范围
+            type: single_choice
+            required: true
+            default_value: full
+            order: 0
+            options:
+              - {value: full, label: 完整短视频文案, description: 标题、封面、正文、预计时长与配文, order: 0}
+              - {value: body-only, label: 仅口播、旁白或字幕正文, order: 1}
+              - {value: storyboard, label: 拍摄或剪辑脚本, order: 2}
+              - {value: article-to-video, label: 长文转短视频文案, order: 3}
+              - {value: rewrite, label: 优化或压缩旧稿, order: 4}
+              - {value: opening-titles, label: 仅开场与标题, order: 5}
+              - {value: topics, label: 选题方向, order: 6}
+          - {key: source, label: 主题、素材或原稿, type: text, placeholder: 粘贴主题或原稿，或提供工作目录内的视频、录音和素材路径, required: true, default_value: null, order: 1}
+          - key: platform
+            label: 发布平台
+            type: single_choice
+            required: true
+            default_value: general
+            order: 2
+            options:
+              - {value: general, label: 通用短视频, order: 0}
+              - {value: douyin, label: 抖音, order: 1}
+              - {value: xiaohongshu, label: 小红书, order: 2}
+              - {value: channels, label: 视频号, order: 3}
+          - key: format
+            label: 视频形式
+            type: single_choice
+            required: true
+            default_value: talking
+            order: 3
+            options:
+              - {value: talking, label: 单人口播, order: 0}
+              - {value: voiceover, label: 配音旁白, order: 1}
+              - {value: captions, label: 纯字幕视频, order: 2}
+              - {value: footage, label: 匹配已有镜头, order: 3}
+          - {key: duration, label: 目标成片时长, type: text, placeholder: 例如：约 60 秒；30 秒以内；匹配已有素材, required: true, default_value: 约 60 秒, help_text: 无录音时提供估算，实际时长以试读或素材为准。, order: 4}
+          - {key: audience, label: 目标观众, type: text, required: false, default_value: 与主题匹配的普通观众, order: 5}
+          - {key: requirements, label: 语气、素材条件与补充要求, type: text, placeholder: 例如：自然口语；只有录屏；保留原稿开头, required: false, default_value: 自然具体，简体中文, order: 6}
+  backend:
+    definition_factory: app_center.write_short_video_copy.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}

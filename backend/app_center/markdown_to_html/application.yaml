@@ -1,0 +1,134 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: markdown-to-html
+  version: 1.0.0
+  name: Markdown 转 HTML
+  description: 将 Markdown 转为带内联样式的 HTML，支持四种主题、代码高亮、数学公式和可选文末引用。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "📄"
+  color: "#0f4c81"
+  tags: [Markdown, HTML, 公众号排版, 文末引用]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: convert-markdown}
+    chat_profile:
+      welcome_message: 提供 Markdown 正文或文件路径，选择主题后生成可用于公众号的 HTML 文件。
+      input_placeholder: 继续调整主题、主色、字号或引用方式…
+      empty_state_title: 将 Markdown 转成带样式的 HTML
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-baoyu-markdown-to-html, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: convert-markdown
+        title: 填写 Markdown 转换设置
+        description: 选择排版主题、字体、字号和外链处理方式，生成 HTML 文件。
+        icon: "📄"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 baoyu-markdown-to-html Skill 将以下 Markdown 转成带内联样式的 HTML。
+
+          Markdown 正文或文件路径：
+          {source}
+
+          主题：{theme}
+          主色：{color}
+          字体：{font}
+          字号：{font_size}
+          外链处理：{citations}
+          正文首标题：{keep_title}
+          Mermaid 图表：{mermaid}
+          补充要求：{requirements}
+
+          用户已通过表单确认以上设置，不要再次询问主题。保持原文内容，仅转换排版；不额外调用格式化 Skill。粘贴的正文先保存为工作目录内的 Markdown 文件，已有文件则读取后转换。使用 Skill 的 scripts/main.ts，优先 bun，否则 npx -y bun。
+          将表单中的中文名称映射为脚本参数：主题「经典」→ --theme default，「优雅」→ --theme grace，「简约」→ --theme simple，「现代」→ --theme modern；字体「无衬线」→ --font-family sans，「衬线」→ --font-family serif，「中文衬线」→ --font-family serif-cjk，「等宽」→ --font-family mono。字号传给 --font-size。主色为空或 theme 时不传 --color，其他值按 --color 处理。外链处理选择「转为文末引用」才启用 --cite；正文首标题选择「保留首标题」才启用 --keep-title。Mermaid 选择「转为 PNG 图片」时按 Skill 使用无头浏览器渲染，选择「保留 Mermaid 源码」时传 --no-mermaid；不可用时保留回退内容并说明，不声称图表已渲染。
+          输出文件与输入文件同目录，已有 HTML 按 Skill 备份。检查实际执行结果，交付可访问的 HTML 文件路径；有备份时说明备份路径，图片等依赖资源一并说明。转换失败或缺少运行依赖时如实报告，不把代码块或虚构路径当成已生成文件。不得打开 Codex 内置浏览器。
+        questions:
+          - {key: source, label: Markdown 正文或文件路径, type: text, placeholder: 粘贴 Markdown，或填写工作目录内的 .md 文件路径, help_text: 正文含本地图片时请提供可访问的图片路径。, required: true, default_value: null, order: 0}
+          - key: theme
+            label: 排版主题
+            type: single_choice
+            required: true
+            default_value: default
+            order: 1
+            options:
+              - {value: default, label: 经典, description: 居中标题与彩色章节标题, order: 0}
+              - {value: grace, label: 优雅, description: 圆角卡片与精致引用, order: 1}
+              - {value: simple, label: 简约, description: 清爽留白与极简布局, order: 2}
+              - {value: modern, label: 现代, description: 胶囊标题与宽松行距, order: 3}
+          - {key: color, label: 主色, type: text, placeholder: theme、blue、red 或十六进制色值, help_text: theme 表示使用主题默认颜色。, required: false, default_value: theme, order: 2}
+          - key: font
+            label: 字体
+            type: single_choice
+            required: true
+            default_value: sans
+            order: 3
+            options:
+              - {value: sans, label: 无衬线, order: 0}
+              - {value: serif, label: 衬线, order: 1}
+              - {value: serif-cjk, label: 中文衬线, order: 2}
+              - {value: mono, label: 等宽, order: 3}
+          - key: font_size
+            label: 字号
+            type: single_choice
+            required: true
+            default_value: 16px
+            order: 4
+            options:
+              - {value: 14px, label: 14px, order: 0}
+              - {value: 15px, label: 15px, order: 1}
+              - {value: 16px, label: 16px, order: 2}
+              - {value: 17px, label: 17px, order: 3}
+              - {value: 18px, label: 18px, order: 4}
+          - key: citations
+            label: 外链处理
+            type: single_choice
+            required: true
+            default_value: inline
+            order: 5
+            options:
+              - {value: inline, label: 保留正文链接, order: 0}
+              - {value: bottom, label: 转为文末引用, description: 公众号链接和裸链接仍保留在正文, order: 1}
+          - key: keep_title
+            label: 正文首标题
+            type: single_choice
+            required: true
+            default_value: remove
+            order: 6
+            options:
+              - {value: remove, label: 从正文移除首标题, order: 0}
+              - {value: keep, label: 保留首标题, order: 1}
+          - key: mermaid
+            label: Mermaid 图表
+            type: single_choice
+            required: true
+            default_value: png
+            order: 7
+            options:
+              - {value: png, label: 转为 PNG 图片, description: 需要可用的 Chrome、Chromium 或 Edge, order: 0}
+              - {value: source, label: 保留 Mermaid 源码, description: 不生成图表图片, order: 1}
+          - {key: requirements, label: 补充要求, type: text, placeholder: 例如：覆盖文章标题；指定 Mermaid 配色, required: false, default_value: "", order: 8}
+  backend:
+    definition_factory: app_center.markdown_to_html.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}
