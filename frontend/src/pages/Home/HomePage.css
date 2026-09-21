@@ -53,6 +53,7 @@
   flex-direction: row;
   gap: 10px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 4px 2px 8px;
 }
 

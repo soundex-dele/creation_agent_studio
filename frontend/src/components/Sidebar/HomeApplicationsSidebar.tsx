@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Button, Checkbox, Empty, Modal, Spin } from 'antd';
 import {
   ArrowDownOutlined,
@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
+import { scrollHorizontalWithWheel } from '@/lib/horizontalWheelScroll';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
@@ -31,7 +32,13 @@ const CONVERSATION_APP: AppItem = {
   tags: ['AI 助手', '多轮对话'],
 };
 
-const HomeApplicationsSidebar: React.FC = () => {
+interface HomeApplicationsSidebarProps {
+  horizontalWheelScroll?: boolean;
+}
+
+const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
+  horizontalWheelScroll = false,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const layoutMode = usePreferencesStore((state) => state.layoutMode);
@@ -41,6 +48,7 @@ const HomeApplicationsSidebar: React.FC = () => {
   const { apps, isLoading, loadApps, setSearchQuery } = useAppStore();
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [preferences, setPreferences] = useState<HomeApplicationPreferences>(EMPTY_PREFERENCES);
+  const applicationListRef = useRef<HTMLDivElement>(null);
   const storageKey = `home-applications:${userId}`;
 
   useEffect(() => {
@@ -73,6 +81,19 @@ const HomeApplicationsSidebar: React.FC = () => {
   }, [allApps, preferences.order]);
 
   const visibleApps = orderedApps.filter((app) => !preferences.hidden.includes(app.id));
+
+  useEffect(() => {
+    const applicationList = applicationListRef.current;
+    if (!horizontalWheelScroll || !applicationList) return undefined;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
+      if (scrollHorizontalWithWheel(applicationList, event)) event.preventDefault();
+    };
+
+    applicationList.addEventListener('wheel', handleWheel, { passive: false });
+    return () => applicationList.removeEventListener('wheel', handleWheel);
+  }, [horizontalWheelScroll, isLoading, visibleApps.length]);
 
   const homeApplicationPath = (app: AppItem) => app.id === CONVERSATION_APP_ID
     ? '/chat?entry=home'
@@ -140,7 +161,10 @@ const HomeApplicationsSidebar: React.FC = () => {
           <Button type="link" onClick={() => setIsConfiguring(true)}>配置应用</Button>
         </div>
       ) : (
-        <div className="home-app-list">
+        <div
+          ref={applicationListRef}
+          className="home-app-list"
+        >
           {visibleApps.map((app) => (
             <button
               type="button"
