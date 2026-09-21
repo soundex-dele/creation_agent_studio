@@ -1,0 +1,113 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: copy-to-jianying
+  version: 1.0.0
+  name: 文案转剪映
+  description: 将口播文案、旁白或文章制作成可编辑剪映草稿，自动编排画面、配音、字幕与时间线。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "🎞️"
+  color: "#ea580c"
+  tags: [剪映, 口播, 分镜, 配音, 字幕]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {}
+    output_schema: {}
+    default_config: {guided_entry_prompt_key: create-jianying-draft}
+    chat_profile:
+      welcome_message: 提供文案或文章，选择画幅与配音方式，预览提示词后制作可继续编辑的剪映草稿。
+      input_placeholder: 继续调整分镜、画面、配音、字幕或节奏…
+      empty_state_title: 把文案变成剪映草稿
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 内容创作专家, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings:
+      - {skill_id: pending-copy-to-jianying, mode: required, config: {}, order: 0}
+    guided_prompts:
+      - key: create-jianying-draft
+        title: 填写剪映草稿需求
+        description: 提供文案与素材，自动完成分镜、配音、字幕和草稿生成。
+        icon: "🎞️"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请使用 copy-to-jianying Skill 完成下面的剪映草稿任务。
+
+          交付范围：{task}
+          文案、文章或文件路径：
+          {source}
+
+          画面比例：{aspect}
+          时长要求：{duration}
+          配音方式：{voice}
+          已有图片、视频或录音：{assets}
+          项目资料目录：{output_directory}
+          剪映草稿根目录：{drafts_root}
+          视觉风格、音色与补充要求：{requirements}
+
+          用户已通过应用表单确认以上设置，请直接执行，不重复询问已有信息。先读取 Skill 的 references/backend.md 并运行 scripts/run_project.py --probe；写脚本前必读 references/storyboard_builder_guide.md。使用执行环境的项目虚拟环境运行 Python，只使用 Skill 内置 scripts/jianying-editor 后端，不搜索其他剪映后端。子模块或普通依赖缺失时按 Skill 文档处理，无法补齐时明确报告阻塞。
+          交付范围优先：「生成可编辑剪映草稿」必须继续到实际构建与审计，不能停在分镜或脚本；「仅生成分镜脚本」由 AI 写好 builder.py 后交付，不执行构建；「仅检查已有脚本」要求输入已有 builder.py 路径，只运行 --check-only，不改写源文件或生成新草稿。检查模式沿用已有脚本设置，其他表单默认值不覆盖脚本。
+          默认简体中文、30fps。「9:16 竖版」使用 1080×1920，「16:9 横版」使用 1920×1080，「1:1 方形」使用 1080×1080。已有口播稿默认完整保留措辞、数字、否定和限定；文章未指定时长时先提炼为约 60 秒口播。明确要求压缩或限时才调整口播稿，并保留关键事实；实际时长以配音实测为准。
+          「自动配音（优先已有录音）」在有录音时优先使用录音，无录音时默认启用自然普通话 TTS；「仅使用已有录音」缺录音时询问必要路径，不擅自合成；只有选择「无声字幕」才关闭旁白和 TTS。音色和效果查询内置词表，不编造标识符。补充要求明确的配音偏好优先于默认值。
+          项目资料目录留空时使用工作区 outputs/jianying/<唯一项目名>/；指定目录已有内容时创建新子目录，保留用户修改与旧工程。保存 narration.txt 和由 AI 直接编写、可重复运行的 builder.py；narration.txt 只包含最终朗读正文。按语义段落与画面变化设计 Scene，不机械地一句一镜，不调用 generate_builder.py、json_to_builder.py，也不先填 PLAN/JSON 再转码代替 AI 编排。JSON 仅由 builder 派生。
+          优先使用用户真实素材；缺画面时设计正式信息卡或本地绘图，不使用搜索词、调试占位图或虚构截图。按需读取预设、剪辑手法与音效指南，使用内置真实音效且不盖过配音。每个镜头写清画面、旁白字幕、强调文字、时序、转场和声音。
+          默认生成时先使用 scripts/run_project.py <builder.py> --check-only，再运行 scripts/run_project.py <builder.py>。草稿根目录留空则沿用技能默认位置；指定时通过 --drafts-root 传入，提醒自定义位置不保证剪映首页自动发现。由同一个 Draft 对象导出分镜、校验并调用 to_jianying；每次构建创建唯一草稿与素材目录。
+          配音失败必须报错，不交付缺旁白的草稿；视频短于实测旁白时更换素材，不截断语音。相同外部资源最多重试两次，连续两次修复无效则保留诊断并报告阻塞。不得自动发布、上传或操作客户端导出成片。
+          验收检查 builder.py、result.json、build.log、timeline.json 与实际素材，核对旁白与字幕数量和精确时间范围。只有实际生成草稿且 result.json 状态为 complete、文件审计通过，才报告草稿完成；checked 仅表示检查通过。无声模式明确标注无旁白。具备获准的预览能力时检查开头、最密集镜头、结尾并试听；不得使用 Codex 内置浏览器。无法完成客户端检查时明确仅通过文件与素材审计，不宣称播放或效果验收通过。
+          交付 builder.py、剪映草稿目录、项目资料目录及审计文件的可访问路径，说明画幅、实际时长、配音与字幕状态以及未完成的检查。仅脚本或检查模式按对应范围交付，不声称已生成草稿；未导出 MP4 不称为成片。提醒保留素材目录与技能运行库。
+        questions:
+          - {key: source, label: 文案、文章或文件路径, type: text, placeholder: 粘贴口播稿、旁白或文章，也可填写工作目录内的文本文件路径；仅检查时填写 builder.py 路径, required: true, default_value: null, order: 0}
+          - key: task
+            label: 交付范围
+            type: single_choice
+            required: true
+            default_value: draft
+            order: 1
+            options:
+              - {value: draft, label: 生成可编辑剪映草稿, description: 分镜、画面、配音、字幕与时间线, order: 0}
+              - {value: script, label: 仅生成分镜脚本, description: 生成可修改和重复运行的 builder.py, order: 1}
+              - {value: check, label: 仅检查已有脚本, description: 校验已有 builder.py，不生成草稿, order: 2}
+          - key: aspect
+            label: 画面比例
+            type: single_choice
+            required: true
+            default_value: "9:16"
+            order: 2
+            options:
+              - {value: "9:16", label: "9:16 竖版", description: "1080×1920", order: 0}
+              - {value: "16:9", label: "16:9 横版", description: "1920×1080", order: 1}
+              - {value: "1:1", label: "1:1 方形", description: "1080×1080", order: 2}
+          - {key: duration, label: 时长要求, type: text, placeholder: 留空则保留完整口播稿；文章提炼为约 60 秒口播, help_text: 如需压缩可填写「60 秒以内」；实际片长以配音实测为准。, required: false, default_value: "", order: 3}
+          - key: voice
+            label: 配音方式
+            type: single_choice
+            required: true
+            default_value: auto
+            order: 4
+            options:
+              - {value: auto, label: 自动配音（优先已有录音）, description: 无录音时合成自然普通话配音, order: 0}
+              - {value: recording, label: 仅使用已有录音, description: 请在素材中提供录音路径, order: 1}
+              - {value: silent, label: 无声字幕, description: 不生成旁白配音, order: 2}
+          - {key: assets, label: 已有图片、视频或录音, type: text, placeholder: 填写工作目录内的素材路径及用途；无素材可留空, help_text: 缺少画面时自动设计信息卡或本地绘图。, required: false, default_value: "", order: 5}
+          - {key: requirements, label: 视觉风格、音色与补充要求, type: text, placeholder: 例如：简洁知识卡片；自然女声；突出三个关键词；保留原稿开头, required: false, default_value: "", order: 6}
+          - {key: output_directory, label: 项目资料目录, type: text, placeholder: 留空则在工作区自动创建唯一项目目录, help_text: 保存分镜脚本、文案、素材和审计文件。, required: false, default_value: "", order: 7}
+          - {key: drafts_root, label: 剪映草稿根目录, type: text, placeholder: 留空使用默认位置, help_text: 自定义位置不保证剪映首页自动发现；请保留草稿引用的素材目录。, required: false, default_value: "", order: 8}
+  backend:
+    definition_factory: app_center.copy_to_jianying.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}
