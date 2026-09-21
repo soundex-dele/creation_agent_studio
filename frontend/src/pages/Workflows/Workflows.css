@@ -65,7 +65,21 @@
 .workflow-input-field label { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .workflow-input-field label > span { color: var(--color-text-sec); font-size: 12px; font-weight: 500; }
 .workflow-input-field > .ant-checkbox-wrapper { min-height: 32px; align-items: center; }
-.workflow-add-actions { margin-bottom: 18px; }
+.workflow-add-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.workflow-create-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.workflow-output-field { display: grid; min-width: 0; gap: 8px; }
+.workflow-mapping-row > .ant-input-number, .workflow-mapping-row > .ant-input-textarea { width: 100%; grid-column: 2; }
+.workflow-editor-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.workflow-editor-mode > span { color: var(--color-text-sec); font-weight: 500; }
+.workflow-node-inspector { min-width: 0; padding: 2px; }
+.workflow-node-inspector .workflow-editor-step .ant-card-body { flex-wrap: wrap; gap: 12px 8px; padding: 16px; }
+.workflow-node-inspector .workflow-step-copy { flex: 1 0 100%; order: 2; }
+.workflow-node-inspector .workflow-step-actions { width: 100%; order: 3; justify-content: flex-end; }
+.workflow-node-inspector .workflow-mapping-row { grid-template-columns: minmax(0, 1fr); }
+.workflow-node-inspector .workflow-mapping-row > .ant-input { grid-column: auto; }
+.workflow-node-inspector .workflow-mapping-row > .ant-input-number,
+.workflow-node-inspector .workflow-mapping-row > .ant-input-textarea { grid-column: auto; }
+.workflow-node-name, .workflow-node-dependencies { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .workflow-app-picker-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-height: 60vh; overflow-y: auto; padding: 2px; }
 .workflow-app-picker-item { min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); color: inherit; background: var(--color-bg-card); text-align: left; cursor: pointer; transition: border-color 0.2s, background-color 0.2s, transform 0.2s; }
 .workflow-app-picker-item:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg-card)); transform: translateY(-1px); }
@@ -88,6 +102,7 @@
 .workflow-output-mapping p { color: var(--color-text-sec); }
 .workflow-output-mapping label { display: grid; grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1.3fr); gap: 12px; align-items: center; margin-top: 10px; }
 .workflow-step-copy span { color: var(--color-text-sec); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-step-copy .workflow-step-application { color: var(--color-text); white-space: normal; overflow-wrap: anywhere; }
 .workflow-runner { height: 100%; min-height: 0; display: flex; background: var(--color-bg-void); }
 .workflow-run-sidebar { width: 270px; flex: 0 0 270px; display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-bg-surface); }
 .workflow-run-brand { min-height: 68px; display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--color-border); }
@@ -122,6 +137,8 @@
   .workflow-mapping-row,
   .workflow-output-mapping label { grid-template-columns: minmax(0, 1fr); }
   .workflow-mapping-row > .ant-input { grid-column: auto; }
+  .workflow-mapping-row > .ant-input-number,
+  .workflow-mapping-row > .ant-input-textarea { grid-column: auto; }
   .workflow-mode-field { align-items: flex-start; flex-direction: column; }
   .workflow-mode-field .ant-segmented { width: 100%; }
   .workflow-mode-field .ant-segmented-group { width: 100%; }

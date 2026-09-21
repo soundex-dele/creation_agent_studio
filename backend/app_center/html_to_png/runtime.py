@@ -8,6 +8,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from apps.workflows.artifacts import workspace_file
+from .workflow_files import insert_illustrations, load_manifest
+
 
 PRESETS = {
     "vertical": (1080, 1440),
@@ -125,11 +128,31 @@ def execute_html_to_png(run_payload, sink):
     allow_all_paths = bool(run_payload.get("allow_all_paths", False))
     if not allow_all_paths and not allowed_roots:
         raise PermissionError("未配置应用可访问的目录范围。")
-    directories = _directories(
-        config, allowed_roots, allow_all_paths=allow_all_paths
-    )
-    files = _html_files(directories)
+    manifest_path = None
+    manifest = None
+    if config.get("manifest_file"):
+        manifest_path, manifest, files = load_manifest(config)
+    elif config.get("html_file"):
+        file = workspace_file(config.get("working_directory"), config["html_file"])
+        if not file.is_file() or file.suffix.lower() != ".html":
+            raise ValueError("指定的 HTML 文件不存在或类型无效。")
+        files = [file]
+    else:
+        directories = _directories(config, allowed_roots, allow_all_paths=allow_all_paths)
+        files = _html_files(directories)
+    for file in files:
+        if not allow_all_paths and any(
+            not _is_within_allowed_roots(path.resolve(), allowed_roots)
+            for path in (file, file.with_suffix(".png"))
+        ):
+            raise PermissionError("HTML 或 PNG 路径不在允许的运行范围内。")
+        if config.get("working_directory"):
+            workspace_file(config["working_directory"], str(file.with_suffix(".png")))
+    if config.get("article_source") and manifest is None:
+        raise ValueError("正文插图需要提供配图清单。")
     if not files:
+        if config.get("strict"):
+            raise ValueError("没有可导出的 HTML 文件。")
         return {
             "status": "completed",
             "total": 0,
@@ -228,7 +251,15 @@ def execute_html_to_png(run_payload, sink):
     if return_code != 0:
         detail = stderr.strip().splitlines()[-1] if stderr.strip() else "未知错误"
         raise RuntimeError(f"Playwright 截图进程失败：{detail}")
-    return {
+    if config.get("strict") or config.get("article_source"):
+        expected = [str(file.with_suffix(".png")) for file in files]
+        if failures or outputs != expected:
+            raise RuntimeError("HTML 导出未全部成功，停止下游处理。")
+        for output in outputs:
+            with Path(output).open("rb") as png:
+                if png.read(8) != b"\x89PNG\r\n\x1a\n":
+                    raise RuntimeError("导出产物不是有效的 PNG 文件。")
+    result = {
         "status": "completed",
         "total": total,
         "succeeded": len(outputs),
@@ -236,3 +267,6 @@ def execute_html_to_png(run_payload, sink):
         "files": outputs,
         "failures": failures,
     }
+    if config.get("article_source"):
+        result["article_md"] = insert_illustrations(config, manifest_path, manifest, files, outputs)
+    return result

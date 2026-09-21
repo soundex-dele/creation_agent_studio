@@ -1,0 +1,46 @@
+.workflow-graph {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--color-bg-card);
+}
+.workflow-graph-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px; }
+.workflow-graph-toolbar > span { flex: 1; color: var(--color-text-sec); font-size: 13px; }
+.workflow-graph-help { margin: 0; padding: 0 12px 12px; color: var(--color-text-sec); font-size: 12px; line-height: 1.7; }
+.workflow-graph-canvas { height: 560px; min-width: 0; border-top: 1px solid var(--color-border); }
+.workflow-graph-canvas > .ant-empty { padding-top: 170px; }
+.workflow-graph .react-flow {
+  --xy-background-color: var(--color-bg-void);
+  --xy-background-pattern-dots-color: var(--color-border);
+  --xy-edge-stroke: var(--color-text-sec);
+  --xy-edge-stroke-selected: var(--color-primary);
+  --xy-edge-stroke-width: 2;
+  --xy-handle-background-color: var(--color-primary);
+  --xy-handle-border-color: var(--color-bg-card);
+  --xy-controls-button-background-color: var(--color-bg-card);
+  --xy-controls-button-background-color-hover: var(--color-bg-elevated);
+  --xy-controls-button-color: var(--color-text);
+  --xy-controls-button-color-hover: var(--color-primary);
+  --xy-controls-button-border-color: var(--color-border);
+}
+.workflow-graph-node { width: 236px; padding: 14px; color: var(--color-text); background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-sm); }
+.workflow-graph-node.is-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+.workflow-graph-node-heading { display: flex; align-items: center; gap: 8px; }
+.workflow-graph-node-heading > span { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 6px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-size: 12px; }
+.workflow-graph-node-heading > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.workflow-graph-node-application { display: flex; align-items: baseline; gap: 6px; margin: 10px 0; font-size: 12px; line-height: 1.5; }
+.workflow-graph-node-application > span { flex-shrink: 0; color: var(--color-text-sec); }
+.workflow-graph-node-application > strong { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+.workflow-graph-node-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.workflow-graph-node-footer > small { color: var(--color-text-sec); font-size: 12px; }
+.workflow-graph-node-footer > button { min-height: 28px; border: 0; border-radius: 4px; padding: 4px 6px; background: transparent; color: var(--color-primary); font: inherit; font-size: 12px; cursor: pointer; }
+.workflow-graph .react-flow__handle { width: 14px; height: 24px; border-radius: 8px; }
+.workflow-graph .react-flow__controls-button { width: 32px; height: 32px; }
+.workflow-graph button:focus-visible, .workflow-graph .react-flow__node:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .workflow-graph-canvas { height: 420px; }
+  .workflow-graph-toolbar > span { flex-basis: 100%; }
+  .workflow-graph-toolbar .ant-btn { min-height: 44px; }
+  .workflow-graph .react-flow__controls-button { width: 44px; height: 44px; }
+}

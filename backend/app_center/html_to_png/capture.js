@@ -36,7 +36,28 @@ async function main() {
             ).forEach((element) => element.remove());
           });
         }
-        await page.waitForTimeout(1000);
+        await page.evaluate(async () => {
+          const imagesReady = Promise.all(Array.from(document.images, async (image) => {
+            if (!image.complete) {
+              await new Promise((resolve, reject) => {
+                image.addEventListener('load', resolve, { once: true });
+                image.addEventListener('error', () => reject(new Error(`图片加载失败：${image.src}`)), { once: true });
+              });
+            }
+            if (!image.naturalWidth) throw new Error(`图片加载失败：${image.src}`);
+          }));
+          let timer;
+          try {
+            await Promise.race([
+              Promise.all([document.fonts.ready, imagesReady]),
+              new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error('等待字体或图片加载超时')), 15000);
+              }),
+            ]);
+          } finally {
+            clearTimeout(timer);
+          }
+        });
         let target = null;
         if (!config.fullPage && config.selector) {
           target = await page.$(config.selector);

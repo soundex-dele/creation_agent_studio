@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: html-to-png
-  version: 1.0.0
+  version: 1.1.0
   name: HTML 批量转 PNG
   description: 选择多个目录，将目录中的 HTML 文件批量渲染为 PNG。
   category:
@@ -28,8 +28,26 @@ spec:
       retry_safe: false
     input_schema:
       type: object
-      required: [directories]
+      anyOf:
+        - required: [directories]
+        - required: [manifest_file]
+        - required: [html_file]
       properties:
+        manifest_file:
+          type: string
+          title: HTML 文件清单
+          description: 工作流生成的 JSON 清单，files 路径相对于清单所在目录。
+        html_file:
+          type: string
+          title: 单个 HTML 文件
+        article_source:
+          type: string
+          title: 待插图 Markdown 原稿
+          description: 根据清单的 insertions 将导出的 PNG 插入正文，另存为 article-with-images.md。
+        strict:
+          type: boolean
+          title: 全部导出成功后继续
+          default: false
         directories:
           type: array
           title: HTML 目录
@@ -69,6 +87,12 @@ spec:
           default: networkidle
     output_schema:
       type: object
+      properties:
+        files: {type: array, items: {type: string}}
+        article_md: {type: string}
+        total: {type: integer}
+        succeeded: {type: integer}
+        failed: {type: integer}
     default_config:
       reference_script: D:/workspace/my-awesome-skills/animation/capture-vertical.js
     dependencies:

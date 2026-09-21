@@ -1,26 +1,52 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Button, Card, Checkbox, Empty, Input, InputNumber, Modal, Segmented, Select, Spin,
+  Alert, Button, Card, Checkbox, Drawer, Empty, Input, InputNumber, Modal, Segmented, Select, Spin,
   message,
 } from 'antd';
 import type { InputRef } from 'antd';
-import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { ApartmentOutlined, ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@/services/api';
-import type { ApplicationRuntime, AppItem, Workflow, WorkflowStep } from '@/types';
+import type { ApplicationRuntime, AppItem, Workflow, WorkflowStep, WorkflowRunInputField } from '@/types';
 import {
   emptyWorkflowInputSchema,
   workflowInputFields,
   workflowInputProperty,
   workflowInputSourceOptions,
 } from '@/lib/workflowInputSchema';
+import {
+  positionWorkflowNodes, removeWorkflowStep, removeWorkflowStepOutputs,
+  updateWorkflowDependencies, workflowGraphError,
+} from '@/lib/workflowGraph';
 import './Workflows.css';
+import { buildWechatParallelWorkflow, WECHAT_PARALLEL_APPS, WECHAT_PARALLEL_PRESET, workflowStepOutputOptions } from '@/lib/wechatParallelWorkflow';
+import WorkflowFixedValueInput, { fixedWorkflowValue } from './WorkflowFixedValueInput';
+
+const WorkflowGraphEditor = lazy(() => import('./WorkflowGraphEditor'));
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
   Array.isArray(value) ? value : value.results ?? [];
 
+function WorkflowStepPanel({ graph, open, onClose, children }: {
+  graph: boolean; open: boolean; onClose: () => void; children: ReactNode;
+}) {
+  const content = (
+    <div className={graph ? 'workflow-step-list workflow-node-inspector' : 'workflow-step-list'}>
+      {children}
+    </div>
+  );
+  return graph ? (
+    <Drawer title="节点配置" open={open} onClose={onClose} width="min(420px, 100vw)"
+      destroyOnHidden>
+      {content}
+    </Drawer>
+  ) : content;
+}
+
 const WorkflowEditorPage = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const preset = searchParams.get('preset');
   const navigate = useNavigate();
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [apps, setApps] = useState<AppItem[]>([]);
@@ -28,10 +54,19 @@ const WorkflowEditorPage = () => {
   const [saving, setSaving] = useState(false);
   const [appPickerOpen, setAppPickerOpen] = useState(false);
   const [addingApplicationId, setAddingApplicationId] = useState<number | null>(null);
+  const [editorMode, setEditorMode] = useState<'list' | 'graph'>('list');
+  const [selectedStepKey, setSelectedStepKey] = useState<string | null>(null);
+  const [nodeConfigOpen, setNodeConfigOpen] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [outputSources, setOutputSources] = useState<Record<string, string>>({});
   const nameInputRef = useRef<InputRef>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setNodeConfigOpen(false);
+    setLoadError('');
     const loadApps = () => api.get<any[]>('/apps/').then((appData) => {
+      if (cancelled) return;
       setApps(unwrap(appData).map((app: any) => ({
         id: app.slug, name: app.name, description: app.description,
         category: app.category_slug, icon: app.icon, color: app.color,
@@ -39,6 +74,22 @@ const WorkflowEditorPage = () => {
         rendererKey: app.renderer_key, kind: app.kind,
       })));
     });
+    if (!id && preset === WECHAT_PARALLEL_PRESET) {
+      setWorkflow(null);
+      Promise.all([
+        Promise.all(WECHAT_PARALLEL_APPS.map((slug) => api.get<ApplicationRuntime>(`/apps/${slug}/`))),
+        loadApps(),
+      ]).then(([applications]) => {
+        if (cancelled) return;
+        const draft = buildWechatParallelWorkflow(applications);
+        setWorkflow(draft);
+        setSteps(draft.steps || []);
+        setEditorMode('graph');
+      }).catch(() => {
+        if (!cancelled) setLoadError('并行预设加载失败，请确认写作、HTML 配图、封面、排版、分页和 PNG 导出应用均已安装并可访问。');
+      });
+      return () => { cancelled = true; };
+    }
     if (!id) {
       setWorkflow({
         id: '',
@@ -52,19 +103,47 @@ const WorkflowEditorPage = () => {
         steps: [],
       });
       setSteps([]);
-      void loadApps();
-      return;
+      void loadApps().catch(() => { if (!cancelled) setLoadError('应用列表加载失败，请刷新重试'); });
+      return () => { cancelled = true; };
     }
     Promise.all([
       api.get<Workflow>(`/workflows/${id}/`),
       loadApps(),
     ]).then(([workflowData]) => {
+      if (cancelled) return;
       setWorkflow(workflowData);
       setSteps(workflowData.steps || []);
-    });
-  }, [id]);
+    }).catch(() => { if (!cancelled) setLoadError('工作流加载失败，请刷新重试'); });
+    return () => { cancelled = true; };
+  }, [id, preset]);
 
+  if (loadError) return <Alert type="error" showIcon message={loadError} />;
   if (!workflow) return <div className="workflows-loading"><Spin size="large" /></div>;
+
+  const activeStepKey = steps.some((step) => step.key === selectedStepKey)
+    ? selectedStepKey : steps[0]?.key ?? null;
+
+  const dependencyOptions = (step: WorkflowStep) => step.depends_on.flatMap((key) => {
+    const dependency = steps.find((item) => item.key === key);
+    return dependency ? workflowStepOutputOptions(dependency).map((option) => ({
+      value: `from:${option.value}`, label: `${dependency.name || key} · ${option.label}`,
+    })) : [];
+  });
+
+  const changeDependencies = (key: string, dependencies: string[]) => {
+    const next = updateWorkflowDependencies(steps, key, dependencies);
+    const error = workflowGraphError(next);
+    if (error) { message.warning(error); return; }
+    setSteps(next);
+  };
+
+  const deleteStep = (key: string) => {
+    if (key === activeStepKey) setNodeConfigOpen(false);
+    setSteps((current) => removeWorkflowStep(current, key));
+    setWorkflow((current) => current ? {
+      ...current, output_mapping: removeWorkflowStepOutputs(current.output_mapping, key),
+    } : current);
+  };
 
   const addStep = async (applicationId: number) => {
     const app = apps.find((item) => item.applicationId === applicationId);
@@ -86,6 +165,7 @@ const WorkflowEditorPage = () => {
         application_id: applicationId,
         application,
       }]);
+      setSelectedStepKey(`step-${stamp}`);
       setAppPickerOpen(false);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '应用详情加载失败，请重试');
@@ -114,14 +194,14 @@ const WorkflowEditorPage = () => {
     }));
   };
 
-  const setOutputAlias = (stepKey: string, alias: string) => {
+  const setOutputAlias = (stepKey: string, alias: string, outputSource: string) => {
     const current = { ...(workflow.output_mapping || {}) };
     Object.entries(current).forEach(([name, binding]) => {
       const source = typeof binding === 'string' ? binding : binding?.from;
-      if (source === `steps.${stepKey}.output.result`) delete current[name];
+      if (source?.startsWith(`steps.${stepKey}.output.`)) delete current[name];
     });
     if (alias.trim()) {
-      current[alias.trim()] = { from: `steps.${stepKey}.output.result` };
+      current[alias.trim()] = { from: outputSource };
     }
     setWorkflow({ ...workflow, output_mapping: current });
   };
@@ -281,6 +361,8 @@ const WorkflowEditorPage = () => {
       message.warning('输入字段 key 不能为空或包含点号');
       return;
     }
+    const graphError = workflowGraphError(steps);
+    if (graphError) { message.warning(graphError); return; }
     setSaving(true);
     try {
       const payload = {
@@ -437,6 +519,21 @@ const WorkflowEditorPage = () => {
         </Card>
       )}
       <div className="workflow-add-actions">
+        <div className="workflow-editor-mode">
+          <span>编辑模式</span>
+          <Segmented
+            aria-label="工作流编辑模式"
+            value={editorMode}
+            options={[
+              { label: '列表编辑', value: 'list', icon: <UnorderedListOutlined /> },
+              { label: '图编辑', value: 'graph', icon: <ApartmentOutlined /> },
+            ]}
+            onChange={(value) => {
+              setEditorMode(value as 'list' | 'graph');
+              setNodeConfigOpen(false);
+            }}
+          />
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAppPickerOpen(true)}>
           添加应用
         </Button>
@@ -470,18 +567,50 @@ const WorkflowEditorPage = () => {
           </div>
         ) : <Empty description="暂无可添加的应用" />}
       </Modal>
-      <div className="workflow-step-list">
+      {editorMode === 'graph' && (
+        <Suspense fallback={<div className="workflows-loading"><Spin tip="正在加载图编辑器" /></div>}>
+          <WorkflowGraphEditor
+            steps={steps}
+            selectedKey={activeStepKey}
+            manual={workflow.execution_mode === 'manual'}
+            onSelect={setSelectedStepKey}
+            onConfigure={(key) => {
+              setSelectedStepKey(key);
+              setNodeConfigOpen(true);
+            }}
+            onDependenciesChange={changeDependencies}
+            onPositionsChange={(positions) => setSteps((current) => positionWorkflowNodes(current, positions))}
+            onAdd={() => setAppPickerOpen(true)}
+          />
+        </Suspense>
+      )}
+      <WorkflowStepPanel graph={editorMode === 'graph'} open={nodeConfigOpen && !!activeStepKey}
+        onClose={() => setNodeConfigOpen(false)}>
         {steps.length === 0 ? <Empty description="请添加至少一个应用" />
-          : steps.map((step, index) => (
+          : steps.map((step, index) => editorMode === 'graph' && step.key !== activeStepKey ? null : (
             <Card key={step.id} className="workflow-editor-step">
               <span className="workflow-step-index">{index + 1}</span>
               <span className="workflow-step-icon">{step.application.application_icon}</span>
               <div className="workflow-step-copy">
-                <strong>{step.name || step.application.application_name}</strong>
+                {editorMode === 'graph' ? (
+                  <label className="workflow-node-name">
+                    <span>节点名称</span>
+                    <Input
+                      value={step.name || ''}
+                      placeholder={step.application.application_name}
+                      onChange={(event) => setSteps((current) => current.map((item) => (
+                        item.key === step.key ? { ...item, name: event.target.value } : item
+                      )))}
+                    />
+                  </label>
+                ) : <strong>{step.name || step.application.application_name}</strong>}
+                <span className="workflow-step-application">使用应用：{step.application.application_name}</span>
                 <span>{step.application.application_description}</span>
-                {workflow.execution_mode === 'automatic' && (
-                  <>
+                {(workflow.execution_mode === 'automatic' || editorMode === 'graph') && (
+                  <label className="workflow-node-dependencies">
+                    <span>前置依赖</span>
                     <Select
+                      aria-label={`${step.name || step.application.application_name}的前置依赖`}
                       mode="multiple"
                       value={step.depends_on || []}
                       placeholder="无依赖（可并行）"
@@ -489,9 +618,12 @@ const WorkflowEditorPage = () => {
                         value: candidate.key,
                         label: candidate.name || candidate.application.application_name,
                       }))}
-                      onChange={(depends_on) => setSteps((current) => current.map((item) =>
-                        item.key === step.key ? { ...item, depends_on } : item))}
+                      onChange={(depends_on) => changeDependencies(step.key, depends_on)}
                     />
+                  </label>
+                )}
+                {workflow.execution_mode === 'automatic' && (
+                  <>
                     <span>
                       节点重试：<InputNumber min={1} max={10} value={step.max_attempts || 1}
                         onChange={(value) => setSteps((current) => current.map((item) =>
@@ -525,6 +657,11 @@ const WorkflowEditorPage = () => {
                               )}
                             />
                             {prompt.questions.map((question) => {
+                              const field: WorkflowRunInputField = {
+                                key: question.key, label: question.label, required: question.required,
+                                type: question.type === 'multi_choice' ? 'array' : question.type === 'number' ? 'number' : 'string',
+                                options: question.options,
+                              };
                               const binding = answers[question.key];
                               const selected = binding?.from
                                 ? `from:${binding.from}`
@@ -542,30 +679,27 @@ const WorkflowEditorPage = () => {
                                         value: `from:workflow.input.${question.key}`,
                                         label: `启动输入 · ${question.label}`,
                                       }]),
-                                      ...step.depends_on.map((dependency) => ({
-                                        value: `from:steps.${dependency}.output.result`,
-                                        label: `节点输出 · ${steps.find((item) => item.key === dependency)?.name || dependency}`,
-                                      })),
+                                      ...dependencyOptions(step),
                                       { value: 'fixed', label: '固定值' },
                                     ]}
                                     onChange={(value) => updateStepAutomation(step.key, (current) => {
                                       const nextAnswers = { ...(current.answers || {}) };
                                       if (value === 'default') delete nextAnswers[question.key];
-                                      else if (value === 'fixed') nextAnswers[question.key] = { value: '' };
+                                      else if (value === 'fixed') nextAnswers[question.key] = { value: fixedWorkflowValue(field) };
                                       else nextAnswers[question.key] = { from: value.replace(/^from:/, '') };
                                       return { ...current, guided_prompt_key: selectedPromptKey, answers: nextAnswers };
                                     })}
                                   />
                                   {selected === 'fixed' && (
-                                    <Input
-                                      value={String(binding?.value || '')}
-                                      placeholder="固定输入值"
-                                      onChange={(event) => updateStepAutomation(step.key, (current) => ({
+                                    <WorkflowFixedValueInput
+                                      field={field}
+                                      value={binding?.value}
+                                      onChange={(value) => updateStepAutomation(step.key, (current) => ({
                                         ...current,
                                         guided_prompt_key: selectedPromptKey,
                                         answers: {
                                           ...(current.answers || {}),
-                                          [question.key]: { value: event.target.value },
+                                          [question.key]: { value },
                                         },
                                       }))}
                                     />
@@ -593,19 +727,14 @@ const WorkflowEditorPage = () => {
                                 options={[
                                   { value: 'default', label: '同名输入或应用默认值' },
                                   ...workflowInputSourceOptions(workflow.input_schema),
-                                  ...step.depends_on.map((dependency) => ({
-                                    value: `from:steps.${dependency}.output.result`,
-                                    label: `节点输出 · ${steps.find((item) => (
-                                      item.key === dependency
-                                    ))?.name || dependency}`,
-                                  })),
+                                  ...dependencyOptions(step),
                                   { value: 'fixed', label: '固定值' },
                                 ]}
                                 onChange={(value) => {
                                   if (value === 'default') {
                                     updateStepInputMapping(step.key, target.key, undefined);
                                   } else if (value === 'fixed') {
-                                    updateStepInputMapping(step.key, target.key, { value: '' });
+                                    updateStepInputMapping(step.key, target.key, { value: fixedWorkflowValue(target) });
                                   } else {
                                     updateStepInputMapping(step.key, target.key, {
                                       from: value.replace(/^from:/, ''),
@@ -614,11 +743,11 @@ const WorkflowEditorPage = () => {
                                 }}
                               />
                               {selected === 'fixed' && (
-                                <Input
-                                  value={String(binding && 'value' in binding ? binding.value : '')}
-                                  placeholder="固定输入值"
-                                  onChange={(event) => updateStepInputMapping(
-                                    step.key, target.key, { value: event.target.value },
+                                <WorkflowFixedValueInput
+                                  field={target}
+                                  value={binding && 'value' in binding ? binding.value : undefined}
+                                  onChange={(value) => updateStepInputMapping(
+                                    step.key, target.key, { value },
                                   )}
                                 />
                               )}
@@ -636,34 +765,33 @@ const WorkflowEditorPage = () => {
                 <Button icon={<ArrowDownOutlined />} disabled={index === steps.length - 1}
                   aria-label="下移步骤" onClick={() => move(index, 1)} />
                 <Button danger icon={<DeleteOutlined />} aria-label="删除步骤"
-                  onClick={() => setSteps((current) => current.filter((_, i) => i !== index)
-                    .map((item, order) => ({
-                      ...item,
-                      order,
-                      depends_on: (item.depends_on || []).filter((key) => key !== step.key),
-                      condition: item.condition?.source === 'dependency'
-                        && item.condition?.step === step.key ? {} : item.condition,
-                    })))} />
+                  onClick={() => deleteStep(step.key)} />
               </div>
             </Card>
           ))}
-      </div>
+      </WorkflowStepPanel>
       {workflow.execution_mode === 'automatic' && steps.length > 0 && (
         <Card title="最终成品汇总" className="workflow-output-mapping">
           <p>为需要交付的节点结果填写字段名；留空的节点仍保留在 outputs 中。</p>
           {steps.map((step) => {
-            const source = `steps.${step.key}.output.result`;
-            const alias = Object.entries(workflow.output_mapping || {}).find(([, binding]) => (
-              (typeof binding === 'string' ? binding : binding?.from) === source
-            ))?.[0] || '';
+            const entry = Object.entries(workflow.output_mapping || {}).find(([, binding]) => (
+              (typeof binding === 'string' ? binding : binding?.from)?.startsWith(`steps.${step.key}.output.`)
+            ));
+            const alias = entry?.[0] || '';
+            const source = entry ? (typeof entry[1] === 'string' ? entry[1] : entry[1].from)
+              : outputSources[step.key] || `steps.${step.key}.output.result`;
             return (
               <label key={step.key}>
                 <span>{step.name || step.application.application_name}</span>
-                <Input
-                  value={alias}
-                  placeholder="例如 article、layout、cover"
-                  onChange={(event) => setOutputAlias(step.key, event.target.value)}
-                />
+                <div className="workflow-output-field">
+                  <Select aria-label={`${step.name || step.key}的交付内容`} value={source}
+                    options={workflowStepOutputOptions(step)} onChange={(value) => {
+                      setOutputSources((current) => ({ ...current, [step.key]: value }));
+                      if (alias) setOutputAlias(step.key, alias, value);
+                    }} />
+                  <Input value={alias} placeholder="例如 article、pages、cover"
+                    onChange={(event) => setOutputAlias(step.key, event.target.value, source)} />
+                </div>
               </label>
             );
           })}

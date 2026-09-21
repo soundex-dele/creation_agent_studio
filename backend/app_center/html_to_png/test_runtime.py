@@ -138,3 +138,70 @@ def test_executor_returns_empty_result_without_starting_node(tmp_path):
 
     assert result["total"] == 0
     assert result["message"] == "所选目录中没有 HTML 文件。"
+
+
+def workflow_fixture(tmp_path):
+    folder = tmp_path / "illustrations"
+    folder.mkdir()
+    (folder / "01.html").write_text("<div>配图</div>", encoding="utf-8")
+    (folder / "index.html").write_text("不应导出预览索引", encoding="utf-8")
+    source = tmp_path / "article.md"
+    source.write_text("# 标题\n\n第一段正文。\n\n第二段正文。", encoding="utf-8")
+    manifest = folder / "manifest.json"
+    manifest.write_text(runtime.json.dumps({
+        "files": ["01.html"],
+        "insertions": [{"file": "01.html", "after": "第一段正文。", "alt": "说明"}],
+    }), encoding="utf-8")
+    return {
+        "working_directory": str(tmp_path), "manifest_file": str(manifest),
+        "article_source": str(source), "strict": True,
+    }, folder
+
+
+def test_manifest_exports_only_listed_files_and_inserts_png_without_changing_copy(monkeypatch, tmp_path):
+    config, folder = workflow_fixture(tmp_path)
+    png = folder / "01.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"fixture")
+    process = _Process([runtime.json.dumps({"type": "completed", "index": 1, "output": str(png)})])
+    monkeypatch.setattr(runtime.shutil, "which", lambda _: "node")
+    monkeypatch.setattr(runtime, "_playwright_module_path", lambda _: tmp_path)
+    monkeypatch.setattr(runtime.subprocess, "Popen", lambda *a, **kw: process)
+    sink = _Sink()
+    result = runtime.execute_html_to_png({"input": config, "allowed_roots": [str(tmp_path)]}, sink)
+    assert result["files"] == [str(png)]
+    assert runtime.json.loads(process.stdin.value)["files"] == [{
+        "input": str(folder / "01.html"), "output": str(png),
+    }]
+    assert (tmp_path / "article-with-images.md").read_text(encoding="utf-8") == (
+        "# 标题\n\n第一段正文。\n\n![说明](illustrations/01.png)\n\n第二段正文。"
+    )
+    assert (tmp_path / "article.md").read_text(encoding="utf-8") == "# 标题\n\n第一段正文。\n\n第二段正文。"
+    assert result["article_md"] == str(tmp_path / "article-with-images.md")
+
+
+@pytest.mark.parametrize("anchor", ["不存在的段落", "第一段", ""])
+def test_invalid_insertion_anchors_stop_without_writing_a_partial_article(tmp_path, anchor):
+    config, folder = workflow_fixture(tmp_path)
+    manifest_path, manifest, files = runtime.load_manifest(config)
+    manifest["insertions"][0]["after"] = anchor
+    with pytest.raises(ValueError, match="锚点"):
+        runtime.insert_illustrations(config, manifest_path, manifest, files, [str(folder / "01.png")])
+    assert not (tmp_path / "article-with-images.md").exists()
+
+
+def test_manifest_cannot_escape_workspace_even_with_unrestricted_executor(tmp_path):
+    config, folder = workflow_fixture(tmp_path)
+    (folder / "manifest.json").write_text(runtime.json.dumps({"files": ["../../escape.html"]}))
+    with pytest.raises(ValueError, match="工作目录内"):
+        runtime.load_manifest(config)
+
+
+def test_strict_export_stops_on_partial_failure(monkeypatch, tmp_path):
+    config, folder = workflow_fixture(tmp_path)
+    process = _Process([runtime.json.dumps({"type": "failed", "index": 1, "error": "missing image"})])
+    monkeypatch.setattr(runtime.shutil, "which", lambda _: "node")
+    monkeypatch.setattr(runtime, "_playwright_module_path", lambda _: tmp_path)
+    monkeypatch.setattr(runtime.subprocess, "Popen", lambda *a, **kw: process)
+    with pytest.raises(RuntimeError, match="未全部成功"):
+        runtime.execute_html_to_png({"input": config, "allowed_roots": [str(tmp_path)]}, _Sink())
+    assert not (tmp_path / "article-with-images.md").exists()

@@ -4,6 +4,9 @@ import time
 
 from apps.enterprise.models import Organization
 from core.llm.factory import build_agent_engine
+from apps.workflows.artifacts import (
+    artifact_instructions, collect_workflow_artifacts, workflow_artifact_baseline,
+)
 logger = logging.getLogger(__name__)
 
 OUTPUT_DELTA_FLUSH_CHARS = 256
@@ -82,6 +85,9 @@ def execute_agent_completion(run_payload, sink):
     checkpoint = ((run_payload.get("checkpoint") or {}).get("metadata") or {}).get(
         "checkpoint"
     ) or {}
+    artifact_baseline = checkpoint.get("workflow_artifact_baseline")
+    if artifact_baseline is None:
+        artifact_baseline = workflow_artifact_baseline(snapshot, input_data.get("working_directory"))
     agent_thread = dict(
         checkpoint.get("agent_thread") or input_data.get("agent_thread") or {}
     )
@@ -100,6 +106,9 @@ def execute_agent_completion(run_payload, sink):
             {"role": "system", "content": str(definition.get("system_prompt") or "")},
             *history,
         ]
+        instructions = artifact_instructions(snapshot)
+        if instructions:
+            messages.append({"role": "user", "content": instructions})
 
     resume_command = run_payload.get("resume_command") or {}
     governance = snapshot.get("governance") or {}
@@ -207,6 +216,8 @@ def execute_agent_completion(run_payload, sink):
             "messages": messages,
             "input_request": checkpoint_request,
         }
+        if artifact_baseline:
+            checkpoint_data["workflow_artifact_baseline"] = artifact_baseline
         if response.thread_id and provider_name:
             checkpoint_data["agent_thread"] = {
                 "provider": provider_name,
@@ -240,6 +251,9 @@ def execute_agent_completion(run_payload, sink):
             )
         ],
     }
+    artifacts = collect_workflow_artifacts(snapshot, input_data.get("working_directory"), artifact_baseline)
+    if artifacts:
+        output["artifacts"] = artifacts
     sink.emit("output.snapshot", output)
     if response.thread_id and provider_name:
         output["agent_thread"] = {
