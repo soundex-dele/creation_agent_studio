@@ -7,6 +7,7 @@ import Sidebar, { hasSidebarContent } from '../components/Sidebar/Sidebar';
 import MobileNavigation from '../components/Navigation/MobileNavigation';
 import useMediaQuery from '../hooks/useMediaQuery';
 import { usePreferencesStore } from '../stores/usePreferencesStore';
+import { shouldHideConversationMainNavigation } from './mainLayoutPolicy';
 import './MainLayout.css';
 
 interface MainLayoutProps {
@@ -35,10 +36,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const isConversationPage = location.pathname === '/chat';
   const homeAppsInContent = layoutMode === 'left-right' && !isMobile
     && (location.pathname === '/' || location.pathname === '');
+  const hideConversationMainNavigation = shouldHideConversationMainNavigation({
+    isConversationPage,
+    isMobile,
+    layoutMode,
+  });
   const shouldHideSidebar = Boolean(
     hideSidebar || embedded || (standalone && !isConversationPage) || homeAppsInContent,
   );
-  const shouldHideHeader = Boolean(hideHeader || embedded || standalone);
+  const shouldHideHeader = Boolean(
+    hideHeader || embedded || standalone || hideConversationMainNavigation,
+  );
   // Chat page needs full-height content without padding
   const ownsPageSpacing = location.pathname === '/' || location.pathname === ''
     || location.pathname === '/chat';
