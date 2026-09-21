@@ -83,6 +83,7 @@ export const sourceRelationType = (run: RunResource): PrimaryTaskType | 'applica
 export interface TaskDestination {
   path: string;
   label: string;
+  target?: '_blank';
 }
 
 export const taskDestination = (
@@ -102,7 +103,7 @@ export const taskDestination = (
   if (requestedType === 'conversation') {
     const conversationId = taskConversationId(run);
     return conversationId
-      ? { path: `/chat?conversation=${encodeURIComponent(conversationId)}`, label: '打开对话' }
+      ? { path: `/chat?conversation=${encodeURIComponent(conversationId)}`, label: '打开对话', target: '_blank' }
       : null;
   }
   if (requestedType === 'workflow') {

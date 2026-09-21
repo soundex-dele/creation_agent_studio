@@ -111,7 +111,7 @@ describe('task center relationships', () => {
     expect(buildTaskRelation(applicationRun, [applicationRun])).toEqual([]);
   });
 
-  it('opens a conversation task at its exact conversation page', () => {
+  it('opens a conversation task in a new window at its exact conversation page', () => {
     const conversationRun = run({
       task_type: 'conversation',
       source_type: 'conversation',
@@ -124,6 +124,7 @@ describe('task center relationships', () => {
     expect(taskDestination(conversationRun)).toEqual({
       path: '/chat?conversation=conversation%2042',
       label: '打开对话',
+      target: '_blank',
     });
   });
 
@@ -184,7 +185,26 @@ describe('task center relationships', () => {
 
   it('opens the current application execution conversation instead of its parent or application', () => {
     const current = run({ id: 'current', parent_id: 'parent-workflow', task_type: 'execution', source_type: 'workflow_step', application_id: '9', conversation_id: 'current conversation' });
-    expect(taskDestination(current)).toEqual({ path: '/chat?conversation=current%20conversation', label: '打开对话' });
+    expect(taskDestination(current)).toEqual({ path: '/chat?conversation=current%20conversation', label: '打开对话', target: '_blank' });
+  });
+
+  it.each([
+    { source_type: 'conversation', source_id: 'conversation & 42' },
+    { source_type: 'workflow_step', definition_snapshot: { conversation_id: 'conversation & 42' } },
+  ])('opens explicit conversation links in new windows using fallback identifiers', (overrides) => {
+    const destination = taskDestination(run(overrides), 'conversation');
+    expect(destination?.target).toBe('_blank');
+    expect(new URL(destination!.path, 'https://studio.test').searchParams.get('conversation'))
+      .toBe('conversation & 42');
+  });
+
+  it('opens a related parent conversation in a new window', () => {
+    const parent = run({ id: 'parent', source_type: 'application', conversation_id: 'parent-chat' });
+    const current = run({ id: 'child', parent_id: parent.id, conversation_id: 'child-chat' });
+    const [relation] = buildTaskRelation(current, [parent, current]);
+    expect(taskDestination(relation.run)).toEqual({
+      path: '/chat?conversation=parent-chat', label: '打开对话', target: '_blank',
+    });
   });
 
   it('does not redirect a task without a conversation or workflow to a resource definition', () => {

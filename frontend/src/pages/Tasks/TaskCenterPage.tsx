@@ -195,7 +195,12 @@ export default function TaskCenterPage() {
 
   const openDestination = (run: RunResource, requestedType?: string) => {
     const destination = taskDestination(run, requestedType);
-    if (destination) navigate(destination.path);
+    if (!destination) return;
+    if (destination.target === '_blank') {
+      window.open(destination.path, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigate(destination.path);
   };
 
   const openTreeBoard = async (run: RunResource) => {
@@ -225,7 +230,13 @@ export default function TaskCenterPage() {
         const meta = typeMeta[node.type] || { ...fallbackTypeMeta, label: node.type };
         const destination = taskDestination(node.run);
         return <li className="task-relation-part" key={node.run.id}>
-          <Link className="task-relation-link" to={destination?.path || `/runs/${node.run.id}`} title={`打开关联任务：${node.name}`}>
+          <Link
+            className="task-relation-link"
+            to={destination?.path || `/runs/${node.run.id}`}
+            target={destination?.target}
+            rel={destination?.target === '_blank' ? 'noopener noreferrer' : undefined}
+            title={`${destination?.target === '_blank' ? '在新窗口打开关联对话' : '打开关联任务'}：${node.name}`}
+          >
             <span aria-hidden="true">{meta.icon}</span><span className="task-relation-type">{meta.label}</span><span className="task-relation-name">{node.name}</span>
           </Link>
         </li>;
