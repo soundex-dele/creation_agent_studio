@@ -5,12 +5,27 @@
 .workflows-heading > div { flex: 1; }
 .workflows-loading, .workflow-run-loading { min-height: 420px; display: grid; place-items: center; }
 .workflow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
-.workflow-card-icon { font-size: 30px; margin-bottom: 12px; }
-.workflow-card h3 { margin: 0 0 8px; }
-.workflow-card p { min-height: 44px; color: var(--color-text-sec); }
-.workflow-card > span { color: var(--color-text-dim); font-size: 13px; }
-.workflow-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-dim); font-size: 13px; }
-.workflow-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.workflow-card { min-width: 0; overflow: hidden; border-color: var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card); box-shadow: var(--shadow-sm); }
+.workflow-card:focus-within { border-color: var(--color-border-lit); box-shadow: var(--shadow-md); }
+.workflow-card > .ant-card-body {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 20px;
+}
+.workflow-card-heading { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; margin-bottom: 16px; }
+.workflow-card-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 12px; background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg-card)); color: var(--color-primary); font-size: 22px; }
+.workflow-card-heading h3 { flex: 1; min-width: 0; align-self: center; margin: 0; color: var(--color-text); font-size: 16px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.workflow-card-heading .workflow-card-delete { flex: 0 0 32px; width: 32px; height: 32px; margin-top: -4px; margin-right: -8px; color: var(--color-text-sec); }
+.workflow-card-heading .workflow-card-delete:hover { color: var(--color-error); background: color-mix(in srgb, var(--color-error) 8%, var(--color-bg-card)); }
+.workflow-card .workflow-card-description { min-height: 44px; margin: 0 0 20px; color: var(--color-text-sec); font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
+.workflow-card-meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px 12px; margin-top: auto; color: var(--color-text-sec); font-size: 12px; }
+.workflow-card-count { display: inline-flex; align-items: center; gap: 6px; }
+.workflow-card-count > .anticon { font-size: 14px; }
+.workflow-card-count strong { color: var(--color-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.workflow-card-meta .ant-tag { margin: 0; border: 0; border-radius: 6px; padding-inline: 8px; }
+.workflow-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.workflow-card-actions > .ant-btn { width: 100%; min-width: 0; height: 36px; }
 .workflow-run-form-description { margin: 0 0 18px; color: var(--color-text-sec); }
 .workflow-run-form { display: flex; max-height: 62vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 2px 5px 2px 2px; }
 .workflow-run-field { display: flex; flex-direction: column; gap: 7px; }
@@ -97,6 +112,8 @@
 .workflow-run-application-frame { display: none; width: 100%; height: 100%; border: 0; background: var(--color-bg-void); }
 .workflow-run-application-frame.active { display: block; }
 @media (max-width: 760px) {
+  .workflow-card-actions > .ant-btn { height: 44px; }
+  .workflow-card-heading .workflow-card-delete { flex-basis: 44px; width: 44px; height: 44px; }
   .workflows-page,
   .workflow-editor { padding: 0; }
   .workflows-heading { align-items: stretch; flex-direction: column; gap: 16px; margin-bottom: 20px; }

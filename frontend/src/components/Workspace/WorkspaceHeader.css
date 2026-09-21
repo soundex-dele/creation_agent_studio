@@ -1,0 +1,56 @@
+.workspace-page:is(.delegates-page, .workflows-page, .automations-page, .knowledge-page) {
+  width: 100%;
+  max-width: 1360px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0 0 24px;
+}
+
+.workspace-header {
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  background: linear-gradient(115deg, color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-card)), var(--color-bg-card) 65%);
+}
+
+.workspace-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px;
+}
+
+.workspace-header-copy { min-width: 0; }
+.workspace-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--color-text-sec); font-size: 12px; font-weight: 600; letter-spacing: .08em; }
+.workspace-eyebrow > span { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-card); color: var(--color-primary); font-size: 16px; }
+.workspace-header .page-title { margin: 0; font-size: clamp(24px, 2.3vw, 30px); line-height: 1.35; }
+.workspace-header .page-subtitle { max-width: 640px; margin: 10px 0 0; line-height: 1.7; }
+.workspace-header-action { flex-shrink: 0; }
+.workspace-header-action .ant-btn { min-height: 40px; padding-inline: 18px; font-weight: 500; }
+.workspace-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 20px 32px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg-card) 75%, transparent); }
+.workspace-metric { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 12px; padding: 0 24px; border-left: 1px solid var(--color-border); }
+.workspace-metric:first-child { padding-left: 0; border-left: 0; }
+.workspace-metric:last-child { padding-right: 0; }
+.workspace-metric dt { color: var(--color-text-sec); font-size: 13px; }
+.workspace-metric dd { align-self: center; margin: 0; color: var(--color-text); font: 600 28px/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+.workspace-metric dt > span { display: block; margin-top: 4px; color: var(--color-text-sec); font-size: 12px; }
+.workspace-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; }
+.workspace-section-heading h2 { margin: 0; color: var(--color-text); font-size: 16px; font-weight: 600; }
+.workspace-section-heading > span { color: var(--color-text-sec); font-size: 12px; }
+.workspace-empty { display: grid; min-height: 280px; place-items: center; padding: 32px 16px; border: 1px dashed var(--color-border-lit); border-radius: var(--border-radius-lg); background: var(--color-bg-card); }
+.workspace-page :where(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+@media (max-width: 680px) {
+  .workspace-header-main { align-items: stretch; flex-direction: column; gap: 20px; padding: 24px 20px; }
+  .workspace-header-action .ant-btn { width: 100%; min-height: 44px; }
+  .workspace-metrics { padding: 16px 20px; gap: 12px; }
+  .workspace-metric { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 0 0 0 12px; }
+  .workspace-metric dd { align-self: flex-start; font-size: 24px; }
+  .workspace-metric dt > span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page, .workspace-page *, .workspace-page *::before, .workspace-page *::after { animation: none !important; transition: none !important; }
+}

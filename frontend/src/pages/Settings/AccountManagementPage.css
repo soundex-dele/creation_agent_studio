@@ -1,128 +1,53 @@
-.account-management-page {
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.account-management-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 20px;
-}
-
-.account-management-heading h1 {
-  margin: 8px 0 0;
-}
-
-.account-management-heading p {
-  margin: 8px 0 0;
-  color: var(--color-text-sec);
-}
-
-.account-management-back {
-  margin-left: -12px;
-  color: var(--color-text-sec);
-}
-
-.account-management-notice {
-  margin-bottom: 20px;
-}
-
-.account-management-card-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.account-permission-form {
-  margin-top: 20px;
-}
-
-.account-permission-basics {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px;
-  gap: 16px;
-}
-
-.account-capability-list {
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.account-capability-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.account-capability-row:last-child {
-  border-bottom: 0;
-}
-
-.account-capability-row > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.account-capability-row span {
-  color: var(--color-text-sec);
-  font-size: 12px;
-}
-
-.account-import-dragger {
-  display: block;
-  margin-top: 18px;
-}
-
-.account-import-errors {
-  max-height: 320px;
-  margin: 12px 0 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  color: var(--color-text);
-  font-family: inherit;
-  line-height: 1.75;
-}
-
-.account-identity {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.account-identity strong,
-.account-identity span {
-  overflow-wrap: anywhere;
-}
-
-.account-identity strong {
-  color: var(--color-text);
-}
-
-.account-identity span {
-  color: var(--color-text-sec);
-  font-size: 12px;
-}
+.account-management-page { width: 100%; max-width: 1360px; min-width: 0; margin: 0 auto; padding-bottom: 32px; }
+.account-management-notice { margin-bottom: 24px; border-radius: 12px; }
+.account-management-card { min-width: 0; overflow: hidden; border-color: var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card); box-shadow: var(--shadow-sm); }
+.account-management-card > .ant-card-head { padding: 20px 24px; border-color: var(--color-border); }
+.account-management-card .ant-card-head-wrapper { justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.account-management-card .ant-card-head-title { min-width: 0; padding: 0; white-space: normal; }
+.account-management-card .ant-card-extra { margin-inline-start: 0; }
+.account-management-card-title h2 { margin: 0; color: var(--color-text); font-size: 16px; font-weight: 600; }
+.account-management-card-title > span { display: block; margin-top: 5px; color: var(--color-text-sec); font-size: 12px; font-weight: 400; }
+.account-management-tools .ant-btn { min-height: 36px; }
+.account-management-card > .ant-card-body { padding: 0; }
+.account-management-card .ant-table { background: var(--color-bg-card); }
+.account-management-card .ant-table-thead > tr > th { padding-block: 14px; background: var(--color-bg-surface); color: var(--color-text-sec); font-size: 12px; font-weight: 500; }
+.account-management-card .ant-table-tbody > tr > td { padding-block: 18px; color: var(--color-text-sec); font-size: 13px; }
+.account-management-card .ant-table-thead > tr > th:first-child, .account-management-card .ant-table-tbody > tr > td:first-child { padding-left: 24px; }
+.account-management-card .ant-pagination { flex-wrap: wrap; padding-inline: 24px; }
+.account-management-card .ant-tag { border-radius: 6px; }
+.account-management-card .ant-table-empty .ant-empty { padding-block: 36px; }
+.account-identity-cell, .account-permission-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.account-avatar { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border)); border-radius: 12px; background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-card)); color: var(--color-text); font: 600 17px/1 var(--font-display); }
+.account-identity { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.account-identity > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.account-identity strong, .account-identity span { overflow-wrap: anywhere; }
+.account-identity strong { color: var(--color-text); font-size: 14px; font-weight: 500; }
+.account-identity > span { color: var(--color-text-sec); font-size: 12px; }
+.account-identity .ant-tag { margin: 0; color: var(--color-text-sec); font-size: 11px; }
+.account-create-modal .ant-modal-title, .account-permission-modal .ant-modal-title, .account-import-modal .ant-modal-title { font-size: 18px; }
+.account-create-modal .ant-modal-body, .account-permission-modal .ant-modal-body, .account-import-modal .ant-modal-body { padding-top: 16px; }
+.account-create-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; margin-top: 20px; }
+.account-create-form .ant-form-item { min-width: 0; margin-bottom: 0; }
+.account-create-form .account-form-full { grid-column: 1 / -1; }
+.account-login-field { padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-surface); }
+.account-create-modal .ant-modal-footer, .account-permission-modal .ant-modal-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.account-permission-identity { padding: 16px; margin-bottom: 20px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-surface); }
+.account-permission-form { margin-top: 24px; }
+.account-permission-basics { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 20px; }
+.account-permission-basics .ant-form-item { margin-bottom: 0; }
+.account-permission-modal .ant-alert, .account-import-modal .ant-alert { border-radius: 10px; }
+.account-import-dragger { display: block; margin-top: 20px; }
+.account-import-dragger .ant-upload-drag { border-radius: 12px; background: var(--color-bg-surface); }
+.account-import-modal .ant-btn-link { margin-top: 8px; padding-left: 0; }
+.account-import-errors { max-height: 320px; margin: 12px 0 0; overflow: auto; white-space: pre-wrap; color: var(--color-text); font-family: inherit; line-height: 1.75; }
 
 @media (max-width: 640px) {
-  .account-management-heading {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .account-management-heading > .ant-btn {
-    min-height: 44px;
-  }
-
-  .account-permission-basics {
-    grid-template-columns: 1fr;
-  }
+  .account-management-card > .ant-card-head { padding: 20px 16px; }
+  .account-management-card .ant-card-head-wrapper { align-items: stretch; flex-direction: column; }
+  .account-management-tools { display: flex; width: 100%; }
+  .account-management-tools > .ant-space-item { flex: 1 1 auto; }
+  .account-management-tools .ant-btn { width: 100%; min-height: 44px; }
+  .account-management-card .ant-pagination { padding-inline: 16px; }
+  .account-create-form, .account-permission-basics { grid-template-columns: minmax(0, 1fr); }
+  .account-create-modal .ant-modal-footer .ant-btn, .account-permission-modal .ant-modal-footer .ant-btn { min-height: 44px; }
 }

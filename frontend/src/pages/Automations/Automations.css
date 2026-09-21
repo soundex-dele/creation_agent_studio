@@ -1,1 +1,21 @@
 .automations-page,.automation-editor,.automation-detail{max-width:1440px;margin:0 auto}.automations-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px}.automations-hero .page-title{margin:0}.automations-hero .page-subtitle{margin:4px 0 0}.automations-toolbar{display:grid;grid-template-columns:minmax(240px,1fr) 180px 180px auto;gap:12px;margin-bottom:16px}.automations-card,.automation-editor .ant-card,.automation-detail .ant-card{background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:14px}.automation-name-button{display:flex;min-height:44px;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:4px 0;border:0;background:none;color:var(--color-text);cursor:pointer;text-align:left}.automation-name-button span{color:var(--color-text-muted);font-size:12px}.automation-editor form{display:flex;flex-direction:column;gap:18px}.automation-full{width:100%}.automation-editor-actions{display:flex;justify-content:flex-end;gap:12px;padding:4px 0 28px}.automation-json{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.automation-secret{display:flex;flex-direction:column;gap:16px;margin-top:16px}.automation-actions{margin:16px 0}.automation-detail{display:flex;flex-direction:column;gap:18px}.automation-detail .automations-hero{margin-bottom:0}.automation-detail pre{max-height:300px;margin:0;overflow:auto;white-space:pre-wrap;word-break:break-word}@media(max-width:800px){.automations-hero{align-items:stretch;flex-direction:column;gap:16px}.automations-toolbar{grid-template-columns:1fr}.automation-editor .ant-card-body{padding:16px}.automation-editor .ant-space{max-width:100%;flex-wrap:wrap;row-gap:8px}.automation-editor-actions{flex-wrap:wrap;gap:8px}.automation-detail .ant-descriptions-view{overflow:auto}}
+
+/* Overview table: the filters and rows form one quiet, continuous surface. */
+.automations-page .automations-card { overflow: hidden; border-radius: var(--border-radius-lg); background: var(--color-bg-card); box-shadow: var(--shadow-sm); }
+.automations-page .automations-toolbar { grid-template-columns: minmax(180px, 1fr) 150px 160px auto; margin: 0; padding: 20px; border-bottom: 1px solid var(--color-border); }
+.automations-page .ant-table { background: var(--color-bg-card); }
+.automations-page .ant-table-thead > tr > th { padding-block: 14px; background: var(--color-bg-surface); color: var(--color-text-sec); font-size: 12px; font-weight: 500; }
+.automations-page .ant-table-tbody > tr > td { padding-block: 18px; }
+.automations-page .automation-name-button { max-width: 320px; }
+.automations-page .automation-name-button strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.automations-page .automation-name-button span { display: -webkit-box; overflow: hidden; color: var(--color-text-sec); line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.automations-page .automation-name-button:hover strong { color: var(--color-primary); }
+.automation-trigger { display: inline-flex; align-items: center; gap: 7px; color: var(--color-text-sec); }
+.automation-no-runs { color: var(--color-text-sec); font-size: 12px; }
+.automations-page .ant-pagination { padding-inline: 20px; }
+@media (max-width: 900px) {
+  .automations-page .automations-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
+}
+@media (max-width: 480px) {
+  .automations-page .automations-toolbar { grid-template-columns: minmax(0, 1fr); }
+}

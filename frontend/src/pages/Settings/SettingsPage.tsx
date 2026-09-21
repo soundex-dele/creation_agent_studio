@@ -1,18 +1,17 @@
 import { useEffect, type CSSProperties } from 'react';
 import {
   Alert, Button, Card, Descriptions, Popconfirm, Segmented, Select, Space, Switch,
-  Tag, Typography, message,
+  Tag, message,
 } from 'antd';
 import {
   BgColorsOutlined, CheckOutlined, KeyOutlined, MessageOutlined, MoonOutlined, ReloadOutlined,
   SafetyCertificateOutlined, TeamOutlined, UserOutlined,
-  BulbOutlined, UndoOutlined,
+  BulbOutlined, UndoOutlined, SettingOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@/stores/useThemeStore';
 import {
   usePreferencesStore,
-  type LayoutMode,
   type NavigationIconMode,
 } from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -33,6 +32,26 @@ const navigationIconSelectOptions = NAVIGATION_ICON_OPTIONS.map((option) => {
     label: <span className="settings-icon-select-option"><Icon aria-hidden="true" />{option.label}</span>,
   };
 });
+
+const settingsSections = [
+  { id: 'appearance', label: '外观与布局', description: '主题、布局与导航', icon: <BgColorsOutlined /> },
+  { id: 'conversation', label: '对话偏好', description: '输入习惯与工具权限', icon: <MessageOutlined /> },
+  { id: 'workspace', label: '团队与工作区', description: '当前组织与成员角色', icon: <TeamOutlined /> },
+  { id: 'security', label: '账号与安全', description: '个人资料与访问凭证', icon: <SafetyCertificateOutlined /> },
+  { id: 'reset', label: '重置偏好', description: '恢复浏览器默认设置', icon: <UndoOutlined /> },
+];
+
+const sectionTitle = (id: string) => {
+  const section = settingsSections.find(item => item.id === id)!;
+  return <div className="settings-section-title">
+    <span className="settings-section-icon" aria-hidden="true">{section.icon}</span>
+    <div><h2>{section.label}</h2><p>{section.description}</p></div>
+  </div>;
+};
+
+const organizationRoleLabels: Record<string, string> = {
+  owner: '所有者', admin: '管理员', developer: '开发者', operator: '操作员', auditor: '审计员', viewer: '查看者',
+};
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -61,26 +80,48 @@ export default function SettingsPage() {
     message.success('偏好设置已恢复默认值');
   };
 
-  return (
-    <div className="settings-page animate-fade-in">
-      <div className="settings-heading"><h1 className="page-title">设置</h1><p className="page-subtitle">调整界面、对话行为和当前团队工作区。</p></div>
+  const currentTheme = SELECTABLE_THEME_PRESETS.find(preset => preset.id === theme);
+  const currentOrganization = organizations.find(item => item.id === currentOrganizationId);
 
+  return (
+    <div className="settings-page">
+      <header className="settings-heading">
+        <div>
+          <span className="settings-eyebrow"><SettingOutlined aria-hidden="true" />工作区偏好</span>
+          <h1 className="page-title">系统设置</h1>
+          <p className="page-subtitle">让界面与协作方式，更贴合你的工作习惯。</p>
+        </div>
+        <div className="settings-current-preferences" aria-label="当前外观">
+          <span><BgColorsOutlined aria-hidden="true" />{currentTheme?.name || '自定义主题'}</span>
+          <span>{layoutMode === 'top-bottom' ? '上下布局' : '左右布局'}</span>
+        </div>
+      </header>
+
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          <nav aria-label="设置分组">
+            {settingsSections.map(section => <a href={`#settings-${section.id}`} key={section.id}>
+              <span aria-hidden="true">{section.icon}</span>
+              <span><strong>{section.label}</strong><small>{section.description}</small></span>
+            </a>)}
+          </nav>
+          <p className="settings-save-note"><CheckOutlined aria-hidden="true" />界面与对话偏好即时生效，自动保存在当前浏览器。</p>
+        </aside>
       <div className="settings-grid">
-        <Card className="settings-appearance-card" title={<><BgColorsOutlined /> 外观</>}>
+        <Card id="settings-appearance" className="settings-appearance-card" title={sectionTitle('appearance')}>
           <div className="settings-row settings-layout-row">
             <div>
               <strong>界面布局</strong>
-              <p>上下布局使用顶部导航；左右布局使用左侧导航，工作台应用横向排列。窄屏自动适配。</p>
+              <p>选择导航所在的位置，窄屏下会自动适配。</p>
             </div>
-            <Segmented
-              value={layoutMode}
-              aria-label="界面布局"
-              options={[
-                { value: 'top-bottom', label: '上下布局' },
-                { value: 'left-right', label: '左右布局' },
-              ]}
-              onChange={(value) => setLayoutMode(value as LayoutMode)}
-            />
+            <div className="settings-layout-options" role="radiogroup" aria-label="界面布局">
+              {(['top-bottom', 'left-right'] as const).map(mode => <label className={`settings-layout-option${layoutMode === mode ? ' selected' : ''}`} key={mode}>
+                <input type="radio" name="settings-layout" value={mode} checked={layoutMode === mode} onChange={() => setLayoutMode(mode)} />
+                <span className={`settings-layout-preview settings-layout-preview--${mode}`} aria-hidden="true"><i /><i /><i /></span>
+                <span>{mode === 'top-bottom' ? '上下布局' : '左右布局'}</span>
+                <CheckOutlined className="settings-layout-check" aria-hidden="true" />
+              </label>)}
+            </div>
           </div>
           <div className="settings-theme-intro">
             <strong>界面主题</strong>
@@ -97,16 +138,13 @@ export default function SettingsPage() {
                 '--theme-preview-accent': preset.colors.primary,
               } as CSSProperties;
               return (
-                <button
-                  type="button"
+                <label
                   key={preset.id}
-                  role="radio"
-                  aria-checked={selected}
                   className={`settings-theme-option${selected ? ' selected' : ''}`}
                   style={previewStyle}
-                  onClick={() => setTheme(preset.id)}
                 >
-                  <span className="settings-theme-preview" aria-hidden="true">
+                  <input type="radio" name="settings-theme" value={preset.id} checked={selected} onChange={() => setTheme(preset.id)} aria-label={`${preset.name}，${preset.description}`} />
+                  <span className={`settings-theme-preview settings-theme-preview--${layoutMode}`} aria-hidden="true">
                     <span className="settings-theme-preview-sidebar" />
                     <span className="settings-theme-preview-content">
                       <span /><span /><span />
@@ -123,7 +161,7 @@ export default function SettingsPage() {
                       {preset.mode === 'dark' ? '暗色' : '亮色'}
                     </span>
                   </span>
-                </button>
+                </label>
               );
             })}
           </div>
@@ -188,14 +226,15 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card title={<><MessageOutlined /> 对话</>}>
+        <Card id="settings-conversation" title={sectionTitle('conversation')}>
           <Space direction="vertical" size={22} style={{ width: '100%' }}>
             <div className="settings-row">
               <div><strong>发送快捷键</strong><p>选择更符合你输入习惯的发送方式。</p></div>
               <Select
+                aria-label="发送快捷键"
                 value={sendShortcut}
                 onChange={setSendShortcut}
-                style={{ width: 190 }}
+                className="settings-control"
                 options={[
                   { value: 'enter', label: 'Enter 发送' },
                   { value: 'mod-enter', label: 'Ctrl/⌘+Enter 发送' },
@@ -208,6 +247,7 @@ export default function SettingsPage() {
                 <p>开启后，新对话默认允许智能体直接调用工具；仍可在输入框中单独切换。</p>
               </div>
               <Switch
+                aria-label="默认自动允许工具"
                 checked={defaultPermissionMode === 'allow_all'}
                 onChange={(checked) => setDefaultPermissionMode(checked ? 'allow_all' : 'default')}
               />
@@ -218,16 +258,17 @@ export default function SettingsPage() {
           </Space>
         </Card>
 
-        <Card title={<><TeamOutlined /> 团队与工作区</>}>
+        <Card id="settings-workspace" title={sectionTitle('workspace')}>
           <div className="settings-row">
             <div><strong>当前组织</strong><p>应用、智能体、工作流和运行记录归属于当前组织。</p></div>
             <Select
+              aria-label="当前组织"
               loading={isLoading}
               disabled={singleTenantMode || organizations.length <= 1}
               value={currentOrganizationId || undefined}
               onChange={selectOrganization}
               placeholder="选择组织"
-              style={{ width: 240 }}
+              className="settings-control"
               options={organizations.map((organization) => ({
                 value: organization.id,
                 label: organization.name,
@@ -241,28 +282,28 @@ export default function SettingsPage() {
             },
             {
               key: 'role', label: '当前角色',
-              children: organizations.find((item) => item.id === currentOrganizationId)?.role || '—',
+              children: currentOrganization ? (organizationRoleLabels[currentOrganization.role] || currentOrganization.role) : '—',
             },
           ]} />
         </Card>
 
-        <Card title={<><SafetyCertificateOutlined /> 账号与安全</>}>
-          <Typography.Paragraph type="secondary">
-            个人资料、登录密码与 API Key 集中在个人中心管理。
-          </Typography.Paragraph>
-          <Space wrap>
-            <Button icon={<UserOutlined />} onClick={() => navigate('/profile')}>编辑个人资料</Button>
-            <Button icon={<KeyOutlined />} onClick={() => navigate('/profile?tab=security')}>安全与 API Key</Button>
+        <Card id="settings-security" title={sectionTitle('security')}>
+          <div className="settings-account-links">
+            <button type="button" onClick={() => navigate('/profile')}>
+              <UserOutlined aria-hidden="true" /><span><strong>个人资料</strong><small>编辑头像、昵称与个人信息</small></span><ArrowRightOutlined aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => navigate('/profile?tab=security')}>
+              <KeyOutlined aria-hidden="true" /><span><strong>安全与 API Key</strong><small>管理登录密码与访问凭证</small></span><ArrowRightOutlined aria-hidden="true" />
+            </button>
             {userRole === 'admin' && (
-              <Button type="primary" icon={<TeamOutlined />} onClick={() => navigate('/settings/accounts')}>
-                账号管理
-              </Button>
+              <button type="button" onClick={() => navigate('/settings/accounts')}>
+                <TeamOutlined aria-hidden="true" /><span><strong>账号管理</strong><small>管理系统账号与访问权限</small></span><ArrowRightOutlined aria-hidden="true" />
+              </button>
             )}
-          </Space>
+          </div>
         </Card>
-      </div>
 
-      <Card className="settings-reset-card" title="重置偏好">
+      <Card id="settings-reset" className="settings-reset-card" title={sectionTitle('reset')}>
         <div className="settings-row">
           <div><strong>恢复默认设置</strong><p>只重置当前浏览器中的主题、布局、导航图标和对话偏好，不会删除账号或业务数据。</p></div>
           <Popconfirm title="恢复默认设置？" description="主题、布局、导航图标和对话偏好将被重置。" onConfirm={reset}>
@@ -270,6 +311,8 @@ export default function SettingsPage() {
           </Popconfirm>
         </div>
       </Card>
+      </div>
+      </div>
     </div>
   );
 }

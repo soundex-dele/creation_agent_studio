@@ -42,7 +42,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     layoutMode,
   });
   const shouldHideSidebar = Boolean(
-    hideSidebar || embedded || (standalone && !isConversationPage) || homeAppsInContent,
+    hideSidebar || embedded || (standalone && !isConversationPage) || homeAppsInContent
+    || !hasSidebarContent(location.pathname),
   );
   const shouldHideHeader = Boolean(
     hideHeader || embedded || standalone || hideConversationMainNavigation,

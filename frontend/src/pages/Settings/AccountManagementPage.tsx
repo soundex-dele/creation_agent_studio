@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import {
-  Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Switch,
+  Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Switch,
   Table, Tag, Typography, Upload, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  ArrowLeftOutlined, DownloadOutlined, ImportOutlined, InboxOutlined,
+  DownloadOutlined, ImportOutlined, InboxOutlined,
   LockOutlined, ReloadOutlined, TeamOutlined, UserAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/useAuthStore';
+import WorkspaceHeader from '@/components/Workspace/WorkspaceHeader';
 import './AccountManagementPage.css';
 
 type AccountRole = 'admin' | 'auditor' | 'member';
@@ -113,9 +114,12 @@ export default function AccountManagementPage() {
       dataIndex: 'username',
       key: 'username',
       render: (username: string, account) => (
-        <div className="account-identity">
-          <strong>{username}</strong>
-          <span>{account.email || '未填写邮箱'}</span>
+        <div className="account-identity-cell">
+          <span className="account-avatar" aria-hidden="true">{Array.from(username)[0]?.toLocaleUpperCase() || 'U'}</span>
+          <div className="account-identity">
+            <div><strong>{username}</strong>{account.id === user?.id && <Tag bordered={false}>当前账号</Tag>}</div>
+            <span>{account.email || '未填写邮箱'}</span>
+          </div>
         </div>
       ),
     },
@@ -151,7 +155,7 @@ export default function AccountManagementPage() {
     {
       title: '操作',
       key: 'actions',
-      width: 132,
+      width: 156,
       fixed: 'right',
       render: (_, account) => (
         <Button
@@ -168,7 +172,7 @@ export default function AccountManagementPage() {
         </Button>
       ),
     },
-  ], [permissionForm]);
+  ], [permissionForm, user?.id]);
 
   const openCreate = () => {
     form.resetFields();
@@ -289,35 +293,20 @@ export default function AccountManagementPage() {
   }
 
   return (
-    <div className="account-management-page animate-fade-in">
-      <div className="account-management-heading">
-        <div>
-          <Button
-            type="text"
-            className="account-management-back"
-            icon={<ArrowLeftOutlined aria-hidden="true" />}
-            onClick={() => navigate('/settings')}
-          >
-            返回设置
-          </Button>
-          <h1 className="page-title">账号管理</h1>
-          <p className="page-subtitle">自主注册关闭后，由管理员在这里为团队添加登录账号。</p>
-        </div>
-        <Space wrap>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={() => void downloadCsv('/auth/admin/users/export/', 'accounts.csv')}
-          >
-            导出账号
-          </Button>
-          <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
-            导入账号
-          </Button>
-          <Button type="primary" icon={<UserAddOutlined />} onClick={openCreate}>
-            添加账号
-          </Button>
-        </Space>
-      </div>
+    <div className="account-management-page workspace-page">
+      <WorkspaceHeader
+        icon={<TeamOutlined />} eyebrow="账号与访问" title="账号管理"
+        description="统一维护团队登录账号、平台角色与登录权限。"
+        loading={loading}
+        action={<Button type="primary" icon={<UserAddOutlined />} onClick={openCreate}>
+          添加账号
+        </Button>}
+        metrics={[
+          { label: '全部账号', value: total, hint: '系统中的登录账号' },
+          { label: '本页可登录', value: accounts.filter(account => account.is_active).length, hint: `第 ${page} 页的启用账号` },
+          { label: '本页已停用', value: accounts.filter(account => !account.is_active).length, hint: `第 ${page} 页的停用账号` },
+        ]}
+      />
 
       <Alert
         className="account-management-notice"
@@ -329,15 +318,22 @@ export default function AccountManagementPage() {
 
       <Card
         className="account-management-card"
-        title={<span className="account-management-card-title"><TeamOutlined /> 团队账号</span>}
+        title={<div className="account-management-card-title"><h2>团队账号</h2><span>管理平台身份与登录状态</span></div>}
         extra={(
-          <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            onClick={() => void loadAccounts(page)}
-          >
-            刷新
-          </Button>
+          <Space wrap className="account-management-tools">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => void downloadCsv('/auth/admin/users/export/', 'accounts.csv')}
+            >导出账号</Button>
+            <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>导入账号</Button>
+            <Button
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={() => void loadAccounts(page)}
+            >
+              刷新
+            </Button>
+          </Space>
         )}
       >
         <Table<Account>
@@ -346,7 +342,7 @@ export default function AccountManagementPage() {
           dataSource={accounts}
           loading={loading}
           scroll={{ x: 820 }}
-          locale={{ emptyText: '还没有可管理的账号' }}
+          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有可管理的账号，添加账号后即可为团队分配访问权限" /> }}
           pagination={{
             current: page,
             pageSize: 20,
@@ -359,7 +355,9 @@ export default function AccountManagementPage() {
       </Card>
 
       <Modal
+        className="account-create-modal"
         title="添加登录账号"
+        width={680}
         open={createOpen}
         okText="创建账号"
         cancelText="取消"
@@ -375,6 +373,7 @@ export default function AccountManagementPage() {
         </Typography.Paragraph>
         <Form<CreateAccountValues>
           form={form}
+          className="account-create-form"
           layout="vertical"
           requiredMark="optional"
           onFinish={createAccount}
@@ -400,7 +399,7 @@ export default function AccountManagementPage() {
           >
             <Input type="email" autoComplete="email" placeholder="name@example.com" />
           </Form.Item>
-          <Form.Item name="role" label="账号角色" rules={[{ required: true }]}>
+          <Form.Item name="role" label="账号角色" className="account-form-full" rules={[{ required: true }]}>
             <Select options={roleOptions} />
           </Form.Item>
           <Form.Item name="password" label="初始密码" rules={[{ required: true, message: '请输入初始密码' }]}>
@@ -422,13 +421,14 @@ export default function AccountManagementPage() {
           >
             <Input.Password autoComplete="new-password" placeholder="再次输入初始密码" />
           </Form.Item>
-          <Form.Item name="is_active" label="允许登录" valuePropName="checked">
+          <Form.Item name="is_active" label="允许登录" valuePropName="checked" className="account-form-full account-login-field">
             <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
+        className="account-permission-modal"
         title={`账号权限 · ${permissionAccount?.username ?? ''}`}
         open={permissionAccount !== null}
         okText="保存权限"
@@ -439,6 +439,10 @@ export default function AccountManagementPage() {
         destroyOnHidden
         width={680}
       >
+        {permissionAccount && <div className="account-permission-identity">
+          <span className="account-avatar" aria-hidden="true">{Array.from(permissionAccount.username)[0]?.toLocaleUpperCase() || 'U'}</span>
+          <div className="account-identity"><strong>{permissionAccount.username}</strong><span>{permissionAccount.email || '未填写邮箱'}</span></div>
+        </div>}
         <Alert
           type="info"
           showIcon
@@ -470,6 +474,7 @@ export default function AccountManagementPage() {
       </Modal>
 
       <Modal
+        className="account-import-modal"
         title="批量导入账号"
         open={importOpen}
         footer={null}

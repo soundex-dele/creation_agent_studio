@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Switch,
-  Tag, message,
+  Tag, Typography, message,
 } from 'antd';
 import {
   AppstoreOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlayCircleOutlined,
-  PlusOutlined,
+  PlusOutlined, PartitionOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
@@ -21,6 +21,7 @@ import {
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
+import WorkspaceHeader from '@/components/Workspace/WorkspaceHeader';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -218,29 +219,27 @@ const WorkflowsPage = () => {
   };
 
   return (
-    <div className="workflows-page">
-      <div className="workflows-heading">
-        <div><h1 className="page-title">工作流</h1><p className="page-subtitle">把多个应用组合成可手动操作或自动运行的业务流程</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflows/new')}>
-          新建工作流
-        </Button>
-      </div>
+    <div className="workflows-page workspace-page">
+      <WorkspaceHeader
+        icon={<PartitionOutlined />} eyebrow="流程编排" title="工作流"
+        description="连接应用与步骤，把重复的工作整理成清晰、可复用的业务流程。"
+        loading={loading}
+        action={<Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflows/new')}>新建工作流</Button>}
+        metrics={[
+          { label: '全部工作流', value: workflows.length, hint: '沉淀可复用的流程' },
+          { label: '自动执行', value: workflows.filter(item => item.execution_mode !== 'manual').length, hint: '一键启动完整流程' },
+          { label: '执行记录', value: runs.length, hint: '查看过程与产出' },
+        ]}
+      />
+      <div className="workspace-section-heading"><h2>我的工作流</h2><span>按需选择手动操作或自动执行</span></div>
       {loading ? <div className="workflows-loading"><Spin size="large" /></div> : (
         <>
-          {workflows.length === 0 ? <Empty description="还没有工作流" />
+          {workflows.length === 0 ? <div className="workspace-empty"><Empty description="还没有工作流，连接应用来创建第一个流程" /></div>
             : <div className="workflow-grid">{workflows.map((workflow) => (
               <Card key={workflow.id} className="workflow-card">
-                <div className="workflow-card-icon">{workflow.icon || '🔀'}</div>
-                <h3>{workflow.name}</h3>
-                <p>{workflow.description || '未填写说明'}</p>
-                <div className="workflow-card-meta">
-                  <span>{workflow.step_count || 0} 个应用</span>
-                  <Tag color={workflow.execution_mode === 'manual' ? 'gold' : 'blue'}>
-                    {workflow.execution_mode === 'manual' ? '手动执行' : '自动执行'}
-                  </Tag>
-                </div>
-                <div className="workflow-card-actions">
-                  <OutlinedButton onClick={() => navigate(`/workflows/${workflow.id}/edit`)} />
+                <div className="workflow-card-heading">
+                  <div className="workflow-card-icon" aria-hidden="true">{workflow.icon || <PartitionOutlined />}</div>
+                  <h3>{workflow.name}</h3>
                   {workflow.can_delete && (
                     <Popconfirm
                       title="删除工作流"
@@ -251,20 +250,37 @@ const WorkflowsPage = () => {
                       onConfirm={() => remove(workflow)}
                     >
                       <Button
+                        type="text"
+                        className="workflow-card-delete"
                         danger
                         icon={<DeleteOutlined />}
                         loading={deletingWorkflowId === workflow.id}
                         aria-label={`删除 ${workflow.name}`}
-                      >
-                        删除
-                      </Button>
+                        title="删除工作流"
+                      />
                     </Popconfirm>
                   )}
+                </div>
+                <Typography.Paragraph
+                  className="workflow-card-description"
+                  ellipsis={{ rows: 2, expandable: 'collapsible', symbol: expanded => expanded ? '收起' : '展开' }}
+                >
+                  {workflow.description || '尚未添加说明，可在编辑中补充流程用途。'}
+                </Typography.Paragraph>
+                <div className="workflow-card-meta">
+                  <span className="workflow-card-count"><AppstoreOutlined aria-hidden="true" /><strong>{workflow.step_count || 0}</strong>个应用</span>
+                  <Tag color={workflow.execution_mode === 'manual' ? 'gold' : 'blue'}>
+                    {workflow.execution_mode === 'manual' ? '手动执行' : '自动执行'}
+                  </Tag>
+                </div>
+                <div className="workflow-card-actions">
+                  <Button icon={<EditOutlined />} onClick={() => navigate(`/workflows/${workflow.id}/edit`)}>编辑</Button>
                   <Button
                     type="primary"
                     icon={workflow.execution_mode === 'manual'
                       ? <AppstoreOutlined /> : <PlayCircleOutlined />}
                     disabled={!workflow.step_count}
+                    title={!workflow.step_count ? '请先编辑工作流并添加应用' : undefined}
                     loading={preparingRunId === workflow.id}
                     onClick={() => start(workflow)}
                   >
@@ -277,7 +293,7 @@ const WorkflowsPage = () => {
           <section className="workflow-history">
             <div className="workflow-history-heading">
               <div><HistoryOutlined /><h2>执行历史</h2></div>
-              <span>所有状态来自统一 Run 事件流</span>
+              <span>回顾每一次执行的进度与结果</span>
             </div>
             {runs.length === 0 ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无执行历史" />
@@ -432,9 +448,5 @@ const WorkflowsPage = () => {
     </div>
   );
 };
-
-const OutlinedButton = ({ onClick }: { onClick: () => void }) => (
-  <Button icon={<EditOutlined />} onClick={onClick}>编辑</Button>
-);
 
 export default WorkflowsPage;

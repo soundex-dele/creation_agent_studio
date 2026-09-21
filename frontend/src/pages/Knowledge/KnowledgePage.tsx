@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   DeleteOutlined, FileTextOutlined, InboxOutlined, PlusOutlined,
-  ReloadOutlined, SearchOutlined,
+  ReloadOutlined, SearchOutlined, BookOutlined, FolderOpenOutlined,
 } from '@ant-design/icons';
 
 import { useRunStream } from '@/features/run-stream';
@@ -18,6 +18,7 @@ import type {
   KnowledgeAnswerOutput, KnowledgeCitation, KnowledgeSearchResponse,
 } from '@/types/knowledge';
 import type { RunResource } from '@/services/applicationRuntime';
+import WorkspaceHeader from '@/components/Workspace/WorkspaceHeader';
 import './KnowledgePage.css';
 
 const roleLevel: Record<string, number> = {
@@ -26,6 +27,9 @@ const roleLevel: Record<string, number> = {
 
 const statusColor: Record<string, string> = {
   pending: 'default', indexing: 'processing', ready: 'success', failed: 'error',
+};
+const statusLabel: Record<string, string> = {
+  pending: '等待索引', indexing: '索引中', ready: '可检索', failed: '索引失败',
 };
 
 export default function KnowledgePage() {
@@ -183,8 +187,8 @@ export default function KnowledgePage() {
       <List className="knowledge-documents" dataSource={documents} locale={{ emptyText: <Empty description="暂无文档" /> }} renderItem={document => <List.Item actions={[
         <Button key="preview" size="small" onClick={() => void previewDocument(document)}>查看原文</Button>,
         ...(canWrite ? [<Button key="reindex" size="small" onClick={async () => { await api.post(`${root}/knowledge-bases/${selectedId}/documents/${document.id}/reindex/`, {}); message.success('已重新加入索引队列'); await loadSelected(); }}>{document.status === 'failed' ? '重试' : '重建索引'}</Button>] : []),
-        ...(canAdmin ? [<Popconfirm key="delete" title="确认删除文档和索引？" onConfirm={async () => { await api.delete(`${root}/knowledge-bases/${selectedId}/documents/${document.id}/`); await loadSelected(); }}><Button size="small" danger icon={<DeleteOutlined />} /></Popconfirm>] : []),
-      ]}><List.Item.Meta avatar={<FileTextOutlined className="knowledge-file-icon" />} title={<Space>{document.title}<Tag color={statusColor[document.status]}>{document.status}</Tag>{Boolean(document.metadata.retrieval_mode) && <Tag>{String(document.metadata.retrieval_mode)}</Tag>}</Space>} description={<>{document.original_filename || '粘贴文本'} · {Math.ceil(document.byte_size / 1024)} KiB{document.error && <Typography.Text type="danger"> · {document.error}</Typography.Text>}{(document.status === 'pending' || document.status === 'indexing') && <Progress size="small" percent={Number(document.metadata.index_progress || 0)} status="active" format={percent => `${String(document.metadata.index_stage || 'pending')} ${percent}%`} />}</>} /></List.Item>} />
+        ...(canAdmin ? [<Popconfirm key="delete" title="确认删除文档和索引？" onConfirm={async () => { await api.delete(`${root}/knowledge-bases/${selectedId}/documents/${document.id}/`); await loadSelected(); }}><Button size="small" danger icon={<DeleteOutlined />} aria-label={`删除 ${document.title}`} /></Popconfirm>] : []),
+      ]}><List.Item.Meta avatar={<FileTextOutlined className="knowledge-file-icon" />} title={<Space>{document.title}<Tag color={statusColor[document.status]}>{statusLabel[document.status] || document.status}</Tag>{Boolean(document.metadata.retrieval_mode) && <Tag>{String(document.metadata.retrieval_mode)}</Tag>}</Space>} description={<>{document.original_filename || '粘贴文本'} · {Math.ceil(document.byte_size / 1024)} KiB{document.error && <Typography.Text type="danger"> · {document.error}</Typography.Text>}{(document.status === 'pending' || document.status === 'indexing') && <Progress size="small" percent={Number(document.metadata.index_progress || 0)} status="active" format={percent => `${String(document.metadata.index_stage || 'pending')} ${percent}%`} />}</>} /></List.Item>} />
     </> },
     { key: 'search', label: '搜索与问答', children: <div className="knowledge-search">
       <Input.Search size="large" value={query} onChange={event => setQuery(event.target.value)} onSearch={() => void runSearch()} enterButton={<><SearchOutlined /> 搜索</>} placeholder="输入要查找的问题或关键词" />
@@ -196,10 +200,29 @@ export default function KnowledgePage() {
     </div> },
   ];
 
-  return <div className="knowledge-page">
-    <header className="knowledge-header"><div><h1 className="page-title">知识库</h1><p className="page-subtitle">组织资料的索引、检索与有据问答</p></div>{canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => { baseForm.resetFields(); baseForm.setFieldsValue({ chunk_size: 600, chunk_overlap: 80 }); setBaseModal(true); }}>新建知识库</Button>}</header>
+  return <div className="knowledge-page workspace-page">
+    <WorkspaceHeader
+      icon={<BookOutlined />} eyebrow="团队知识" title="知识库"
+      description="让分散的资料成为可检索的知识，通过搜索与有据问答，快速找到需要的答案。"
+      loading={loading || (selectedId !== null && selected?.id !== selectedId)}
+      action={canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => { baseForm.resetFields(); baseForm.setFieldsValue({ chunk_size: 600, chunk_overlap: 80 }); setBaseModal(true); }}>新建知识库</Button>}
+      metrics={[
+        { label: '知识库', value: bases.length, hint: '按主题组织资料' },
+        { label: '当前库文档', value: documents.length, hint: '当前选择的知识库' },
+        { label: '可检索文档', value: documents.filter(item => item.status === 'ready').length, hint: '当前库已完成索引' },
+      ]}
+    />
     <div className="knowledge-layout">
-      <Card className="knowledge-bases" loading={loading}><List dataSource={bases} locale={{ emptyText: <Empty description="暂无知识库" /> }} renderItem={item => <List.Item className={item.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(item.id)}><List.Item.Meta title={item.name} description={`${item.document_count} 个文档`} /></List.Item>} /></Card>
+      <Card className="knowledge-bases" title={<span className="knowledge-library-title"><FolderOpenOutlined aria-hidden="true" />资料目录</span>} extra={<span className="knowledge-library-count">{bases.length}</span>} loading={loading}>
+        <List dataSource={bases} locale={{ emptyText: <Empty description="暂无知识库" /> }} renderItem={item => (
+          <List.Item>
+            <button type="button" className={`knowledge-base-button${item.id === selectedId ? ' active' : ''}`} aria-pressed={item.id === selectedId} onClick={() => setSelectedId(item.id)}>
+              <span className="knowledge-base-icon" aria-hidden="true"><BookOutlined /></span>
+              <span className="knowledge-base-copy"><strong>{item.name}</strong><small>{item.document_count} 个文档</small></span>
+            </button>
+          </List.Item>
+        )} />
+      </Card>
       <Card className="knowledge-main">{selected ? <><div className="knowledge-title"><div><Typography.Title level={3}>{selected.name}</Typography.Title><Typography.Text type="secondary">{selected.description || '暂无描述'}</Typography.Text></div><Space>{canWrite && <Button onClick={openSettings}>设置</Button>}{canAdmin && <Popconfirm title="确认删除整个知识库？" onConfirm={async () => { await api.delete(`${root}/knowledge-bases/${selected.id}/`); setSelectedId(null); await loadBases(); }}><Button danger>删除</Button></Popconfirm>}</Space></div><Tabs items={tabs} /></> : <Empty description="选择或新建一个知识库" />}</Card>
     </div>
     <Modal className="knowledge-base-modal" title={baseForm.getFieldValue('id') ? '知识库设置' : '新建知识库'} open={baseModal} onCancel={() => setBaseModal(false)} onOk={() => void saveBase()} width={680}><Form layout="vertical" form={baseForm}><Form.Item name="id" hidden><Input /></Form.Item><Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="description" label="描述"><Input.TextArea rows={3} /></Form.Item><Space className="knowledge-chunk-fields" align="start"><Form.Item name="chunk_size" label="分块 Token 数"><InputNumber min={100} max={1500} /></Form.Item><Form.Item name="chunk_overlap" label="重叠 Token 数"><InputNumber min={0} max={749} /></Form.Item></Space>{canAdmin && <><Form.Item name="embedding_provider" label="嵌入供应商名称"><Input /></Form.Item><Form.Item name="embedding_model" label="嵌入模型"><Input /></Form.Item><Form.Item name="answer_provider" label="回答供应商名称"><Input /></Form.Item><Form.Item name="answer_model" label="回答模型"><Input /></Form.Item></>}</Form></Modal>

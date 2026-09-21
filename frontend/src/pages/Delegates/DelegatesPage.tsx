@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Empty, Popconfirm, Spin, Switch, Tag, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, RightOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { CompassOutlined, DeleteOutlined, EditOutlined, PlusOutlined, RightOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '@/services/api';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Delegate, DelegateInstance } from '@/types/delegate';
+import WorkspaceHeader from '@/components/Workspace/WorkspaceHeader';
 import './Delegates.css';
 
 const instanceTime = (value: string) => new Intl.DateTimeFormat('zh-CN', {
@@ -108,23 +109,31 @@ const DelegatesPage = () => {
   };
 
   return (
-    <div className="delegates-page">
-      <div className="delegates-heading">
-        <div><h1 className="page-title">AI 分身</h1><p className="page-subtitle">创建代表你的总指挥，规划并调度智能体和应用完成复杂任务。</p></div>
-        {canCreateAgent && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/delegates/new')}>新建分身</Button>}
-      </div>
-      {loading ? <Spin size="large" /> : items.length === 0 ? (
-        <Empty description="还没有 AI 分身" />
+    <div className="delegates-page workspace-page">
+      <WorkspaceHeader
+        icon={<CompassOutlined />} eyebrow="智能协作" title="AI 分身"
+        description="把任务交给你的专属分身，让它规划步骤、调度智能体与应用，协同完成工作。"
+        loading={loading}
+        action={canCreateAgent && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/delegates/new')}>新建分身</Button>}
+        metrics={[
+          { label: '全部分身', value: items.length, hint: '你的专属协作团队' },
+          { label: '已启用', value: items.filter(item => item.is_active).length, hint: '当前启用的分身' },
+          { label: '分身实例', value: instances.length, hint: '保留任务上下文' },
+        ]}
+      />
+      <div className="workspace-section-heading"><h2>我的分身</h2><span>配置职责，或召唤实例开始协作</span></div>
+      {loading ? <div className="workspace-empty"><Spin size="large" /></div> : items.length === 0 ? (
+        <div className="workspace-empty"><Empty description="还没有 AI 分身，创建后即可开始协作" /></div>
       ) : (
         <div className="delegate-grid">
           {items.map((item) => {
             const delegateInstances = instancesByDelegate[item.id] || [];
             return (
               <article className="delegate-card" key={item.id}>
-              <div className="delegate-icon">{item.icon || '🧭'}</div>
+              <div className="delegate-icon" aria-hidden="true">{item.icon || <CompassOutlined />}</div>
               <div className="delegate-card-copy">
                 <div className="delegate-card-title">
-                  <strong>{item.name}</strong>
+                  <h3>{item.name}</h3>
                   <Tag>{item.visibility === 'private' ? '仅自己' : '组织共享'}</Tag>
                   <Tag color={item.is_active ? 'green' : 'default'}>{item.is_active ? '已启用' : '已停用'}</Tag>
                 </div>
@@ -188,7 +197,7 @@ const DelegatesPage = () => {
                 {item.can_edit && <Button icon={<EditOutlined />} onClick={() => navigate(`/delegates/${item.id}`)}>配置</Button>}
                 {item.can_delete && (
                   <Popconfirm title="删除这个 AI 分身？" onConfirm={() => void remove(item.id)}>
-                    <Button danger icon={<DeleteOutlined />} />
+                    <Button danger icon={<DeleteOutlined />} aria-label={`删除 ${item.name}`} />
                   </Popconfirm>
                 )}
               </div>
