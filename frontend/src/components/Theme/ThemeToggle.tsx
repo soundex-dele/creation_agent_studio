@@ -17,6 +17,7 @@ const ThemeToggle: React.FC = () => {
       trigger={['click']}
       placement="bottomRight"
       menu={{
+        style: { maxHeight: 'min(480px, 70vh)', overflowY: 'auto' },
         selectedKeys: [theme],
         onClick: ({ key }) => setTheme(key as ThemeId),
         items: SELECTABLE_THEME_PRESETS.map((preset) => ({

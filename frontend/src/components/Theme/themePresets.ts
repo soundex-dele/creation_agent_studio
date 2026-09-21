@@ -1,4 +1,5 @@
-export type ThemeId = 'light' | 'ink' | 'dark' | 'midnight' | 'ocean' | 'forest' | 'violet' | 'sage' | 'lavender';
+export type ThemeId = 'light' | 'ink' | 'dark' | 'midnight' | 'ocean' | 'forest' | 'violet' | 'sage' | 'lavender'
+  | 'sky' | 'oat' | 'rose' | 'terracotta' | 'pine' | 'mocha';
 
 export interface ThemeColors {
   bgVoid: string;
@@ -93,7 +94,7 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
     colors: {
       bgVoid: '#07131D', bgSurface: '#0B1B28', bgCard: '#102433', bgElevated: '#173246',
       border: '#24465D', borderLit: '#35627D', text: '#EAF6FB', textSecondary: '#A7C0CE',
-      textDim: '#7592A2', primary: '#38BDF8', primaryHover: '#7DD3FC', onPrimary: '#052332',
+      textDim: '#91ADBD', primary: '#38BDF8', primaryHover: '#7DD3FC', onPrimary: '#052332',
       shadowSm: '0 1px 2px rgba(1, 8, 15, 0.34)',
       shadowMd: '0 4px 14px rgba(1, 8, 15, 0.42)',
       shadowLg: '0 14px 32px rgba(1, 8, 15, 0.52)',
@@ -107,7 +108,7 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
     colors: {
       bgVoid: '#F7FAF7', bgSurface: '#EEF5EF', bgCard: '#FFFFFF', bgElevated: '#E7F0E9',
       border: '#D1E0D4', borderLit: '#B2CAB7', text: '#203129', textSecondary: '#596E61',
-      textDim: '#7F9285', primary: '#1F7550', primaryHover: '#185E41', onPrimary: '#FFFFFF',
+      textDim: '#5D7063', primary: '#1F7550', primaryHover: '#185E41', onPrimary: '#FFFFFF',
       shadowSm: '0 1px 2px rgba(24, 66, 43, 0.05)',
       shadowMd: '0 4px 12px rgba(24, 66, 43, 0.08)',
       shadowLg: '0 12px 28px rgba(24, 66, 43, 0.12)',
@@ -121,7 +122,7 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
     colors: {
       bgVoid: '#120F18', bgSurface: '#19141F', bgCard: '#221B2A', bgElevated: '#2D2436',
       border: '#3B3047', borderLit: '#514160', text: '#F4EFF7', textSecondary: '#B9ABC2',
-      textDim: '#87768F', primary: '#C4B5FD', primaryHover: '#DDD6FE', onPrimary: '#25153B',
+      textDim: '#AC99B6', primary: '#C4B5FD', primaryHover: '#DDD6FE', onPrimary: '#25153B',
       shadowSm: '0 1px 2px rgba(5, 2, 8, 0.32)',
       shadowMd: '0 4px 14px rgba(5, 2, 8, 0.4)',
       shadowLg: '0 14px 32px rgba(5, 2, 8, 0.5)',
@@ -155,19 +156,97 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
       shadowLg: '0 16px 36px rgba(67, 50, 91, 0.13)',
     },
   },
+  {
+    id: 'sky',
+    name: '晴空',
+    description: '清爽理性的浅蓝工作区',
+    mode: 'light',
+    colors: {
+      bgVoid: '#F3F8FC', bgSurface: '#EAF2F9', bgCard: '#FFFFFF', bgElevated: '#DEEAF4',
+      border: '#C4D6E6', borderLit: '#7B9DBB', text: '#1D2E40', textSecondary: '#4D6378',
+      textDim: '#536A7F', primary: '#2563A6', primaryHover: '#1D4F86', onPrimary: '#FFFFFF',
+      shadowSm: '0 1px 2px rgba(29, 62, 94, 0.06)',
+      shadowMd: '0 5px 16px rgba(29, 62, 94, 0.09)',
+      shadowLg: '0 16px 36px rgba(29, 62, 94, 0.13)',
+    },
+  },
+  {
+    id: 'oat',
+    name: '燕麦',
+    description: '温暖舒适的奶油纸感工作区',
+    mode: 'light',
+    colors: {
+      bgVoid: '#F6F1E8', bgSurface: '#EFE8DC', bgCard: '#FFFCF7', bgElevated: '#E7DECF',
+      border: '#D5C7B4', borderLit: '#A38B70', text: '#32291F', textSecondary: '#665747',
+      textDim: '#70604E', primary: '#805A3B', primaryHover: '#66462E', onPrimary: '#FFFFFF',
+      shadowSm: '0 1px 2px rgba(75, 53, 31, 0.06)',
+      shadowMd: '0 5px 16px rgba(75, 53, 31, 0.09)',
+      shadowLg: '0 16px 36px rgba(75, 53, 31, 0.13)',
+    },
+  },
+  {
+    id: 'rose',
+    name: '胭脂',
+    description: '柔和细腻的豆沙粉工作区',
+    mode: 'light',
+    colors: {
+      bgVoid: '#FCF5F6', bgSurface: '#F7EBEF', bgCard: '#FFFCFD', bgElevated: '#F0DFE5',
+      border: '#E2C7D1', borderLit: '#B78095', text: '#39252D', textSecondary: '#70515F',
+      textDim: '#795B68', primary: '#A34261', primaryHover: '#85354F', onPrimary: '#FFFFFF',
+      shadowSm: '0 1px 2px rgba(91, 39, 58, 0.06)',
+      shadowMd: '0 5px 16px rgba(91, 39, 58, 0.09)',
+      shadowLg: '0 16px 36px rgba(91, 39, 58, 0.13)',
+    },
+  },
+  {
+    id: 'terracotta',
+    name: '赤陶',
+    description: '温暖鲜活的杏白砖橙工作区',
+    mode: 'light',
+    colors: {
+      bgVoid: '#FBF4EE', bgSurface: '#F5E9DE', bgCard: '#FFFCF9', bgElevated: '#EDDDCF',
+      border: '#DFC4B1', borderLit: '#B18468', text: '#3A2920', textSecondary: '#715342',
+      textDim: '#795D4D', primary: '#A2452B', primaryHover: '#873922', onPrimary: '#FFFFFF',
+      shadowSm: '0 1px 2px rgba(99, 49, 27, 0.06)',
+      shadowMd: '0 5px 16px rgba(99, 49, 27, 0.09)',
+      shadowLg: '0 16px 36px rgba(99, 49, 27, 0.13)',
+    },
+  },
+  {
+    id: 'pine',
+    name: '松夜',
+    description: '安静自然的墨绿工作区',
+    mode: 'dark',
+    colors: {
+      bgVoid: '#101C18', bgSurface: '#16251F', bgCard: '#1D2E26', bgElevated: '#273D32',
+      border: '#365245', borderLit: '#648674', text: '#EDF7F0', textSecondary: '#B3CCBD',
+      textDim: '#A0BBAA', primary: '#79C9A3', primaryHover: '#A0DEBE', onPrimary: '#10291D',
+      shadowSm: '0 1px 2px rgba(3, 12, 7, 0.32)',
+      shadowMd: '0 5px 16px rgba(3, 12, 7, 0.42)',
+      shadowLg: '0 16px 36px rgba(3, 12, 7, 0.52)',
+    },
+  },
+  {
+    id: 'mocha',
+    name: '摩卡',
+    description: '温润复古的深咖工作区',
+    mode: 'dark',
+    colors: {
+      bgVoid: '#211A17', bgSurface: '#2A211C', bgCard: '#342820', bgElevated: '#44352A',
+      border: '#5D4838', borderLit: '#92735A', text: '#FAF1E7', textSecondary: '#D4BEA8',
+      textDim: '#C4AB93', primary: '#D7AB7A', primaryHover: '#E9C59E', onPrimary: '#302014',
+      shadowSm: '0 1px 2px rgba(15, 8, 4, 0.32)',
+      shadowMd: '0 5px 16px rgba(15, 8, 4, 0.42)',
+      shadowLg: '0 16px 36px rgba(15, 8, 4, 0.52)',
+    },
+  },
 ] as const;
 
 export const THEME_PRESET_MAP = Object.fromEntries(
   THEME_PRESETS.map((preset) => [preset.id, preset]),
 ) as Record<ThemeId, ThemePreset>;
 
-const SELECTABLE_THEME_IDS: readonly ThemeId[] = ['light', 'ink', 'dark', 'midnight', 'sage', 'lavender'];
-
-// Keep experimental palettes available without exposing them in user-facing
-// selectors. Explicit ids prevent array ordering from changing the rollout.
-export const SELECTABLE_THEME_PRESETS = THEME_PRESETS.filter((preset) => (
-  SELECTABLE_THEME_IDS.includes(preset.id)
-));
+export const SELECTABLE_THEME_PRESETS = THEME_PRESETS;
 
 export const isThemeId = (value: unknown): value is ThemeId => (
   typeof value === 'string' && value in THEME_PRESET_MAP

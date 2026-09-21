@@ -45,16 +45,14 @@ describe('theme presets', () => {
     }
   });
 
-  it('exposes the established themes and released color themes', () => {
+  it('exposes all established and new themes', () => {
     expect(SELECTABLE_THEME_PRESETS.map((preset) => preset.id)).toEqual([
-      'light', 'ink', 'dark', 'midnight', 'sage', 'lavender',
+      'light', 'ink', 'dark', 'midnight', 'ocean', 'forest', 'violet', 'sage', 'lavender',
+      'sky', 'oat', 'rose', 'terracotta', 'pine', 'mocha',
     ]);
-    expect(isSelectableThemeId('light')).toBe(true);
-    expect(isSelectableThemeId('ink')).toBe(true);
-    expect(isSelectableThemeId('midnight')).toBe(true);
-    expect(isSelectableThemeId('sage')).toBe(true);
-    expect(isSelectableThemeId('lavender')).toBe(true);
-    expect(isSelectableThemeId('ocean')).toBe(false);
+    expect(THEME_PRESETS.every((preset) => isSelectableThemeId(preset.id))).toBe(true);
+    expect(isSelectableThemeId('unknown')).toBe(false);
+    expect(isSelectableThemeId(undefined)).toBe(false);
   });
 
   it('keeps text and solid controls at WCAG AA contrast', () => {
@@ -69,7 +67,10 @@ describe('theme presets', () => {
   });
 
   it('keeps released color-theme text roles readable across their surfaces', () => {
-    for (const themeId of ['ink', 'midnight', 'sage', 'lavender'] as const) {
+    for (const themeId of [
+      'ink', 'midnight', 'sage', 'lavender', 'ocean', 'forest', 'violet',
+      'sky', 'oat', 'rose', 'terracotta', 'pine', 'mocha',
+    ] as const) {
       const { colors } = getThemePreset(themeId);
       const surfaces = [colors.bgVoid, colors.bgSurface, colors.bgCard, colors.bgElevated];
       const textRoles = [colors.text, colors.textSecondary, colors.textDim, colors.primary];
