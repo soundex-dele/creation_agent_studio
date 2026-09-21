@@ -6,6 +6,7 @@ from apps.enterprise.models import Organization
 from core.llm.factory import build_agent_engine
 from apps.workflows.artifacts import (
     artifact_instructions, collect_workflow_artifacts, workflow_artifact_baseline,
+    publish_workflow_artifacts,
 )
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,7 @@ def execute_agent_completion(run_payload, sink):
     artifacts = collect_workflow_artifacts(snapshot, input_data.get("working_directory"), artifact_baseline)
     if artifacts:
         output["artifacts"] = artifacts
+        publish_workflow_artifacts(artifacts, sink)
     sink.emit("output.snapshot", output)
     if response.thread_id and provider_name:
         output["agent_thread"] = {

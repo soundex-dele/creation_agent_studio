@@ -78,6 +78,9 @@ def _playwright_module_path(config):
     reference_script = config.get("reference_script")
     if reference_script:
         candidates.append(Path(reference_script).expanduser().parent.parent / "node_modules")
+    # Package-local dependencies work on every host without a developer's path.
+    # Also accept an installation in a parent backend/repository directory.
+    candidates.extend(parent / "node_modules" for parent in Path(__file__).resolve().parents)
     for candidate in candidates:
         resolved = candidate.resolve(strict=False)
         if (resolved / "playwright").is_dir():
@@ -169,7 +172,8 @@ def execute_html_to_png(run_payload, sink):
     if module_path is None:
         raise RuntimeError(
             "HTML 转 PNG 功能不可用：未找到 Playwright。"
-            "请设置 PLAYWRIGHT_NODE_MODULES 或安装参考脚本的依赖。"
+            "请在 backend/app_center/html_to_png 中运行 npm ci 和 "
+            "npx playwright install chromium，或设置 PLAYWRIGHT_NODE_MODULES。"
         )
 
     capture_config = _capture_config(config, files)
@@ -220,6 +224,16 @@ def execute_html_to_png(run_payload, sink):
             })
         elif event_type == "completed":
             output = str(event.get("output") or "")
+            if not 1 <= index <= total or output != str(files[index - 1].with_suffix(".png")):
+                process.terminate()
+                process.wait(timeout=5)
+                raise RuntimeError("截图进程返回了非预期的输出路径。")
+            sink.create_artifact(
+                kind="result",
+                filename=Path(output).name,
+                content=Path(output).read_bytes(),
+                mime_type="image/png",
+            )
             outputs.append(output)
             sink.emit("output.delta", {"text": f"✓ {output}\n"})
             sink.emit("tool.completed", {
@@ -269,4 +283,9 @@ def execute_html_to_png(run_payload, sink):
     }
     if config.get("article_source"):
         result["article_md"] = insert_illustrations(config, manifest_path, manifest, files, outputs)
+        article = Path(result["article_md"])
+        sink.create_artifact(
+            kind="result", filename=article.name,
+            content=article.read_bytes(), mime_type="text/markdown",
+        )
     return result

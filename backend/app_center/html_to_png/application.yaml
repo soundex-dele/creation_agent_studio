@@ -93,8 +93,7 @@ spec:
         total: {type: integer}
         succeeded: {type: integer}
         failed: {type: integer}
-    default_config:
-      reference_script: D:/workspace/my-awesome-skills/animation/capture-vertical.js
+    default_config: {}
     dependencies:
       agents: []
       skills: []

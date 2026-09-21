@@ -2,7 +2,19 @@ import json
 
 import pytest
 
-from apps.workflows.artifacts import artifact_instructions, collect_workflow_artifacts, workflow_artifact_baseline
+from apps.workflows.artifacts import artifact_instructions, collect_workflow_artifacts, workflow_artifact_baseline, publish_workflow_artifacts
+from unittest.mock import Mock
+
+
+def test_declared_outputs_are_published_once_with_content_and_filename(tmp_path):
+    source = tmp_path / "article.html"
+    source.write_text("<h1>正文</h1>", encoding="utf-8")
+    sink = Mock()
+    publish_workflow_artifacts({"html": str(source), "alias": str(source)}, sink)
+    sink.create_artifact.assert_called_once_with(
+        kind="result", filename="article.html", content=source.read_bytes(),
+        mime_type="text/html", metadata={"output_field": "html"},
+    )
 
 
 def snapshot(contract):

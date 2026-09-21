@@ -15,6 +15,7 @@ import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
+import RunArtifacts from '@/components/Applications/RunArtifacts';
 import './WorkflowRunnerPage.css';
 
 const terminal = ['succeeded', 'failed', 'cancelled'];
@@ -165,7 +166,7 @@ const WorkflowRunnerPage = () => {
   );
   const summary = projection.state.output || (Object.keys(run.output_summary || {}).length
     ? JSON.stringify(run.output_summary, null, 2) : '');
-  const statusDescription = status === 'succeeded' ? '本次执行已完成，可以查看各节点的执行结果。'
+  const statusDescription = status === 'succeeded' ? '本次执行已完成，可以查看节点结果与输出文件。'
     : status === 'failed' ? '执行遇到异常，请查看节点错误信息后重跑。'
       : status === 'cancelled' ? '本次执行已取消，已产生的输出仍可查看。'
         : status === 'waiting_input' ? '工作流正在等待输入，请打开对应节点的对话继续。'
@@ -248,7 +249,8 @@ const WorkflowRunnerPage = () => {
                 const conversationId = String(stepState.conversation_id || step.conversation_id
                   || run.workflow_conversations?.[step.key] || '');
                 const completedOutput = stepState.output as Record<string, unknown> | undefined;
-                const output = String(stepState.stream_output || completedOutput?.result || '');
+                const output = String(stepState.stream_output || completedOutput?.result
+                  || (completedOutput ? JSON.stringify(completedOutput, null, 2) : '') || '');
                 return (
                   <li key={step.key} className={`workflow-execution-step is-${presentation.status}`}>
                     <span className="workflow-execution-step-marker" aria-hidden>
@@ -271,6 +273,7 @@ const WorkflowRunnerPage = () => {
                           ? `依赖：${step.depends_on.map((key) => steps.find((item) => item.key === key)?.name || key).join('、')}`
                           : '无前置依赖，可独立执行'}</span>
                       </div>
+                      {Boolean(stepState.error_message) && <Alert type="error" showIcon message={String(stepState.error_message)} />}
                       {output ? (
                         <div className="workflow-execution-output">
                           <div className="workflow-execution-output-label"><FileTextOutlined aria-hidden />节点输出</div>
@@ -309,7 +312,7 @@ const WorkflowRunnerPage = () => {
               : <div className="workflow-execution-empty">
                 <span className="workflow-execution-empty-icon"><FileTextOutlined aria-hidden /></span>
                 <strong>{isTerminal ? '暂无汇总内容' : '等待汇总结果'}</strong>
-                <p>{isTerminal ? '可在各节点中查看执行输出。' : '各节点的实时输出显示在左侧，汇总结果将在这里呈现。'}</p>
+                <p>{isTerminal ? '可在各节点中查看执行输出，生成的文件显示在下方。' : '各节点的实时输出显示在左侧，汇总结果将在这里呈现。'}</p>
               </div>}
           </Card>
           <details className="workflow-execution-details">
@@ -322,6 +325,10 @@ const WorkflowRunnerPage = () => {
           </details>
         </aside>
       </div>
+      {organizationId && <section className="workflow-execution-artifacts" aria-label="输出文件">
+        <RunArtifacts key={`${organizationId}:${run.id}`} organizationId={organizationId}
+          runId={run.id} includeDescendants active={!isTerminal} />
+      </section>}
     </div>
   );
 };

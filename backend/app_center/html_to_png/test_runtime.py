@@ -8,10 +8,14 @@ from app_center.html_to_png import runtime
 class _Sink:
     def __init__(self):
         self.events = []
+        self.artifacts = []
         self.cancelled = False
 
     def emit(self, event_type, payload):
         self.events.append((event_type, payload))
+
+    def create_artifact(self, **artifact):
+        self.artifacts.append(artifact)
 
 
 class _Input:
@@ -38,6 +42,27 @@ class _Process:
 
     def terminate(self):
         self.terminated = True
+
+
+def test_playwright_uses_local_dependency_when_legacy_path_is_unavailable(monkeypatch, tmp_path):
+    package = tmp_path / "backend" / "app_center" / "html_to_png"
+    modules = package / "node_modules"
+    (modules / "playwright").mkdir(parents=True)
+    monkeypatch.setattr(runtime, "__file__", str(package / "runtime.py"))
+    monkeypatch.delenv("PLAYWRIGHT_NODE_MODULES", raising=False)
+    assert runtime._playwright_module_path({
+        "reference_script": str(tmp_path / "missing" / "animation" / "capture.js"),
+    }) == modules
+
+
+def test_playwright_explicit_path_takes_precedence(monkeypatch, tmp_path):
+    package = tmp_path / "app"
+    (package / "node_modules" / "playwright").mkdir(parents=True)
+    configured = tmp_path / "custom_modules"
+    (configured / "playwright").mkdir(parents=True)
+    monkeypatch.setattr(runtime, "__file__", str(package / "runtime.py"))
+    monkeypatch.setenv("PLAYWRIGHT_NODE_MODULES", str(configured))
+    assert runtime._playwright_module_path({}) == configured
 
 
 def test_directories_are_deduplicated_and_html_files_are_sorted(tmp_path):
@@ -92,6 +117,7 @@ def test_executor_reports_success_and_partial_failure(monkeypatch, tmp_path):
     second = selected / "b.html"
     first.write_text("", encoding="utf-8")
     second.write_text("", encoding="utf-8")
+    first.with_suffix(".png").write_bytes(b"\x89PNG\r\n\x1a\nfixture")
     process = _Process([
         '{"type":"started","index":1,"input":"a.html"}\n',
         f'{{"type":"completed","index":1,"input":"a.html",'
@@ -117,6 +143,10 @@ def test_executor_reports_success_and_partial_failure(monkeypatch, tmp_path):
     assert result["succeeded"] == 1
     assert result["failed"] == 1
     assert result["files"] == [str(first.with_suffix(".png"))]
+    assert sink.artifacts == [{
+        "kind": "result", "filename": "a.png", "mime_type": "image/png",
+        "content": first.with_suffix(".png").read_bytes(),
+    }]
     assert [event for event, _payload in sink.events].count("progress.updated") == 2
     submitted = runtime.json.loads(process.stdin.value)
     assert [item["input"] for item in submitted["files"]] == [str(first), str(second)]
@@ -138,6 +168,25 @@ def test_executor_returns_empty_result_without_starting_node(tmp_path):
 
     assert result["total"] == 0
     assert result["message"] == "所选目录中没有 HTML 文件。"
+
+
+def test_exporter_cannot_publish_an_unexpected_file(monkeypatch, tmp_path):
+    (tmp_path / "cover.html").write_text("<div>cover</div>")
+    unexpected = tmp_path / "private.txt"
+    unexpected.write_text("must not be published")
+    process = _Process([runtime.json.dumps({
+        "type": "completed", "index": 1, "output": str(unexpected),
+    })])
+    monkeypatch.setattr(runtime.shutil, "which", lambda _: "node")
+    monkeypatch.setattr(runtime, "_playwright_module_path", lambda _: tmp_path)
+    monkeypatch.setattr(runtime.subprocess, "Popen", lambda *a, **kw: process)
+    sink = _Sink()
+    with pytest.raises(RuntimeError, match="非预期"):
+        runtime.execute_html_to_png({
+            "input": {"directories": [str(tmp_path)]}, "allowed_roots": [str(tmp_path)],
+        }, sink)
+    assert not sink.artifacts
+    assert process.terminated
 
 
 def workflow_fixture(tmp_path):
@@ -168,6 +217,7 @@ def test_manifest_exports_only_listed_files_and_inserts_png_without_changing_cop
     monkeypatch.setattr(runtime.subprocess, "Popen", lambda *a, **kw: process)
     sink = _Sink()
     result = runtime.execute_html_to_png({"input": config, "allowed_roots": [str(tmp_path)]}, sink)
+    assert [item["mime_type"] for item in sink.artifacts] == ["image/png", "text/markdown"]
     assert result["files"] == [str(png)]
     assert runtime.json.loads(process.stdin.value)["files"] == [{
         "input": str(folder / "01.html"), "output": str(png),

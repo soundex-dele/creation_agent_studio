@@ -1,5 +1,6 @@
 """Explicit file outputs for workflow Agent steps; never infer paths from prose."""
 import json
+import mimetypes
 from pathlib import Path
 
 
@@ -67,3 +68,18 @@ def collect_workflow_artifacts(snapshot, workspace, baseline=None):
                 raise ValueError(f"工作流产物校验未通过：{path.name}")
         artifacts[field] = str(path)
     return artifacts
+
+
+def publish_workflow_artifacts(artifacts, sink):
+    """Publish only files already validated by the workflow output contract."""
+    seen = set()
+    for field, value in artifacts.items():
+        path = Path(value)
+        if path in seen:
+            continue
+        seen.add(path)
+        sink.create_artifact(
+            kind="result", filename=path.name, content=path.read_bytes(),
+            mime_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+            metadata={"output_field": field},
+        )

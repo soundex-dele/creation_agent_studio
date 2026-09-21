@@ -34,6 +34,6 @@ backend/.venv/bin/python backend/manage.py validate_app_center
 backend/.venv/bin/python backend/manage.py sync_app_center --package html-to-png --organization <组织ID>
 ```
 
-其余应用需已安装：`wechat-viral-article`、`article-html-illustrator`、`markdown-to-html`、`html-to-paged-cards`、`html-cover-generator`。工作节点需要对应完整技能目录、Node.js、Bun/npx、Playwright 与 Chromium，以及可用的模型执行器。通过 `PLAYWRIGHT_NODE_MODULES` 指定包含 `playwright` 的目录。
+其余应用需已安装：`wechat-viral-article`、`article-html-illustrator`、`markdown-to-html`、`html-to-paged-cards`、`html-cover-generator`。工作节点需要对应完整技能目录、Node.js、Bun/npx、Playwright 与 Chromium，以及可用的模型执行器。在 `backend/app_center/html_to_png` 中运行 `npm ci` 和 `npx playwright install chromium` 安装 PNG 导出依赖。PNG 执行器自动查找应用目录及父目录中的 `node_modules`，也可通过 `PLAYWRIGHT_NODE_MODULES` 指定包含 `playwright` 的目录。
 
 不需要数据库迁移。更新后重启后端/执行 worker，并重新构建前端。测试使用模拟生成器/截图进程校验文件交接；真正生成效果仍需使用真实选题和执行环境验收。

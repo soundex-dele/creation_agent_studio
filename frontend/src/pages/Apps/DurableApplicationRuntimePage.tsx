@@ -4,10 +4,8 @@ import {
   Button,
   Card,
   Checkbox,
-  Empty,
   Input,
   InputNumber,
-  List,
   Progress,
   Radio,
   Select,
@@ -34,11 +32,11 @@ import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import {
   loadApplicationRuntime,
   type ApplicationRuntimeDescriptor,
-  type RunArtifact,
   type RunResource,
 } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import FolderPickerModal from './FolderPickerModal';
+import RunArtifacts from '@/components/Applications/RunArtifacts';
 
 
 interface HtmlToPngInputProps {
@@ -186,7 +184,6 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
   const [inputText, setInputText] = useState('{}');
   const [run, setRun] = useState<RunResource | null>(null);
   const [starting, setStarting] = useState(false);
-  const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
   const projection = useRunStream({
     organizationId: descriptor.organization_id,
     runId: run?.id ?? null,
@@ -196,11 +193,6 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
   const current = Number(progress?.current ?? 0);
   const total = Number(progress?.total ?? 0);
   const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
-
-  useEffect(() => {
-    if (!run || projection.state.artifactIds.length === 0) return;
-    runtime.listArtifacts(run.id).then((page) => setArtifacts(page.results));
-  }, [projection.state.artifactIds.length, run, runtime]);
 
   const start = async (providedInput?: Record<string, unknown>) => {
     let input: Record<string, unknown>;
@@ -219,7 +211,6 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
       }
     }
     setStarting(true);
-    setArtifacts([]);
     try {
       setRun(await runtime.startRun(input, createIdempotencyKey('application')));
     } catch (error) {
@@ -280,19 +271,9 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
           {projection.state.output || '等待输出…'}
         </Typography.Paragraph>
       </Card>}
-      {run && !isHtmlToPng && <Card title="Artifacts">
-        {artifacts.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> : (
-          <List dataSource={artifacts} renderItem={(artifact) => (
-            <List.Item actions={[<Button key="open" type="link" onClick={async () => {
-              const access = await runtime.getArtifactAccess(run.id, artifact.id);
-              window.open(access.url, '_blank', 'noopener,noreferrer');
-            }}>打开</Button>]}> 
-              <List.Item.Meta title={String(artifact.metadata.filename ?? artifact.kind)}
-                description={`${artifact.mime_type} · ${artifact.size} bytes`} />
-            </List.Item>
-          )} />
-        )}
-      </Card>}
+      {run && <RunArtifacts key={`${descriptor.organization_id}:${run.id}`}
+        organizationId={descriptor.organization_id} runId={run.id}
+        active={!['succeeded', 'failed', 'cancelled'].includes(projection.state.status ?? run.status)} />}
     </Space>
   );
 }
