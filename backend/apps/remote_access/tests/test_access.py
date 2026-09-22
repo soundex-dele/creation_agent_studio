@@ -1,6 +1,8 @@
 from datetime import timedelta
 from unittest.mock import patch
+from urllib.parse import urlsplit
 
+import httpx
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -156,7 +158,7 @@ def test_pairing_requires_local_confirmation_and_is_single_use(grant):
     assert other.get('/api/v1/remote/devices/').data == []
     assert other.delete(f'/api/v1/remote/devices/{device_id}/').status_code == 404
     assert owner.delete(f'/api/v1/remote/devices/{device_id}/').status_code == 204
-    assert computer.get(f'/api/v1/remote/connector/{device_id}/').status_code in {401, 403}
+    assert computer.get(f'/api/v1/remote/connector/{device_id}/').status_code == 401
     device = RemoteDevice.objects.get(pk=device_id)
     assert device.token_hash == digest('a' * 48)
     assert device.revoked_at
@@ -171,7 +173,89 @@ def test_expired_pairing_cannot_be_claimed_or_confirmed(grant):
     assert client.post('/api/v1/remote/claim/', {'code': 'ABCDEFGH'}, format='json').status_code == 400
     client.force_authenticate(None)
     client.credentials(HTTP_AUTHORIZATION='Device secret')
-    assert client.post(f'/api/v1/remote/connector/{device.id}/', {'action': 'confirm', 'account_id': user.id}, format='json').status_code in {401, 403}
+    assert client.post(f'/api/v1/remote/connector/{device.id}/', {'action': 'confirm', 'account_id': user.id}, format='json').status_code == 401
+
+
+@pytest.mark.parametrize('state', ['active', 'revoked', 'expired', 'missing'])
+def test_local_unbind_clears_active_or_already_invalid_binding(grant, monkeypatch, state):
+    user, _, config = grant
+    device = RemoteDevice.objects.create(
+        name='Computer', owner=user, token_hash=digest('device-secret'),
+        confirmed=state != 'expired',
+        pairing_expires_at=timezone.now() - timedelta(minutes=1),
+        revoked_at=timezone.now() if state == 'revoked' else None,
+    )
+    config.device_id = device.id
+    config.save()
+    if state == 'missing':
+        device.delete()
+
+    # Exercise the real device-control endpoint across the HTTP boundary so
+    # DRF's exception status handling is included in the local unbind result.
+    def relay_request(method, url, *, json, headers, **kwargs):
+        relay = APIClient()
+        relay.credentials(HTTP_AUTHORIZATION=headers['Authorization'])
+        response = relay.post(urlsplit(url).path, json, format='json')
+        return httpx.Response(response.status_code, json=response.data, headers=dict(response.items()))
+
+    monkeypatch.setattr('apps.remote_access.views.httpx.request', relay_request)
+    local = APIClient()
+    local.force_authenticate(user)
+    response = local.post('/api/v1/remote-access/unbind/', {}, format='json')
+    assert response.status_code == 200, response.data
+    config.refresh_from_db()
+    assert config.enabled is False
+    assert config.status == 'disabled'
+    assert config.device_id is None
+    assert config.credentials == config.bound_account == config.pairing_code == ''
+    if state == 'active':
+        device.refresh_from_db()
+        assert device.revoked_at is not None
+        assert not device.online
+    assert local.post('/api/v1/remote-access/unbind/', {}, format='json').status_code == 200
+
+
+@pytest.mark.parametrize('failure', [403, 503, 'network'])
+def test_unbind_keeps_credentials_for_retry_on_unconfirmed_failure(grant, monkeypatch, failure):
+    import uuid
+    user, _, config = grant
+    config.device_id = uuid.uuid4()
+    config.save()
+    original_id, original_credentials = config.device_id, config.credentials
+
+    def failed_request(*args, **kwargs):
+        if failure == 'network':
+            raise httpx.ConnectError('unavailable')
+        return httpx.Response(failure, json={'detail': 'unavailable'})
+
+    monkeypatch.setattr('apps.remote_access.views.httpx.request', failed_request)
+    local = APIClient()
+    local.force_authenticate(user)
+    response = local.post('/api/v1/remote-access/unbind/', {}, format='json')
+    assert response.status_code == 503
+    config.refresh_from_db()
+    assert not config.enabled
+    assert config.status == 'disabled'
+    assert config.device_id == original_id
+    assert config.credentials == original_credentials
+
+
+def test_invalid_device_credential_returns_401_with_device_challenge(grant):
+    user, _, _ = grant
+    device = RemoteDevice.objects.create(
+        name='Computer', owner=user, confirmed=True, token_hash=digest('correct-token'),
+        pairing_expires_at=timezone.now() + timedelta(minutes=10),
+    )
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='Device wrong-token')
+    for response in (
+        client.get(f'/api/v1/remote/connector/{device.id}/'),
+        client.post(f'/api/v1/remote/connector/{device.id}/', {'action': 'revoke'}, format='json'),
+    ):
+        assert response.status_code == 401
+        assert response['WWW-Authenticate'].startswith('Device ')
+    device.refresh_from_db()
+    assert device.revoked_at is None
 
 
 @pytest.mark.parametrize('method,path,body', [

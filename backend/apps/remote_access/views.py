@@ -251,6 +251,12 @@ class ConnectorControlView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    def get_authenticate_header(self, request):
+        # Device authentication runs below rather than in an authentication
+        # class. Without a challenge DRF rewrites AuthenticationFailed to 403,
+        # preventing the computer from clearing an already revoked binding.
+        return 'Device realm="remote-connector"'
+
     def device(self, request, device_id):
         require_relay()
         token = request.headers.get("Authorization", "").removeprefix("Device ")

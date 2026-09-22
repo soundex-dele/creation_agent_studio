@@ -250,6 +250,13 @@ def main():
         check(host_counts['Conversation'] == 2, f'Unexpected local records: {host_counts}')
         print('PASS: offline rejection, reconnection and isolated business data', flush=True)
 
+        if not args.keep_running:
+            api(server, 'DELETE', f'/api/v1/remote/devices/{device_id}/', expected=204)
+            unbound = api(host, 'POST', '/api/v1/remote-access/unbind/', json={}).json()
+            check(unbound['device_id'] is None and not unbound['enabled'], 'Stale local binding remains')
+            api(host, 'POST', '/api/v1/remote-access/unbind/', json={})
+            print('PASS: local unbind after server revocation and repeated unbind', flush=True)
+
         access = {role: {'url': str(client.base_url), 'username': env['SMOKE_USERNAME'],
                          'password': env['SMOKE_PASSWORD']}
                   for role, client, env in [('server', server, server_env), ('client', host, host_env)]}
