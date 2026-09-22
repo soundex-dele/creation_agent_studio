@@ -116,7 +116,15 @@ def authenticated_client(api_actor):
 
 
 @pytest.fixture
-def deployed_application(api_actor, api_organization):
+def deployed_application(api_actor, api_organization, settings):
+    # Starting a Run validates registration but does not launch its executor.
+    settings.EXECUTION_CHILD_ADAPTERS = {
+        **settings.EXECUTION_CHILD_ADAPTERS,
+        "media": {
+            **settings.EXECUTION_CHILD_ADAPTERS.get("media", {}),
+            "batch-transcribe": "tests.fake:execute",
+        },
+    }
     category, _ = ApplicationCategory.objects.get_or_create(
         slug="execution-tests", defaults={"name": "Execution Tests"}
     )
@@ -156,6 +164,7 @@ def _run_url(organization, run, suffix=""):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("stored_workspace", [False, True])
 @patch("modules.execution.api.views.open_workspace_directory")
 def test_workflow_run_opens_its_shared_workspace(
     open_directory,
@@ -164,6 +173,7 @@ def test_workflow_run_opens_its_shared_workspace(
     api_organization,
     settings,
     tmp_path,
+    stored_workspace,
 ):
     settings.LOCAL_FILE_MANAGER_ENABLED = True
     settings.AGENT_WORKSPACE_ROOT = tmp_path
@@ -177,6 +187,15 @@ def test_workflow_run_opens_its_shared_workspace(
         definition_snapshot={"durable_children": True},
         input_data={},
     )
+    expected = (
+        tmp_path / "organizations" / str(api_organization.id)
+        / "workflows" / ("original-run" if stored_workspace else str(run.id))
+    ).resolve()
+    if stored_workspace:
+        run.input = {"working_directory": str(expected)}
+        run.save(update_fields=["input"])
+        expected.mkdir(parents=True)
+        (expected / "result.txt").write_text("retained output", encoding="utf-8")
 
     response = authenticated_client.post(
         _run_url(api_organization, run, "/open-workspace"),
@@ -184,13 +203,45 @@ def test_workflow_run_opens_its_shared_workspace(
         format="json",
     )
 
-    expected = (
-        tmp_path / "organizations" / str(api_organization.id)
-        / "workflows" / str(run.id)
-    ).resolve()
     assert response.status_code == 200
     assert Path(response.data["working_directory"]) == expected
     open_directory.assert_called_once_with(str(expected))
+    if stored_workspace:
+        assert (expected / "result.txt").read_text(encoding="utf-8") == "retained output"
+        assert not (expected.parent / str(run.id)).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("directory_parts", [
+    ("outside",),
+    ("organizations", "other-organization", "workflows", "other-run"),
+])
+@patch("modules.execution.api.views.open_workspace_directory")
+def test_workflow_run_cannot_open_workspace_outside_its_scope(
+    open_directory, authenticated_client, api_actor, api_organization,
+    settings, tmp_path, directory_parts,
+):
+    settings.LOCAL_FILE_MANAGER_ENABLED = True
+    settings.AGENT_WORKSPACE_ROOT = tmp_path / "managed"
+    directory = settings.AGENT_WORKSPACE_ROOT.joinpath(*directory_parts)
+    run = create_run(
+        organization=api_organization,
+        owner=api_actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        executor_key="workflow-dag",
+        source_type="workflow",
+        source_id="workflow-1",
+        definition_snapshot={"durable_children": True},
+        input_data={"working_directory": str(directory)},
+    )
+
+    response = authenticated_client.post(
+        _run_url(api_organization, run, "/open-workspace"), {}, format="json",
+    )
+
+    assert response.status_code == 500
+    open_directory.assert_not_called()
+    assert not directory.exists()
 
 
 def test_run_list_uses_canonical_history_and_source_filter(

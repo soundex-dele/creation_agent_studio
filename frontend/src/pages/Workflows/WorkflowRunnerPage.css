@@ -46,7 +46,7 @@
 .workflow-execution-progress > small { color: var(--color-text-sec); font-size: 12px; }
 .workflow-execution > .ant-alert { margin-bottom: 24px; }
 
-.workflow-execution-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); align-items: start; gap: 28px; }
+.workflow-execution-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 28px; }
 .workflow-execution-timeline, .workflow-execution-sidebar { min-width: 0; }
 .workflow-execution-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 18px; }
 .workflow-execution-section-heading > div { display: flex; align-items: center; gap: 10px; }
@@ -71,8 +71,20 @@
 .workflow-execution-dependencies > .anticon { flex-shrink: 0; }
 .workflow-execution-step-card > .ant-alert { margin-top: 16px; overflow-wrap: anywhere; }
 .workflow-execution-output { margin-top: 16px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-surface); }
-.workflow-execution-output-label { display: flex; align-items: center; gap: 7px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-text-sec); font-size: 12px; }
-.workflow-execution-output-text.ant-typography { max-height: 360px; margin: 0; padding: 14px; overflow: auto; overscroll-behavior: contain; color: var(--color-text); font-size: 13px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: thin; }
+.workflow-execution-output-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; border-bottom: 1px solid var(--color-border); }
+.workflow-execution-output-label { display: flex; align-items: center; gap: 7px; color: var(--color-text-sec); font-size: 12px; }
+.workflow-execution-output-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.workflow-execution-output-preview { position: relative; display: flex; flex-direction: column; max-height: var(--output-preview-height); overflow: clip; }
+.workflow-execution-output-preview.is-running { justify-content: flex-end; }
+.workflow-execution-output-preview.is-expanded { max-height: none; overflow: visible; }
+.workflow-execution-output-preview.is-clipped::after { position: absolute; right: 0; bottom: 0; left: 0; height: 40px; background: linear-gradient(transparent, var(--color-bg-surface)); pointer-events: none; content: ''; }
+.workflow-execution-output-preview.is-clipped.is-running::after { top: 0; bottom: auto; background: linear-gradient(var(--color-bg-surface), transparent); }
+.workflow-execution-output-text { flex: 0 0 auto; margin: 0; padding: 14px; color: var(--color-text); font-size: 13px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-execution-output-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 4px 12px; border-top: 1px solid var(--color-border); color: var(--color-text-sec); font-size: 12px; }
+.workflow-node-output-modal .ant-modal-body { display: flex; flex-direction: column; max-height: 78vh; max-height: 78dvh; }
+.workflow-node-output-modal-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-bottom: 12px; color: var(--color-text-sec); font-size: 13px; }
+.workflow-node-output-modal-content { min-height: 0; padding: 16px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-surface); color: var(--color-text); font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: thin; }
+.workflow-node-output-modal-content:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
 .workflow-execution-output-pending { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 14px; border-radius: 8px; background: var(--color-bg-surface); color: var(--color-text-sec); font-size: 12px; }
 .workflow-execution-step-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-border); }
 
@@ -84,6 +96,7 @@
 .workflow-execution-panel > .ant-card-head h2 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; font-weight: 600; }
 .workflow-execution-panel > .ant-card-head h2 .anticon { color: var(--color-text-sec); }
 .workflow-execution-panel > .ant-card-body { padding: 20px; }
+.workflow-execution-summary-panel { min-width: 0; margin-top: 24px; }
 .workflow-execution-summary.ant-typography { margin-bottom: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text); font-size: 13px; line-height: 1.85; }
 .workflow-execution-empty { display: flex; flex-direction: column; align-items: center; padding: 18px 4px; text-align: center; }
 .workflow-execution-empty-icon { display: grid; width: 48px; height: 48px; margin-bottom: 16px; place-items: center; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-surface); color: var(--color-text-sec); font-size: 22px; }
@@ -102,13 +115,11 @@
 .workflow-execution-output-text:focus-visible { outline-offset: -3px; }
 
 @media (max-width: 1100px) {
-  .workflow-execution-grid { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 20px; }
+  .workflow-execution-grid { gap: 20px; }
   .workflow-execution-heading { align-items: flex-start; flex-wrap: wrap; }
 }
 
 @media (max-width: 900px) {
-  .workflow-execution-grid { grid-template-columns: minmax(0, 1fr); }
-  .workflow-execution-sidebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .workflow-execution-overview-body { gap: 20px; padding: 20px; }
   .workflow-execution-progress { padding-left: 20px; }
   .workflow-execution-artifacts { margin-top: 24px; }
@@ -134,7 +145,7 @@
   .workflow-execution-step-card { padding: 16px; }
   .workflow-execution-step-heading { gap: 8px; }
   .workflow-execution-sidebar { grid-template-columns: minmax(0, 1fr); }
-  .workflow-execution-output-text.ant-typography { padding: 12px; font-size: 14px; }
+  .workflow-execution-output-text { padding: 12px; font-size: 14px; }
   .workflow-execution-panel > .ant-card-body,
   .workflow-execution-artifacts > .ant-card > .ant-card-body { padding: 16px; }
 }

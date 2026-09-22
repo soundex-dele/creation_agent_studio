@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from decouple import config as environment_config
+
 from apps.workflows.artifacts import workspace_file
 from .workflow_files import insert_illustrations, load_manifest
 
@@ -70,8 +72,8 @@ def _number(config, key, default, *, minimum, maximum):
 
 def _playwright_module_path(config):
     candidates = []
-    configured = config.get("playwright_node_modules") or os.environ.get(
-        "PLAYWRIGHT_NODE_MODULES"
+    configured = config.get("playwright_node_modules") or environment_config(
+        "PLAYWRIGHT_NODE_MODULES", default=""
     )
     if configured:
         candidates.append(Path(configured).expanduser())
@@ -179,6 +181,9 @@ def execute_html_to_png(run_payload, sink):
     capture_config = _capture_config(config, files)
     helper = Path(__file__).with_name("capture.js")
     env = os.environ.copy()
+    # Node's local module lookup takes precedence over NODE_PATH. Pass the
+    # selected directory explicitly so shared installations are actually used.
+    env["PLAYWRIGHT_NODE_MODULES"] = str(module_path)
     current_node_path = env.get("NODE_PATH", "")
     env["NODE_PATH"] = os.pathsep.join(
         value for value in (str(module_path), current_node_path) if value

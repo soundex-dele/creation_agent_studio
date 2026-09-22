@@ -16,6 +16,7 @@ import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
 import RunArtifacts from '@/components/Applications/RunArtifacts';
+import WorkflowNodeOutput from './WorkflowNodeOutput';
 import './WorkflowRunnerPage.css';
 
 const terminal = ['succeeded', 'failed', 'cancelled'];
@@ -275,13 +276,8 @@ const WorkflowRunnerPage = () => {
                       </div>
                       {Boolean(stepState.error_message) && <Alert type="error" showIcon message={String(stepState.error_message)} />}
                       {output ? (
-                        <div className="workflow-execution-output">
-                          <div className="workflow-execution-output-label"><FileTextOutlined aria-hidden />节点输出</div>
-                          <Typography.Paragraph className="workflow-execution-output-text" tabIndex={0}
-                            role="region" aria-label={`${step.name || step.key}的节点输出`}>
-                            {output}
-                          </Typography.Paragraph>
-                        </div>
+                        <WorkflowNodeOutput key={`${run.id}:${step.key}`} output={output}
+                          name={step.name || step.key} running={presentation.status === 'running'} />
                       ) : presentation.status === 'running' && (
                         <div className="workflow-execution-output-pending"><LoadingOutlined aria-hidden />正在处理，输出将在这里显示…</div>
                       )}
@@ -306,15 +302,7 @@ const WorkflowRunnerPage = () => {
           )}
         </section>
 
-        <aside className="workflow-execution-sidebar" aria-label="执行结果与详情">
-          <Card className="workflow-execution-panel" title={<h2><FileTextOutlined aria-hidden />工作流汇总</h2>}>
-            {summary ? <Typography.Paragraph className="workflow-execution-summary" copyable>{summary}</Typography.Paragraph>
-              : <div className="workflow-execution-empty">
-                <span className="workflow-execution-empty-icon"><FileTextOutlined aria-hidden /></span>
-                <strong>{isTerminal ? '暂无汇总内容' : '等待汇总结果'}</strong>
-                <p>{isTerminal ? '可在各节点中查看执行输出，生成的文件显示在下方。' : '各节点的实时输出显示在左侧，汇总结果将在这里呈现。'}</p>
-              </div>}
-          </Card>
+        <aside className="workflow-execution-sidebar" aria-label="运行详情">
           <details className="workflow-execution-details">
             <summary>运行详情<span>编号与执行环境</span></summary>
             <dl>
@@ -329,6 +317,15 @@ const WorkflowRunnerPage = () => {
         <RunArtifacts key={`${organizationId}:${run.id}`} organizationId={organizationId}
           runId={run.id} includeDescendants active={!isTerminal} />
       </section>}
+      <Card className="workflow-execution-panel workflow-execution-summary-panel"
+        title={<h2><FileTextOutlined aria-hidden />工作流汇总</h2>}>
+        {summary ? <Typography.Paragraph className="workflow-execution-summary" copyable>{summary}</Typography.Paragraph>
+          : <div className="workflow-execution-empty">
+            <span className="workflow-execution-empty-icon"><FileTextOutlined aria-hidden /></span>
+            <strong>{isTerminal ? '暂无汇总内容' : '等待汇总结果'}</strong>
+            <p>{isTerminal ? '可在上方各节点中查看执行输出与生成的文件。' : '各节点的实时输出显示在上方，汇总结果将在这里呈现。'}</p>
+          </div>}
+      </Card>
     </div>
   );
 };

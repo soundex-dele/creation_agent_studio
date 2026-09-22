@@ -22,7 +22,7 @@ import type { RunResource } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
 import WorkspaceHeader from '@/components/Workspace/WorkspaceHeader';
-import { WECHAT_PARALLEL_PRESET } from '@/lib/wechatParallelWorkflow';
+import WorkflowPresetsFolder from './WorkflowPresetsFolder';
 import './Workflows.css';
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
@@ -226,9 +226,6 @@ const WorkflowsPage = () => {
         description="连接应用与步骤，把重复的工作整理成清晰、可复用的业务流程。"
         loading={loading}
         action={<div className="workflow-create-actions">
-          <Button icon={<PartitionOutlined />} onClick={() => navigate(`/workflows/new?preset=${WECHAT_PARALLEL_PRESET}`)}>
-            公众号图文并行预设
-          </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflows/new')}>新建工作流</Button>
         </div>}
         metrics={[
@@ -237,6 +234,7 @@ const WorkflowsPage = () => {
           { label: '执行记录', value: runs.length, hint: '查看过程与产出' },
         ]}
       />
+      <WorkflowPresetsFolder />
       <div className="workspace-section-heading"><h2>我的工作流</h2><span>按需选择手动操作或自动执行</span></div>
       {loading ? <div className="workflows-loading"><Spin size="large" /></div> : (
         <>

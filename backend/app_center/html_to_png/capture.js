@@ -1,8 +1,11 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const { pathToFileURL } = require('url');
-const { chromium } = require('playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_NODE_MODULES
+  ? path.join(process.env.PLAYWRIGHT_NODE_MODULES, 'playwright')
+  : 'playwright');
 
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);

@@ -19,13 +19,35 @@ import {
   updateWorkflowDependencies, workflowGraphError,
 } from '@/lib/workflowGraph';
 import './Workflows.css';
-import { buildWechatParallelWorkflow, WECHAT_PARALLEL_APPS, WECHAT_PARALLEL_PRESET, workflowStepOutputOptions } from '@/lib/wechatParallelWorkflow';
+import { workflowStepOutputOptions } from '@/lib/wechatParallelWorkflow';
+import { findWorkflowPreset } from './presets';
 import WorkflowFixedValueInput, { fixedWorkflowValue } from './WorkflowFixedValueInput';
 
 const WorkflowGraphEditor = lazy(() => import('./WorkflowGraphEditor'));
 
 const unwrap = <T,>(value: T[] | { results?: T[] }): T[] =>
   Array.isArray(value) ? value : value.results ?? [];
+
+function WorkflowEditorSurface({ graph, overlayOpen, onClose, children }: {
+  graph: boolean; overlayOpen: boolean; onClose: () => void; children: ReactNode;
+}) {
+  return (
+    <>
+      {!graph && children}
+      <Modal title="工作流图编辑" open={graph} destroyOnHidden className="workflow-graph-modal"
+        width="calc(100vw - 32px)" style={{ top: 16, paddingBottom: 0 }}
+        maskClosable={false} keyboard={!overlayOpen} onCancel={onClose}
+        footer={(
+          <div className="workflow-graph-modal-footer">
+            <span>修改已保留在当前编辑中，完成后请保存工作流。</span>
+            <Button type="primary" onClick={onClose}>完成编辑</Button>
+          </div>
+        )}>
+        {graph && children}
+      </Modal>
+    </>
+  );
+}
 
 function WorkflowStepPanel({ graph, open, onClose, children }: {
   graph: boolean; open: boolean; onClose: () => void; children: ReactNode;
@@ -63,6 +85,7 @@ const WorkflowEditorPage = () => {
 
   useEffect(() => {
     let cancelled = false;
+    setEditorMode('list');
     setNodeConfigOpen(false);
     setLoadError('');
     const loadApps = () => api.get<any[]>('/apps/').then((appData) => {
@@ -74,19 +97,24 @@ const WorkflowEditorPage = () => {
         rendererKey: app.renderer_key, kind: app.kind,
       })));
     });
-    if (!id && preset === WECHAT_PARALLEL_PRESET) {
+    if (!id && preset) {
       setWorkflow(null);
+      const definition = findWorkflowPreset(preset);
+      if (!definition) {
+        setLoadError('该工作流预设不存在，请返回工作流页面重新选择。');
+        return () => { cancelled = true; };
+      }
       Promise.all([
-        Promise.all(WECHAT_PARALLEL_APPS.map((slug) => api.get<ApplicationRuntime>(`/apps/${slug}/`))),
+        Promise.all(definition.applicationSlugs.map((slug) => api.get<ApplicationRuntime>(`/apps/${slug}/`))),
         loadApps(),
       ]).then(([applications]) => {
         if (cancelled) return;
-        const draft = buildWechatParallelWorkflow(applications);
+        const draft = definition.build(applications);
         setWorkflow(draft);
         setSteps(draft.steps || []);
-        setEditorMode('graph');
+        setEditorMode(draft.execution_mode === 'automatic' ? 'graph' : 'list');
       }).catch(() => {
-        if (!cancelled) setLoadError('并行预设加载失败，请确认写作、HTML 配图、封面、排版、分页和 PNG 导出应用均已安装并可访问。');
+        if (!cancelled) setLoadError(definition.loadError);
       });
       return () => { cancelled = true; };
     }
@@ -120,6 +148,11 @@ const WorkflowEditorPage = () => {
   if (loadError) return <Alert type="error" showIcon message={loadError} />;
   if (!workflow) return <div className="workflows-loading"><Spin size="large" /></div>;
 
+  const graphEditing = workflow.execution_mode === 'automatic' && editorMode === 'graph';
+  const closeGraphEditor = () => {
+    setEditorMode('list');
+    setNodeConfigOpen(false);
+  };
   const activeStepKey = steps.some((step) => step.key === selectedStepKey)
     ? selectedStepKey : steps[0]?.key ?? null;
 
@@ -417,10 +450,10 @@ const WorkflowEditorPage = () => {
                 { label: '手动执行', value: 'manual' },
                 { label: '自动执行', value: 'automatic' },
               ]}
-              onChange={(value) => setWorkflow({
-                ...workflow,
-                execution_mode: value as Workflow['execution_mode'],
-              })}
+              onChange={(value) => {
+                setWorkflow({ ...workflow, execution_mode: value as Workflow['execution_mode'] });
+                if (value !== 'automatic') closeGraphEditor();
+              }}
             />
             <small>
               {workflow.execution_mode === 'manual'
@@ -519,7 +552,7 @@ const WorkflowEditorPage = () => {
         </Card>
       )}
       <div className="workflow-add-actions">
-        <div className="workflow-editor-mode">
+        {workflow.execution_mode === 'automatic' ? <div className="workflow-editor-mode">
           <span>编辑模式</span>
           <Segmented
             aria-label="工作流编辑模式"
@@ -533,7 +566,7 @@ const WorkflowEditorPage = () => {
               setNodeConfigOpen(false);
             }}
           />
-        </div>
+        </div> : <span>手动执行使用列表编辑；切换到自动执行可使用图编辑。</span>}
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAppPickerOpen(true)}>
           添加应用
         </Button>
@@ -541,6 +574,7 @@ const WorkflowEditorPage = () => {
       <Modal
         title="选择应用"
         open={appPickerOpen}
+        zIndex={1200}
         footer={null}
         width={760}
         onCancel={() => setAppPickerOpen(false)}
@@ -567,12 +601,13 @@ const WorkflowEditorPage = () => {
           </div>
         ) : <Empty description="暂无可添加的应用" />}
       </Modal>
-      {editorMode === 'graph' && (
+      <WorkflowEditorSurface graph={graphEditing} overlayOpen={appPickerOpen || nodeConfigOpen}
+        onClose={closeGraphEditor}>
+      {graphEditing && (
         <Suspense fallback={<div className="workflows-loading"><Spin tip="正在加载图编辑器" /></div>}>
           <WorkflowGraphEditor
             steps={steps}
             selectedKey={activeStepKey}
-            manual={workflow.execution_mode === 'manual'}
             onSelect={setSelectedStepKey}
             onConfigure={(key) => {
               setSelectedStepKey(key);
@@ -584,15 +619,15 @@ const WorkflowEditorPage = () => {
           />
         </Suspense>
       )}
-      <WorkflowStepPanel graph={editorMode === 'graph'} open={nodeConfigOpen && !!activeStepKey}
+      <WorkflowStepPanel graph={graphEditing} open={nodeConfigOpen && !!activeStepKey}
         onClose={() => setNodeConfigOpen(false)}>
         {steps.length === 0 ? <Empty description="请添加至少一个应用" />
-          : steps.map((step, index) => editorMode === 'graph' && step.key !== activeStepKey ? null : (
+          : steps.map((step, index) => graphEditing && step.key !== activeStepKey ? null : (
             <Card key={step.id} className="workflow-editor-step">
               <span className="workflow-step-index">{index + 1}</span>
               <span className="workflow-step-icon">{step.application.application_icon}</span>
               <div className="workflow-step-copy">
-                {editorMode === 'graph' ? (
+                {graphEditing ? (
                   <label className="workflow-node-name">
                     <span>节点名称</span>
                     <Input
@@ -606,7 +641,7 @@ const WorkflowEditorPage = () => {
                 ) : <strong>{step.name || step.application.application_name}</strong>}
                 <span className="workflow-step-application">使用应用：{step.application.application_name}</span>
                 <span>{step.application.application_description}</span>
-                {(workflow.execution_mode === 'automatic' || editorMode === 'graph') && (
+                {workflow.execution_mode === 'automatic' && (
                   <label className="workflow-node-dependencies">
                     <span>前置依赖</span>
                     <Select
@@ -770,6 +805,7 @@ const WorkflowEditorPage = () => {
             </Card>
           ))}
       </WorkflowStepPanel>
+      </WorkflowEditorSurface>
       {workflow.execution_mode === 'automatic' && steps.length > 0 && (
         <Card title="最终成品汇总" className="workflow-output-mapping">
           <p>为需要交付的节点结果填写字段名；留空的节点仍保留在 outputs 中。</p>

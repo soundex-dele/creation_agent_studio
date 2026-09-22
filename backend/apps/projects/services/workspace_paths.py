@@ -59,10 +59,19 @@ def application_working_directory(project) -> str:
     return project.working_directory
 
 
-def workflow_working_directory(user, organization, run_id) -> str:
-    """Create the one shared directory owned by a durable workflow Run."""
-    scope = _scope_root(user, organization)
-    return str(_create_managed(scope / 'workflows' / str(run_id)))
+def workflow_working_directory(
+    user, organization, run_id, *, working_directory=None,
+) -> str:
+    """Resolve the shared workspace, including one retained by a retried Run."""
+    scope = _scope_root(user, organization) / 'workflows'
+    target = scope / str(run_id)
+    if working_directory:
+        if not isinstance(working_directory, str):
+            raise RuntimeError('Invalid workflow working directory.')
+        target = Path(working_directory).expanduser().resolve()
+        if scope not in target.parents:
+            raise RuntimeError('Working directory escaped the workflow scope.')
+    return str(_create_managed(target))
 
 
 def validate_system_working_directory(raw_path: str) -> str:

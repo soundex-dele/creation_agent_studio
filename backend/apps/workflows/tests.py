@@ -32,6 +32,15 @@ from .models import Workflow
 
 class WorkflowApiTest(TestCase):
     def setUp(self):
+        # API fixtures only schedule runs; they do not need a locally installed
+        # transcription application or a live executor.
+        self.enterContext(self.settings(EXECUTION_CHILD_ADAPTERS={
+            **settings.EXECUTION_CHILD_ADAPTERS,
+            "media": {
+                **settings.EXECUTION_CHILD_ADAPTERS.get("media", {}),
+                "batch-transcribe": "tests.fake:execute",
+            },
+        }))
         self.user = get_user_model().objects.create_user(username="workflow-owner")
         self.organization = self.user.owned_organizations.get()
         self.client = APIClient()
@@ -306,6 +315,30 @@ class WorkflowApiTest(TestCase):
         self.assertEqual(
             retry_run.definition_snapshot["output_mapping"], workflow.output_mapping
         )
+        shared_directory = previous.input["working_directory"]
+        for retry_index in range(2):
+            self.assertEqual(retry_run.input["working_directory"], shared_directory)
+            with self.settings(LOCAL_FILE_MANAGER_ENABLED=True), patch(
+                "modules.execution.api.views.open_workspace_directory"
+            ) as open_directory:
+                opened = self.client.post(
+                    f"/api/v1/organizations/{self.organization.id}/runs/"
+                    f"{retry_run.id}/open-workspace",
+                    {}, format="json",
+                )
+            self.assertEqual(opened.status_code, 200, opened.data)
+            self.assertEqual(opened.data["working_directory"], shared_directory)
+            open_directory.assert_called_once_with(shared_directory)
+            self.assertFalse((Path(shared_directory).parent / str(retry_run.id)).exists())
+            if retry_index == 0:
+                Run.objects.filter(pk=retry_run.pk).update(status=Run.Status.FAILED)
+                retried = self.client.post(
+                    f"/api/v1/workflows/{workflow.id}/retry-step/",
+                    {"run_id": str(retry_run.id), "step_key": "second"}, format="json",
+                    HTTP_IDEMPOTENCY_KEY="retry-second-again", **self.headers,
+                )
+                self.assertEqual(retried.status_code, 202, retried.data)
+                retry_run = Run.objects.get(pk=retried.data["id"])
 
     def test_owner_can_delete_workflow(self):
         workflow = Workflow.objects.create(

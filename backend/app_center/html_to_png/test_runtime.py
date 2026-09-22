@@ -50,6 +50,7 @@ def test_playwright_uses_local_dependency_when_legacy_path_is_unavailable(monkey
     (modules / "playwright").mkdir(parents=True)
     monkeypatch.setattr(runtime, "__file__", str(package / "runtime.py"))
     monkeypatch.delenv("PLAYWRIGHT_NODE_MODULES", raising=False)
+    monkeypatch.setattr(runtime, "environment_config", lambda *_args, **_kwargs: "")
     assert runtime._playwright_module_path({
         "reference_script": str(tmp_path / "missing" / "animation" / "capture.js"),
     }) == modules
@@ -63,6 +64,39 @@ def test_playwright_explicit_path_takes_precedence(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime, "__file__", str(package / "runtime.py"))
     monkeypatch.setenv("PLAYWRIGHT_NODE_MODULES", str(configured))
     assert runtime._playwright_module_path({}) == configured
+
+
+def test_playwright_can_use_backend_env_file(monkeypatch, tmp_path):
+    from decouple import Config, RepositoryEnv
+
+    configured = tmp_path / "shared_modules"
+    (configured / "playwright").mkdir(parents=True)
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"PLAYWRIGHT_NODE_MODULES={configured.as_posix()}\n", encoding="utf-8")
+    monkeypatch.delenv("PLAYWRIGHT_NODE_MODULES", raising=False)
+    monkeypatch.setattr(runtime, "environment_config", Config(RepositoryEnv(str(env_file))))
+    assert runtime._playwright_module_path({}) == configured
+
+
+def test_capture_uses_selected_shared_installation_instead_of_local_package(tmp_path):
+    node = runtime.shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the capture module resolution test")
+    modules = tmp_path / "shared_modules"
+    package = modules / "playwright"
+    package.mkdir(parents=True)
+    (package / "index.js").write_text(
+        "module.exports = { chromium: { launch: async () => { "
+        "throw new Error('selected-shared-playwright'); } } };",
+        encoding="utf-8",
+    )
+    result = runtime.subprocess.run(
+        [node, str(runtime.Path(runtime.__file__).with_name("capture.js"))],
+        input="{}", text=True, capture_output=True, timeout=15,
+        env={**runtime.os.environ, "PLAYWRIGHT_NODE_MODULES": str(modules)},
+    )
+    assert result.returncode == 1
+    assert "selected-shared-playwright" in result.stderr
 
 
 def test_directories_are_deduplicated_and_html_files_are_sorted(tmp_path):
@@ -128,7 +162,11 @@ def test_executor_reports_success_and_partial_failure(monkeypatch, tmp_path):
     ])
     monkeypatch.setattr(runtime.shutil, "which", lambda _name: "node")
     monkeypatch.setattr(runtime, "_playwright_module_path", lambda _config: modules)
-    monkeypatch.setattr(runtime.subprocess, "Popen", lambda *_args, **_kwargs: process)
+    def start_process(*_args, **kwargs):
+        assert kwargs["env"]["PLAYWRIGHT_NODE_MODULES"] == str(modules)
+        return process
+
+    monkeypatch.setattr(runtime.subprocess, "Popen", start_process)
     sink = _Sink()
 
     result = runtime.execute_html_to_png(

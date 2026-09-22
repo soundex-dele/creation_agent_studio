@@ -390,7 +390,8 @@ class OrganizationRunWorkspaceView(ProblemDetailsAPIView):
             )
         try:
             directory = workflow_working_directory(
-                run.owner, run.organization, run.id
+                run.owner, run.organization, run.id,
+                working_directory=(run.input or {}).get("working_directory"),
             )
             open_workspace_directory(directory)
         except (FileNotFoundError, OSError, RuntimeError):

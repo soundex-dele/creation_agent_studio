@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, Empty, message } from 'antd';
-import { ApartmentOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Background, Controls, Handle, MarkerType, Position, ReactFlow,
   type Node, type NodeProps, type ReactFlowInstance,
@@ -50,7 +50,6 @@ const edgeTypes = { workflow: WorkflowGraphEdge };
 interface Props {
   steps: WorkflowStep[];
   selectedKey: string | null;
-  manual: boolean;
   onSelect: (key: string) => void;
   onConfigure: (key: string) => void;
   onDependenciesChange: (key: string, dependencies: string[]) => void;
@@ -59,7 +58,7 @@ interface Props {
 }
 
 export default function WorkflowGraphEditor({
-  steps, selectedKey, manual, onSelect, onConfigure, onDependenciesChange, onPositionsChange, onAdd,
+  steps, selectedKey, onSelect, onConfigure, onDependenciesChange, onPositionsChange, onAdd,
 }: Props) {
   const [instance, setInstance] = useState<ReactFlowInstance<ApplicationNode, WorkflowEdge> | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -97,6 +96,7 @@ export default function WorkflowGraphEditor({
     <section className="workflow-graph" aria-label="工作流图编辑器">
       <div className="workflow-graph-toolbar">
         <span>{steps.length} 个节点 · {edges.length} 条连线</span>
+        <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>添加应用</Button>
         <Button icon={<ApartmentOutlined />} disabled={!steps.length} onClick={() => {
           onPositionsChange(layoutWorkflowGraph(steps));
           setTimeout(() => void instance?.fitView({ padding: 0.2 }), 0);
@@ -112,7 +112,6 @@ export default function WorkflowGraphEditor({
       <p className="workflow-graph-help">
         拖动节点调整位置，连接右侧圆点到另一节点左侧圆点。也可点击两个连接点，或在节点配置中选择前置依赖。
         删除依赖会清除引用该依赖的输入映射与条件。
-        {manual && ' 手动执行时仍按列表顺序展示应用，连线用于自动执行依赖。'}
       </p>
       <p className="workflow-graph-help" aria-live="polite">
         {activeEdge ? `当前连线：${activeEdge.data?.description}` : '连线从右侧输出到左侧输入，点击连线可查看起点和终点。'}
