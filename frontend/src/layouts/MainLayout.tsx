@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Button, Drawer } from 'antd';
-import { HistoryOutlined } from '@ant-design/icons';
-import { useLocation } from 'react-router-dom';
+import { ArrowLeftOutlined, HistoryOutlined } from '@ant-design/icons';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import Header from '../components/Header/Header';
 import Sidebar, { hasSidebarContent } from '../components/Sidebar/Sidebar';
 import MobileNavigation from '../components/Navigation/MobileNavigation';
@@ -27,6 +27,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   fullBleed,
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const layoutMode = usePreferencesStore((state) => state.layoutMode);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -34,10 +35,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const embedded = searchParams.get('embedded') === '1';
   const standalone = searchParams.get('standalone') === '1';
   const isConversationPage = location.pathname === '/chat';
+  const isRemoteConversationPage = Boolean(matchPath(
+    '/apps/my-computer/:deviceId/conversations/:conversationId', location.pathname,
+  ));
   const homeAppsInContent = layoutMode === 'left-right' && !isMobile
     && (location.pathname === '/' || location.pathname === '');
   const hideConversationMainNavigation = shouldHideConversationMainNavigation({
     isConversationPage,
+    isRemoteConversationPage,
     isMobile,
     layoutMode,
   });
@@ -84,6 +89,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       )}
       {showContextToolbar && (
         <div className="app-context-toolbar">
+          {isConversationPage && (
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>
+              返回首页
+            </Button>
+          )}
           <Button
             type="text"
             icon={<HistoryOutlined />}

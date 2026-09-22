@@ -43,7 +43,7 @@ describe('mobile page scrolling', () => {
 
     expect(appStyles).toMatch(/\.apps-category-strip button\s*\{\s*min-height:\s*44px/);
     expect(agentStyles).toMatch(/\.agents-category-strip button\s*\{\s*min-height:\s*44px/);
-    expect(taskStyles).toMatch(/\.task-mobile-title,[\s\S]*?\.task-relation-part button\s*\{\s*min-height:\s*44px/);
+    expect(taskStyles).toMatch(/\.task-mobile-title,\s*\.task-relation-link\s*\{\s*min-height:\s*44px/);
   });
 
   it('separates bulk permission controls from their tables on every viewport', () => {
