@@ -1,5 +1,14 @@
 # Server deployment runbook
 
+For a host installation without containers, run `bash install-dependencies.sh
+--system-deps --with-codex` from the repository root before the migration/startup
+steps. On Windows use `powershell -ExecutionPolicy Bypass -File
+.\install-dependencies.ps1 -SystemDeps -WithCodex`. See the root README for
+prerequisites, optional desktop/mobile packages, and dry-run flags. These scripts
+install into the backend virtual environment and npm package directories; they
+do not install services or change `.env`. The Compose flow below installs its
+dependencies inside the images instead.
+
 ## 1. Prepare the host
 
 - Use a supported Linux host with Docker Engine and Docker Compose v2.

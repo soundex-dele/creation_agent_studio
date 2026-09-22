@@ -161,10 +161,10 @@ fi
 [[ $# -eq 0 ]] || fail "Unknown argument: $1 (use --help for usage)."
 
 PYTHON_BIN="$(find_python)" || fail \
-  "Backend virtual environment not found. Create backend/.venv and install the requirements first."
+  "Backend virtual environment not found. Run 'bash install-dependencies.sh --system-deps' first."
 NPM_BIN="$(command -v npm)" || fail "npm is not installed or is not available on PATH."
 [[ -d "${FRONTEND_DIR}/node_modules" ]] || fail \
-  "Frontend dependencies are missing. Run 'cd frontend && npm ci' first."
+  "Frontend dependencies are missing. Run 'bash install-dependencies.sh' first."
 
 trap stop_services EXIT INT TERM
 

@@ -42,7 +42,59 @@ Workflow 使用唯一的 `workflow-dag` 执行器，支持显式依赖、条件�
 
 ## 本地启动
 
-要求 Python 3.11+、Node.js 20.19+（推荐 Node.js 22）。生产形态另需 Docker、PostgreSQL 和 Redis。
+要求 Python 3.11+（推荐 3.12）、Node.js 20.19+ / 22.12+（推荐 24 LTS）。生产形态另需 Docker、PostgreSQL 和 Redis。
+
+### 一键安装部署依赖
+
+首次部署或更新依赖清单后，在仓库根目录执行（也可以从其他目录使用脚本绝对路径）：
+
+```powershell
+# Windows：预先安装 Python 3.11+、Node.js 22.12+ / 24 LTS 和 Git
+powershell -ExecutionPolicy Bypass -File .\install-dependencies.ps1 -SystemDeps -WithCodex
+```
+
+```bash
+# Linux / macOS：预先安装 Python 3.11+（含 venv）、Node.js 22.12+ / 24 LTS 和 Git
+bash install-dependencies.sh --system-deps --with-codex
+```
+
+脚本创建或复用项目虚拟环境，初始化锁定版本的 Git 子模块，安装后端
+`requirements/production.txt`、前端 npm 依赖、HTML 转 PNG 的 Playwright 和
+Chromium，并执行 `pip check` 与浏览器截图自检。Windows 使用 `backend/venv`；
+Linux/macOS 优先复用 `backend/.venv`，其次 `backend/venv`，新环境使用 `.venv`。
+所有 pip 操作均在该虚拟环境内执行。前端构建所需的开发依赖也会安装。
+
+`-SystemDeps` / `--system-deps` 会通过 Windows winget、macOS Homebrew 或
+Debian/Ubuntu apt 安装 FFmpeg；Linux 同时安装中文字体和 Chromium 系统库，可能需要
+管理员/sudo 权限。其他 Linux 发行版请自行安装 FFmpeg 和 Chromium 系统库后省略该参数。
+Windows 安装 FFmpeg 后需要重新打开终端再启动服务。Python、Node.js、Git 和系统包管理器
+需预先可用；指定 Python 可使用 Windows `-Python C:\Python312\python.exe`，或
+Linux/macOS 的 `PYTHON_BOOTSTRAP=python3.12`。
+
+可选参数：
+
+| Windows | Linux/macOS | 用途 |
+| --- | --- | --- |
+| `-Development` | `--development` | 额外安装测试及开发 Python 依赖 |
+| `-WithCreationMaster` | 不支持 | 安装 Creation Master Windows 桌面依赖（含 Torch、Qt 等大包） |
+| `-WithMobile` | `--with-mobile` | 安装移动端 npm 包，Android/iOS SDK 仍需单独配置 |
+| `-WithCodex` | `--with-codex` | 安装与后端 Dockerfile 对齐的 Codex CLI；已有可用执行器时可省略 |
+| `-SkipSubmodules` | `--skip-submodules` | 使用已初始化的子模块或包含完整子模块的源码包 |
+| `-DryRun` | `--dry-run` | 只显示安装计划；虚拟环境不存在时只显示创建提示 |
+
+`WithCodex` 使用 npm 的全局安装目录，该目录需对当前用户可写（例如使用 nvm 管理的 Node.js）；
+若组织已统一安装 Codex CLI，可省略此参数并确保 `codex` 在 worker 的 PATH 中。
+
+请使用实际运行后端/worker 的用户执行，Chromium 缓存属于该用户。可通过
+`PLAYWRIGHT_BROWSERS_PATH` 指定共享缓存，但安装与运行时必须保持一致且可读。
+旧 `.env` 中的 `PLAYWRIGHT_NODE_MODULES` 若指向其他机器，应清除或改为当前仓库
+`backend/app_center/html_to_png/node_modules` 的绝对路径。
+
+脚本可重复执行，失败会立即停止；`npm ci` 会重建目标目录的 `node_modules`，请在服务
+停止时执行。它不改写 `.env`、不执行数据库迁移、不启动服务。完成后继续下方启动步骤，
+已有虚拟环境无需再次创建或手动安装依赖。模型登录、完整外部 Skill 目录及各 Skill 自身依赖
+仍按 [App Center 说明](backend/app_center/README.md) 配置。此脚本用于宿主机部署；
+Docker Compose 的容器依赖由 Dockerfile 安装，宿主机安装不会改变容器。
 
 后端：
 
