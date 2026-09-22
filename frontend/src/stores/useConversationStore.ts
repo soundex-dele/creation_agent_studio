@@ -11,7 +11,8 @@ import {
   type RunEventState,
 } from '@/entities/run';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
-import { api } from '@/services/api';
+import { api as defaultApi } from '@/services/api';
+import { createConnectionApi, type RemoteConnection } from '@/services/chatConnection';
 import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -172,10 +173,9 @@ const asToolCall = (event: RunEventEnvelope): AgentToolCall => ({
     : undefined,
 });
 
-let latestConversationDetailRequest = 0;
-let restoredConversationRunStream: RunStreamHandle | null = null;
-
 interface ConversationState {
+  disconnect: () => void;
+  refreshIfIdle: (id: string) => Promise<void>;
   conversations: Conversation[];
   currentConversation: ConversationDetail | null;
   activeRun: RunResource | null;
@@ -208,7 +208,7 @@ interface ConversationState {
     conversationId: string,
     content: string,
     options?: ChatRunOptions,
-  ) => AbortController;
+  ) => AbortController & { submitted?: Promise<void> };
   appendStreamContent: (content: string) => void;
   replaceStreamContent: (content: string) => void;
   recordStreamToolCall: (toolCall: AgentToolCall) => void;
@@ -227,7 +227,13 @@ interface ConversationState {
   clearError: () => void;
 }
 
-export const useConversationStore = create<ConversationState>()(
+export const createConversationStore = (connection?: RemoteConnection) => {
+  const api = connection ? createConnectionApi(connection) : defaultApi;
+  const runTenantRoot = (id: string) => connection ? `/organizations/${id}` : tenantApiRoot(id);
+  let latestConversationDetailRequest = 0;
+  let restoredConversationRunStream: RunStreamHandle | null = null;
+  let activeController: AbortController | null = null;
+  return create<ConversationState>()(
   persist(
     (set, get) => {
       const finishRun = (conversationId: string) => {
@@ -245,6 +251,7 @@ export const useConversationStore = create<ConversationState>()(
           ? asQuestion(projection.pendingInput)
           : null;
         set((state) => ({
+          error: null,
           pendingQuestion,
           activeRun: state.activeRun ? {
             ...state.activeRun,
@@ -332,6 +339,7 @@ export const useConversationStore = create<ConversationState>()(
           case 'run.failed':
             set({
               error: String(event.payload.message ?? event.payload.error_message ?? 'Agent 执行失败'),
+              activeRun: null,
               streamingMessageId: null,
               pendingQuestion: null,
               agentActivity: null,
@@ -384,6 +392,7 @@ export const useConversationStore = create<ConversationState>()(
 
         let projection = createRunEventState(run.id);
         restoredConversationRunStream = streamRunEvents({
+          connection,
           organizationId: run.organization_id,
           runId: run.id,
           onEvent: (event) => {
@@ -405,6 +414,21 @@ export const useConversationStore = create<ConversationState>()(
       };
 
       return {
+        disconnect: () => {
+          latestConversationDetailRequest += 1;
+          restoredConversationRunStream?.abort();
+          restoredConversationRunStream = null;
+          activeController?.abort();
+          activeController = null;
+        },
+        refreshIfIdle: async (id) => {
+          if (get().isLoading || get().streamingMessageId || get().activeRun || get().error) return;
+          const version = latestConversationDetailRequest;
+          const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
+          if (version !== latestConversationDetailRequest || get().currentConversation?.id !== id || get().activeRun) return;
+          set({ currentConversation: { ...response, id: String(response.id) } });
+          if (response.active_run) restoreConversationRun(id, response.active_run);
+        },
         conversations: [],
         currentConversation: null,
         activeRun: null,
@@ -427,6 +451,9 @@ export const useConversationStore = create<ConversationState>()(
 
         fetchConversationDetail: async (id) => {
           const requestId = ++latestConversationDetailRequest;
+          restoredConversationRunStream?.abort();
+          restoredConversationRunStream = null;
+          activeController?.abort();
           set({ isLoading: true, error: null });
           try {
             const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
@@ -469,7 +496,9 @@ export const useConversationStore = create<ConversationState>()(
             if (context.applicationId) payload.application_id = context.applicationId;
             if (context.skillIds?.length) payload.skill_ids = context.skillIds;
             if (context.workingDirectory) payload.working_directory = context.workingDirectory;
-            const response = await api.post<Conversation>('/conversations/', payload);
+            const response = await api.post<Conversation>('/conversations/', payload, {
+              headers: { 'Idempotency-Key': createIdempotencyKey('conversation') },
+            });
             const conversation = normalizeConversation(response);
             if (!projectId) set({ conversations: [conversation, ...get().conversations] });
             set({ isLoading: false });
@@ -526,7 +555,9 @@ export const useConversationStore = create<ConversationState>()(
             });
           };
           logTiming('send');
-          const controller = new AbortController();
+          activeController?.abort();
+          const controller = new AbortController() as AbortController & { submitted?: Promise<void> };
+          activeController = controller;
           let stream: RunStreamHandle | null = null;
           const current = get().currentConversation;
           const stamp = Date.now();
@@ -568,12 +599,13 @@ export const useConversationStore = create<ConversationState>()(
               : null,
           });
 
-          void get().sendMessage(conversationId, content, options).then((run) => {
+          controller.submitted = get().sendMessage(conversationId, content, options).then((run) => {
             logTiming('run_response', { runId: run.id });
             if (controller.signal.aborted) return;
             set({ activeRun: run, isLoading: false });
             let projection = createRunEventState(run.id);
             stream = streamRunEvents({
+              connection,
               organizationId: run.organization_id,
               runId: run.id,
               onEvent: (event) => {
@@ -613,9 +645,13 @@ export const useConversationStore = create<ConversationState>()(
                 error: responseData?.detail || imageError || '创建 Run 失败',
                 streamingMessageId: null,
                 agentActivity: null,
+                currentConversation: current,
+                isLoading: false,
               });
             }
+            throw error;
           });
+          void controller.submitted.catch(() => undefined);
           controller.signal.addEventListener('abort', () => stream?.abort(), { once: true });
           return controller;
         },
@@ -708,7 +744,7 @@ export const useConversationStore = create<ConversationState>()(
           });
           try {
             await api.post(
-              `${tenantApiRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`,
+              `${runTenantRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`,
               {
                 type,
                 idempotency_key: createIdempotencyKey('chat-command'),
@@ -732,7 +768,7 @@ export const useConversationStore = create<ConversationState>()(
           if (!run) return;
           set({ agentActivity: '正在取消…', error: null });
           await api.post(
-            `${tenantApiRoot(run.organization_id)}/runs/${run.id}/commands`,
+            `${runTenantRoot(run.organization_id)}/runs/${run.id}/commands`,
             { type: 'cancel', idempotency_key: createIdempotencyKey('chat-command'), payload: {} },
           );
         },
@@ -776,7 +812,12 @@ export const useConversationStore = create<ConversationState>()(
       };
     },
     {
-      name: 'conversation-storage',
+      name: connection ? `remote-conversation-${connection.deviceId}` : 'conversation-storage',
+      ...(connection ? { storage: {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined,
+      } } : {}),
       merge: (persisted, current) => {
         const value = (persisted as Partial<ConversationState>) ?? {};
         return {
@@ -795,3 +836,6 @@ export const useConversationStore = create<ConversationState>()(
     },
   ),
 );
+};
+
+export const useConversationStore = createConversationStore();

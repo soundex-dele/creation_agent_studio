@@ -85,6 +85,7 @@ for package in ("backend", "apps", "core", "modules"):
 for package in ("app_center.batch_transcribe",):
     hiddenimports += collect_submodules(package, filter=runtime_module)
 hiddenimports += collect_submodules("whitenoise", filter=runtime_module)
+hiddenimports += collect_submodules("websockets.asyncio", filter=runtime_module)
 hiddenimports += ["pystray._win32"]
 
 a = Analysis(

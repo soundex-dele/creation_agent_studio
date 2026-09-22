@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Result, Spin, Tag } from 'antd';
-import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlayCircleOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { applicationPath } from '@/lib/applicationCatalog';
@@ -86,7 +86,7 @@ const AppDetailPage: React.FC = () => {
                 : undefined
             }
           >
-            <span>{app.icon}</span>
+            <span>{app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon}</span>
           </div>
           <div className="app-detail-meta">
             <h1 className="app-detail-name">{app.name}</h1>
@@ -138,7 +138,7 @@ const AppDetailPage: React.FC = () => {
                 <img className="app-detail-shot-img" src={src} alt={`${app.name} 截图 ${i + 1}`} />
               ) : (
                 <div className="app-detail-shot-placeholder">
-                  <div className="app-detail-shot-emoji">{app.icon}</div>
+                  <div className="app-detail-shot-emoji">{app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon}</div>
                   <div className="app-detail-shot-name">{app.name}</div>
                   <div className="app-detail-shot-mock">
                     <span /><span /><span />

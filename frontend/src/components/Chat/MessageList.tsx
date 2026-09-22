@@ -14,6 +14,7 @@ import { normalizeMarkdownMath } from '@/lib/markdownMath';
 import type { MessageAttachment } from '@/stores/useConversationStore';
 import 'katex/dist/katex.min.css';
 import './MessageList.css';
+import { useChatConnection } from './ChatConnectionContext';
 
 const { Text } = Typography;
 
@@ -62,6 +63,7 @@ const MessageList: React.FC<MessageListProps> = ({
   streamingMessageId = null,
   renderAssistantContent,
 }) => {
+  const { remote } = useChatConnection();
   const copyMessageContent = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -207,7 +209,10 @@ const MessageList: React.FC<MessageListProps> = ({
                   ))}
                 </div>
               )}
-              {message.attachments && message.attachments.length > 0 && (
+              {remote && message.attachments?.map(attachment => (
+                <p key={attachment.id}>{attachment.original_name} · 远程访问暂不支持附件预览</p>
+              ))}
+              {!remote && message.attachments && message.attachments.length > 0 && (
                 <div className="message-image-grid" aria-label="消息图片">
                   <Image.PreviewGroup>
                     {message.attachments.map((attachment) => (
@@ -241,6 +246,10 @@ const MessageList: React.FC<MessageListProps> = ({
                     </span>
                   ) : (
                     <ReactMarkdown
+                      components={remote ? {
+                        img: ({ alt }) => <span>{alt || '附件'} · 远程访问暂不支持预览</span>,
+                        a: ({ children }) => <span>{children}（远程访问暂不支持打开文件或链接）</span>,
+                      } : undefined}
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                     >

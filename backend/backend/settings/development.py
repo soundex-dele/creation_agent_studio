@@ -50,6 +50,15 @@ LOCAL_FILE_MANAGER_ENABLED = config(
     default=DATABASE_ENGINE in {'sqlite', 'sqlite3'},
     cast=bool,
 )
+REMOTE_ACCESS_HOST_ENABLED = config(
+    'REMOTE_ACCESS_HOST_ENABLED', default=DATABASE_ENGINE in {'sqlite', 'sqlite3'}, cast=bool)
+if not REDIS_ENABLED:
+    REMOTE_RELAY_REDIS_URL = config('REMOTE_RELAY_REDIS_URL', default='')
+REMOTE_CONNECTOR_LOCK_PATH = config(
+    'REMOTE_CONNECTOR_LOCK_PATH',
+    default=str(Path(DATABASES['default']['NAME']).with_suffix('.remote-connector.lock'))
+    if DATABASE_ENGINE in {'sqlite', 'sqlite3'} else str(BASE_DIR / '.remote-connector.lock'),
+)
 
 if not REDIS_ENABLED:
     # SQLite Local and tests are self-contained; DB polling is the cross-process

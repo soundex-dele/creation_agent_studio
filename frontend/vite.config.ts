@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Shell override lets two development frontends reach different local backends.
+const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8080'
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -60,16 +63,16 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: proxyTarget,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: proxyTarget.replace(/^http/, 'ws'),
         ws: true,
         changeOrigin: true,
       },
       '/media': {
-        target: 'http://localhost:8080',
+        target: proxyTarget,
         changeOrigin: true,
       },
     }

@@ -10,6 +10,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.agents.models import Agent
@@ -59,6 +60,7 @@ from .serializers import (
     SendMessageSerializer,
 )
 from .services import prepare_image_specs, persist_message_attachments
+from .idempotency import idempotent_creation
 
 
 GENERAL_AGENT_SLUG = "general"
@@ -242,9 +244,15 @@ class ConversationViewSet(viewsets.ViewSet):
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(title__icontains=search)
+        if "page" in request.query_params:
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(queryset, request)
+            return paginator.get_paginated_response(ConversationListSerializer(page, many=True).data)
         limit = 100 if agent_kind == Agent.Kind.SUPERVISOR else 20
         return Response(ConversationListSerializer(queryset[:limit], many=True).data)
 
+    @idempotent_creation
     def create(self, request):
         serializer = CreateConversationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

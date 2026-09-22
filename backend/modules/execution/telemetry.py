@@ -51,7 +51,7 @@ def configure_telemetry():
                 )
             )
         trace.set_tracer_provider(provider)
-        DjangoInstrumentor().instrument()
+        DjangoInstrumentor().instrument(excluded_urls=r"/api/v1/remote/,/ws/remote/")
         _configured = True
 
 

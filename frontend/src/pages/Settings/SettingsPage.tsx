@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
   Alert, Button, Card, Descriptions, Popconfirm, Segmented, Select, Space, Switch,
   Tag, message,
@@ -24,6 +24,7 @@ import {
 } from '@/components/Header/headerNavigation';
 import { getNavigationIconComponent } from '@/components/Header/navigationIconComponents';
 import './SettingsPage.css';
+import RemoteAccessSettings from './RemoteAccessSettings';
 
 const navigationIconSelectOptions = NAVIGATION_ICON_OPTIONS.map((option) => {
   const Icon = getNavigationIconComponent(option.id);
@@ -54,6 +55,7 @@ const organizationRoleLabels: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  const [remoteAccessAvailable, setRemoteAccessAvailable] = useState(false);
   const navigate = useNavigate();
   const userId = useAuthStore((state) => state.user?.id);
   const userRole = useAuthStore((state) => state.user?.role);
@@ -100,6 +102,7 @@ export default function SettingsPage() {
       <div className="settings-layout">
         <aside className="settings-sidebar">
           <nav aria-label="设置分组">
+            {remoteAccessAvailable && <a href="#settings-remote-access"><SettingOutlined aria-hidden="true" /><span><strong>远程访问</strong><small>设备配对与连接状态</small></span></a>}
             {settingsSections.map(section => <a href={`#settings-${section.id}`} key={section.id}>
               <span aria-hidden="true">{section.icon}</span>
               <span><strong>{section.label}</strong><small>{section.description}</small></span>
@@ -108,6 +111,7 @@ export default function SettingsPage() {
           <p className="settings-save-note"><CheckOutlined aria-hidden="true" />界面与对话偏好即时生效，自动保存在当前浏览器。</p>
         </aside>
       <div className="settings-grid">
+        <RemoteAccessSettings onAvailable={setRemoteAccessAvailable} />
         <Card id="settings-appearance" className="settings-appearance-card" title={sectionTitle('appearance')}>
           <div className="settings-row settings-layout-row">
             <div>

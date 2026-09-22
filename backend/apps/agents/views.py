@@ -94,6 +94,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         queryset = Agent.objects.filter(kind=Agent.Kind.STANDARD).select_related(
             'category', 'created_by', 'draft'
         )
+        if getattr(self.request, 'remote_connector', False):
+            queryset = queryset.filter(
+                Q(organization_id=self.request.remote_organization_id) | Q(organization__isnull=True))
         manageable_list = (
             self.action == 'list'
             and self.request.query_params.get('manageable') == '1'

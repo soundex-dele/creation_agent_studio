@@ -4,7 +4,9 @@
 
 {$APP_DOMAIN} {
   encode zstd gzip
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:3000 {
+    flush_interval -1
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

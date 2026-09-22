@@ -74,6 +74,7 @@ def configure_environment() -> tuple[Path, Path]:
         "SECRET_KEY": _secret_key(data_root),
         "ALLOWED_HOSTS": "127.0.0.1,localhost",
         "LICENSE_FILE_PATH": str(data_root / "license.lic"),
+        "REMOTE_CONNECTOR_LOCAL_URL": f"http://{HOST}:{PORT}",
     }
     for key, value in values.items():
         os.environ[key] = value
@@ -117,6 +118,8 @@ def _internal_mode(mode: str) -> None:
         _run_coordinator()
     elif mode == "scheduler":
         _run_scheduler()
+    elif mode == "remote-connector":
+        _run_management_command("run_remote_connector")
     else:
         raise SystemExit(f"Unknown internal mode: {mode}")
 
@@ -212,7 +215,7 @@ def main() -> int:
     _run_management_command("migrate", "--noinput")
     _run_management_command("sync_app_center")
 
-    children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler")]
+    children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler"), _spawn("remote-connector")]
     try:
         if not _wait_until_ready(children[0]):
             raise RuntimeError("The local Agent Studio server did not start")

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Tooltip, message } from 'antd';
 import { FolderOpenOutlined } from '@ant-design/icons';
-import { api } from '@/services/api';
-import { useConversationStore } from '@/stores/useConversationStore';
+import { useChatConnection } from './ChatConnectionContext';
 import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
@@ -74,6 +73,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   inputAccessory,
   renderAssistantContent,
 }) => {
+  const { store: useConversationStore, api, remote, online } = useChatConnection();
   const { user } = useAuthStore();
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
   const {
@@ -90,6 +90,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     cancelTurn,
     clearError,
     setCurrentConversation,
+    disconnect,
+    refreshIfIdle,
   } = useConversationStore();
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -124,8 +126,17 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+      disconnect();
     };
-  }, []);
+  }, [disconnect]);
+
+  useEffect(() => {
+    if (!conversationId || !online) return;
+    const timer = setInterval(() => {
+      void refreshIfIdle(conversationId).catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [conversationId, online, refreshIfIdle]);
 
   useEffect(() => {
     if (!draftRequest || appliedDraftRequestIdRef.current === draftRequest.id) return;
@@ -138,7 +149,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     composer: ComposerContext,
     images: File[],
   ) => {
-    if (creatingConversationRef.current) return;
+    if (creatingConversationRef.current || !online) throw new Error('电脑当前不可用，草稿已保留。');
     shouldAutoScrollRef.current = true;
 
     let targetConversationId = conversationId;
@@ -187,7 +198,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       const controller = sendMessageStream(targetConversationId, content, {
         permissionMode: composer.permissionMode,
         skillNames: composer.skillNames,
-        agentId: composer.agentId,
+        agentId: composer.agentId ?? (creationContext?.applicationId ? activeConversation?.agent?.id : null),
         images,
       });
       abortControllerRef.current = controller;
@@ -195,6 +206,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         skipNextFetchRef.current = targetConversationId;
         onConversationCreated?.(targetConversationId);
       }
+      await controller.submitted;
     } catch (error) {
       console.error('Failed to start stream:', error);
       throw error;
@@ -235,24 +247,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const isEmpty = messages.length === 0;
   const agent = currentConversation?.agent;
 
-  if (error) {
-    return (
-      <div className="flex h-full items-start justify-center p-6">
-        <Alert
-          message="Agent 执行失败"
-          description={error}
-          type="error"
-          showIcon
-          closable
-          onClose={clearError}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="chat-container">
-      {conversationId && (
+      {error && <Alert message={error} type="error" showIcon closable onClose={clearError} />}
+      {conversationId && !remote && (
         <div className="chat-workspace-toolbar">
           <Tooltip title="打开目录">
             <Button
@@ -307,11 +305,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                 <div className="agent-activity">{agentActivity}</div>
               )}
               {pendingQuestion && conversationId && (
+                <fieldset disabled={!online} style={{ border: 0, padding: 0, margin: 0 }}>
                 <AgentQuestionCard
                   question={pendingQuestion}
                   onAnswer={(answer) => answerQuestion(conversationId, answer)}
                   onCancel={() => cancelTurn(conversationId)}
                 />
+                </fieldset>
               )}
             </div>
           </div>
@@ -334,14 +334,14 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             )}
             mode={composerMode}
             disabled={
-              !user || isLoading || isCreatingConversation || isStreaming
+              !user || !online || isLoading || isCreatingConversation || isStreaming || Boolean(pendingQuestion)
               || (!conversationId && !createOnFirstSend)
             }
             placeholder={user ? (inputPlaceholder || '描述你的需求... (Enter 发送，Shift+Enter 换行)') : '请先登录'}
           />
           <div className="chat-input-hint">
             {isStreaming && conversationId ? (
-              <button className="agent-cancel-link" onClick={() => void cancelTurn(conversationId)}>
+              <button disabled={!online} className="agent-cancel-link" onClick={() => void cancelTurn(conversationId)}>
                 停止当前任务
               </button>
             ) : sendShortcut === 'enter'

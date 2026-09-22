@@ -18,6 +18,7 @@ const TemplatesPage = lazy(() => import('@/pages/Templates/TemplatesPage'));
 const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPage'));
 const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
 const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
+const MyComputerPage = lazy(() => import('@/pages/Apps/MyComputerPage'));
 const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
 const ChatApplicationRuntimePage = lazy(() => import('@/pages/Apps/ChatApplicationRuntimePage'));
 const WorkspacePage = lazy(() => import('@/pages/Workspace/WorkspacePage'));
@@ -70,6 +71,10 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  ...['/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId'].map(path => ({
+    path,
+    element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<MyComputerPage />)}</MainLayout></ProtectedRoute>,
+  })),
   {
     path: '/',
     element: (

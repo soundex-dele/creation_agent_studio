@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'apps.applications',
     'apps.templates',
     'apps.conversations',
+    'apps.remote_access',
     'apps.projects',
     'apps.marketplace',
     'apps.enterprise',
@@ -363,6 +364,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'apps.remote_access.security.LocalConnectorAuthentication',
         'apps.users.authentication.LicenseAwareJWTAuthentication',
         'apps.users.authentication.ScopedAPIKeyAuthentication',
     ],
@@ -559,3 +561,20 @@ IMAGE_BASE_URL = config('IMAGE_BASE_URL', default='https://api.openai.com/v1')
 IMAGE_MODEL = config('IMAGE_MODEL', default='dall-e-3')
 IMAGE_SIZE = config('IMAGE_SIZE', default='1024x1024')
 IMAGE_QUALITY = config('IMAGE_QUALITY', default='standard')
+
+# A server may relay computers without itself becoming a controlled computer.
+REMOTE_ACCESS_HOST_ENABLED = config('REMOTE_ACCESS_HOST_ENABLED', default=False, cast=bool)
+REMOTE_RELAY_ENABLED = config('REMOTE_RELAY_ENABLED', default=True, cast=bool)
+REMOTE_RELAY_REDIS_URL = config(
+    'REMOTE_RELAY_REDIS_URL',
+    default=(f'redis://{_redis_auth}{_redis_host}:{_redis_port}/0' if REDIS_ENABLED else ''),
+)
+REMOTE_RELAY_ALLOW_MEMORY = config('REMOTE_RELAY_ALLOW_MEMORY', default=False, cast=bool)
+REMOTE_CONNECTOR_LOCAL_URL = config('REMOTE_CONNECTOR_LOCAL_URL', default='http://127.0.0.1:8080')
+REMOTE_CONNECTOR_LOCK_PATH = config(
+    'REMOTE_CONNECTOR_LOCK_PATH',
+    default=str(Path(DATABASES['default']['NAME']).with_suffix('.remote-connector.lock'))
+    if DATABASE_ENGINE in {'sqlite', 'sqlite3'} else str(BASE_DIR / '.remote-connector.lock'),
+)
+# WebSocket debug traces include frames and authentication headers.
+LOGGING.setdefault('loggers', {})['websockets'] = {'level': 'WARNING', 'propagate': True}

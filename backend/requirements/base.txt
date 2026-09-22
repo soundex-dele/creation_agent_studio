@@ -30,3 +30,5 @@ python-docx~=1.2
 Pillow>=12.3,<13
 pgvector~=0.4
 sqlite-vec~=0.1
+httpx>=0.28,<0.29
+websockets>=15,<16

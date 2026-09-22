@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 
 import { Button, Empty, Input, Select, Spin } from 'antd';
 import {
   AppstoreOutlined,
+  DesktopOutlined,
   ArrowRightOutlined,
   MessageOutlined,
   ReloadOutlined,
@@ -181,7 +182,7 @@ const AppsPage: React.FC = () => {
       {renderFavorite(app.id, app.name)}
       <div className="app-card-body">
         <div className="app-card-heading">
-          <span className="app-card-icon" aria-hidden="true">{app.icon || <AppstoreOutlined />}</span>
+          <span className="app-card-icon" aria-hidden="true">{app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon || <AppstoreOutlined />}</span>
           <span className="app-card-category">{categoryName(app.category)}</span>
         </div>
         <div className="app-card-content">

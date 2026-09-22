@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!backend/.env.remote-http.example
 *.pem
 *.key
 *.license
@@ -35,6 +36,7 @@ venv/
 *.sqlite3-shm
 *.sqlite3-wal
 *.coordinator.lock
+*.remote-connector.lock
 staticfiles/
 media/
 artifacts/

@@ -51,6 +51,9 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = _runtime_prefetch(Application.objects.all())
+        if getattr(self.request, 'remote_connector', False):
+            queryset = queryset.filter(
+                Q(organization_id=self.request.remote_organization_id) | Q(organization__isnull=True))
         if self.action != 'permissions':
             queryset = queryset.filter(is_active=True)
         return accessible_resources(queryset, self.request.user)

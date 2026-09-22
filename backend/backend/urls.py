@@ -10,6 +10,7 @@ from drf_yasg.views import get_schema_view
 from backend.schema import api_info
 from core.health import health, readiness
 from core.media import private_media
+from apps.remote_access.urls import local_patterns, relay_patterns
 
 # Debug Toolbar URLs - must be first in urlpatterns
 if settings.DEBUG:
@@ -27,6 +28,8 @@ schema_view = get_schema_view(
 )
 
 urlpatterns += [
+    path('api/v1/remote-access/', include(local_patterns)),
+    path('api/v1/remote/', include(relay_patterns)),
     path('healthz/', health, name='health'),
     path('readyz/', readiness, name='readiness'),
     path('api/v1/media/', private_media, name='private-media'),

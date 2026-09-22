@@ -2,6 +2,7 @@ import type { RunEventEnvelope, RunEventSnapshotEnvelope } from '@/entities/run'
 import { getAccessToken, refreshAccessToken } from './authSession';
 import { API_BASE_URL } from './apiBaseUrl';
 import { tenantApiRoot } from './tenantContext';
+import { remotePath, type RemoteConnection } from './chatConnection';
 
 export interface RunEventsPage {
   results: RunEventEnvelope[];
@@ -11,6 +12,7 @@ export interface RunEventsPage {
 }
 
 export interface RunStreamOptions {
+  connection?: RemoteConnection;
   organizationId: string;
   runId: string;
   after?: number;
@@ -209,7 +211,8 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const controller = new AbortController();
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = options.baseUrl ?? API_BASE_URL;
-  const root = `${baseUrl}${tenantApiRoot(options.organizationId)}/runs/${options.runId}`;
+  const runPath = `${options.connection ? `/organizations/${options.organizationId}` : tenantApiRoot(options.organizationId)}/runs/${options.runId}`;
+  const root = `${baseUrl}${options.connection ? remotePath(options.connection, runPath) : runPath}`;
   const managedAuthentication = options.authToken === undefined;
   const currentToken = (): string | null => (
     managedAuthentication ? getAccessToken() : options.authToken ?? null
@@ -258,7 +261,16 @@ export function streamRunEvents(options: RunStreamOptions): RunStreamHandle {
   const recoverCompactedHistory = async (
     problem: EventHistoryCompactedProblem,
   ): Promise<void> => {
-    const response = await authenticatedFetch(problem.snapshot_url, {
+    let snapshotUrl = problem.snapshot_url;
+    if (options.connection) {
+      const path = new URL(snapshotUrl, 'http://local.invalid').pathname;
+      const expected = `/api/v1/organizations/${options.organizationId}/runs/${options.runId}/snapshot`;
+      if (path !== expected && path !== `/api/v1/runs/${options.runId}/snapshot`) {
+        throw new Error('Snapshot does not belong to this computer and Run');
+      }
+      snapshotUrl = `${root}/snapshot`;
+    }
+    const response = await authenticatedFetch(snapshotUrl, {
       credentials: 'include',
       signal: controller.signal,
     });

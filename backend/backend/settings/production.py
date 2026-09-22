@@ -5,6 +5,10 @@ from .base import *
 from django.core.exceptions import ImproperlyConfigured
 
 DEBUG = False
+if REMOTE_RELAY_ENABLED and not REMOTE_RELAY_REDIS_URL and not REMOTE_RELAY_ALLOW_MEMORY:
+    raise ImproperlyConfigured(
+        'Remote relay requires REMOTE_RELAY_REDIS_URL or explicit '
+        'REMOTE_RELAY_ALLOW_MEMORY=True for a single ASGI process.')
 
 if SECRET_KEY == 'django-insecure-change-in-production' or len(SECRET_KEY) < 50:
     raise ImproperlyConfigured('SECRET_KEY must be a production secret of at least 50 characters.')
@@ -29,14 +33,14 @@ CREATION_MASTER_ALLOW_ALL_PATHS = config(
     'CREATION_MASTER_ALLOW_ALL_PATHS', default=False, cast=bool)
 
 # Security settings
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=SECURE_SSL_REDIRECT, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=SECURE_SSL_REDIRECT, cast=bool)
 JWT_REFRESH_COOKIE_SECURE = config(
-    'JWT_REFRESH_COOKIE_SECURE', default=True, cast=bool)
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+    'JWT_REFRESH_COOKIE_SECURE', default=SECURE_SSL_REDIRECT, cast=bool)
+SECURE_HSTS_SECONDS = 31536000 if SECURE_SSL_REDIRECT else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_SSL_REDIRECT
+SECURE_HSTS_PRELOAD = SECURE_SSL_REDIRECT
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
@@ -55,6 +59,9 @@ sentry_sdk.init(
     integrations=[DjangoIntegration()],
     traces_sample_rate=0.1,
     send_default_pii=False,
+    # Relay payloads and device credentials must not reach exception storage.
+    before_send=lambda event, hint: None if '/api/v1/remote/' in event.get('request', {}).get('url', '') else event,
+    before_send_transaction=lambda event, hint: None if '/api/v1/remote/' in event.get('request', {}).get('url', '') else event,
 )
 
 # Logging

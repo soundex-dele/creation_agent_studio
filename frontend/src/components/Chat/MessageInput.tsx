@@ -11,7 +11,8 @@ import {
   SendOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { api } from '@/services/api';
+import { useChatConnection } from './ChatConnectionContext';
+import { loadConnectionCollection } from '@/services/chatConnection';
 import { useAgentStore, type Agent } from '@/stores/useAgentStore';
 import { useProjectStore, type Project } from '@/stores/useProjectStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
@@ -60,6 +61,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   workspaceLocked = false,
   mode = 'default',
 }) => {
+  const { api, remote } = useChatConnection();
   const [internalValue, setInternalValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -79,7 +81,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects, loadProjects } = useProjectStore();
-  const { agents, loadAgents } = useAgentStore();
+  const { agents: serverAgents, loadAgents } = useAgentStore();
+  const [remoteAgents, setRemoteAgents] = useState<ComposerAgent[]>([]);
+  const agents = remote ? remoteAgents : serverAgents;
 
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
@@ -91,12 +95,20 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   useEffect(() => {
     if (mode === 'study') return;
-    void loadProjects();
-    void loadAgents();
+    let cancelled = false;
+    if (remote) {
+      loadConnectionCollection<ComposerAgent>(api, '/agents/')
+        .then(result => { if (!cancelled) setRemoteAgents(result); })
+        .catch(() => { if (!cancelled) setRemoteAgents([]); });
+    } else {
+      void loadProjects();
+      void loadAgents();
+    }
     api.get<{ skills: SkillOption[] }>('/conversations/composer-options/')
-      .then((response) => setSkills(response.skills || []))
-      .catch(() => setSkills([]));
-  }, [loadAgents, loadProjects, mode]);
+      .then((response) => { if (!cancelled) setSkills(response.skills || []); })
+      .catch(() => { if (!cancelled) setSkills([]); });
+    return () => { cancelled = true; };
+  }, [loadAgents, loadProjects, mode, api, remote]);
 
   useEffect(() => {
     setSelectedAgent(currentAgent);
@@ -198,11 +210,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   ];
 
   const attachmentItems = useMemo<MenuProps['items']>(() => [
-    {
+    ...(!remote ? [{
       key: 'images',
       icon: <PictureOutlined />,
       label: '图片',
-    },
+    }] : []),
     {
       key: 'skills',
       icon: <ThunderboltOutlined />,
@@ -227,7 +239,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           }))
         : [{ key: 'agents-empty', disabled: true, label: '暂无可用 Agent' }],
     },
-  ], [agents, skills]);
+  ], [agents, skills, remote]);
 
   const handleAttachmentClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'images') {
@@ -360,7 +372,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             },
           }}
         >
-          <button className="chat-composer-action" disabled={disabled || workspaceLocked}>
+          <button className="chat-composer-action" disabled={disabled || workspaceLocked || remote}>
             <FolderOutlined />
             <span>{selectedProject?.title
               || (selectedSystemDirectory ? selectedSystemDirectory : '选择工作空间')}</span>
@@ -384,7 +396,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           placement="topLeft"
           menu={{ items: attachmentItems, onClick: handleAttachmentClick }}
         >
-          <button className="chat-composer-plus" disabled={disabled} aria-label="添加图片、Skill 或 Agent">
+          <button className="chat-composer-plus" disabled={disabled} aria-label={remote ? '添加 Skill 或 Agent' : '添加图片、Skill 或 Agent'}>
             <PlusOutlined />
           </button>
         </Dropdown>

@@ -1,0 +1,16 @@
+# Run with APP_FRONTEND_ROOT set to the absolute frontend/dist directory.
+# The explicit http:// scheme keeps this listener on plain HTTP.
+http://:3000 {
+	@backend path /api/* /ws/* /admin/* /static/* /healthz/ /readyz/
+	handle @backend {
+		reverse_proxy 127.0.0.1:8080 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		root * {$APP_FRONTEND_ROOT}
+		try_files {path} /index.html
+		file_server
+	}
+}

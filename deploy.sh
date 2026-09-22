@@ -8,6 +8,11 @@ FRONTEND_DIR="${PROJECT_ROOT}/frontend"
 
 BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
+FRONTEND_PORT="${FRONTEND_PORT:-3030}"
+EXECUTION_WORKERS_ENABLED="${EXECUTION_WORKERS_ENABLED:-True}"
+export VITE_PROXY_TARGET="${VITE_PROXY_TARGET:-http://127.0.0.1:${BACKEND_PORT}}"
+export REMOTE_ACCESS_HOST_ENABLED="${REMOTE_ACCESS_HOST_ENABLED:-True}"
+export REMOTE_CONNECTOR_LOCAL_URL="${REMOTE_CONNECTOR_LOCAL_URL:-http://127.0.0.1:${BACKEND_PORT}}"
 
 SERVICE_NAMES=()
 SERVICE_PIDS=()
@@ -20,8 +25,8 @@ Usage: ./deploy.sh
 Bootstrap and start the local Agent Studio stack:
   1. Apply Django migrations
   2. Create a superuser when one does not exist
-  3. Synchronize the Study With Method App Center package
-  4. Start the frontend, backend, and all execution worker pools
+  3. Synchronize the Study With Method and My Computer packages
+  4. Start the frontend, backend, execution workers and remote connector
 
 Optional environment variables:
   DJANGO_SUPERUSER_USERNAME  Create this superuser non-interactively
@@ -29,10 +34,14 @@ Optional environment variables:
   DJANGO_SUPERUSER_EMAIL     Email for non-interactive creation
   BACKEND_HOST               Backend listen address (default: 0.0.0.0)
   BACKEND_PORT               Backend listen port (default: 8080)
+  FRONTEND_PORT              Frontend listen port (default: 3030)
+  VITE_PROXY_TARGET          Frontend proxy origin (default: local BACKEND_PORT)
+  EXECUTION_WORKERS_ENABLED  Set False for a relay-only server (default: True)
+  REMOTE_ACCESS_HOST_ENABLED Set False on the relay server (default: True)
 
 If no superuser exists and the credential variables are not set, the script
 runs Django's interactive createsuperuser command when attached to a terminal.
-Press Ctrl-C to stop all three services.
+Press Ctrl-C to stop all managed services.
 EOF
 }
 
@@ -178,18 +187,31 @@ create_superuser
 log "Synchronizing the Study With Method App Center package."
 "${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center \
   --package study-with-method
+"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center --package my-computer
 
 start_service "frontend" \
-  bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0' \
-  _ "${FRONTEND_DIR}" "${NPM_BIN}"
+  bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0 --port "$3" --strictPort' \
+  _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}"
 
 start_service "backend" \
   bash -c 'cd "$1" && exec "$2" manage.py runserver "$3:$4"' \
   _ "${BACKEND_DIR}" "${PYTHON_BIN}" "${BACKEND_HOST}" "${BACKEND_PORT}"
 
-start_service "worker" \
-  bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all' \
-  _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+case "${EXECUTION_WORKERS_ENABLED}" in
+  True|true|1|yes)
+    start_service "worker" \
+      bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all' \
+      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+    ;;
+esac
 
-log "Agent Studio is running. Frontend: http://localhost:3030"
+case "${REMOTE_ACCESS_HOST_ENABLED}" in
+  True|true|1|yes)
+    start_service "remote-connector" \
+      bash -c 'cd "$1" && exec "$2" manage.py run_remote_connector' \
+      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+    ;;
+esac
+
+log "Agent Studio is running. Frontend: http://localhost:${FRONTEND_PORT}"
 wait_for_services

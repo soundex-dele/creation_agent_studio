@@ -13,4 +13,4 @@ class ApplicationFilter(django_filters.FilterSet):
 
     class Meta:
         model = Application
-        fields = ['category']
+        fields = ['category', 'kind']
