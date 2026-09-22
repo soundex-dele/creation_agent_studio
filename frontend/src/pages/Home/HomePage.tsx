@@ -14,7 +14,7 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import HomeApplicationsSidebar from '@/components/Sidebar/HomeApplicationsSidebar';
-import { collapseConversationRuns } from '@/pages/Tasks/taskCenterModel';
+import { collapseConversationRuns, taskType } from '@/pages/Tasks/taskCenterModel';
 import './HomePage.css';
 
 const ACTIVE_STATUSES = new Set([
@@ -34,6 +34,7 @@ const statusMeta: Record<string, { label: string; color: string }> = {
 
 const taskTypeLabel: Record<string, string> = {
   automation: '自动化', workflow: '工作流', application: '应用',
+  execution: '执行任务',
   conversation: '对话', delegate: 'AI 分身', agent: '智能体', evaluation: '评测',
 };
 
@@ -44,7 +45,7 @@ const formatTime = (value?: string | null) => value
   : '—';
 
 const taskTitle = (run: RunResource) => run.task_title
-  || `${taskTypeLabel[run.task_type || run.source_type || 'application'] || '任务'} #${run.source_id || run.id.slice(0, 8)}`;
+  || `${taskTypeLabel[taskType(run)] || '任务'} #${run.source_id || run.id.slice(0, 8)}`;
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ export default function HomePage() {
         `${tenantApiRoot(organizationId)}/runs`,
         { collapse_conversations: true },
       );
-      setRuns(collapseConversationRuns(response.filter((run) => !run.parent_id)));
+      setRuns(collapseConversationRuns(response));
     } catch {
       setRuns([]);
     } finally {
@@ -116,9 +117,9 @@ export default function HomePage() {
         <Spin spinning={loading}>
           {recentRuns.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" /> : <div className="home-recent-list">
             {recentRuns.map((run) => {
-              const type = run.task_type || run.source_type || 'application';
+              const type = taskType(run);
               const status = statusMeta[run.status] || { label: run.status, color: 'default' };
-              return <button type="button" key={run.id} onClick={() => navigate('/tasks')}>
+              return <button type="button" key={run.id} onClick={() => navigate(`/tasks?run=${encodeURIComponent(run.id)}`)}>
                 <span className="home-task-mark" aria-hidden="true" />
                 <span className="home-task-copy"><strong>{taskTitle(run)}</strong><small>{taskTypeLabel[type] || '任务'} · {formatTime(run.created_at)}</small></span>
                 <Tag color={status.color}>{status.label}</Tag>

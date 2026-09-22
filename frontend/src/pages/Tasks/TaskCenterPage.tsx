@@ -11,7 +11,7 @@ import {
   ExportOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined,
   RobotOutlined, SearchOutlined, UnorderedListOutlined, WarningOutlined,
 } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
@@ -94,12 +94,16 @@ const triggerLabel = (trigger?: string) => {
 
 export default function TaskCenterPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedRunId = searchParams.get('run');
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const loadOrganizations = useOrganizationStore((state) => state.loadOrganizations);
   const [runs, setRuns] = useState<RunResource[]>([]);
   const [parents, setParents] = useState<RunResource[]>([]);
   const [children, setChildren] = useState<RunResource[]>([]);
   const [selected, setSelected] = useState<RunResource | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [page, setPage] = useState(1);
   const [treeRoot, setTreeRoot] = useState<RunResource | null>(null);
   const [treeRuns, setTreeRuns] = useState<RunResource[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -130,10 +134,50 @@ export default function TaskCenterPage() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!organizationId || !selected) { setChildren([]); return; }
+    setSelected(null);
+    setDetailLoading(false);
+    if (!organizationId || !linkedRunId) return;
+    let cancelled = false;
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setQuery('');
+    setDetailLoading(true);
+    // Fetch the exact run even if it is outside the latest history window or
+    // has been replaced by a newer turn in the collapsed conversation list.
+    void api.get<RunResource>(
+      `${tenantApiRoot(organizationId)}/runs/${encodeURIComponent(linkedRunId)}`,
+    ).then((run) => {
+      if (!cancelled) setSelected(run);
+    }).catch(() => {
+      if (!cancelled) message.error('无法打开该任务，任务不存在或你没有访问权限');
+    }).finally(() => {
+      if (!cancelled) setDetailLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [organizationId, linkedRunId]);
+
+  const closeDetail = () => {
+    setSelected(null);
+    setDetailLoading(false);
+    if (linkedRunId) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('run');
+      setSearchParams(params, { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setChildren([]);
+    if (!organizationId || !selected) return;
     void api.get<RunResource[]>(
       `${tenantApiRoot(organizationId)}/runs/${selected.id}/children`,
-    ).then(setChildren).catch(() => setChildren([]));
+    ).then((runs) => {
+      if (!cancelled) setChildren(runs);
+    }).catch(() => {
+      if (!cancelled) setChildren([]);
+    });
+    return () => { cancelled = true; };
   }, [organizationId, selected]);
 
   useEffect(() => {
@@ -160,6 +204,11 @@ export default function TaskCenterPage() {
   }, [children, parents, runs]);
 
   const taskRuns = useMemo(() => collapseConversationRuns(runs), [runs]);
+  useEffect(() => {
+    const index = taskRuns.findIndex((run) => run.id === linkedRunId);
+    const unfiltered = typeFilter === 'all' && statusFilter === 'all' && !query;
+    setPage(unfiltered && index >= 0 ? Math.floor(index / 20) + 1 : 1);
+  }, [linkedRunId, taskRuns, typeFilter, statusFilter, query]);
   const runsWithChildren = useMemo(() => new Set(
     taskRuns.flatMap((run) => run.parent_id ? [run.parent_id] : []),
   ), [taskRuns]);
@@ -472,7 +521,10 @@ export default function TaskCenterPage() {
       <Table
         className="task-desktop-table"
         rowKey="id" loading={loading} columns={columns} dataSource={visibleRuns}
+        rowClassName={(run) => run.id === selected?.id ? 'task-row-selected' : ''}
         pagination={{
+          current: page,
+          onChange: setPage,
           pageSize: 20,
           showSizeChanger: false,
           hideOnSinglePage: true,
@@ -484,7 +536,7 @@ export default function TaskCenterPage() {
         {visibleRuns.map((run) => {
           const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
           const destination = taskDestination(run);
-          return <article className="task-mobile-card" key={run.id}>
+          return <article className={`task-mobile-card${run.id === selected?.id ? ' task-row-selected' : ''}`} key={run.id}>
             <div className="task-mobile-card-main">
               <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
               <button type="button" className="task-mobile-title" onClick={() => setSelected(run)}>
@@ -538,12 +590,13 @@ export default function TaskCenterPage() {
         <span><strong>{taskTitle(selected)}</strong><small>{typeMeta[taskType(selected)]?.label || '任务'} · {triggerLabel(selected.trigger_type)}</small></span>
       </div> : '任务详情'}
       width={760}
-      open={Boolean(selected)}
-      onClose={() => setSelected(null)}
+      open={detailLoading || Boolean(selected)}
+      onClose={closeDetail}
       extra={selectedDestination && <Button type="primary" icon={<ExportOutlined />} onClick={() => selected && openDestination(selected)}>
         {selectedDestination.label}
       </Button>}
     >
+      {detailLoading && <Spin tip="正在加载任务详情"><div style={{ minHeight: 160 }} /></Spin>}
       {selected && <div className="task-detail-stack">
         <div className="task-detail-summary">
           <TaskStatusBadge status={selected.status} />
