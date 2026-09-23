@@ -228,8 +228,8 @@ interface ConversationState {
   clearError: () => void;
 }
 
-export const createConversationStore = (connection?: RemoteConnection) => {
-  const api = connection ? createConnectionApi(connection) : defaultApi;
+export const createConversationStore = (connection?: RemoteConnection, apiOverride?: typeof defaultApi) => {
+  const api = apiOverride ?? (connection ? createConnectionApi(connection) : defaultApi);
   const runTenantRoot = (id: string) => connection ? `/organizations/${id}` : tenantApiRoot(id);
   let latestConversationDetailRequest = 0;
   let restoredConversationRunStream: RunStreamHandle | null = null;
@@ -823,7 +823,7 @@ export const createConversationStore = (connection?: RemoteConnection) => {
     },
     {
       name: connection ? `remote-conversation-${connection.deviceId}` : 'conversation-storage',
-      ...(connection ? { storage: {
+      ...(connection || apiOverride ? { storage: {
         getItem: () => null,
         setItem: () => undefined,
         removeItem: () => undefined,

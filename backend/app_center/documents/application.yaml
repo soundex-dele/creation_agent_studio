@@ -1,0 +1,32 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: documents
+  version: 1.0.0
+  name: 在线文档
+  description: 在线编辑富文本文档，与组织成员共享，使用 AI 起草、润色和总结。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: "文"
+  color: "#2563EB"
+  tags: [在线文档, 富文本, 共享, AI 助手]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: documents
+    executor_protocol_version: 1
+    renderer_key: documents
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {type: object}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.documents.backend.apps.DocumentsConfig
+    urlconf: app_center.documents.backend.urls
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

@@ -186,6 +186,24 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    if (root.input or {}).get("document_id"):
+        if root.owner_id != request.user.id:
+            return False
+        from django.apps import apps
+        from django.http import Http404
+        from rest_framework.exceptions import APIException
+        if not apps.is_installed("app_center.documents.backend"):
+            return False
+        from app_center.documents.backend.models import Document
+        from app_center.documents.backend.access import document_for
+        doc = Document.objects.filter(pk=root.input["document_id"]).first()
+        if doc is None:
+            return False
+        try:
+            document_for(request.user, root.organization_id, doc.application_id, doc.pk)
+        except (Http404, APIException):
+            return False
+        return True
     if root.source_type != "supervisor":
         return True
     if request.user.is_superuser or root.owner_id == request.user.id:

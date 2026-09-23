@@ -34,6 +34,10 @@ package does not drop its tables or historical catalog records.
 
 ## Guided content applications
 
+The **在线文档** (`documents`) dedicated workspace provides rich text editing,
+autosave, per-member sharing and a private AI sidebar. See
+[`documents/README.md`](documents/README.md) for deployment and runtime details.
+
 These packages use the shared chat renderer and content creation agent. Users
 fill in a form, review the generated prompt, and continue editing in chat.
 

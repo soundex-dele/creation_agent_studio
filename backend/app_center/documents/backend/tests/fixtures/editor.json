@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {"type": "heading", "attrs": {"level": 1}, "content": [{"type": "text", "text": "文档标题"}]},
+    {"type": "orderedList", "attrs": {"start": 1, "type": null}, "content": [
+      {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "第一项"}]}]}
+    ]},
+    {"type": "codeBlock", "attrs": {"language": null}, "content": [{"type": "text", "text": "hello()"}]},
+    {"type": "table", "content": [
+      {"type": "tableRow", "content": [
+        {"type": "tableHeader", "attrs": {"colspan": 1, "rowspan": 1, "colwidth": null, "align": "center"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "表头"}]}]}
+      ]},
+      {"type": "tableRow", "content": [
+        {"type": "tableCell", "attrs": {"colspan": 1, "rowspan": 1, "colwidth": null, "align": null}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "内容"}]}]}
+      ]}
+    ]},
+    {"type": "paragraph"}
+  ]
+}

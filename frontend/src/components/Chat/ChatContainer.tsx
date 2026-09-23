@@ -41,7 +41,7 @@ export interface ChatContainerProps {
   draftRequest?: { id: number; text: string } | null;
   projectId?: number;
   defaultAgent?: ComposerAgent | null;
-  composerMode?: 'default' | 'study';
+  composerMode?: 'default' | 'study' | 'document';
   inputAccessory?: React.ReactNode;
   /** Allows a feature page to specialize assistant presentation while keeping
    * the shared conversation, streaming, attachments, and composer behavior. */
@@ -251,7 +251,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   return (
     <div className="chat-container">
       {error && <Alert message={error} type="error" showIcon closable onClose={clearError} />}
-      {conversationId && !remote && (
+      {conversationId && !remote && composerMode !== 'document' && (
         <div className="chat-workspace-toolbar">
           <Tooltip title="打开目录">
             <Button

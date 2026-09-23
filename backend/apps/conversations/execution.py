@@ -162,6 +162,7 @@ def create_conversation_run(
     max_retries=6,
     permission_mode="default",
     collaboration_mode="default",
+    document_context=None,
 ):
     for retry_no in range(max_retries):
         saved_storage_names = []
@@ -178,6 +179,7 @@ def create_conversation_run(
                 request_id=request_id,
                 permission_mode=permission_mode,
                 collaboration_mode=collaboration_mode,
+                document_context=document_context,
             )
         except OperationalError as exc:
             for storage_name in saved_storage_names:
@@ -206,6 +208,7 @@ def _create_run_once(
     request_id="",
     permission_mode="default",
     collaboration_mode="default",
+    document_context=None,
 ):
     if saved_storage_names is None:
         saved_storage_names = []
@@ -215,6 +218,11 @@ def _create_run_once(
         user_id=actor.id,
     )
     organization = conversation.organization
+    original_message = message
+    from django.apps import apps
+    if apps.is_installed("app_center.documents.backend"):
+        from app_center.documents.backend.access import prepare_document_message
+        message = prepare_document_message(conversation, actor, message, document_context)
     if conversation.application_id and not accessible_resources(
         Application.objects.filter(
             Q(organization=organization) | Q(organization__isnull=True),
@@ -230,6 +238,8 @@ def _create_run_once(
     selection_changed = conversation.agent_id != getattr(
         selected_agent, "id", None)
     ensure_supervisor_access(agent, actor)
+    if document_context is not None and agent.kind == Agent.Kind.SUPERVISOR:
+        raise ValidationError({"detail": "在线文档需要配置普通通用智能体。"})
     operation = (
         CREATE_SUPERVISOR_RUN_OPERATION
         if agent.kind == Agent.Kind.SUPERVISOR
@@ -363,6 +373,7 @@ def _create_run_once(
         agent_id=agent.id,
         actor=actor,
         input_data={
+            **({"document_id": str(conversation.document_session.document_id)} if document_context is not None else {}),
             "permission_mode": permission_mode,
             "collaboration_mode": collaboration_mode,
             "message": message,
@@ -380,6 +391,7 @@ def _create_run_once(
         },
         idempotency_key=idempotency_key,
         idempotency_input_data={
+            **({"document_context": document_context} if document_context is not None else {}),
             "permission_mode": permission_mode,
             "collaboration_mode": collaboration_mode,
             "message": message,
@@ -405,6 +417,11 @@ def _create_run_once(
         ),
     )
     if not replayed:
+        if document_context is not None:
+            user_message.run = run
+            user_message.content = original_message
+            user_message.metadata = {**user_message.metadata, "document_context": document_context}
+            user_message.save(update_fields=["run", "content", "metadata"])
         update_fields = ["title", "updated_at"]
         if selection_changed:
             conversation.agent = selected_agent

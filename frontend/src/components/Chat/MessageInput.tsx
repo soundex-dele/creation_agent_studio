@@ -50,7 +50,7 @@ interface MessageInputProps {
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
   workspaceLocked?: boolean;
-  mode?: 'default' | 'study';
+  mode?: 'default' | 'study' | 'document';
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -97,7 +97,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   useEffect(() => {
-    if (mode === 'study') return;
+    if (mode !== 'default') return;
     let cancelled = false;
     if (remote) {
       loadConnectionCollection<ComposerAgent>(api, '/agents/')
@@ -334,7 +334,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
-      {mode === 'study' ? (
+      {mode === 'document' ? null : mode === 'study' ? (
         <div className="chat-composer-toolbar chat-composer-toolbar--study">
           <button
             type="button"
