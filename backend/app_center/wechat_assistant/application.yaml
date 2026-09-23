@@ -4,7 +4,7 @@ metadata:
   id: wechat-assistant
   version: 1.0.0
   name: 微信助手
-  description: 扫码绑定个人微信，与自己的智能体进行多轮文本对话。
+  description: 扫码绑定个人微信，与智能体聊天，发送“菜单”管理智能体、会话和任务。
   category:
     slug: productivity
     name: 效率工具
@@ -37,7 +37,7 @@ spec:
     urlconf: app_center.wechat_assistant.backend.urls
   database:
     mode: django-migrations
-    schema_version: 2
+    schema_version: 3
     tenant_scoped: true
   install:
     scope: per-organization

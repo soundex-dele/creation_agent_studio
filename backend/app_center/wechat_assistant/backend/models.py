@@ -13,6 +13,9 @@ class Binding(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     agent = models.ForeignKey("agents.Agent", null=True, blank=True, on_delete=models.SET_NULL)
     conversation = models.ForeignKey("conversations.Conversation", null=True, blank=True, on_delete=models.SET_NULL)
+    menu_state = models.CharField(max_length=16, blank=True, default="")
+    menu_expires_at = models.DateTimeField(null=True, blank=True)
+    menu_data = models.JSONField(default=dict, blank=True)
     # NULL permits multiple unbound records; uniqueness spans tenants.
     bot_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     peer_id = models.CharField(max_length=255, blank=True)

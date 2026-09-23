@@ -82,7 +82,7 @@ export function WechatAssistantApp({ apiBasePath, requester, openConversation }:
   const stale = binding && (binding.enabled || status === 'qr_pending') && (!binding.heartbeat_at || Date.now() - new Date(binding.heartbeat_at).getTime() > 120000);
   const canLogin = !!binding?.agent_id && !binding.enabled && !binding.busy;
   return <div className="wechat-assistant">
-    <header><Typography.Title level={2}><MessageOutlined aria-hidden /> 微信助手</Typography.Title><Typography.Paragraph type="secondary">绑定个人微信，与自己的智能体对话。需要回答问题或批准操作时，请回到项目会话中处理。</Typography.Paragraph></header>
+    <header><Typography.Title level={2}><MessageOutlined aria-hidden /> 微信助手</Typography.Title><Typography.Paragraph type="secondary">绑定个人微信，与自己的智能体对话。发送“菜单”或 /menu 管理会话和任务，也可直接发送“添加想法”“添加待办”“查询想法”“查询待办”。添加时每行保存一条，与“想法&待办”应用同步。任务需要回答问题或批准操作时，请回到项目会话中处理。</Typography.Paragraph></header>
     <div aria-live="polite" aria-atomic="true">{notice && <Alert type="success" message={notice} showIcon />}</div>
     {error && <Alert type="error" role="alert" message={error} showIcon action={<Button onClick={() => void reload()}>重试</Button>} />}
     {loading ? <Spin tip="正在加载微信助手"><div style={{ minHeight: 180 }} /></Spin> : <>

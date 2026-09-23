@@ -13,6 +13,7 @@ from modules.execution.application.errors import DeploymentUnavailable, InvalidE
 from modules.tenancy.database import tenant_database_context
 from .models import Binding, IncomingMessage, OutgoingMessage
 from .protocol import BASE_URL, WechatClient, WechatError, seal, unseal, trusted_base
+from .menu import clear_menu
 from .services import active_lease, check_access, collect_results, dispatch_message, enqueue, store_updates
 
 LOGIN_STATES = ("qr_pending", "wait", "scaned", "need_verifycode")
@@ -81,6 +82,7 @@ def login_step(snapshot, owner, client_factory=WechatClient):
                 current.cursor = ""
                 current.conversation = None
             current.enabled = True
+            clear_menu(current)
             current.status = "connecting"
             current.login_data = ""
             current.login_id = current.login_expires_at = None
@@ -182,7 +184,7 @@ def cycle(organization_id, binding_id, client_factory=WechatClient):
             if not claim(binding_id, owner):
                 return
             snapshot = Binding.objects.select_related("user", "organization", "application", "agent").get(pk=binding_id)
-            check_access(snapshot)
+            check_access(snapshot, require_agent=False)
         if snapshot.status in LOGIN_STATES:
             login_step(snapshot, owner, client_factory)
             return

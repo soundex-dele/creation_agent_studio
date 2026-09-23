@@ -18,6 +18,7 @@ from core.resource_access import can_access_resource
 from modules.execution.models import Run
 from .models import Binding, IncomingMessage, OutgoingMessage
 from .protocol import seal
+from .menu import clear_menu, dispatch_menu
 
 ACTIVE = ("queued", "running", "waiting_input", "waiting_children", "cancelling")
 BUSY = "当前任务尚未完成，请在项目中处理后重试。"
@@ -75,6 +76,7 @@ def configure(binding, agent_id=None, *, reset=False):
     if reset:
         check_access(binding)
         new_conversation(binding)
+    clear_menu(binding)
     return binding
 
 
@@ -90,6 +92,7 @@ def start_login(binding):
     binding.login_data = ""
     binding.login_expires_at = timezone.now() + timedelta(minutes=5)
     binding.status = "qr_pending"
+    clear_menu(binding)
     binding.next_poll_at = timezone.now()
     binding.last_error = ""
     binding.save()
@@ -108,6 +111,7 @@ def unbind(binding):
     binding.last_error = ""
     binding.save()
     IncomingMessage.objects.filter(binding=binding, state="pending").update(state="discarded")
+    clear_menu(binding)
     OutgoingMessage.objects.filter(incoming__binding=binding).exclude(state="sent").update(state="discarded")
     return binding
 
@@ -171,12 +175,15 @@ def dispatch_message(message_id, owner):
     if item.state != "pending":
         return
     try:
-        check_access(binding)
+        check_access(binding, require_agent=False)
         if not item.supported or not item.text.strip():
             enqueue(item, "unsupported", "微信助手首版仅支持文本私聊，请发送文字。")
         elif len(item.text) > 32000:
             enqueue(item, "too-long", "消息过长，请缩短后重新发送。")
+        elif dispatch_menu(binding, item):
+            pass
         else:
+            check_access(binding)
             if not binding.conversation_id:
                 new_conversation(binding)
             item.conversation = binding.conversation
