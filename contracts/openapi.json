@@ -33,6 +33,24 @@
                         }
                     },
                     {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_name",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
                         "description": "A page number within the paginated result set.",
@@ -249,6 +267,24 @@
                         "name": "search",
                         "in": "query",
                         "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_name",
+                        "in": "query",
+                        "description": "",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -741,30 +777,6 @@
             },
             "patch": {
                 "operationId": "applications_partial_update",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/address-book": {
-            "get": {
-                "operationId": "applications_address-book_list",
                 "description": "",
                 "responses": {
                     "200": {
@@ -2198,6 +2210,318 @@
                 }
             ]
         },
+        "/applications/{application_id}/documents": {
+            "get": {
+                "operationId": "applications_documents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_documents_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/members": {
+            "get": {
+                "operationId": "applications_documents_members_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}": {
+            "get": {
+                "operationId": "applications_documents_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_documents_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_documents_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}/assistant": {
+            "post": {
+                "operationId": "applications_documents_assistant_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}/conversation": {
+            "get": {
+                "operationId": "applications_documents_conversation_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_documents_conversation_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}/copy": {
+            "post": {
+                "operationId": "applications_documents_copy_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}/download": {
+            "get": {
+                "operationId": "applications_documents_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/documents/{id}/shares": {
+            "get": {
+                "operationId": "applications_documents_shares_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_documents_shares_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_documents_shares_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/draft": {
             "get": {
                 "operationId": "applications_draft_list",
@@ -2226,6 +2550,366 @@
             "parameters": [
                 {
                     "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/ideas-todos/ideas": {
+            "get": {
+                "operationId": "applications_ideas-todos_ideas_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Idea"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_ideas-todos_ideas_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Idea"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/ideas-todos/ideas/{id}": {
+            "get": {
+                "operationId": "applications_ideas-todos_ideas_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_ideas-todos_ideas_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Idea"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_ideas-todos_ideas_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/ideas-todos/todos": {
+            "get": {
+                "operationId": "applications_ideas-todos_todos_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Todo"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_ideas-todos_todos_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Todo"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/ideas-todos/todos/{id}": {
+            "get": {
+                "operationId": "applications_ideas-todos_todos_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_ideas-todos_todos_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Todo"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_ideas-todos_todos_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -2514,6 +3198,74 @@
                 }
             ]
         },
+        "/applications/{application_id}/study/diagnostics": {
+            "get": {
+                "operationId": "applications_study_diagnostics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_study_diagnostics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/study/diagnostics/{assessment_id}/submit": {
+            "post": {
+                "operationId": "applications_study_diagnostics_submit_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "assessment_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/study/enrollments/{subject}": {
             "patch": {
                 "operationId": "applications_study_enrollments_partial_update",
@@ -2549,6 +3301,42 @@
         "/applications/{application_id}/study/export": {
             "get": {
                 "operationId": "applications_study_export_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/study/goals": {
+            "get": {
+                "operationId": "applications_study_goals_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "put": {
+                "operationId": "applications_study_goals_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -3230,6 +4018,288 @@
                 }
             ]
         },
+        "/applications/{application_id}/wechat-assistant/": {
+            "get": {
+                "operationId": "applications_wechat-assistant_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "��δ����"
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "put": {
+                "operationId": "applications_wechat-assistant_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Configuration"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/agents": {
+            "get": {
+                "operationId": "applications_wechat-assistant_agents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AgentOption"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/login": {
+            "post": {
+                "operationId": "applications_wechat-assistant_login_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/new-conversation": {
+            "post": {
+                "operationId": "applications_wechat-assistant_new-conversation_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/reconnect": {
+            "post": {
+                "operationId": "applications_wechat-assistant_reconnect_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/tasks": {
+            "get": {
+                "operationId": "applications_wechat-assistant_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/unbind": {
+            "post": {
+                "operationId": "applications_wechat-assistant_unbind_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/verify": {
+            "post": {
+                "operationId": "applications_wechat-assistant_verify_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Verify"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/apps/": {
             "get": {
                 "operationId": "apps_list",
@@ -3239,6 +4309,24 @@
                         "name": "search",
                         "in": "query",
                         "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "description": "",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -4047,7 +5135,7 @@
                 {
                     "name": "id",
                     "in": "path",
-                    "description": "A unique integer value identifying this 用户.",
+                    "description": "A unique integer value identifying this �û�.",
                     "required": true,
                     "schema": {
                         "type": "integer"
@@ -4073,7 +5161,7 @@
         "/auth/login/": {
             "post": {
                 "operationId": "auth_login_create",
-                "description": "自定义登录视图",
+                "description": "�Զ����¼��ͼ",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -4105,7 +5193,7 @@
         "/auth/logout/": {
             "post": {
                 "operationId": "auth_logout_create",
-                "description": "登出",
+                "description": "�ǳ�",
                 "responses": {
                     "201": {
                         "description": ""
@@ -4120,7 +5208,7 @@
         "/auth/me/": {
             "get": {
                 "operationId": "auth_me_read",
-                "description": "用户信息",
+                "description": "�û���Ϣ",
                 "responses": {
                     "200": {
                         "description": "",
@@ -4139,7 +5227,7 @@
             },
             "put": {
                 "operationId": "auth_me_update",
-                "description": "用户信息",
+                "description": "�û���Ϣ",
                 "requestBody": {
                     "$ref": "#/components/requestBodies/UserDetail"
                 },
@@ -4161,7 +5249,7 @@
             },
             "patch": {
                 "operationId": "auth_me_partial_update",
-                "description": "用户信息",
+                "description": "�û���Ϣ",
                 "requestBody": {
                     "$ref": "#/components/requestBodies/UserDetail"
                 },
@@ -4254,7 +5342,7 @@
         "/auth/me/change-password/": {
             "put": {
                 "operationId": "auth_me_change-password_update",
-                "description": "修改密码",
+                "description": "�޸�����",
                 "requestBody": {
                     "$ref": "#/components/requestBodies/ChangePassword"
                 },
@@ -4276,7 +5364,7 @@
             },
             "patch": {
                 "operationId": "auth_me_change-password_partial_update",
-                "description": "修改密码",
+                "description": "�޸�����",
                 "requestBody": {
                     "$ref": "#/components/requestBodies/ChangePassword"
                 },
@@ -4301,7 +5389,7 @@
         "/auth/me/generate-api-key/": {
             "post": {
                 "operationId": "auth_me_generate-api-key_create",
-                "description": "生成 API 密钥",
+                "description": "���� API ��Կ",
                 "responses": {
                     "201": {
                         "description": ""
@@ -4331,7 +5419,7 @@
         "/auth/register/": {
             "post": {
                 "operationId": "auth_register_create",
-                "description": "用户注册",
+                "description": "�û�ע��",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -8478,38 +9566,6 @@
                 }
             ]
         },
-        "/organizations/{organization_id}/applications/{application_id}/address-book": {
-            "get": {
-                "operationId": "organizations_applications_address-book_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
         "/organizations/{organization_id}/applications/{application_id}/creation-master/directories": {
             "get": {
                 "operationId": "organizations_applications_creation-master_directories_list",
@@ -10234,6 +11290,382 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/documents": {
+            "get": {
+                "operationId": "organizations_applications_documents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_documents_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/members": {
+            "get": {
+                "operationId": "organizations_applications_documents_members_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}": {
+            "get": {
+                "operationId": "organizations_applications_documents_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_documents_partial_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_documents_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}/assistant": {
+            "post": {
+                "operationId": "organizations_applications_documents_assistant_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}/conversation": {
+            "get": {
+                "operationId": "organizations_applications_documents_conversation_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_documents_conversation_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}/copy": {
+            "post": {
+                "operationId": "organizations_applications_documents_copy_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}/download": {
+            "get": {
+                "operationId": "organizations_applications_documents_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/documents/{id}/shares": {
+            "get": {
+                "operationId": "organizations_applications_documents_shares_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_documents_shares_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_documents_shares_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/draft": {
             "get": {
                 "operationId": "organizations_applications_draft_list",
@@ -10270,6 +11702,398 @@
                 },
                 {
                     "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/ideas": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_ideas_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Idea"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_ideas-todos_ideas_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Idea"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/ideas/{id}": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_ideas_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_ideas-todos_ideas_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Idea"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Idea"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_ideas-todos_ideas_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_todos_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Todo"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_ideas-todos_todos_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Todo"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos/{id}": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_todos_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_ideas-todos_todos_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Todo"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Todo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_ideas-todos_todos_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
                     "in": "path",
                     "required": true,
                     "schema": {
@@ -10638,6 +12462,90 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/study/diagnostics": {
+            "get": {
+                "operationId": "organizations_applications_study_diagnostics_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_study_diagnostics_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/study/diagnostics/{assessment_id}/submit": {
+            "post": {
+                "operationId": "organizations_applications_study_diagnostics_submit_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "assessment_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/study/enrollments/{subject}": {
             "patch": {
                 "operationId": "organizations_applications_study_enrollments_partial_update",
@@ -10681,6 +12589,50 @@
         "/organizations/{organization_id}/applications/{application_id}/study/export": {
             "get": {
                 "operationId": "organizations_applications_study_export_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/study/goals": {
+            "get": {
+                "operationId": "organizations_applications_study_goals_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "put": {
+                "operationId": "organizations_applications_study_goals_update",
                 "description": "",
                 "responses": {
                     "200": {
@@ -11505,6 +13457,352 @@
                 "responses": {
                     "200": {
                         "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "��δ����"
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "put": {
+                "operationId": "organizations_applications_wechat-assistant_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Configuration"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_agents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AgentOption"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_login_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_new-conversation_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_reconnect_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_unbind_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_verify_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Verify"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
                     }
                 },
                 "tags": [
@@ -13797,6 +16095,177 @@
                 }
             ]
         },
+        "/remote-access/": {
+            "get": {
+                "operationId": "remote-access_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote-access"
+                ]
+            },
+            "put": {
+                "operationId": "remote-access_update",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote-access"
+                ]
+            },
+            "parameters": []
+        },
+        "/remote-access/context/": {
+            "get": {
+                "operationId": "remote-access_context_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote-access"
+                ]
+            },
+            "parameters": []
+        },
+        "/remote-access/{action}/": {
+            "post": {
+                "operationId": "remote-access_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote-access"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "action",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/remote/claim/": {
+            "post": {
+                "operationId": "remote_claim_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "parameters": []
+        },
+        "/remote/connector/{device_id}/": {
+            "get": {
+                "operationId": "remote_connector_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "post": {
+                "operationId": "remote_connector_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "device_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/remote/devices/": {
+            "get": {
+                "operationId": "remote_devices_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "parameters": []
+        },
+        "/remote/devices/{device_id}/": {
+            "delete": {
+                "operationId": "remote_devices_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "device_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/remote/pairings/": {
+            "post": {
+                "operationId": "remote_pairings_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "remote"
+                ]
+            },
+            "parameters": []
+        },
         "/runs": {
             "get": {
                 "operationId": "runs_list",
@@ -14324,6 +16793,60 @@
                         }
                     },
                     {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_name",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "content_type",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "copyright_mode",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
                         "description": "A page number within the paginated result set.",
@@ -14528,6 +17051,60 @@
                         }
                     },
                     {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_name",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "content_type",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "copyright_mode",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
                         "description": "A page number within the paginated result set.",
@@ -14589,6 +17166,60 @@
                         "name": "search",
                         "in": "query",
                         "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_name",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "content_type",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "copyright_mode",
+                        "in": "query",
+                        "description": "",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -15020,634 +17651,6 @@
                     }
                 }
             ]
-        },
-        "/applications/{application_id}/wechat-assistant/": {
-            "get": {
-                "operationId": "applications_wechat-assistant_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "��δ����"
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "put": {
-                "operationId": "applications_wechat-assistant_update",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/Configuration"
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/agents": {
-            "get": {
-                "operationId": "applications_wechat-assistant_agents_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/AgentOption"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/login": {
-            "post": {
-                "operationId": "applications_wechat-assistant_login_create",
-                "description": "",
-                "responses": {
-                    "202": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/new-conversation": {
-            "post": {
-                "operationId": "applications_wechat-assistant_new-conversation_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/reconnect": {
-            "post": {
-                "operationId": "applications_wechat-assistant_reconnect_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/tasks": {
-            "get": {
-                "operationId": "applications_wechat-assistant_tasks_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Task"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/unbind": {
-            "post": {
-                "operationId": "applications_wechat-assistant_unbind_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/applications/{application_id}/wechat-assistant/verify": {
-            "post": {
-                "operationId": "applications_wechat-assistant_verify_create",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/Verify"
-                },
-                "responses": {
-                    "202": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "applications"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
-            "get": {
-                "operationId": "organizations_applications_wechat-assistant_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "��δ����"
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "put": {
-                "operationId": "organizations_applications_wechat-assistant_update",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/Configuration"
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
-            "get": {
-                "operationId": "organizations_applications_wechat-assistant_agents_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/AgentOption"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
-            "post": {
-                "operationId": "organizations_applications_wechat-assistant_login_create",
-                "description": "",
-                "responses": {
-                    "202": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
-            "post": {
-                "operationId": "organizations_applications_wechat-assistant_new-conversation_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
-            "post": {
-                "operationId": "organizations_applications_wechat-assistant_reconnect_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
-            "get": {
-                "operationId": "organizations_applications_wechat-assistant_tasks_list",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Task"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
-            "post": {
-                "operationId": "organizations_applications_wechat-assistant_unbind_create",
-                "description": "",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
-        },
-        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
-            "post": {
-                "operationId": "organizations_applications_wechat-assistant_verify_create",
-                "description": "",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/Verify"
-                },
-                "responses": {
-                    "202": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Binding"
-                                }
-                            }
-                        }
-                    }
-                },
-                "tags": [
-                    "organizations"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "organization_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                },
-                {
-                    "name": "application_id",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "string"
-                    }
-                }
-            ]
         }
     },
     "servers": [
@@ -15787,6 +17790,16 @@
                 },
                 "required": true
             },
+            "Verify": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Verify"
+                        }
+                    }
+                },
+                "required": true
+            },
             "SubmitRunCommand": {
                 "content": {
                     "application/json": {
@@ -15807,11 +17820,41 @@
                 },
                 "required": true
             },
+            "Todo": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Todo"
+                        }
+                    }
+                },
+                "required": true
+            },
             "ResourcePermission": {
                 "content": {
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ResourcePermission"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "Idea": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Idea"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "Configuration": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Configuration"
                         }
                     }
                 },
@@ -15962,26 +18005,6 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/WorkflowDetail"
-                        }
-                    }
-                },
-                "required": true
-            },
-            "Verify": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/Verify"
-                        }
-                    }
-                },
-                "required": true
-            },
-            "Configuration": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/Configuration"
                         }
                     }
                 },
@@ -16427,6 +18450,343 @@
                             "$ref": "#/components/schemas/ResourcePermissionUser"
                         },
                         "readOnly": true
+                    }
+                }
+            },
+            "Idea": {
+                "required": [
+                    "title"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 1
+                    },
+                    "body": {
+                        "title": "Body",
+                        "type": "string",
+                        "maxLength": 20000
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 40,
+                            "minLength": 1
+                        },
+                        "maxItems": 20
+                    },
+                    "is_pinned": {
+                        "title": "Is pinned",
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "Todo": {
+                "required": [
+                    "title"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 1
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string",
+                        "maxLength": 20000
+                    },
+                    "priority": {
+                        "title": "Priority",
+                        "type": "integer",
+                        "enum": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "due_date": {
+                        "title": "Due date",
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "is_completed": {
+                        "title": "Is completed",
+                        "type": "boolean"
+                    },
+                    "completed_at": {
+                        "title": "Completed at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "Binding": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "enabled": {
+                        "title": "Enabled",
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "agent_id": {
+                        "title": "Agent id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "conversation_id": {
+                        "title": "Conversation id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "busy": {
+                        "title": "Busy",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "login_id": {
+                        "title": "Login id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "login_expires_at": {
+                        "title": "Login expires at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "qr_content": {
+                        "title": "Qr content",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "heartbeat_at": {
+                        "title": "Heartbeat at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "received_at": {
+                        "title": "Received at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "sent_at": {
+                        "title": "Sent at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_error": {
+                        "title": "Last error",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    }
+                }
+            },
+            "Configuration": {
+                "required": [
+                    "agent_id"
+                ],
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "title": "Agent id",
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "AgentOption": {
+                "required": [
+                    "id",
+                    "name",
+                    "kind"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "integer"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "Reply": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "title": "State",
+                        "type": "string",
+                        "maxLength": 24,
+                        "minLength": 1
+                    },
+                    "attempts": {
+                        "title": "Attempts",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "last_error": {
+                        "title": "Last error",
+                        "type": "string",
+                        "maxLength": 300
+                    }
+                }
+            },
+            "Task": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "text": {
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "state": {
+                        "title": "State",
+                        "type": "string",
+                        "maxLength": 24,
+                        "minLength": 1
+                    },
+                    "run_id": {
+                        "title": "Run id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "run_status": {
+                        "title": "Run status",
+                        "type": "string",
+                        "readOnly": true,
+                        "default": "",
+                        "minLength": 1
+                    },
+                    "conversation_id": {
+                        "title": "Conversation id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "replies": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Reply"
+                        },
+                        "readOnly": true
+                    }
+                }
+            },
+            "Verify": {
+                "required": [
+                    "login_id",
+                    "code"
+                ],
+                "type": "object",
+                "properties": {
+                    "login_id": {
+                        "title": "Login id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "title": "Code",
+                        "type": "string",
+                        "pattern": "^[0-9]{4,12}$",
+                        "minLength": 1
                     }
                 }
             },
@@ -16901,14 +19261,14 @@
                     },
                     "avatar": {
                         "title": "Avatar",
-                        "description": "用户头像 URL",
+                        "description": "�û�ͷ�� URL",
                         "type": "string",
                         "format": "uri",
                         "maxLength": 200
                     },
                     "bio": {
                         "title": "Bio",
-                        "description": "用户简介",
+                        "description": "�û����",
                         "type": "string"
                     },
                     "created_at": {
@@ -18521,22 +20881,26 @@
                     "automation_id": {
                         "title": "Automation id",
                         "type": "integer",
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "workflow_id": {
                         "title": "Workflow id",
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "application_id": {
                         "title": "Application id",
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "conversation_id": {
                         "title": "Conversation id",
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     }
                 }
             },
@@ -20955,230 +23319,6 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
-                    }
-                }
-            },
-            "Binding": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "title": "Id",
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true
-                    },
-                    "status": {
-                        "title": "Status",
-                        "type": "string",
-                        "readOnly": true,
-                        "minLength": 1
-                    },
-                    "enabled": {
-                        "title": "Enabled",
-                        "type": "boolean",
-                        "readOnly": true
-                    },
-                    "agent_id": {
-                        "title": "Agent id",
-                        "type": "integer",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "conversation_id": {
-                        "title": "Conversation id",
-                        "type": "integer",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "busy": {
-                        "title": "Busy",
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "login_id": {
-                        "title": "Login id",
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "login_expires_at": {
-                        "title": "Login expires at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "qr_content": {
-                        "title": "Qr content",
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "heartbeat_at": {
-                        "title": "Heartbeat at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "received_at": {
-                        "title": "Received at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "sent_at": {
-                        "title": "Sent at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "last_error": {
-                        "title": "Last error",
-                        "type": "string",
-                        "readOnly": true,
-                        "minLength": 1
-                    }
-                }
-            },
-            "AgentOption": {
-                "required": [
-                    "id",
-                    "name",
-                    "kind"
-                ],
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "title": "Id",
-                        "type": "integer"
-                    },
-                    "name": {
-                        "title": "Name",
-                        "type": "string",
-                        "minLength": 1
-                    },
-                    "kind": {
-                        "title": "Kind",
-                        "type": "string",
-                        "minLength": 1
-                    }
-                }
-            },
-            "Task": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "title": "Id",
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true
-                    },
-                    "text": {
-                        "title": "Text",
-                        "type": "string"
-                    },
-                    "state": {
-                        "title": "State",
-                        "type": "string",
-                        "maxLength": 24,
-                        "minLength": 1
-                    },
-                    "run_id": {
-                        "title": "Run id",
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "run_status": {
-                        "title": "Run status",
-                        "type": "string",
-                        "readOnly": true,
-                        "default": "",
-                        "minLength": 1
-                    },
-                    "conversation_id": {
-                        "title": "Conversation id",
-                        "type": "integer",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "created_at": {
-                        "title": "Created at",
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    },
-                    "replies": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/Reply"
-                        },
-                        "readOnly": true
-                    }
-                }
-            },
-            "Configuration": {
-                "required": [
-                    "agent_id"
-                ],
-                "type": "object",
-                "properties": {
-                    "agent_id": {
-                        "title": "Agent id",
-                        "type": "integer",
-                        "minimum": 1
-                    }
-                }
-            },
-            "Verify": {
-                "required": [
-                    "login_id",
-                    "code"
-                ],
-                "type": "object",
-                "properties": {
-                    "login_id": {
-                        "title": "Login id",
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "code": {
-                        "title": "Code",
-                        "type": "string",
-                        "pattern": "^[0-9]{4,12}$",
-                        "minLength": 1
-                    }
-                }
-            },
-            "Reply": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "title": "Id",
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true
-                    },
-                    "state": {
-                        "title": "State",
-                        "type": "string",
-                        "maxLength": 24,
-                        "minLength": 1
-                    },
-                    "attempts": {
-                        "title": "Attempts",
-                        "type": "integer",
-                        "maximum": 9223372036854776000,
-                        "minimum": 0
-                    },
-                    "last_error": {
-                        "title": "Last error",
-                        "type": "string",
-                        "maxLength": 300
                     }
                 }
             }

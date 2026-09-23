@@ -291,24 +291,6 @@ export interface paths {
         patch: operations["applications_partial_update"];
         trace?: never;
     };
-    "/applications/{application_id}/address-book": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_address-book_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/applications/{application_id}/creation-master/directories": {
         parameters: {
             query?: never;
@@ -1036,6 +1018,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_list"];
+        put?: never;
+        post: operations["applications_documents_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_members_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_documents_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_documents_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_documents_assistant_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_conversation_list"];
+        put?: never;
+        post: operations["applications_documents_conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_documents_copy_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/documents/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_documents_shares_list"];
+        put?: never;
+        post: operations["applications_documents_shares_create"];
+        delete: operations["applications_documents_shares_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{application_id}/draft": {
         parameters: {
             query?: never;
@@ -1052,6 +1184,80 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/ideas-todos/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_ideas_list"];
+        put?: never;
+        post: operations["applications_ideas-todos_ideas_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/ideas-todos/ideas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_ideas_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_ideas-todos_ideas_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_ideas-todos_ideas_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/ideas-todos/todos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_todos_list"];
+        put?: never;
+        post: operations["applications_ideas-todos_todos_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/ideas-todos/todos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_todos_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_ideas-todos_todos_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_ideas-todos_todos_partial_update"];
         trace?: never;
     };
     "/applications/{application_id}/revisions": {
@@ -1236,6 +1442,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/study/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_study_diagnostics_list"];
+        put?: never;
+        post: operations["applications_study_diagnostics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/study/diagnostics/{assessment_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_study_diagnostics_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{application_id}/study/enrollments/{subject}": {
         parameters: {
             query?: never;
@@ -1266,6 +1509,24 @@ export interface paths {
         };
         get: operations["applications_study_export_list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/study/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_study_goals_list"];
+        put: operations["applications_study_goals_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1642,6 +1903,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/wechat-assistant/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_list"];
+        put: operations["applications_wechat-assistant_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_agents_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_login_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/new-conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_new-conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_reconnect_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_tasks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_unbind_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/apps/": {
         parameters: {
             query?: never;
@@ -1923,7 +2328,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this 用户. */
+                /** @description A unique integer value identifying this �û�. */
                 id: number;
             };
             cookie?: never;
@@ -1966,7 +2371,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description 自定义登录视图 */
+        /** @description �Զ����¼��ͼ */
         post: operations["auth_login_create"];
         delete?: never;
         options?: never;
@@ -1983,7 +2388,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description 登出 */
+        /** @description �ǳ� */
         post: operations["auth_logout_create"];
         delete?: never;
         options?: never;
@@ -1998,15 +2403,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description 用户信息 */
+        /** @description �û���Ϣ */
         get: operations["auth_me_read"];
-        /** @description 用户信息 */
+        /** @description �û���Ϣ */
         put: operations["auth_me_update"];
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description 用户信息 */
+        /** @description �û���Ϣ */
         patch: operations["auth_me_partial_update"];
         trace?: never;
     };
@@ -2052,13 +2457,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description 修改密码 */
+        /** @description �޸����� */
         put: operations["auth_me_change-password_update"];
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description 修改密码 */
+        /** @description �޸����� */
         patch: operations["auth_me_change-password_partial_update"];
         trace?: never;
     };
@@ -2071,7 +2476,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description 生成 API 密钥 */
+        /** @description ���� API ��Կ */
         post: operations["auth_me_generate-api-key_create"];
         delete?: never;
         options?: never;
@@ -2105,7 +2510,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description 用户注册 */
+        /** @description �û�ע�� */
         post: operations["auth_register_create"];
         delete?: never;
         options?: never;
@@ -3489,25 +3894,6 @@ export interface paths {
         patch: operations["organizations_applications_partial_update"];
         trace?: never;
     };
-    "/organizations/{organization_id}/applications/{application_id}/address-book": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_address-book_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/organizations/{organization_id}/applications/{application_id}/creation-master/directories": {
         parameters: {
             query?: never;
@@ -4274,6 +4660,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_list"];
+        put?: never;
+        post: operations["organizations_applications_documents_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_members_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_documents_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_documents_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_documents_assistant_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_conversation_list"];
+        put?: never;
+        post: operations["organizations_applications_documents_conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_documents_copy_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/documents/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_documents_shares_list"];
+        put?: never;
+        post: operations["organizations_applications_documents_shares_create"];
+        delete: operations["organizations_applications_documents_shares_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/draft": {
         parameters: {
             query?: never;
@@ -4291,6 +4835,84 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_ideas_list"];
+        put?: never;
+        post: operations["organizations_applications_ideas-todos_ideas_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/ideas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_ideas_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_ideas-todos_ideas_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_ideas-todos_ideas_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_todos_list"];
+        put?: never;
+        post: operations["organizations_applications_ideas-todos_todos_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_todos_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_ideas-todos_todos_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_ideas-todos_todos_partial_update"];
         trace?: never;
     };
     "/organizations/{organization_id}/applications/{application_id}/revisions": {
@@ -4485,6 +5107,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/study/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_study_diagnostics_list"];
+        put?: never;
+        post: operations["organizations_applications_study_diagnostics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/study/diagnostics/{assessment_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_study_diagnostics_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/study/enrollments/{subject}": {
         parameters: {
             query?: never;
@@ -4517,6 +5178,25 @@ export interface paths {
         };
         get: operations["organizations_applications_study_export_list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/study/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_study_goals_list"];
+        put: operations["organizations_applications_study_goals_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4907,6 +5587,158 @@ export interface paths {
         get: operations["organizations_applications_study_tutors_list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_list"];
+        put: operations["organizations_applications_wechat-assistant_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_agents_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_login_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_new-conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_reconnect_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_tasks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_unbind_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_verify_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5796,6 +6628,140 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/remote-access/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["remote-access_list"];
+        put: operations["remote-access_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote-access/context/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["remote-access_context_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote-access/{action}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["remote-access_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/claim/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["remote_claim_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/connector/{device_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["remote_connector_read"];
+        put?: never;
+        post: operations["remote_connector_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/devices/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["remote_devices_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/devices/{device_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remote_devices_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/pairings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["remote_pairings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs": {
         parameters: {
             query?: never;
@@ -6295,302 +7261,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/applications/{application_id}/wechat-assistant/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_wechat-assistant_list"];
-        put: operations["applications_wechat-assistant_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/agents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_wechat-assistant_agents_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_wechat-assistant_login_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/new-conversation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_wechat-assistant_new-conversation_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/reconnect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_wechat-assistant_reconnect_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["applications_wechat-assistant_tasks_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/unbind": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_wechat-assistant_unbind_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/applications/{application_id}/wechat-assistant/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["applications_wechat-assistant_verify_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_wechat-assistant_list"];
-        put: operations["organizations_applications_wechat-assistant_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_wechat-assistant_agents_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_wechat-assistant_login_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_wechat-assistant_new-conversation_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_wechat-assistant_reconnect_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get: operations["organizations_applications_wechat-assistant_tasks_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_wechat-assistant_unbind_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["organizations_applications_wechat-assistant_verify_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6790,6 +7460,177 @@ export interface components {
             /** @default [] */
             grants: components["schemas"]["ResourceGrant"][];
             readonly available_users?: components["schemas"]["ResourcePermissionUser"][];
+        };
+        Idea: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body?: string;
+            tags?: string[];
+            /** Is pinned */
+            is_pinned?: boolean;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+        };
+        Todo: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string;
+            /**
+             * Priority
+             * @enum {integer}
+             */
+            priority?: 1 | 2 | 3;
+            /**
+             * Due date
+             * Format: date
+             */
+            due_date?: string | null;
+            /** Is completed */
+            is_completed?: boolean;
+            /**
+             * Completed at
+             * Format: date-time
+             */
+            readonly completed_at?: string | null;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+        };
+        Binding: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Status */
+            readonly status?: string;
+            /** Enabled */
+            readonly enabled?: boolean;
+            /** Agent id */
+            readonly agent_id?: number | null;
+            /** Conversation id */
+            readonly conversation_id?: number | null;
+            /** Busy */
+            readonly busy?: string;
+            /**
+             * Login id
+             * Format: uuid
+             */
+            readonly login_id?: string | null;
+            /**
+             * Login expires at
+             * Format: date-time
+             */
+            readonly login_expires_at?: string | null;
+            /** Qr content */
+            readonly qr_content?: string;
+            /**
+             * Heartbeat at
+             * Format: date-time
+             */
+            readonly heartbeat_at?: string | null;
+            /**
+             * Received at
+             * Format: date-time
+             */
+            readonly received_at?: string | null;
+            /**
+             * Sent at
+             * Format: date-time
+             */
+            readonly sent_at?: string | null;
+            /** Last error */
+            readonly last_error?: string;
+        };
+        Configuration: {
+            /** Agent id */
+            agent_id: number;
+        };
+        AgentOption: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+        };
+        Reply: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** State */
+            state?: string;
+            /** Attempts */
+            attempts?: number;
+            /** Last error */
+            last_error?: string;
+        };
+        Task: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Text */
+            text?: string;
+            /** State */
+            state?: string;
+            /**
+             * Run id
+             * Format: uuid
+             */
+            readonly run_id?: string | null;
+            /**
+             * Run status
+             * @default
+             */
+            readonly run_status: string;
+            /** Conversation id */
+            readonly conversation_id?: number | null;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            readonly replies?: components["schemas"]["Reply"][];
+        };
+        Verify: {
+            /**
+             * Login id
+             * Format: uuid
+             */
+            login_id: string;
+            /** Code */
+            code: string;
         };
         ApplicationList: {
             /** ID */
@@ -7015,12 +7856,12 @@ export interface components {
             /**
              * Avatar
              * Format: uri
-             * @description 用户头像 URL
+             * @description �û�ͷ�� URL
              */
             avatar?: string;
             /**
              * Bio
-             * @description 用户简介
+             * @description �û����
              */
             bio?: string;
             /**
@@ -7823,13 +8664,13 @@ export interface components {
             /** Trigger type */
             readonly trigger_type?: string;
             /** Automation id */
-            readonly automation_id?: number;
+            readonly automation_id?: number | null;
             /** Workflow id */
-            readonly workflow_id?: string;
+            readonly workflow_id?: string | null;
             /** Application id */
-            readonly application_id?: string;
+            readonly application_id?: string | null;
             /** Conversation id */
-            readonly conversation_id?: string;
+            readonly conversation_id?: string | null;
         };
         KnowledgeCitation: {
             /** Chunk id */
@@ -8926,115 +9767,6 @@ export interface components {
              */
             readonly updated_at?: string;
         };
-        Binding: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            readonly id?: string;
-            /** Status */
-            readonly status?: string;
-            /** Enabled */
-            readonly enabled?: boolean;
-            /** Agent id */
-            readonly agent_id?: number | null;
-            /** Conversation id */
-            readonly conversation_id?: number | null;
-            /** Busy */
-            readonly busy?: string;
-            /**
-             * Login id
-             * Format: uuid
-             */
-            readonly login_id?: string | null;
-            /**
-             * Login expires at
-             * Format: date-time
-             */
-            readonly login_expires_at?: string | null;
-            /** Qr content */
-            readonly qr_content?: string;
-            /**
-             * Heartbeat at
-             * Format: date-time
-             */
-            readonly heartbeat_at?: string | null;
-            /**
-             * Received at
-             * Format: date-time
-             */
-            readonly received_at?: string | null;
-            /**
-             * Sent at
-             * Format: date-time
-             */
-            readonly sent_at?: string | null;
-            /** Last error */
-            readonly last_error?: string;
-        };
-        AgentOption: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Kind */
-            kind: string;
-        };
-        Task: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            readonly id?: string;
-            /** Text */
-            text?: string;
-            /** State */
-            state?: string;
-            /**
-             * Run id
-             * Format: uuid
-             */
-            readonly run_id?: string | null;
-            /**
-             * Run status
-             * @default
-             */
-            readonly run_status: string;
-            /** Conversation id */
-            readonly conversation_id?: number | null;
-            /**
-             * Created at
-             * Format: date-time
-             */
-            readonly created_at?: string;
-            readonly replies?: components["schemas"]["Reply"][];
-        };
-        Configuration: {
-            /** Agent id */
-            agent_id: number;
-        };
-        Verify: {
-            /**
-             * Login id
-             * Format: uuid
-             */
-            login_id: string;
-            /** Code */
-            code: string;
-        };
-        Reply: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            readonly id?: string;
-            /** State */
-            state?: string;
-            /** Attempts */
-            attempts?: number;
-            /** Last error */
-            last_error?: string;
-        };
     };
     responses: never;
     parameters: never;
@@ -9104,6 +9836,11 @@ export interface components {
                 "application/json": components["schemas"]["AdminUser"];
             };
         };
+        Verify: {
+            content: {
+                "application/json": components["schemas"]["Verify"];
+            };
+        };
         SubmitRunCommand: {
             content: {
                 "application/json": components["schemas"]["SubmitRunCommand"];
@@ -9114,9 +9851,24 @@ export interface components {
                 "application/json": components["schemas"]["AgentWrite"];
             };
         };
+        Todo: {
+            content: {
+                "application/json": components["schemas"]["Todo"];
+            };
+        };
         ResourcePermission: {
             content: {
                 "application/json": components["schemas"]["ResourcePermission"];
+            };
+        };
+        Idea: {
+            content: {
+                "application/json": components["schemas"]["Idea"];
+            };
+        };
+        Configuration: {
+            content: {
+                "application/json": components["schemas"]["Configuration"];
             };
         };
         ApplicationList: {
@@ -9194,16 +9946,6 @@ export interface components {
                 "application/json": components["schemas"]["WorkflowDetail"];
             };
         };
-        Verify: {
-            content: {
-                "application/json": components["schemas"]["Verify"];
-            };
-        };
-        Configuration: {
-            content: {
-                "application/json": components["schemas"]["Configuration"];
-            };
-        };
     };
     headers: never;
     pathItems: never;
@@ -9215,6 +9957,8 @@ export interface operations {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                category_name?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -9339,6 +10083,8 @@ export interface operations {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                category_name?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -9722,25 +10468,6 @@ export interface operations {
         };
     };
     applications_partial_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "applications_address-book_list": {
         parameters: {
             query?: never;
             header?: never;
@@ -10978,6 +11705,283 @@ export interface operations {
             };
         };
     };
+    applications_documents_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_members_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_assistant_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_conversation_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_conversation_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_copy_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_download_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_shares_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_shares_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_documents_shares_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     applications_draft_list: {
         parameters: {
             query?: never;
@@ -11013,6 +12017,246 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "applications_ideas-todos_ideas_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Idea"][];
+                    };
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_ideas_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Idea"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_ideas_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_ideas_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_ideas-todos_ideas_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Idea"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_todos_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Todo"][];
+                    };
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_todos_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Todo"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_todos_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_todos_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_ideas-todos_todos_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Todo"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
             };
         };
     };
@@ -11246,6 +12490,64 @@ export interface operations {
             };
         };
     };
+    applications_study_diagnostics_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_study_diagnostics_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_study_diagnostics_submit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     applications_study_enrollments_partial_update: {
         parameters: {
             query?: never;
@@ -11267,6 +12569,44 @@ export interface operations {
         };
     };
     applications_study_export_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_study_goals_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applications_study_goals_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -11847,11 +13187,209 @@ export interface operations {
             };
         };
     };
+    "applications_wechat-assistant_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+            /** @description ��δ���� */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_wechat-assistant_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Configuration"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_agents_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOption"][];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_login_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_new-conversation_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_reconnect_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_unbind_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_verify_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Verify"];
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
     apps_list: {
         parameters: {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                kind?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -12343,7 +13881,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this 用户. */
+                /** @description A unique integer value identifying this �û�. */
                 id: number;
             };
             cookie?: never;
@@ -12365,7 +13903,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this 用户. */
+                /** @description A unique integer value identifying this �û�. */
                 id: number;
             };
             cookie?: never;
@@ -12387,7 +13925,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this 用户. */
+                /** @description A unique integer value identifying this �û�. */
                 id: number;
             };
             cookie?: never;
@@ -15645,26 +17183,6 @@ export interface operations {
             };
         };
     };
-    "organizations_applications_address-book_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     "organizations_applications_creation-master_directories_list": {
         parameters: {
             query?: never;
@@ -16946,6 +18464,297 @@ export interface operations {
             };
         };
     };
+    organizations_applications_documents_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_members_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_assistant_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_conversation_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_conversation_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_copy_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_download_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_shares_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_shares_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_documents_shares_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     organizations_applications_draft_list: {
         parameters: {
             query?: never;
@@ -16983,6 +18792,256 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_ideas_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Idea"][];
+                    };
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_ideas_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Idea"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_ideas_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_ideas_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_ideas_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Idea"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_todos_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Todo"][];
+                    };
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_todos_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Todo"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_todos_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_todos_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_todos_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Todo"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Todo"];
+                };
             };
         };
     };
@@ -17228,6 +19287,67 @@ export interface operations {
             };
         };
     };
+    organizations_applications_study_diagnostics_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_study_diagnostics_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_study_diagnostics_submit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     organizations_applications_study_enrollments_partial_update: {
         parameters: {
             query?: never;
@@ -17250,6 +19370,46 @@ export interface operations {
         };
     };
     organizations_applications_study_export_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_study_goals_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organizations_applications_study_goals_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -17857,6 +20017,211 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+            /** @description ��δ���� */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Configuration"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_agents_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOption"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_login_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_new-conversation_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_reconnect_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_unbind_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_verify_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Verify"];
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
             };
         };
     };
@@ -19354,6 +21719,184 @@ export interface operations {
             };
         };
     };
+    "remote-access_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "remote-access_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "remote-access_context_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "remote-access_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_claim_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_connector_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_connector_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_devices_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_devices_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remote_pairings_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     runs_list: {
         parameters: {
             query?: never;
@@ -19768,6 +22311,12 @@ export interface operations {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                category_name?: string;
+                content_type?: string;
+                platform?: string;
+                copyright_mode?: string;
+                tag?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -19877,6 +22426,12 @@ export interface operations {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                category_name?: string;
+                content_type?: string;
+                platform?: string;
+                copyright_mode?: string;
+                tag?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -19908,6 +22463,12 @@ export interface operations {
             query?: {
                 /** @description A search term. */
                 search?: string;
+                category?: string;
+                category_name?: string;
+                content_type?: string;
+                platform?: string;
+                copyright_mode?: string;
+                tag?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -20209,407 +22770,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowDetail"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-            /** @description ��δ���� */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "applications_wechat-assistant_update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: components["requestBodies"]["Configuration"];
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_agents_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentOption"][];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_login_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_new-conversation_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_reconnect_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_tasks_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Task"][];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_unbind_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "applications_wechat-assistant_verify_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: components["requestBodies"]["Verify"];
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-            /** @description ��δ���� */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: components["requestBodies"]["Configuration"];
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_agents_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentOption"][];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_login_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_new-conversation_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_reconnect_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_tasks_list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Task"][];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_unbind_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
-                };
-            };
-        };
-    };
-    "organizations_applications_wechat-assistant_verify_create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization_id: string;
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: components["requestBodies"]["Verify"];
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Binding"];
                 };
             };
         };
