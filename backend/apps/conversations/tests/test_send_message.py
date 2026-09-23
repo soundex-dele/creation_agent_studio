@@ -588,6 +588,20 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(response.status_code, 400, response.data)
         self.assertIn("missing-skill", str(response.data["skill_names"]))
 
+    def test_composer_options_reflect_current_organization_approval_policy(self):
+        from apps.enterprise.models import GovernancePolicy
+
+        for required in (True, False):
+            with self.subTest(require_tool_approval=required):
+                GovernancePolicy.objects.filter(organization=self.organization).update(
+                    require_tool_approval=required,
+                )
+                response = self.client.get(
+                    "/api/v1/conversations/composer-options/", **self.headers,
+                )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertIs(response.data["require_tool_approval"], required)
+
     def test_composer_options_reads_current_global_adapter_directory(self):
         with TemporaryDirectory() as directory, override_settings(
             AGENT_ENGINE_ADAPTER="graphflow",

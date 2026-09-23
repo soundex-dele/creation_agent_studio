@@ -34,6 +34,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const searchParams = new URLSearchParams(location.search);
   const embedded = searchParams.get('embedded') === '1';
   const standalone = searchParams.get('standalone') === '1';
+  const openedFromApps = searchParams.get('entry') === 'apps';
   const isConversationPage = location.pathname === '/chat';
   const isRemoteConversationPage = Boolean(matchPath(
     '/apps/my-computer/:deviceId/conversations/:conversationId', location.pathname,
@@ -89,7 +90,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       )}
       {showContextToolbar && (
         <div className="app-context-toolbar">
-          {isConversationPage && (
+          {isConversationPage && !standalone && !openedFromApps && (
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>
               返回首页
             </Button>

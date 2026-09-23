@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Button, Empty, Input, Select, Spin } from 'antd';
 import {
-  AppstoreOutlined,
-  DesktopOutlined,
   ArrowRightOutlined,
   MessageOutlined,
   ReloadOutlined,
@@ -14,6 +12,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { applicationPath } from '@/lib/applicationCatalog';
+import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
 import './AppsPage.css';
 
@@ -35,7 +34,7 @@ const AppsPage: React.FC = () => {
   const layoutMode = usePreferencesStore((state) => state.layoutMode);
   const conversationPath = layoutMode === 'left-right'
     ? '/chat?entry=apps&standalone=1'
-    : '/chat';
+    : '/chat?entry=apps';
   const {
     apps,
     isLoading,
@@ -182,7 +181,7 @@ const AppsPage: React.FC = () => {
       {renderFavorite(app.id, app.name)}
       <div className="app-card-body">
         <div className="app-card-heading">
-          <span className="app-card-icon" aria-hidden="true">{app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon || <AppstoreOutlined />}</span>
+          <span className="app-card-icon" aria-hidden="true"><ApplicationIcon app={app} /></span>
           <span className="app-card-category">{categoryName(app.category)}</span>
         </div>
         <div className="app-card-content">

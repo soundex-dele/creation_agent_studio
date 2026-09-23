@@ -79,10 +79,14 @@ class ConversationViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="composer-options")
     def composer_options(self, request):
+        from apps.enterprise.services import execution_governance_snapshot
+
+        governance = execution_governance_snapshot(resolve_organization(request))
         adapter = resolve_skill_adapter()
         return Response({
             "adapter": adapter,
             "skills": discover_runtime_skills(adapter),
+            "require_tool_approval": governance.get("require_tool_approval", True),
         })
 
     def list(self, request):

@@ -68,3 +68,29 @@ it('keeps mobile navigation nested and retains the current draft while offline',
   await click('电脑列表');
   expect(container.textContent).toContain('绑定电脑');
 });
+
+it('shows every named computer and opens the selected computer', async () => {
+  const get = vi.mocked(api.get);
+  const original = get.getMockImplementation()!;
+  get.mockImplementation(async (path, ...args) => path === '/remote/devices/' ? [
+    { id: 'study', name: '书房电脑', online: true, confirmed: true },
+    { id: 'office', name: '办公室电脑', online: true, confirmed: true },
+    { id: 'laptop', name: '出差笔记本', online: false, confirmed: true },
+    { id: 'pending', name: '待确认电脑', online: false, confirmed: false },
+  ] : original(path, ...args));
+  await act(async () => root.render(React.createElement(MemoryRouter, { initialEntries: ['/apps/my-computer'] },
+    React.createElement(Routes, {}, ...['/apps/my-computer', '/apps/my-computer/:deviceId'].map(path =>
+      React.createElement(Route, { key: path, path, element: React.createElement(MyComputerPage) }))))));
+
+  expect(container.textContent).toContain('电脑列表（4）');
+  const cards = Array.from(container.querySelectorAll('.my-computer-devices .ant-card'));
+  expect(cards.map(card => card.querySelector('.ant-card-head-title')?.textContent?.trim()))
+    .toEqual(['书房电脑', '办公室电脑', '出差笔记本', '待确认电脑']);
+  expect(cards[2].textContent).toContain('离线');
+  expect(cards[3].textContent).toContain('等待电脑确认');
+  expect(cards.map(card => card.querySelector<HTMLButtonElement>('button')!.disabled))
+    .toEqual([false, false, true, true]);
+  await act(async () => { cards[1].querySelector<HTMLButtonElement>('button')!.click(); });
+  expect(container.querySelector('.my-computer-toolbar strong')?.textContent).toContain('办公室电脑');
+  expect(get.mock.calls.some(([path]) => path.includes('/remote/devices/office/') && path.endsWith('/conversations/'))).toBe(true);
+});

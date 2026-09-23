@@ -90,7 +90,7 @@ export default function SettingsPage() {
       <header className="settings-heading">
         <div>
           <span className="settings-eyebrow"><SettingOutlined aria-hidden="true" />工作区偏好</span>
-          <h1 className="page-title">系统设置</h1>
+          <h1 className="page-title">设置</h1>
           <p className="page-subtitle">让界面与协作方式，更贴合你的工作习惯。</p>
         </div>
         <div className="settings-current-preferences" aria-label="当前外观">

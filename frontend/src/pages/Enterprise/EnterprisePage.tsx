@@ -197,7 +197,7 @@ export default function EnterprisePage() {
     <header className="enterprise-hero">
       <div>
         <span className="enterprise-eyebrow"><BankOutlined aria-hidden="true" />管理控制台</span>
-        <h1 className="page-title">系统管理</h1>
+        <h1 className="page-title">控制台</h1>
         <p className="page-subtitle">集中管理组织资源，掌握运行情况与服务配置。</p>
       </div>
       <div className="enterprise-organization">
@@ -220,7 +220,7 @@ export default function EnterprisePage() {
       </Card>)}
     </div>
     <div className="enterprise-workspace">
-      <nav className="enterprise-navigation" aria-label="系统管理分组">
+      <nav className="enterprise-navigation" aria-label="控制台分组">
         {navigationGroups.map(group => <div className="enterprise-navigation-group" key={group.title}>
           <h2>{group.title}</h2>
           {group.keys.filter(key => (key !== 'audit' || currentRoleLevel >= 20) && (!isPlatformAuditor || !['applications', 'lifecycle'].includes(key))).map(key => <button

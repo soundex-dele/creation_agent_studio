@@ -12,6 +12,7 @@ const EMPTY_LISTING: WorkspaceFileListing = {
 export function useWorkspaceFiles(projectId?: number, conversationId?: string | null) {
   const [listing, setListing] = useState<WorkspaceFileListing>(EMPTY_LISTING);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const projectIdRef = useRef(projectId);
   const conversationIdRef = useRef(conversationId);
   projectIdRef.current = projectId;
@@ -29,6 +30,7 @@ export function useWorkspaceFiles(projectId?: number, conversationId?: string | 
       return;
     }
     setIsRefreshing(true);
+    setError(null);
     try {
       const response = await api.get<WorkspaceFileListing>(
         endpoint,
@@ -39,6 +41,9 @@ export function useWorkspaceFiles(projectId?: number, conversationId?: string | 
       ) setListing(response);
     } catch (error) {
       console.error('Failed to scan workspace files:', error);
+      if (projectIdRef.current === projectId && conversationIdRef.current === conversationId) {
+        setError('加载工作空间文件失败，请点击刷新重试');
+      }
     } finally {
       if (
         projectIdRef.current === projectId
@@ -57,8 +62,9 @@ export function useWorkspaceFiles(projectId?: number, conversationId?: string | 
 
   useEffect(() => {
     setListing(EMPTY_LISTING);
-    void refresh();
+    setIsRefreshing(false);
+    setError(null);
   }, [refresh]);
 
-  return { ...listing, isRefreshing, refresh, readFile };
+  return { ...listing, isRefreshing, error, refresh, readFile };
 }

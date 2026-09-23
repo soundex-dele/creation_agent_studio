@@ -150,6 +150,15 @@ DJANGO_SUPERUSER_EMAIL=admin@example.com \
 `./deploy.sh`。如果尚无 superuser 且未提供上述环境变量，终端会进入 Django
 的交互式创建流程。按 `Ctrl-C` 会一并停止前端、后端和 worker。
 
+Windows 在仓库根目录使用 PowerShell 启动：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy.ps1
+```
+
+该脚本使用 `backend\venv`，同时管理前后端、执行 worker 和连接器。
+端口配置、日志位置及双端远程访问联调命令见 [部署指南](docs/DEPLOYMENT.md)。
+
 ## Android / iOS 移动端外壳
 
 `mobile` 目录提供 React Native WebView 外壳，Android 和 iOS 共用同一套

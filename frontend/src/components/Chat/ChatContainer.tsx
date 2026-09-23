@@ -1,15 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Tooltip, message } from 'antd';
-import { FolderOpenOutlined } from '@ant-design/icons';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Alert, message } from 'antd';
+import { DownOutlined, MessageOutlined, StopOutlined, UpOutlined } from '@ant-design/icons';
 import { useChatConnection } from './ChatConnectionContext';
 import type { ConversationDetail } from '@/stores/useConversationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { usePreferencesStore } from '@/stores/usePreferencesStore';
+import useMediaQuery from '@/hooks/useMediaQuery';
 import MessageList from './MessageList';
 import type { AssistantMessageRenderContext } from './MessageList';
 import MessageInput from './MessageInput';
 import type { ComposerAgent, ComposerContext } from './MessageInput';
 import AgentQuestionCard from './AgentQuestionCard';
+import ChatWorkspaceSidebar from './ChatWorkspaceSidebar';
 import './ChatContainer.css';
 
 interface ChatSuggestion {
@@ -73,9 +74,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   inputAccessory,
   renderAssistantContent,
 }) => {
-  const { store: useConversationStore, api, remote, online } = useChatConnection();
+  const { store: useConversationStore, remote, online } = useChatConnection();
   const { user } = useAuthStore();
-  const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const composerId = useId();
   const {
     currentConversation,
     isLoading,
@@ -96,13 +98,19 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<ReturnType<typeof sendMessageStream> | null>(null);
   const creatingConversationRef = useRef(false);
   const skipNextFetchRef = useRef<string | null>(null);
   const appliedDraftRequestIdRef = useRef<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const stoppingRef = useRef(false);
+
+  useEffect(() => {
+    setComposerExpanded(false);
+  }, [conversationId]);
 
   useEffect(() => {
     shouldAutoScrollRef.current = true;
@@ -142,6 +150,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     if (!draftRequest || appliedDraftRequestIdRef.current === draftRequest.id) return;
     appliedDraftRequestIdRef.current = draftRequest.id;
     setInputValue(draftRequest.text);
+    setComposerExpanded(true);
   }, [draftRequest]);
 
   const handleSendMessage = async (
@@ -208,9 +217,34 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         onConversationCreated?.(targetConversationId);
       }
       await controller.submitted;
+      setComposerExpanded(false);
     } catch (error) {
       console.error('Failed to start stream:', error);
       throw error;
+    }
+  };
+
+  const handleStop = async () => {
+    if (!online || stoppingRef.current) return;
+    const targetId = useConversationStore.getState().currentConversation?.id;
+    if (!targetId) return;
+    stoppingRef.current = true;
+    setIsStopping(true);
+    try {
+      // A stop pressed during submission must wait for the server's run id.
+      if (!useConversationStore.getState().activeRun) {
+        await abortControllerRef.current?.submitted;
+      }
+      const state = useConversationStore.getState();
+      if (state.currentConversation?.id === targetId
+        && (state.streamingMessageId || state.pendingQuestion)) {
+        await cancelTurn(targetId);
+      }
+    } catch {
+      message.error('结束任务失败，请重试');
+    } finally {
+      stoppingRef.current = false;
+      setIsStopping(false);
     }
   };
 
@@ -228,43 +262,30 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     shouldAutoScrollRef.current = distanceFromBottom <= 96;
   };
 
-  const openWorkspace = async () => {
-    if (!conversationId || isOpeningWorkspace) return;
-    setIsOpeningWorkspace(true);
-    try {
-      await api.post(`/conversations/${conversationId}/open-workspace/`, {});
-    } catch (error: any) {
-      message.error(error?.response?.data?.detail || '无法打开当前会话目录');
-    } finally {
-      setIsOpeningWorkspace(false);
-    }
-  };
-
   const isStreaming = streamingMessageId !== null;
   const messages = currentConversation?.messages || [];
   // The first optimistic messages are added just before the URL receives its
   // conversation id. Render them immediately instead of keeping the welcome
   // screen visible during that transition.
   const isEmpty = messages.length === 0;
+  const isRunning = isStreaming || Boolean(pendingQuestion);
+  const canCollapseComposer = isMobile && !isEmpty;
+  const composerVisible = !canCollapseComposer || composerExpanded;
   const agent = currentConversation?.agent;
+  const showWorkspaceSidebar = Boolean(conversationId && !remote && composerMode !== 'document');
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container && shouldAutoScrollRef.current) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
+    }
+  }, [composerVisible]);
 
   return (
-    <div className="chat-container">
+    <div className={`chat-container${showWorkspaceSidebar ? ' chat-container--with-toolbar' : ''}${!composerVisible ? ' chat-container--composer-collapsed' : ''}`}>
       {error && <Alert message={error} type="error" showIcon closable onClose={clearError} />}
-      {conversationId && !remote && composerMode !== 'document' && (
-        <div className="chat-workspace-toolbar">
-          <Tooltip title="打开目录">
-            <Button
-              type="text"
-              shape="circle"
-              size="small"
-              icon={<FolderOpenOutlined />}
-              loading={isOpeningWorkspace}
-              aria-label="打开目录"
-              onClick={() => void openWorkspace()}
-            />
-          </Tooltip>
-        </div>
+      {showWorkspaceSidebar && conversationId && (
+        <ChatWorkspaceSidebar key={conversationId} conversationId={conversationId} />
       )}
       {isEmpty && !isLoading ? (
         <div className="chat-empty">
@@ -319,35 +340,61 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </>
       )}
 
-      {inputAccessory && (
+      {inputAccessory && composerVisible && (
         <div className="chat-input-accessory">{inputAccessory}</div>
       )}
       <div className="chat-input-area">
         <div className="chat-input-wrapper">
-          <MessageInput
-            value={inputValue}
-            onValueChange={setInputValue}
-            onSendMessage={handleSendMessage}
-            currentAgent={currentConversation?.agent || defaultAgent}
-            workspaceLocked={Boolean(
-              conversationId || projectId || creationContext?.applicationId
-              || creationContext?.workflowStepRunId
-            )}
-            mode={composerMode}
-            disabled={
-              !user || !online || isLoading || isCreatingConversation || isStreaming || Boolean(pendingQuestion)
-              || (!conversationId && !createOnFirstSend)
-            }
-            placeholder={user ? (inputPlaceholder || '描述你的需求... (Enter 发送，Shift+Enter 换行)') : '请先登录'}
-          />
-          <div className="chat-input-hint">
-            {isStreaming && conversationId ? (
-              <button disabled={!online} className="agent-cancel-link" onClick={() => void cancelTurn(conversationId)}>
-                停止当前任务
+          {canCollapseComposer && (
+            <div className="chat-mobile-controls">
+              <button
+                type="button"
+                className="chat-composer-toggle"
+                aria-expanded={composerExpanded}
+                aria-controls={composerId}
+                onClick={() => setComposerExpanded((expanded) => !expanded)}
+              >
+                <MessageOutlined aria-hidden="true" />
+                <span>{composerExpanded ? '收起聊天' : '聊天'}</span>
+                {composerExpanded ? <DownOutlined aria-hidden="true" /> : <UpOutlined aria-hidden="true" />}
               </button>
-            ) : sendShortcut === 'enter'
-              ? 'Enter 发送 · Shift+Enter 换行'
-              : 'Ctrl/⌘+Enter 发送 · Enter 换行'}
+              {!composerVisible && isRunning && (
+                <button
+                  type="button"
+                  className="chat-mobile-stop"
+                  disabled={!online || isStopping}
+                  onClick={() => void handleStop()}
+                  aria-label="结束任务"
+                  title="结束任务"
+                  aria-busy={isStopping}
+                >
+                  <StopOutlined aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
+          <div id={composerId} hidden={!composerVisible}>
+            <MessageInput
+              value={inputValue}
+              onValueChange={setInputValue}
+              onSendMessage={handleSendMessage}
+              isRunning={isRunning}
+              onStop={handleStop}
+              stopDisabled={!online || isStopping}
+              isStopping={isStopping}
+              visible={composerVisible}
+              currentAgent={currentConversation?.agent || defaultAgent}
+              workspaceLocked={Boolean(
+                conversationId || projectId || creationContext?.applicationId
+                || creationContext?.workflowStepRunId
+              )}
+              mode={composerMode}
+              disabled={
+                !user || !online || isLoading || isCreatingConversation || isRunning
+                || (!conversationId && !createOnFirstSend)
+              }
+              placeholder={user ? (inputPlaceholder || '描述你的需求...') : '请先登录'}
+            />
           </div>
         </div>
       </div>

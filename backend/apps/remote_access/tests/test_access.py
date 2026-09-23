@@ -179,6 +179,51 @@ def test_pairing_requires_local_confirmation_and_is_single_use(grant):
     assert device.revoked_at
 
 
+def test_account_can_bind_multiple_named_computers_and_revoke_one(grant):
+    user, _, _ = grant
+    owner = APIClient()
+    owner.force_authenticate(user)
+    device_ids = []
+    names = ['书房电脑', '办公室电脑']
+    for name, code, token in zip(names, ['ABCDEFGH', 'JKLMNPQR'], ['a' * 48, 'b' * 48]):
+        computer = APIClient()
+        created = computer.post('/api/v1/remote/pairings/', {
+            'name': name, 'code': code, 'token': token,
+        }, format='json')
+        assert created.status_code == 201
+        device_id = created.data['id']
+        device_ids.append(device_id)
+        claimed = owner.post('/api/v1/remote/claim/', {'code': code}, format='json')
+        assert claimed.status_code == 200
+        assert claimed.data['name'] == name
+        computer.credentials(HTTP_AUTHORIZATION=f'Device {token}')
+        assert computer.post(f'/api/v1/remote/connector/{device_id}/', {
+            'action': 'confirm', 'account_id': user.id,
+        }, format='json').status_code == 200
+
+    devices = owner.get('/api/v1/remote/devices/').data
+    assert {item['id']: item['name'] for item in devices} == dict(zip(device_ids, names))
+    assert all(item['confirmed'] for item in devices)
+    assert owner.delete(f'/api/v1/remote/devices/{device_ids[0]}/').status_code == 204
+    remaining = owner.get('/api/v1/remote/devices/').data
+    assert [item['id'] for item in remaining] == [device_ids[1]]
+    computer = APIClient()
+    computer.credentials(HTTP_AUTHORIZATION='Device ' + 'b' * 48)
+    assert computer.get(f'/api/v1/remote/connector/{device_ids[1]}/').status_code == 200
+
+
+def test_new_local_config_uses_computer_hostname(grant):
+    user, _, config = grant
+    config.delete()
+    client = APIClient()
+    client.force_authenticate(user)
+    with patch('apps.remote_access.models.socket.gethostname', return_value='OFFICE-PC'):
+        response = client.get('/api/v1/remote-access/')
+    assert response.status_code == 200
+    assert response.data['computer_name'] == 'OFFICE-PC'
+    assert LocalRemoteConfig.objects.get(pk=1).computer_name == 'OFFICE-PC'
+
+
 def test_expired_pairing_cannot_be_claimed_or_confirmed(grant):
     user, _, _ = grant
     device = RemoteDevice.objects.create(name='Expired', token_hash=digest('secret'), pairing_hash=digest('ABCDEFGH'),

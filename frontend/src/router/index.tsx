@@ -355,7 +355,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/enterprise',
-    element: <ProtectedRoute><MainLayout>{page(<EnterprisePage />)}</MainLayout></ProtectedRoute>,
+    element: <ProtectedRoute requiredRole="admin"><MainLayout>{page(<EnterprisePage />)}</MainLayout></ProtectedRoute>,
   },
   {
     path: '/profile',

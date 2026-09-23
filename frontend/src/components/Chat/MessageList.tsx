@@ -1,11 +1,11 @@
 import React, { type ReactNode } from 'react';
 import { Avatar, Button, Image, message as toast, Tooltip, Typography } from 'antd';
 import {
-  CopyOutlined,
   RobotOutlined,
   ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import { CopySimple } from '@phosphor-icons/react';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
@@ -171,7 +171,7 @@ const MessageList: React.FC<MessageListProps> = ({
           }}
         />
 
-        <div className="message-bubble-column max-w-[75%]">
+        <div className="message-bubble-column">
           <div
             className={`rounded-2xl px-4 py-3 ${
               isUser
@@ -182,23 +182,7 @@ const MessageList: React.FC<MessageListProps> = ({
               background: 'color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-card))',
             } : undefined}
           >
-            <div
-              className={`mb-1 flex items-center gap-2 text-xs ${
-                isUser ? 'justify-end text-text-sec' : 'text-text-dim'
-              }`}
-            >
-              <span className="font-medium">
-                {isUser ? '你' : isSystem ? '系统' : '助手'}
-              </span>
-              <span>
-                {new Date(message.created_at).toLocaleString('zh-CN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
-
-            <div className={`text-sm leading-relaxed ${isUser ? '' : 'message-markdown'}`}>
+            <div className={`message-content text-sm leading-relaxed ${isUser ? 'message-user-content' : 'message-markdown'}`}>
               {isUser && selectedSkills.length > 0 && (
                 <div className="message-selected-skills" aria-label="本轮使用的技能">
                   {selectedSkills.map((skill) => (
@@ -241,7 +225,7 @@ const MessageList: React.FC<MessageListProps> = ({
                 ? customAssistantContent
                 : message.content && (
                   isUser || isSystem || isStreamingMessage ? (
-                    <span className={isStreamingMessage ? 'message-streaming-content' : undefined}>
+                    <span className={isUser ? 'message-user-text' : isStreamingMessage ? 'message-streaming-content' : undefined}>
                       {message.content}
                     </span>
                   ) : (
@@ -259,28 +243,33 @@ const MessageList: React.FC<MessageListProps> = ({
                 )}
             </div>
           </div>
-
-          {message.content.trim() && (
-            <div className={`message-actions ${isUser ? 'message-actions--user' : ''}`}>
+          <div className="message-actions">
+            <time className="message-time" dateTime={message.created_at}>
+              {new Date(message.created_at).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </time>
+            {message.content.trim() && (
               <Tooltip title="复制正文">
                 <Button
                   type="text"
                   size="small"
                   className="message-copy-button"
-                  icon={<CopyOutlined />}
+                  icon={<CopySimple size={14} weight="bold" aria-hidden="true" />}
                   aria-label="复制消息正文"
                   onClick={() => void copyMessageContent(message.content)}
                 />
               </Tooltip>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col px-4 py-6">
+    <div className="message-list-content">
       {messages.length === 0 && !isLoading && (
         <div className="flex flex-1 items-center justify-center">
           <Text className="text-text-dim">开始新的对话吧...</Text>

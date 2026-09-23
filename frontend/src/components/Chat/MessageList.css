@@ -1,4 +1,16 @@
-/* MessageList styles — layout handled by Tailwind */
+.message-list-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 0;
+}
+
+.message-row {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .message-list {
   display: flex;
   flex-direction: column;
@@ -138,31 +150,67 @@
 
 .message-bubble-column {
   min-width: 0;
+  max-width: 75%;
+  flex: 0 1 auto;
+}
+
+.message-user-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-user-text {
+  display: block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .message-actions {
   display: flex;
-  height: 18px;
-  padding: 0 2px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
 }
 
-.message-actions--user {
-  justify-content: flex-end;
+.message-time {
+  color: var(--color-text-sec);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .message-copy-button.ant-btn {
-  width: 20px;
-  min-width: 20px;
-  height: 18px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
-  color: var(--color-text-dim);
-  font-size: 13px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-sec);
+  transition: color 0.18s;
 }
 
 .message-copy-button.ant-btn:hover,
+.message-copy-button.ant-btn:active,
 .message-copy-button.ant-btn:focus-visible {
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  background: transparent;
   color: var(--color-primary);
+}
+
+.message-copy-button.ant-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-copy-button.ant-btn {
+    transition: none;
+  }
 }
 
 .tool-call-list {
@@ -322,7 +370,38 @@
   border-radius: 10px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
+  .message-row--user > .message-bubble-column {
+    max-width: calc(100% - 48px);
+  }
+
+  .message-content {
+    font-size: 16px;
+  }
+
+  .message-actions {
+    align-items: flex-start;
+    margin-top: 0;
+  }
+
+  .message-copy-button.ant-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    /* Keep the touch target, but place the glyph next to the bubble. */
+    align-items: flex-start;
+    padding-top: 5px;
+  }
+
+  .message-copy-button .ant-btn-icon {
+    display: flex;
+  }
+
+  .message-time {
+    font-size: 12px;
+    line-height: 24px;
+  }
+
   .message-row--assistant {
     gap: 0;
   }

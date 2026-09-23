@@ -194,32 +194,7 @@
   }
 }
 
-.chat-files-drawer .ant-drawer-body {
-  padding: 0;
-}
-
-.chat-files-drawer .workspace-files-panel {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  border-left: 0;
-}
-
-.chat-files-mobile-trigger {
-  display: none;
-}
-
 @media (max-width: 767px) {
-  .chat-files-mobile-trigger {
-    position: absolute;
-    z-index: 6;
-    top: 10px;
-    right: 64px;
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-  }
-
   .workspace-files-actions button {
     width: 44px;
     height: 44px;

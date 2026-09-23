@@ -10,6 +10,8 @@ import {
   RobotOutlined,
   SafetyCertificateOutlined,
   SendOutlined,
+  StopOutlined,
+  LoadingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useChatConnection } from './ChatConnectionContext';
@@ -17,6 +19,7 @@ import { loadConnectionCollection } from '@/services/chatConnection';
 import { useAgentStore, type Agent } from '@/stores/useAgentStore';
 import { useProjectStore, type Project } from '@/stores/useProjectStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import FolderPickerModal from '@/pages/Apps/FolderPickerModal';
 import './MessageInput.css';
 
@@ -47,6 +50,11 @@ interface MessageInputProps {
     images: File[],
   ) => void | Promise<void>;
   disabled?: boolean;
+  isRunning?: boolean;
+  onStop?: () => void | Promise<void>;
+  stopDisabled?: boolean;
+  isStopping?: boolean;
+  visible?: boolean;
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
   workspaceLocked?: boolean;
@@ -58,6 +66,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   onValueChange,
   onSendMessage,
   disabled = false,
+  isRunning = false,
+  onStop,
+  stopDisabled = false,
+  isStopping = false,
+  visible = true,
   placeholder = '输入消息...',
   currentAgent = null,
   workspaceLocked = false,
@@ -81,6 +94,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const defaultPermissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
   const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
+  const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
+  const [approvalPolicy, setApprovalPolicy] = useState<{
+    api: typeof api;
+    organizationId: string | null;
+    required: boolean | undefined;
+  } | null>(null);
+  // Never reuse a different computer's or organization's permission policy.
+  const requireToolApproval = approvalPolicy?.api === api
+    && approvalPolicy.organizationId === organizationId ? approvalPolicy.required : undefined;
+  const fullControlAllowed = requireToolApproval === false;
+  const effectivePermissionMode = fullControlAllowed ? permissionMode : 'default';
   const [collaborationMode, setCollaborationMode] = useState<'default' | 'plan'>('default');
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects, loadProjects } = useProjectStore();
@@ -107,11 +131,25 @@ const MessageInput: React.FC<MessageInputProps> = ({
       void loadProjects();
       void loadAgents();
     }
-    api.get<{ skills: SkillOption[] }>('/conversations/composer-options/')
-      .then((response) => { if (!cancelled) setSkills(response.skills || []); })
-      .catch(() => { if (!cancelled) setSkills([]); });
     return () => { cancelled = true; };
   }, [loadAgents, loadProjects, mode, api, remote]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setApprovalPolicy(null);
+    api.get<{ skills: SkillOption[]; require_tool_approval: boolean }>('/conversations/composer-options/')
+      .then((response) => {
+        if (cancelled) return;
+        setSkills(response.skills || []);
+        setApprovalPolicy({ api, organizationId, required: response.require_tool_approval });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSkills([]);
+        setApprovalPolicy(null);
+      });
+    return () => { cancelled = true; };
+  }, [api, organizationId]);
 
   useEffect(() => {
     setSelectedAgent(currentAgent);
@@ -138,10 +176,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   };
-  useEffect(autosizeTextarea, [content]);
+  useEffect(autosizeTextarea, [content, visible]);
 
   const handleSend = async () => {
-    if ((content.trim() || selectedImages.length > 0) && !disabled && !isSubmitting) {
+    if ((content.trim() || selectedImages.length > 0) && !disabled && !isSubmitting && !isRunning) {
       setIsSubmitting(true);
       try {
         await onSendMessage(content.trim(), {
@@ -149,7 +187,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           workingDirectory: selectedSystemDirectory || undefined,
           agentId: selectedAgent?.id ?? null,
           agent: selectedAgent,
-          permissionMode,
+          permissionMode: effectivePermissionMode,
           collaborationMode,
           skillNames: selectedSkills,
         }, selectedImages.map(({ file }) => file));
@@ -210,7 +248,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   const permissionItems: MenuProps['items'] = [
     { key: 'default', label: '默认权限', extra: '按需确认高风险工具' },
-    { key: 'allow_all', label: '完全控制', extra: '完整文件访问，无需逐次确认' },
+    {
+      key: 'allow_all', label: '完全控制', disabled: !fullControlAllowed,
+      extra: requireToolApproval === true ? '组织要求工具审批，无法开启'
+        : fullControlAllowed ? '完整文件访问，无需逐次确认' : '尚未获取组织权限，暂不可用',
+    },
   ];
 
   const attachmentItems = useMemo<MenuProps['items']>(() => [
@@ -278,18 +320,23 @@ const MessageInput: React.FC<MessageInputProps> = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
+          aria-label="消息内容"
           disabled={disabled}
           rows={1}
           className="chat-input-textarea"
         />
         <button
           type="button"
-          className="chat-send-btn"
-          onClick={() => void handleSend()}
-          disabled={(!content.trim() && selectedImages.length === 0) || disabled || isSubmitting}
-          aria-label="发送消息"
+          className={`chat-send-btn ${isRunning ? 'chat-send-btn--stop' : ''}`}
+          onClick={() => { if (isRunning) void onStop?.(); else void handleSend(); }}
+          disabled={isRunning
+            ? stopDisabled || isStopping || !onStop
+            : (!content.trim() && selectedImages.length === 0) || disabled || isSubmitting}
+          aria-label={isRunning ? '结束任务' : '发送消息'}
+          title={isRunning ? '结束任务' : '发送消息'}
+          aria-busy={isStopping || isSubmitting}
         >
-          <SendOutlined />
+          {isRunning ? (isStopping ? <LoadingOutlined /> : <StopOutlined />) : <SendOutlined />}
         </button>
       </div>
 
@@ -386,13 +433,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
           trigger={['click']}
           menu={{
             items: permissionItems,
-            selectedKeys: [permissionMode],
-            onClick: ({ key }) => setPermissionMode(key as 'default' | 'allow_all'),
+            selectedKeys: [effectivePermissionMode],
+            onClick: ({ key }) => {
+              if (key === 'default' || (key === 'allow_all' && fullControlAllowed)) setPermissionMode(key);
+            },
           }}
         >
           <button className="chat-composer-action" disabled={disabled}>
             <SafetyCertificateOutlined />
-            <span>{permissionMode === 'default' ? '默认权限' : '完全控制'}</span>
+            <span>{effectivePermissionMode === 'default' ? '默认权限' : '完全控制'}</span>
           </button>
         </Dropdown>
         <Dropdown

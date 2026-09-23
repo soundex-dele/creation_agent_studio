@@ -181,12 +181,12 @@ export default function MyComputerPage() {
     <Alert type="info" message={loaded ? '这台电脑尚未绑定或已被解绑。' : '正在加载电脑…'} />
   </div>;
 
-  const visible = devices.filter(item => manage || item.online);
   return <section className="my-computer-content">
-    <header><h1 className="page-title">我的电脑</h1><p className="page-subtitle">从手机继续电脑上的对话与任务。</p></header>
+    <header><h1 className="page-title">我的电脑</h1><p className="page-subtitle">一个账号可绑定多台电脑，选择电脑继续对话与任务。</p></header>
     {error && <Alert closable onClose={() => setError('')} showIcon type="error" message={error} />}
     {notice && <Alert showIcon type="success" message={notice} />}
     <Card title="绑定电脑">
+      <p>在每台电脑上生成配对码，逐台添加到当前账号。电脑名称可在该电脑的“设置 → 远程访问”中修改。</p>
       <form onSubmit={event => { event.preventDefault(); void claim(); }}>
         <label htmlFor="remote-pairing-code">电脑“设置 → 远程访问”中的配对码</label>
         <div className="my-computer-pairing">
@@ -196,14 +196,14 @@ export default function MyComputerPage() {
         </div>
       </form>
     </Card>
-    <div className="my-computer-toolbar"><h2>{manage ? '设备管理' : '在线电脑'}</h2>
-      <Space><span>显示离线设备</span><Switch aria-label="显示离线设备" checked={manage} onChange={setManage} /></Space>
+    <div className="my-computer-toolbar"><h2>电脑列表{loaded ? `（${devices.length}）` : ''}</h2>
+      <Space><span>管理电脑</span><Switch aria-label="管理电脑" checked={manage} onChange={setManage} /></Space>
     </div>
-    {!visible.length && <Empty description={loaded ? '暂无在线电脑，请在电脑设置中开启远程访问' : '正在加载电脑…'} />}
-    <div className="my-computer-devices">{visible.map(item => <Card key={item.id} title={<><DesktopOutlined aria-hidden="true" /> {item.name}</>}>
+    {!devices.length && <Empty description={loaded ? '尚未绑定电脑，请输入电脑上的配对码' : '正在加载电脑…'} />}
+    <div className="my-computer-devices">{devices.map(item => <Card key={item.id} title={<span className="my-computer-name"><DesktopOutlined aria-hidden="true" /> {item.name}</span>}>
       <Space direction="vertical" size="middle">
         <Tag color={item.online ? 'green' : 'default'}>{!item.confirmed ? '等待电脑确认' : item.online ? '在线' : '离线'}</Tag>
-        <Button type="primary" disabled={!known || !item.online} onClick={() => navigate(`/apps/my-computer/${item.id}`)}>查看对话</Button>
+        <Button type="primary" disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}`)}>查看对话</Button>
         {manage && <Popconfirm title={`解绑“${item.name}”？`} description="此账号将无法继续访问该电脑。"
           onConfirm={async () => {
             await api.delete(`/remote/devices/${item.id}/`);

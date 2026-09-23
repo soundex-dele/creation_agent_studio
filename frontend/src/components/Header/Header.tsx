@@ -70,12 +70,12 @@ const Header: React.FC<HeaderProps> = ({
       label: '设置',
       onClick: () => navigate('/settings'),
     },
-    {
+    ...(user?.role === 'admin' ? [{
       key: 'enterprise',
       icon: <BankOutlined />,
-      label: '系统管理',
+      label: '控制台',
       onClick: () => navigate('/enterprise'),
-    },
+    }] : []),
     ...(user?.role === 'admin' ? [{
       key: 'account-management',
       icon: <TeamOutlined />,

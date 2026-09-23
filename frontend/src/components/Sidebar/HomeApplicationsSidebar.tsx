@@ -4,12 +4,12 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   AppstoreOutlined,
-  DesktopOutlined,
   MessageOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
+import ApplicationIcon from '@/components/ApplicationIcon';
 import { scrollHorizontalWithWheel } from '@/lib/horizontalWheelScroll';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -177,7 +177,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
               onClick={() => openApplication(app)}
             >
               <span className="home-app-icon">
-                {app.id === CONVERSATION_APP_ID ? <MessageOutlined /> : app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon || <AppstoreOutlined />}
+                {app.id === CONVERSATION_APP_ID ? <MessageOutlined /> : <ApplicationIcon app={app} />}
               </span>
               <span className="home-app-copy"><strong>{app.name}</strong><small>{app.description}</small></span>
             </button>
@@ -200,7 +200,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
           {orderedApps.map((app, index) => (
             <div className="home-app-config-item" key={app.id}>
               <Checkbox checked={!preferences.hidden.includes(app.id)} onChange={(event) => toggle(app.id, event.target.checked)}>
-                <span className="home-app-config-icon">{app.rendererKey === 'my-computer' ? <DesktopOutlined /> : app.icon}</span>{app.name}
+                <span className="home-app-config-icon"><ApplicationIcon app={app} /></span>{app.name}
               </Checkbox>
               <div>
                 <Button type="text" size="small" aria-label={`上移${app.name}`} disabled={index === 0} icon={<ArrowUpOutlined />} onClick={() => move(app.id, -1)} />

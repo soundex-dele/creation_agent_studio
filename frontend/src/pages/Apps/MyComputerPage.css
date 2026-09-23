@@ -3,6 +3,8 @@
 .my-computer-toolbar strong { min-width: 0; overflow-wrap: anywhere; flex: 1; }
 .my-computer-toolbar h2 { margin: 0; flex: 1; font-size: 20px; }
 .my-computer-devices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.my-computer-devices > .ant-card { min-width: 0; }
+.my-computer-name { display: block; white-space: normal; overflow-wrap: anywhere; padding: 12px 0; }
 .my-computer-pairing { display: flex; gap: 12px; margin-top: 12px; }
 .my-computer-pairing input { min-width: 0; }
 .my-computer-workspace { height: 100%; min-height: 0; display: flex; flex-direction: column; }

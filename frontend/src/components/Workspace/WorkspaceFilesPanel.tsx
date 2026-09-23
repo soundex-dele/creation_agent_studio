@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Empty, Spin, message } from 'antd';
 import {
   CopyOutlined,
@@ -44,29 +44,18 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkspaceFilePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const newestPathRef = useRef<string | null>(null);
-
-  const newestFilePath = useMemo(() => entries
-    .filter((entry) => !entry.is_directory)
-    .sort((left, right) => Date.parse(right.modified_at) - Date.parse(left.modified_at))[0]?.path ?? null,
-  [entries]);
-
   useEffect(() => {
-    if (!newestFilePath) {
+    if (selectedPath && !entries.some((entry) => entry.path === selectedPath)) {
       setSelectedPath(null);
       setPreview(null);
-      newestPathRef.current = null;
-      return;
+      setPreviewLoading(false);
     }
-    if (newestPathRef.current !== newestFilePath) {
-      newestPathRef.current = newestFilePath;
-      setSelectedPath(newestFilePath);
-    }
-  }, [newestFilePath]);
+  }, [entries, selectedPath]);
 
   useEffect(() => {
     if (!selectedPath) return;
     let active = true;
+    setPreview(null);
     setPreviewLoading(true);
     onReadFile(selectedPath)
       .then((result) => {
@@ -98,7 +87,7 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
           <div className="workspace-files-path" title={workingDirectory}>{workingDirectory}</div>
         </div>
         <div className="workspace-files-actions">
-          <button type="button" aria-label="复制工作目录" onClick={copyDirectory}>
+          <button type="button" aria-label="复制工作目录" onClick={copyDirectory} disabled={!workingDirectory}>
             <CopyOutlined />
           </button>
           <button type="button" aria-label="刷新文件" onClick={onRefresh} disabled={isRefreshing}>
@@ -108,7 +97,9 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
       </div>
 
       <div className="workspace-files-tree" aria-label="工作目录文件">
-        {entries.length === 0 ? (
+        {isRefreshing ? (
+          <div className="workspace-file-preview-state"><Spin size="small" /></div>
+        ) : entries.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="目录为空" />
         ) : entries.map((entry) => (
           <button

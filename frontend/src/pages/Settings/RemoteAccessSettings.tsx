@@ -93,7 +93,7 @@ export default function RemoteAccessSettings({ onAvailable }: { onAvailable: (av
         <Form.Item name="server_url" label="服务器地址" rules={[{ required: true, message: '请输入服务器地址' }, { type: 'url', message: '请输入完整 HTTP/HTTPS 地址' }]}>
           <Input placeholder="https://studio.example.com" disabled={Boolean(config.device_id)} />
         </Form.Item>
-        <Form.Item name="computer_name" label="电脑名称" rules={[{ required: true, message: '请输入电脑名称' }]}>
+        <Form.Item name="computer_name" label="电脑名称" extra="此名称显示在账号的电脑列表中，建议为每台电脑设置便于区分的名称。" rules={[{ required: true, whitespace: true, message: '请输入电脑名称' }]}>
           <Input maxLength={100} />
         </Form.Item>
         <Form.Item name="local_user_id" label="授权访问的本地用户" rules={[{ required: true, message: '请选择本地用户' }]}>

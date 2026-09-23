@@ -6,10 +6,12 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredRole?: 'admin';
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userRole = useAuthStore((state) => state.user?.role);
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const loadedForUserId = useOrganizationStore((state) => state.loadedForUserId);
   const isLoading = useOrganizationStore((state) => state.isLoading);
@@ -37,6 +39,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/auth/login" replace />;
+  }
+
+  if (requiredRole && userRole !== requiredRole) {
+    return <Navigate to="/" replace />;
   }
 
   // Validate the persisted organization before any protected page can issue

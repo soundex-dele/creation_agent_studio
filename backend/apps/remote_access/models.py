@@ -1,4 +1,5 @@
 """Only connection metadata lives on the relay; business records stay local."""
+import socket
 import uuid
 
 from django.conf import settings
@@ -6,10 +7,14 @@ from django.db import models
 from django.utils import timezone
 
 
+def default_computer_name():
+    return socket.gethostname().strip()[:100] or "我的电脑"
+
+
 class LocalRemoteConfig(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     server_url = models.URLField(blank=True)
-    computer_name = models.CharField(max_length=100, default="我的电脑")
+    computer_name = models.CharField(max_length=100, default=default_computer_name)
     enabled = models.BooleanField(default=False)
     local_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     organization = models.ForeignKey("enterprise.Organization", null=True, on_delete=models.SET_NULL)
