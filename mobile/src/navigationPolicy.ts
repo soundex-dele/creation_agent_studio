@@ -2,6 +2,21 @@ export type NavigationDecision = 'internal' | 'external' | 'blocked';
 
 const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 
+/** Ordinary websites and redirects stay in the user-selected browser session. */
+export function classifyBrowserNavigation(
+  targetUrl: string,
+): NavigationDecision {
+  if (targetUrl === 'about:blank') return 'internal';
+  try {
+    const target = new URL(targetUrl);
+    if (target.protocol === 'http:' || target.protocol === 'https:')
+      return 'internal';
+    return EXTERNAL_PROTOCOLS.has(target.protocol) ? 'external' : 'blocked';
+  } catch {
+    return 'blocked';
+  }
+}
+
 function normalizedOrigin(value: string): string | null {
   try {
     return new URL(value).origin;
@@ -47,12 +62,14 @@ export function resolveDeepLink(
     return null;
   }
 
-  if (incoming.origin === normalizedOrigin(appOrigin)) return incoming.toString();
+  if (incoming.origin === normalizedOrigin(appOrigin))
+    return incoming.toString();
 
   if (incoming.protocol !== `${customScheme}:`) return null;
 
   const requestedPath = incoming.searchParams.get('path');
-  if (!requestedPath?.startsWith('/') || requestedPath.startsWith('//')) return null;
+  if (!requestedPath?.startsWith('/') || requestedPath.startsWith('//'))
+    return null;
 
   const destination = new URL(requestedPath, appOrigin);
   return destination.origin === normalizedOrigin(appOrigin)

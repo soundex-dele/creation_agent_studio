@@ -2,6 +2,10 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// Android Studio and ordinary debug installs must work without a Metro server.
+// Opt into Metro explicitly for JavaScript development with -PuseMetro=true.
+def useMetro = providers.gradleProperty("useMetro").map { it.toBoolean() }.getOrElse(false)
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -18,10 +22,8 @@ react {
     // cliFile = file("../../node_modules/react-native/cli.js")
 
     /* Variants */
-    //   The list of variants to that are debuggable. For those we're going to
-    //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
+    // Only Metro builds skip packaging JavaScript. Release always embeds it.
+    debuggableVariants = useMetro ? ["debug", "debugOptimized"] : []
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -90,6 +92,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        buildConfigField "boolean", "USE_METRO", "false"
     }
     signingConfigs {
         debug {
@@ -110,6 +113,7 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            buildConfigField "boolean", "USE_METRO", useMetro.toString()
         }
         release {
             if (hasReleaseSigning) {

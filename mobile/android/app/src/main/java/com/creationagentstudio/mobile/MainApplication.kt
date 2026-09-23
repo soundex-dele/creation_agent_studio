@@ -13,6 +13,7 @@ class MainApplication : Application(), ReactApplication {
     getDefaultReactHost(
       context = applicationContext,
       packageList = PackageList(this).packages,
+      useDevSupport = BuildConfig.USE_METRO,
     )
   }
 
