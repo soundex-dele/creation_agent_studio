@@ -41,6 +41,43 @@ describe('useAppStore.loadApps', () => {
     useAppStore.setState({ apps: [], error: null, isLoading: false, searchQuery: '' });
   });
 
+  it('includes applications beyond the first 20 results', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      id: index + 1, slug: `app-${index}`, name: `App ${index}`,
+      description: '', category_slug: 'productivity',
+    }));
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ results: firstPage, next: 'http://backend:8080/api/v1/apps/?page=2' })
+      .mockResolvedValueOnce({ results: [{
+        id: 21, slug: 'my-computer', name: '我的电脑', description: '连接电脑',
+        category_slug: 'productivity', renderer_key: 'my-computer',
+      }], next: null });
+
+    await useAppStore.getState().loadApps();
+
+    expect(api.get).toHaveBeenNthCalledWith(2, '/apps/', { page: 2 });
+    expect(useAppStore.getState().apps).toHaveLength(21);
+    expect(useAppStore.getState().apps[20]).toMatchObject({
+      id: 'my-computer', rendererKey: 'my-computer',
+    });
+  });
+
+  it('preserves category and search parameters across pages', async () => {
+    useAppStore.setState({ searchQuery: '电脑' });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ results: [], next: '?page=2' })
+      .mockResolvedValueOnce({ results: [{
+        id: 21, slug: 'my-computer', name: '我的电脑', description: '连接电脑',
+        category_slug: 'productivity',
+      }], next: null });
+
+    await useAppStore.getState().loadApps('productivity');
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/apps/', { category: 'productivity', search: '电脑' });
+    expect(api.get).toHaveBeenNthCalledWith(2, '/apps/', { category: 'productivity', search: '电脑', page: 2 });
+    expect(useAppStore.getState().apps).toHaveLength(1);
+  });
+
   it('exposes a recoverable error and clears it after a successful retry', async () => {
     vi.mocked(api.get).mockRejectedValueOnce({ response: { data: { detail: '服务暂不可用' } } });
 

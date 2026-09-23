@@ -24,6 +24,18 @@ function unwrap<T>(response: any): T[] {
   return Array.isArray(response) ? response : (response?.results ?? []);
 }
 
+async function loadAllPages<T>(path: string, params: Record<string, unknown> = {}): Promise<T[]> {
+  const items: T[] = [];
+  let page = 1;
+  while (true) {
+    // Keep requests on the configured API transport, including behind a proxy.
+    const response = await api.get<any>(path, page === 1 ? params : { ...params, page });
+    items.push(...unwrap<T>(response));
+    if (Array.isArray(response) || !response?.next) return items;
+    page += 1;
+  }
+}
+
 /** Map an API application object to the frontend AppItem shape (id = slug). */
 function toAppItem(app: any): AppItem {
   return {
@@ -61,8 +73,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadCategories: async () => {
     try {
-      const response = await api.get<any>('/apps/categories/');
-      const categories = unwrap<AppCategory>(response);
+      const categories = await loadAllPages<AppCategory>('/apps/categories/');
       set({ categories });
     } catch (error) {
       console.error('Failed to load app categories:', error);
@@ -77,8 +88,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const params: any = {};
       if (category) params.category = category;
       if (searchQuery) params.search = searchQuery;
-      const response = await api.get<any>('/apps/', { params });
-      let apps = unwrap<any>(response).map(toAppItem);
+      const response = await loadAllPages<any>('/apps/', params);
+      let apps = response.map(toAppItem);
       if (category) apps = apps.filter((app) => app.category === category);
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLocaleLowerCase();
