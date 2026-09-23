@@ -5,6 +5,11 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens Ideas & Todos with a dedicated renderer from either catalog entry', () => {
+    const app = { id: 'ideas-todos', applicationId: 25, kind: 'custom' as const, rendererKey: 'ideas-todos' };
+    expect(applicationPath(app)).toBe('/applications/25/ideas-todos?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/applications/25/ideas-todos?entry=home');
+  });
   it('opens Creation Master with its registered React renderer', () => {
     expect(applicationPath({
       id: 'creation-master', applicationId: 15, kind: 'custom', rendererKey: 'creation-master',
