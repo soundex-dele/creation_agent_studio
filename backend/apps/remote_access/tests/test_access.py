@@ -179,6 +179,94 @@ def test_pairing_requires_local_confirmation_and_is_single_use(grant):
     assert device.revoked_at
 
 
+@pytest.mark.django_db(transaction=True)
+def test_local_pairing_allows_connector_heartbeat_during_relay_request(grant, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from uuid import uuid4
+
+    from django.db import connections
+
+    user, _, config = grant
+    config.bound_account = ''
+    config.save()
+    device_id = uuid4()
+    seen_at = timezone.now()
+
+    def heartbeat():
+        try:
+            LocalRemoteConfig.objects.filter(pk=1).update(
+                connector_seen_at=seen_at, status='unpaired',
+            )
+        finally:
+            connections.close_all()
+
+    def relay_request(*args, **kwargs):
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(heartbeat).result(timeout=10)
+        return httpx.Response(201, json={'id': str(device_id), 'expires_in': 600})
+
+    monkeypatch.setattr('apps.remote_access.views.httpx.request', relay_request)
+    client = APIClient()
+    client.force_authenticate(user)
+    response = client.post('/api/v1/remote-access/pair/', {}, format='json')
+    assert response.status_code == 200, response.data
+    config.refresh_from_db()
+    assert config.device_id == device_id
+    assert len(config.pairing_code) == 8
+    assert config.revision == 1
+    assert config.connector_seen_at == seen_at
+    assert config.status == 'unpaired'
+
+
+def test_local_pairing_does_not_overwrite_concurrent_settings_change(grant, monkeypatch):
+    from uuid import uuid4
+
+    user, _, config = grant
+    config.bound_account = ''
+    config.save()
+    original_credentials = config.credentials
+
+    def relay_request(*args, **kwargs):
+        LocalRemoteConfig.objects.filter(pk=1).update(enabled=False, revision=1)
+        return httpx.Response(201, json={'id': str(uuid4()), 'expires_in': 600})
+
+    monkeypatch.setattr('apps.remote_access.views.httpx.request', relay_request)
+    client = APIClient()
+    client.force_authenticate(user)
+    response = client.post('/api/v1/remote-access/pair/', {}, format='json')
+    assert response.status_code == 409
+    config.refresh_from_db()
+    assert config.enabled is False
+    assert config.revision == 1
+    assert config.device_id is None
+    assert config.pairing_code == ''
+    assert config.credentials == original_credentials
+
+
+@pytest.mark.parametrize('failure', [503, 'network'])
+def test_local_pairing_failure_keeps_original_configuration(grant, monkeypatch, failure):
+    user, _, config = grant
+    config.bound_account = ''
+    config.save()
+    original_credentials = config.credentials
+
+    def relay_request(*args, **kwargs):
+        if failure == 'network':
+            raise httpx.ConnectError('unavailable')
+        return httpx.Response(failure, json={'detail': 'unavailable'})
+
+    monkeypatch.setattr('apps.remote_access.views.httpx.request', relay_request)
+    client = APIClient()
+    client.force_authenticate(user)
+    response = client.post('/api/v1/remote-access/pair/', {}, format='json')
+    assert response.status_code == 400
+    config.refresh_from_db()
+    assert config.device_id is None
+    assert config.pairing_code == ''
+    assert config.revision == 0
+    assert config.credentials == original_credentials
+
+
 def test_account_can_bind_multiple_named_computers_and_revoke_one(grant):
     user, _, _ = grant
     owner = APIClient()

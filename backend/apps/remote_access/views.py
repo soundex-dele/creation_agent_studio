@@ -41,6 +41,26 @@ class DeviceCredentialExpired(exceptions.ValidationError):
     default_detail = "配对已过期或绑定已撤销，请重新配对。"
 
 
+class LocalConfigChanged(exceptions.APIException):
+    status_code = 409
+    default_detail = "远程访问设置已更改，请刷新后重试。"
+
+
+def save_local_action(config, original, *, force_fields=()):
+    # A single conditional UPDATE is atomic on SQLite too. Do not hold a read
+    # transaction across relay HTTP calls: connector heartbeats would invalidate
+    # its WAL snapshot and SQLite cannot upgrade that snapshot to a writer.
+    changes = {
+        field: getattr(config, field)
+        for field, value in original.items()
+        if field in force_fields or getattr(config, field) != value
+    }
+    changes["revision"] = config.revision + 1
+    if not LocalRemoteConfig.objects.filter(pk=config.pk, revision=config.revision).update(**changes):
+        raise LocalConfigChanged()
+    config.refresh_from_db()
+
+
 def server_call(config, action, data=None, *, method="POST"):
     credentials = decrypt_credentials(config.credentials)
     try:
@@ -122,11 +142,16 @@ class LocalConfigView(APIView):
 
 
 class LocalActionView(APIView):
-    @transaction.atomic
     def post(self, request, action):
         require_host(request)
-        local_config()
-        config = LocalRemoteConfig.objects.select_for_update().get(pk=1)
+        config = local_config()
+        original = {
+            field: getattr(config, field)
+            for field in (
+                "enabled", "device_id", "credentials", "bound_account",
+                "pairing_code", "pairing_expires_at", "status",
+            )
+        }
         if action == "pair":
             if not config.server_url:
                 raise exceptions.ValidationError("请先保存服务器和授权设置。")
@@ -170,8 +195,7 @@ class LocalActionView(APIView):
                 except exceptions.ValidationError:
                     config.enabled = False
                     config.status = "disabled"
-                    config.revision += 1
-                    config.save()
+                    save_local_action(config, original, force_fields=("enabled", "status"))
                     return Response({"detail": "本机已停止远程访问。服务器暂不可用，请恢复网络后再次解绑以撤销服务器凭证。"}, status=503)
             config.enabled = False
             config.device_id = None
@@ -180,8 +204,7 @@ class LocalActionView(APIView):
             config.status = "disabled"
         elif action != "reconnect":
             raise exceptions.NotFound()
-        config.revision += 1
-        config.save()
+        save_local_action(config, original, force_fields=("enabled", "status") if action == "unbind" else ())
         return Response(config_data(config))
 
 
