@@ -15020,6 +15020,634 @@
                     }
                 }
             ]
+        },
+        "/applications/{application_id}/wechat-assistant/": {
+            "get": {
+                "operationId": "applications_wechat-assistant_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "��δ����"
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "put": {
+                "operationId": "applications_wechat-assistant_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Configuration"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/agents": {
+            "get": {
+                "operationId": "applications_wechat-assistant_agents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AgentOption"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/login": {
+            "post": {
+                "operationId": "applications_wechat-assistant_login_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/new-conversation": {
+            "post": {
+                "operationId": "applications_wechat-assistant_new-conversation_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/reconnect": {
+            "post": {
+                "operationId": "applications_wechat-assistant_reconnect_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/tasks": {
+            "get": {
+                "operationId": "applications_wechat-assistant_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/unbind": {
+            "post": {
+                "operationId": "applications_wechat-assistant_unbind_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/wechat-assistant/verify": {
+            "post": {
+                "operationId": "applications_wechat-assistant_verify_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Verify"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "��δ����"
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "put": {
+                "operationId": "organizations_applications_wechat-assistant_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Configuration"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_agents_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AgentOption"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_login_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_new-conversation_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_reconnect_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
+            "get": {
+                "operationId": "organizations_applications_wechat-assistant_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_unbind_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
+            "post": {
+                "operationId": "organizations_applications_wechat-assistant_verify_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Verify"
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Binding"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
         }
     },
     "servers": [
@@ -15334,6 +15962,26 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/WorkflowDetail"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "Verify": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Verify"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "Configuration": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Configuration"
                         }
                     }
                 },
@@ -20307,6 +20955,230 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
+                    }
+                }
+            },
+            "Binding": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "enabled": {
+                        "title": "Enabled",
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "agent_id": {
+                        "title": "Agent id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "conversation_id": {
+                        "title": "Conversation id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "busy": {
+                        "title": "Busy",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "login_id": {
+                        "title": "Login id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "login_expires_at": {
+                        "title": "Login expires at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "qr_content": {
+                        "title": "Qr content",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "heartbeat_at": {
+                        "title": "Heartbeat at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "received_at": {
+                        "title": "Received at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "sent_at": {
+                        "title": "Sent at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_error": {
+                        "title": "Last error",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    }
+                }
+            },
+            "AgentOption": {
+                "required": [
+                    "id",
+                    "name",
+                    "kind"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "integer"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "Task": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "text": {
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "state": {
+                        "title": "State",
+                        "type": "string",
+                        "maxLength": 24,
+                        "minLength": 1
+                    },
+                    "run_id": {
+                        "title": "Run id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "run_status": {
+                        "title": "Run status",
+                        "type": "string",
+                        "readOnly": true,
+                        "default": "",
+                        "minLength": 1
+                    },
+                    "conversation_id": {
+                        "title": "Conversation id",
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "replies": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Reply"
+                        },
+                        "readOnly": true
+                    }
+                }
+            },
+            "Configuration": {
+                "required": [
+                    "agent_id"
+                ],
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "title": "Agent id",
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "Verify": {
+                "required": [
+                    "login_id",
+                    "code"
+                ],
+                "type": "object",
+                "properties": {
+                    "login_id": {
+                        "title": "Login id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "title": "Code",
+                        "type": "string",
+                        "pattern": "^[0-9]{4,12}$",
+                        "minLength": 1
+                    }
+                }
+            },
+            "Reply": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "title": "State",
+                        "type": "string",
+                        "maxLength": 24,
+                        "minLength": 1
+                    },
+                    "attempts": {
+                        "title": "Attempts",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "last_error": {
+                        "title": "Last error",
+                        "type": "string",
+                        "maxLength": 300
                     }
                 }
             }

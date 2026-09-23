@@ -578,3 +578,6 @@ REMOTE_CONNECTOR_LOCK_PATH = config(
 )
 # WebSocket debug traces include frames and authentication headers.
 LOGGING.setdefault('loggers', {})['websockets'] = {'level': 'WARNING', 'propagate': True}
+
+# Optional phone-accessible origin for WeChat conversation links.
+WECHAT_ASSISTANT_PUBLIC_URL = config("WECHAT_ASSISTANT_PUBLIC_URL", default="")

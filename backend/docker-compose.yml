@@ -279,6 +279,37 @@ services:
       timeout: 5s
       retries: 5
 
+  wechat-connector:
+    <<: *backend-security
+    build: *backend-build
+    networks: [app, data]
+    restart: unless-stopped
+    command: python manage.py run_wechat_connector
+    env_file: ${BACKEND_ENV_FILE:-.env}
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      ARTIFACT_ROOT: /data/artifacts
+      AGENT_WORKSPACE_ROOT: /data/agent-workspaces
+      MEDIA_ROOT: /data/media
+    volumes:
+      - runtime_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      app-center-sync:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_wechat_connector"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   maintenance:
     <<: *backend-security
     build: *backend-build

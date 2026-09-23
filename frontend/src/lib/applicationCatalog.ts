@@ -21,6 +21,7 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'creation-master': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-master`, entry,
   ),
+  'wechat-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/wechat-assistant`, entry),
   'creation-toolbox': (app, entry) => withEntry(
     `/applications/${app.applicationId}/creation-toolbox`, entry,
   ),

@@ -15,6 +15,9 @@ export default defineConfig({
       '@creation-master': process.env.VITE_EXCLUDE_CREATION_MASTER === 'true'
         ? path.resolve(__dirname, './src/stubs/creation-master')
         : path.resolve(__dirname, '../backend/app_center/creation_master/react/src'),
+      'antd': path.resolve(__dirname, './node_modules/antd'),
+      '@ant-design/icons': path.resolve(__dirname, './node_modules/@ant-design/icons'),
+      '@wechat-assistant': path.resolve(__dirname, '../backend/app_center/wechat_assistant/react/src'),
       '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
       '@phosphor-icons/react': path.resolve(__dirname, './node_modules/@phosphor-icons/react'),
       'lucide-react': path.resolve(__dirname, './node_modules/lucide-react/dist/esm/lucide-react.js'),

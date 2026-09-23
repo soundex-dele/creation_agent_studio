@@ -118,6 +118,8 @@ def _internal_mode(mode: str) -> None:
         _run_coordinator()
     elif mode == "scheduler":
         _run_scheduler()
+    elif mode == "wechat-connector":
+        _run_management_command("run_wechat_connector")
     elif mode == "remote-connector":
         _run_management_command("run_remote_connector")
     else:
@@ -215,7 +217,7 @@ def main() -> int:
     _run_management_command("migrate", "--noinput")
     _run_management_command("sync_app_center")
 
-    children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler"), _spawn("remote-connector")]
+    children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler"), _spawn("remote-connector"), _spawn("wechat-connector")]
     try:
         if not _wait_until_ready(children[0]):
             raise RuntimeError("The local Agent Studio server did not start")

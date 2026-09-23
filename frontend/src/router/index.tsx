@@ -30,6 +30,7 @@ const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
 const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWithMethodPage'));
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
+const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
@@ -240,6 +241,10 @@ const router = createBrowserRouter([
         </ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/wechat-assistant',
+    element: <ProtectedRoute><ApplicationShell>{page(<WechatAssistantPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/creation-toolbox',

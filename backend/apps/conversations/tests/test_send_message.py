@@ -13,8 +13,8 @@ from rest_framework.test import APIClient
 
 from apps.agents.models import Agent, AgentCategory
 from apps.conversations.models import Conversation, Message, MessageAttachment
-from apps.conversations.views import (
-    ConversationViewSet,
+from apps.conversations.execution import (
+    create_conversation_run,
     application_agent_overrides,
 )
 from modules.catalog.models import AgentDeployment, AgentDraft, AgentRevision
@@ -155,7 +155,7 @@ class DurableConversationRunTest(TestCase):
             self.assertEqual(serialized["original_name"], "diagram.png")
             self.assertIn("/media/conversations/", serialized["url"])
 
-    @patch("apps.conversations.views.application_definition")
+    @patch("apps.conversations.execution.application_definition")
     def test_application_agent_overrides_use_the_matching_binding(self, definition):
         definition.return_value = {
             "agent_bindings": [
@@ -268,7 +268,7 @@ class DurableConversationRunTest(TestCase):
         self.assertIn("GraphFlow", str(response.data["images"]))
         self.assertFalse(MessageAttachment.objects.exists())
 
-    @patch("apps.conversations.views.start_agent_run")
+    @patch("apps.conversations.execution.start_agent_run")
     def test_failed_image_run_removes_database_and_storage_file(self, start_run):
         from modules.execution.application.errors import DeploymentUnavailable
 
@@ -309,8 +309,8 @@ class DurableConversationRunTest(TestCase):
             conversation=self.conversation, role="user", content="hello"
         ).exists())
 
-    @patch("apps.conversations.views.time.sleep")
-    @patch.object(ConversationViewSet, "_create_run_once")
+    @patch("apps.conversations.execution.time.sleep")
+    @patch("apps.conversations.execution._create_run_once")
     def test_send_message_retries_the_full_transaction_when_sqlite_is_busy(
         self, create_run_once, sleep,
     ):
@@ -320,8 +320,8 @@ class DurableConversationRunTest(TestCase):
             expected,
         ]
 
-        result = ConversationViewSet()._create_run(
-            request=object(),
+        result = create_conversation_run(
+            actor=self.user,
             conversation=self.conversation,
             message="retry me",
             idempotency_key="conversation-lock-retry",
@@ -331,7 +331,7 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(create_run_once.call_count, 2)
         sleep.assert_called_once_with(0.02)
 
-    @patch("apps.conversations.views.resolve_agent")
+    @patch("apps.conversations.execution.resolve_agent")
     def test_explicit_null_agent_uses_fallback_without_saving_it(self, resolve_agent):
         resolve_agent.return_value = self.agent
 
@@ -362,7 +362,7 @@ class DurableConversationRunTest(TestCase):
         )
         self.assertIsNone(message.metadata["composer"]["agent_id"])
 
-    @patch("apps.conversations.views.start_agent_run")
+    @patch("apps.conversations.execution.start_agent_run")
     def test_failed_run_creation_does_not_persist_user_message(self, start_run):
         from modules.execution.application.errors import DeploymentUnavailable
 

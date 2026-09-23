@@ -82,7 +82,7 @@ def runtime_module(name):
 hiddenimports = []
 for package in ("backend", "apps", "core", "modules"):
     hiddenimports += collect_submodules(package, filter=runtime_module)
-for package in ("app_center.batch_transcribe",):
+for package in ("app_center.batch_transcribe", "app_center.wechat_assistant"):
     hiddenimports += collect_submodules(package, filter=runtime_module)
 hiddenimports += collect_submodules("whitenoise", filter=runtime_module)
 hiddenimports += collect_submodules("websockets.asyncio", filter=runtime_module)

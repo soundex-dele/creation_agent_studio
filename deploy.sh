@@ -189,6 +189,8 @@ log "Synchronizing the Study With Method App Center package."
   --package study-with-method
 "${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center --package my-computer
 
+"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center --package wechat-assistant
+
 start_service "frontend" \
   bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0 --port "$3" --strictPort' \
   _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}"
@@ -212,6 +214,10 @@ case "${REMOTE_ACCESS_HOST_ENABLED}" in
       _ "${BACKEND_DIR}" "${PYTHON_BIN}"
     ;;
 esac
+
+start_service "wechat-connector" \
+  bash -c 'cd "$1" && exec "$2" manage.py run_wechat_connector' \
+  _ "${BACKEND_DIR}" "${PYTHON_BIN}"
 
 log "Agent Studio is running. Frontend: http://localhost:${FRONTEND_PORT}"
 wait_for_services

@@ -18,7 +18,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
+      "antd": ["node_modules/antd"],
+      "@ant-design/icons": ["node_modules/@ant-design/icons"],
       "@creation-master/*": ["../backend/app_center/creation_master/react/src/*"],
+      "@wechat-assistant/*": ["../backend/app_center/wechat_assistant/react/src/*"],
       "@creation-toolbox/*": ["../backend/app_center/creation_toolbox/react/src/*"],
       "@phosphor-icons/react": ["node_modules/@phosphor-icons/react"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
@@ -33,6 +36,6 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../backend/app_center/creation_master/react/src", "../backend/app_center/creation_toolbox/react/src"],
+  "include": ["src", "../backend/app_center/wechat_assistant/react/src", "../backend/app_center/creation_master/react/src", "../backend/app_center/creation_toolbox/react/src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

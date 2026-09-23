@@ -6295,6 +6295,302 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/wechat-assistant/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_list"];
+        put: operations["applications_wechat-assistant_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_agents_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_login_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/new-conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_new-conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_reconnect_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_wechat-assistant_tasks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_unbind_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/wechat-assistant/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_wechat-assistant_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_list"];
+        put: operations["organizations_applications_wechat-assistant_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_agents_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_login_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/new-conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_new-conversation_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_reconnect_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_wechat-assistant_tasks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_unbind_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/wechat-assistant/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_wechat-assistant_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8630,6 +8926,115 @@ export interface components {
              */
             readonly updated_at?: string;
         };
+        Binding: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Status */
+            readonly status?: string;
+            /** Enabled */
+            readonly enabled?: boolean;
+            /** Agent id */
+            readonly agent_id?: number | null;
+            /** Conversation id */
+            readonly conversation_id?: number | null;
+            /** Busy */
+            readonly busy?: string;
+            /**
+             * Login id
+             * Format: uuid
+             */
+            readonly login_id?: string | null;
+            /**
+             * Login expires at
+             * Format: date-time
+             */
+            readonly login_expires_at?: string | null;
+            /** Qr content */
+            readonly qr_content?: string;
+            /**
+             * Heartbeat at
+             * Format: date-time
+             */
+            readonly heartbeat_at?: string | null;
+            /**
+             * Received at
+             * Format: date-time
+             */
+            readonly received_at?: string | null;
+            /**
+             * Sent at
+             * Format: date-time
+             */
+            readonly sent_at?: string | null;
+            /** Last error */
+            readonly last_error?: string;
+        };
+        AgentOption: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+        };
+        Task: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Text */
+            text?: string;
+            /** State */
+            state?: string;
+            /**
+             * Run id
+             * Format: uuid
+             */
+            readonly run_id?: string | null;
+            /**
+             * Run status
+             * @default
+             */
+            readonly run_status: string;
+            /** Conversation id */
+            readonly conversation_id?: number | null;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            readonly replies?: components["schemas"]["Reply"][];
+        };
+        Configuration: {
+            /** Agent id */
+            agent_id: number;
+        };
+        Verify: {
+            /**
+             * Login id
+             * Format: uuid
+             */
+            login_id: string;
+            /** Code */
+            code: string;
+        };
+        Reply: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** State */
+            state?: string;
+            /** Attempts */
+            attempts?: number;
+            /** Last error */
+            last_error?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -8787,6 +9192,16 @@ export interface components {
         WorkflowDetail: {
             content: {
                 "application/json": components["schemas"]["WorkflowDetail"];
+            };
+        };
+        Verify: {
+            content: {
+                "application/json": components["schemas"]["Verify"];
+            };
+        };
+        Configuration: {
+            content: {
+                "application/json": components["schemas"]["Configuration"];
             };
         };
     };
@@ -19794,6 +20209,407 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+            /** @description ��δ���� */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_wechat-assistant_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Configuration"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_agents_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOption"][];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_login_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_new-conversation_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_reconnect_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_unbind_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "applications_wechat-assistant_verify_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Verify"];
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+            /** @description ��δ���� */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Configuration"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_agents_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOption"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_login_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_new-conversation_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_reconnect_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_unbind_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
+                };
+            };
+        };
+    };
+    "organizations_applications_wechat-assistant_verify_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Verify"];
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"];
                 };
             };
         };
