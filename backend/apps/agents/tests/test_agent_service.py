@@ -218,6 +218,7 @@ class DurableAgentAdapterTest(TestCase):
         )
         mock_factory.return_value = engine
         payload = self._payload(self.organization.id)
+        payload["input"].update(permission_mode="allow_all", collaboration_mode="plan")
         payload["checkpoint"] = {"metadata": {"checkpoint": {
             "messages": [{"role": "user", "content": "Build the app"}],
             "agent_thread": {"provider": "codex", "id": "thread-1"},
@@ -237,6 +238,8 @@ class DurableAgentAdapterTest(TestCase):
         execute_agent_completion(payload, MagicMock(cancelled=False))
 
         self.assertEqual(engine.complete.call_args.kwargs["thread_id"], "thread-1")
+        self.assertEqual(engine.complete.call_args.kwargs["permission_mode"], "allow_all")
+        self.assertEqual(engine.complete.call_args.kwargs["collaboration_mode"], "plan")
         self.assertEqual(engine.complete.call_args.args[0][-1], {
             "role": "user",
             "content": (

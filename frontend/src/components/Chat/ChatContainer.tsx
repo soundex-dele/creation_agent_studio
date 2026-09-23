@@ -197,6 +197,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       }
       const controller = sendMessageStream(targetConversationId, content, {
         permissionMode: composer.permissionMode,
+        collaborationMode: composer.collaborationMode,
         skillNames: composer.skillNames,
         agentId: composer.agentId ?? (creationContext?.applicationId ? activeConversation?.agent?.id : null),
         images,

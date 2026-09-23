@@ -458,6 +458,8 @@ class ConversationViewSet(viewsets.ViewSet):
         requested_skill_names=(),
         image_specs=(),
         max_retries=6,
+        permission_mode="default",
+        collaboration_mode="default",
     ):
         for retry_no in range(max_retries):
             saved_storage_names = []
@@ -471,6 +473,8 @@ class ConversationViewSet(viewsets.ViewSet):
                     requested_skill_names=requested_skill_names,
                     image_specs=image_specs,
                     saved_storage_names=saved_storage_names,
+                    permission_mode=permission_mode,
+                    collaboration_mode=collaboration_mode,
                 )
             except OperationalError as exc:
                 for storage_name in saved_storage_names:
@@ -497,6 +501,8 @@ class ConversationViewSet(viewsets.ViewSet):
         requested_skill_names=(),
         image_specs=(),
         saved_storage_names=None,
+        permission_mode="default",
+        collaboration_mode="default",
     ):
         if saved_storage_names is None:
             saved_storage_names = []
@@ -561,6 +567,8 @@ class ConversationViewSet(viewsets.ViewSet):
         working_directory = conversation_working_directory(conversation)
         validate_requested_skill_names(conversation, requested_skill_names)
         if agent.kind == Agent.Kind.SUPERVISOR:
+            if collaboration_mode == "plan" or permission_mode == "allow_all":
+                raise ValidationError({"collaboration_mode": "该执行设置仅支持 Codex 智能体。"})
             if image_specs:
                 raise ValidationError({
                     "images": "主管智能体（GraphFlow）暂不支持图片，请仅发送文本。",
@@ -597,6 +605,12 @@ class ConversationViewSet(viewsets.ViewSet):
             (effective_definition.get("model_config") or {}).get("adapter")
             or settings.AGENT_ENGINE_ADAPTER
         )
+        if permission_mode == "allow_all":
+            from apps.enterprise.services import execution_governance_snapshot
+            if execution_governance_snapshot(organization).get("require_tool_approval"):
+                raise ValidationError({"permission_mode": "组织要求工具审批，无法开启完全控制。"})
+        if adapter != "codex" and (collaboration_mode == "plan" or permission_mode == "allow_all"):
+            raise ValidationError({"collaboration_mode": "该执行设置仅支持 Codex 智能体。"})
         if image_specs and adapter != "codex":
             raise ValidationError({
                 "images": "当前 GraphFlow 智能体不支持图片，请改用 Codex 智能体。",
@@ -625,6 +639,8 @@ class ConversationViewSet(viewsets.ViewSet):
                 metadata={
                     "run_request_id": getattr(request, "request_id", ""),
                     "composer": {
+                        "permission_mode": permission_mode,
+                        "collaboration_mode": collaboration_mode,
                         "agent_id": getattr(selected_agent, "id", None),
                         "skill_names": sorted(
                             str(value) for value in requested_skill_names),
@@ -644,6 +660,8 @@ class ConversationViewSet(viewsets.ViewSet):
             agent_id=agent.id,
             actor=request.user,
             input_data={
+                "permission_mode": permission_mode,
+                "collaboration_mode": collaboration_mode,
                 "message": message,
                 "messages": history,
                 "working_directory": working_directory,
@@ -659,6 +677,8 @@ class ConversationViewSet(viewsets.ViewSet):
             },
             idempotency_key=idempotency_key,
             idempotency_input_data={
+                "permission_mode": permission_mode,
+                "collaboration_mode": collaboration_mode,
                 "message": message,
                 "skill_names": sorted(
                     str(value) for value in requested_skill_names),
@@ -727,6 +747,8 @@ class ConversationViewSet(viewsets.ViewSet):
                 requested_skill_names=serializer.validated_data.get(
                     "skill_names", ()),
                 image_specs=image_specs,
+                permission_mode=serializer.validated_data["permission_mode"],
+                collaboration_mode=serializer.validated_data["collaboration_mode"],
             )
         except ValidationError as exc:
             logger.warning(

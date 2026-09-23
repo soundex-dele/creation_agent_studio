@@ -135,7 +135,7 @@ def _codex_tool_payload(item):
 
 def _consume_codex_turn(
     thread, text, *, model="", skills=None, image_paths=None, on_event=None,
-    cancelled=None,
+    cancelled=None, collaboration_mode=None,
 ):
     """Consume one Codex turn while preserving text and tool notifications."""
 
@@ -145,8 +145,11 @@ def _consume_codex_turn(
             model=model or None,
             skills=skills,
             image_paths=image_paths,
+            collaboration_mode=collaboration_mode,
         )
     else:
+        if collaboration_mode == "plan":
+            raise RuntimeError("Plan 模式需要 CODEX_TRANSPORT=app-server。")
         if image_paths:
             raise RuntimeError(
                 "Codex Python SDK transport does not support image input; "
@@ -260,6 +263,7 @@ class _AppServerTransport:
         )
         self._request_id = 0
         self._request_lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._pending: dict[int, queue.Queue] = {}
         self._notifications: queue.Queue = queue.Queue()
         self._stderr_lines: list[str] = []
@@ -337,8 +341,9 @@ class _AppServerTransport:
                 "Codex app-server is not running" + (f": {detail}" if detail else "")
             )
         assert self._process.stdin is not None
-        self._process.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
-        self._process.stdin.flush()
+        with self._write_lock:
+            self._process.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
+            self._process.stdin.flush()
 
     def request(self, method: str, params: Optional[dict] = None) -> dict:
         with self._request_lock:
@@ -374,6 +379,9 @@ class _AppServerTransport:
     def _handle_server_request(self, message: dict) -> None:
         """Resolve or project interactive requests into the durable Run protocol."""
         method = message.get("method", "")
+        if self.input_request:
+            # Preserve the first request while the consumer checkpoints it.
+            return
         if method in {"item/tool/requestUserInput", "tool/requestUserInput"}:
             params = message.get("params") or {}
             questions = _normalize_user_input_questions(params.get("questions"))
@@ -393,18 +401,9 @@ class _AppServerTransport:
                     "auto_resolution_ms": params.get("autoResolutionMs"),
                 },
             }
-            # A durable Run cannot retain this process while waiting for a user.
-            # Resolve the in-process request with empty answers, then resume the
-            # same Codex thread in a new turn after the answer command arrives.
-            self._send({
-                "id": message["id"],
-                "result": {
-                    "answers": {
-                        question["id"]: {"answers": []}
-                        for question in questions
-                    }
-                },
-            })
+            # Hand off immediately to the durable Run. Do not submit empty
+            # answers and let Codex continue before the controller can respond.
+            self._notifications.put({"method": "agentStudio/inputRequired", "params": {}})
             return
         if method in {
             "item/commandExecution/requestApproval",
@@ -433,6 +432,8 @@ class _AppServerTransport:
                         ],
                         "permission": {"method": method, "request": params},
                     }
+                    self._notifications.put({"method": "agentStudio/inputRequired", "params": {}})
+                    return
             self._send({"id": message["id"], "result": {"decision": decision}})
             return
         self._send(
@@ -513,6 +514,8 @@ def _turn_input(text: str, skills=None, image_paths=None) -> list[dict]:
 
 
 def _approval_settings(approval_mode: str) -> tuple[str, str]:
+    if approval_mode == "user":
+        return "on-request", "user"
     if approval_mode == "auto_review":
         return "on-request", "auto_review"
     return "never", "user"
@@ -521,7 +524,8 @@ def _approval_settings(approval_mode: str) -> tuple[str, str]:
 class _AppServerTurn:
     def __init__(
         self, *, transport: _AppServerTransport, thread_id: str, text: str,
-        model: str, skills=None, image_paths=None,
+        model: str, skills=None, image_paths=None, collaboration_mode=None,
+        reasoning_effort=None,
     ):
         self._transport = transport
         self._thread_id = thread_id
@@ -529,6 +533,8 @@ class _AppServerTurn:
         self._model = model
         self._skills = skills or []
         self._image_paths = image_paths or []
+        self._collaboration_mode = collaboration_mode
+        self._reasoning_effort = reasoning_effort
         self.id = ""
 
     def _start(self) -> None:
@@ -542,6 +548,17 @@ class _AppServerTurn:
         }
         if self._model:
             params["model"] = self._model
+        if self._collaboration_mode is not None:
+            if not self._model:
+                raise RuntimeError("Codex 未返回当前模型，无法设置执行模式。")
+            params["collaborationMode"] = {
+                "mode": self._collaboration_mode,
+                "settings": {
+                    "model": self._model,
+                    "reasoning_effort": self._reasoning_effort,
+                    "developer_instructions": None,
+                },
+            }
         result = self._transport.request("turn/start", params)
         self.id = result["turn"]["id"]
 
@@ -549,6 +566,8 @@ class _AppServerTurn:
         self._start()
         while True:
             message = self._transport.next_notification()
+            if message["method"] == "agentStudio/inputRequired":
+                return
             params = message.get("params") or {}
             if params.get("threadId") not in (None, self._thread_id):
                 continue
@@ -581,21 +600,26 @@ class _AppServerTurn:
 
 
 class _AppServerThread:
-    def __init__(self, *, transport: _AppServerTransport, thread_id: str) -> None:
+    def __init__(self, *, transport: _AppServerTransport, thread_id: str,
+                 model: str = "", reasoning_effort=None) -> None:
         self._transport = transport
         self.id = thread_id
+        self.model = model
+        self.reasoning_effort = reasoning_effort
 
     def turn(
         self, text: str, *, model: Optional[str] = None, skills=None,
-        image_paths=None,
+        image_paths=None, collaboration_mode=None,
     ) -> _AppServerTurn:
         return _AppServerTurn(
             transport=self._transport,
             thread_id=self.id,
             text=text,
-            model=model or "",
+            model=model or self.model,
             skills=skills,
             image_paths=image_paths,
+            collaboration_mode=collaboration_mode,
+            reasoning_effort=self.reasoning_effort,
         )
 
     def run(self, text: str, *, model: Optional[str] = None):
@@ -687,6 +711,8 @@ class _AppServerCodex:
         return _AppServerThread(
             transport=self._transport,
             thread_id=result["thread"]["id"],
+            model=result.get("model") or model or "",
+            reasoning_effort=result.get("reasoningEffort"),
         )
 
     def thread_resume(
@@ -716,6 +742,8 @@ class _AppServerCodex:
         return _AppServerThread(
             transport=self._transport,
             thread_id=result["thread"]["id"],
+            model=result.get("model") or model or "",
+            reasoning_effort=result.get("reasoningEffort"),
         )
 
     def close(self) -> None:
@@ -810,8 +838,8 @@ def _usage_payload(token_usage) -> dict:
     }
 
 
-def _sandbox(sdk):
-    configured = settings.CODEX_SANDBOX.strip().lower()
+def _sandbox(sdk, configured=None):
+    configured = str(configured or settings.CODEX_SANDBOX).strip().lower()
     values = {
         "read-only": sdk.Sandbox.read_only,
         "workspace-write": sdk.Sandbox.workspace_write,
@@ -875,6 +903,14 @@ class CodexAdapter(AgentAdapter):
         return sdk, sdk.Codex(config=config)
 
     def complete(self, messages: list[dict], **options) -> LLMResponse:
+        permission_mode = options.get("permission_mode")
+        collaboration_mode = options.get("collaboration_mode")
+        if permission_mode not in (None, "default", "allow_all"):
+            raise ValueError("Invalid Codex permission mode")
+        if collaboration_mode not in (None, "default", "plan"):
+            raise ValueError("Invalid Codex collaboration mode")
+        if permission_mode == "allow_all" and options.get("require_tool_approval"):
+            raise ValueError("组织要求工具审批，无法开启完全控制。")
         system_prompt, query = format_messages_for_query(messages)
         requested_thread_id = str(options.get("thread_id") or "").strip()
         conversational = [item for item in messages if item.get("role") != "system"]
@@ -890,11 +926,20 @@ class CodexAdapter(AgentAdapter):
         )
         input_request = None
         try:
+            sandbox = _sandbox(sdk)
+            if permission_mode == "allow_all":
+                sandbox = sdk.Sandbox.full_access
+                approval_mode = sdk.ApprovalMode.deny_all
+            elif permission_mode == "default" or options.get("require_tool_approval"):
+                # The composer must be able to restore constrained access when
+                # resuming a thread that previously had full control.
+                sandbox = (sdk.Sandbox.read_only if settings.CODEX_SANDBOX == "read-only"
+                           else sdk.Sandbox.workspace_write)
+                approval_mode = "user" if sdk is _AppServerSdk else sdk.ApprovalMode.auto_review
+            else:
+                approval_mode = _approval_mode(sdk)
             thread_options = {
-                "approval_mode": _approval_mode(
-                    sdk,
-                    "auto_review" if options.get("require_tool_approval") else None,
-                ),
+                "approval_mode": approval_mode,
                 "base_instructions": (
                     resume_system_prompt
                     if requested_thread_id
@@ -902,7 +947,7 @@ class CodexAdapter(AgentAdapter):
                 ),
                 "cwd": cwd,
                 "model": self.model or None,
-                "sandbox": _sandbox(sdk),
+                "sandbox": sandbox,
             }
             if requested_thread_id:
                 try:
@@ -929,6 +974,7 @@ class CodexAdapter(AgentAdapter):
                 image_paths=options.get("image_paths") or [],
                 on_event=options.get("on_event"),
                 cancelled=options.get("cancelled"),
+                collaboration_mode=collaboration_mode,
             )
             input_request = getattr(client, "input_request", None)
         finally:

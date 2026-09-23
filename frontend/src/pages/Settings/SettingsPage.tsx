@@ -247,17 +247,17 @@ export default function SettingsPage() {
             </div>
             <div className="settings-row settings-row--top">
               <div>
-                <strong>默认自动允许工具</strong>
-                <p>开启后，新对话默认允许智能体直接调用工具；仍可在输入框中单独切换。</p>
+                <strong>默认完全控制</strong>
+                <p>开启后，新对话（含“我的电脑”）默认给 Codex 完整文件访问权限；仍可在输入框中单独切换。</p>
               </div>
               <Switch
-                aria-label="默认自动允许工具"
+                aria-label="默认完全控制"
                 checked={defaultPermissionMode === 'allow_all'}
                 onChange={(checked) => setDefaultPermissionMode(checked ? 'allow_all' : 'default')}
               />
             </div>
             {defaultPermissionMode === 'allow_all' && (
-              <Alert type="warning" showIcon message="自动允许会减少运行时确认，仅建议在可信任务和工作区中使用。" />
+              <Alert type="warning" showIcon message="完全控制允许 Codex 访问工作区外的文件并执行命令，无需逐次确认；组织强制审批策略仍然有效。" />
             )}
           </Space>
         </Card>

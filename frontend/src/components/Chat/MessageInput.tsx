@@ -3,6 +3,7 @@ import { Dropdown, Empty, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   CloseOutlined,
+  ProfileOutlined,
   FolderOutlined,
   PictureOutlined,
   PlusOutlined,
@@ -25,6 +26,7 @@ export interface ComposerContext {
   agentId: number | null;
   agent: ComposerAgent | null;
   permissionMode: 'default' | 'allow_all';
+  collaborationMode: 'default' | 'plan';
   skillNames: string[];
 }
 
@@ -79,6 +81,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const defaultPermissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
   const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
+  const [collaborationMode, setCollaborationMode] = useState<'default' | 'plan'>('default');
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects, loadProjects } = useProjectStore();
   const { agents: serverAgents, loadAgents } = useAgentStore();
@@ -147,6 +150,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           agentId: selectedAgent?.id ?? null,
           agent: selectedAgent,
           permissionMode,
+          collaborationMode,
           skillNames: selectedSkills,
         }, selectedImages.map(({ file }) => file));
         setContent('');
@@ -206,7 +210,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   const permissionItems: MenuProps['items'] = [
     { key: 'default', label: '默认权限', extra: '按需确认高风险工具' },
-    { key: 'allow_all', label: '自动允许', extra: '工具无需逐次确认' },
+    { key: 'allow_all', label: '完全控制', extra: '完整文件访问，无需逐次确认' },
   ];
 
   const attachmentItems = useMemo<MenuProps['items']>(() => [
@@ -388,7 +392,23 @@ const MessageInput: React.FC<MessageInputProps> = ({
         >
           <button className="chat-composer-action" disabled={disabled}>
             <SafetyCertificateOutlined />
-            <span>{permissionMode === 'default' ? '默认权限' : '自动允许'}</span>
+            <span>{permissionMode === 'default' ? '默认权限' : '完全控制'}</span>
+          </button>
+        </Dropdown>
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              { key: 'default', label: '执行模式', extra: '直接处理任务' },
+              { key: 'plan', label: 'Plan 模式', extra: '先讨论并制定计划' },
+            ],
+            selectedKeys: [collaborationMode],
+            onClick: ({ key }) => setCollaborationMode(key as 'default' | 'plan'),
+          }}
+        >
+          <button className="chat-composer-action" disabled={disabled} aria-label="设置执行模式">
+            <ProfileOutlined aria-hidden="true" />
+            <span>{collaborationMode === 'plan' ? 'Plan 模式' : '执行模式'}</span>
           </button>
         </Dropdown>
         <Dropdown

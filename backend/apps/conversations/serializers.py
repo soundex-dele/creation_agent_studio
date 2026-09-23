@@ -180,6 +180,10 @@ class SendMessageSerializer(serializers.Serializer):
         write_only=True,
     )
     conversation_id = serializers.IntegerField(required=False)
+    permission_mode = serializers.ChoiceField(
+        choices=('default', 'allow_all'), required=False, default='default')
+    collaboration_mode = serializers.ChoiceField(
+        choices=('default', 'plan'), required=False, default='default')
     agent_id = serializers.IntegerField(required=False, allow_null=True)
     skill_names = serializers.ListField(
         child=serializers.CharField(max_length=160), required=False, default=list)

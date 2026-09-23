@@ -193,6 +193,8 @@ def execute_agent_completion(run_payload, sink):
             messages,
             approval_decision=approval_decision,
             require_tool_approval=bool(governance.get("require_tool_approval", False)),
+            permission_mode=input_data.get("permission_mode"),
+            collaboration_mode=input_data.get("collaboration_mode"),
             thread_id=thread_id,
             skills=skills,
             image_paths=[] if resume_command else image_paths,

@@ -45,7 +45,7 @@ def validate_request(method, target, body=None, organization_id=None):
                 raise ValueError("Remote command is not allowed")
             allowed = {"type", "idempotency_key", "input_request_id", "payload"}
         elif parsed.path.endswith("/send_message/"):
-            allowed = {"content", "agent_id", "skill_names"}
+            allowed = {"content", "agent_id", "skill_names", "permission_mode", "collaboration_mode"}
         else:
             allowed = {"title", "agent_id", "application_id", "skill_ids"}
         if set(body) - allowed:

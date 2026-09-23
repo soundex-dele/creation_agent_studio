@@ -224,13 +224,15 @@ describe('useConversationStore durable Run integration', () => {
     await useConversationStore.getState().sendMessage(
       'conversation-1',
       'Use the selected configuration',
-      { agentId: 42, skillNames: ['skill-1', 'skill-2'] },
+      { agentId: 42, skillNames: ['skill-1', 'skill-2'], permissionMode: 'allow_all', collaborationMode: 'plan' },
     );
 
     expect(api.post).toHaveBeenCalledWith(
       '/conversations/conversation-1/send_message/',
       {
         content: 'Use the selected configuration',
+        permission_mode: 'allow_all',
+        collaboration_mode: 'plan',
         agent_id: 42,
         skill_names: ['skill-1', 'skill-2'],
       },
@@ -255,6 +257,8 @@ describe('useConversationStore durable Run integration', () => {
       '/conversations/conversation-1/send_message/',
       {
         content: 'Use the fallback without binding it',
+        permission_mode: 'default',
+        collaboration_mode: 'default',
         agent_id: null,
       },
       { headers: { 'Idempotency-Key': expect.any(String) } },
@@ -272,7 +276,7 @@ describe('useConversationStore durable Run integration', () => {
     await useConversationStore.getState().sendMessage(
       'conversation-1',
       'Describe this',
-      { agentId: 42, skillNames: ['vision'], images: [image] },
+      { agentId: 42, skillNames: ['vision'], images: [image], permissionMode: 'allow_all', collaborationMode: 'plan' },
     );
 
     const [url, body, config] = post.mock.calls[0];
@@ -280,6 +284,8 @@ describe('useConversationStore durable Run integration', () => {
     expect(body).toBeInstanceOf(FormData);
     const form = body as FormData;
     expect(form.get('content')).toBe('Describe this');
+    expect(form.get('permission_mode')).toBe('allow_all');
+    expect(form.get('collaboration_mode')).toBe('plan');
     expect(form.get('agent_id')).toBe('42');
     expect(form.getAll('skill_names')).toEqual(['vision']);
     expect((form.get('images') as File).name).toBe('diagram.png');

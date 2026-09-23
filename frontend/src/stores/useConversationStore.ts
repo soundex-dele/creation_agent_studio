@@ -57,6 +57,7 @@ export interface ConversationDetail extends Conversation {
 
 export interface ChatRunOptions {
   permissionMode?: 'default' | 'allow_all';
+  collaborationMode?: 'default' | 'plan';
   skillNames?: string[];
   agentId?: number | null;
   images?: File[];
@@ -513,6 +514,8 @@ export const createConversationStore = (connection?: RemoteConnection) => {
           if (options.images?.length) {
             const payload = new FormData();
             payload.append('content', content);
+            payload.append('permission_mode', options.permissionMode ?? 'default');
+            payload.append('collaboration_mode', options.collaborationMode ?? 'default');
             options.images.forEach((image) => payload.append('images', image, image.name));
             options.skillNames?.forEach((skillName) => payload.append('skill_names', skillName));
             if (options.agentId === null) payload.append('agent_id', '');
@@ -531,7 +534,11 @@ export const createConversationStore = (connection?: RemoteConnection) => {
               },
             );
           }
-          const payload: Record<string, unknown> = { content };
+          const payload: Record<string, unknown> = {
+            content,
+            permission_mode: options.permissionMode ?? 'default',
+            collaboration_mode: options.collaborationMode ?? 'default',
+          };
           if (options.agentId !== undefined) {
             payload.agent_id = options.agentId;
           }
@@ -572,6 +579,7 @@ export const createConversationStore = (connection?: RemoteConnection) => {
                 skill_names: options.skillNames ?? [],
                 agent_id: options.agentId ?? null,
                 permission_mode: options.permissionMode ?? 'default',
+                collaboration_mode: options.collaborationMode ?? 'default',
               },
             },
             attachments: (options.images ?? []).map((image, index) => ({
@@ -642,7 +650,9 @@ export const createConversationStore = (connection?: RemoteConnection) => {
                 ? responseData.images.join(' ')
                 : responseData?.images;
               set({
-                error: responseData?.detail || imageError || '创建 Run 失败',
+                error: responseData?.detail || imageError
+                  || responseData?.permission_mode?.[0] || responseData?.collaboration_mode?.[0]
+                  || '创建 Run 失败',
                 streamingMessageId: null,
                 agentActivity: null,
                 currentConversation: current,

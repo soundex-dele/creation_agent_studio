@@ -1,5 +1,6 @@
 """Tests for adapter registration and the Codex event bridge."""
 import os
+import queue
 import sys
 import threading
 from pathlib import Path
@@ -13,6 +14,8 @@ from django.test import override_settings
 from core.agent_engine.adapters.base import AgentAdapter
 from core.agent_engine.adapters.codex import (
     _AppServerThread,
+    _AppServerCodex,
+    _AppServerSdk,
     CodexAdapter,
     _AppServerTransport,
     _consume_codex_turn,
@@ -161,6 +164,7 @@ class CodexIntegrationTest(TestCase):
     def test_projects_request_user_input_into_durable_question(self):
         transport = object.__new__(_AppServerTransport)
         transport.input_request = None
+        transport._notifications = queue.Queue()
         transport._send = MagicMock()
 
         transport._handle_server_request({
@@ -209,15 +213,64 @@ class CodexIntegrationTest(TestCase):
         })
         self.assertTrue(transport.input_request["questions"][1]["is_secret"])
         self.assertEqual(transport.input_request["codex"]["thread_id"], "thread-1")
-        transport._send.assert_called_once_with({
-            "id": 17,
-            "result": {
-                "answers": {
-                    "framework": {"answers": []},
-                    "token": {"answers": []},
-                },
-            },
-        })
+        transport._send.assert_not_called()
+        self.assertEqual(transport.next_notification()["method"], "agentStudio/inputRequired")
+
+    def test_question_ends_stream_without_waiting_for_turn_completion(self):
+        transport = MagicMock()
+        transport.request.return_value = {"turn": {"id": "turn-1"}}
+        transport.next_notification.return_value = {
+            "method": "agentStudio/inputRequired", "params": {},
+        }
+        thread = _AppServerThread(transport=transport, thread_id="thread-1")
+        result = _consume_codex_turn(thread, "Ask me")
+        self.assertEqual(result.final_response, "")
+        transport.next_notification.assert_called_once()
+
+    @override_settings(CODEX_MODEL="", CODEX_SANDBOX="workspace-write")
+    def test_composer_modes_reach_start_resume_and_turn_protocol(self):
+        for permission, sandbox, approval in (
+            ("allow_all", "danger-full-access", "never"),
+            ("default", "workspace-write", "on-request"),
+        ):
+            for mode in ("plan", "default"):
+                for resume in (False, True):
+                    with self.subTest(permission=permission, mode=mode, resume=resume):
+                        transport = MagicMock(input_request=None)
+                        def request(method, params):
+                            if method in ("thread/start", "thread/resume"):
+                                return {"thread": {"id": "thread-1"}, "model": "configured-model",
+                                        "reasoningEffort": "high"}
+                            return {"turn": {"id": "turn-1"}}
+                        transport.request.side_effect = request
+                        transport.next_notification.return_value = {
+                            "method": "turn/completed", "params": {
+                                "threadId": "thread-1", "turn": {"id": "turn-1", "status": "completed"},
+                            },
+                        }
+                        with patch("core.agent_engine.adapters.codex._AppServerTransport", return_value=transport):
+                            client = _AppServerCodex(codex_bin=Path("codex"))
+                        adapter = CodexAdapter()
+                        with patch.object(adapter, "_client", return_value=(_AppServerSdk, client)):
+                            response = adapter.complete(
+                                [{"role": "user", "content": "hello"}],
+                                thread_id="thread-1" if resume else "",
+                                permission_mode=permission, collaboration_mode=mode,
+                            )
+                        self.assertTrue(response.success)
+                        thread_call, turn_call = transport.request.call_args_list
+                        self.assertEqual(thread_call.args[0], "thread/resume" if resume else "thread/start")
+                        self.assertEqual(thread_call.args[1]["sandbox"], sandbox)
+                        self.assertEqual(thread_call.args[1]["approvalPolicy"], approval)
+                        self.assertEqual(thread_call.args[1]["approvalsReviewer"], "user")
+                        self.assertEqual(turn_call.args[1]["collaborationMode"], {
+                            "mode": mode, "settings": {"model": "configured-model",
+                            "reasoning_effort": "high", "developer_instructions": None},
+                        })
+
+    def test_full_control_cannot_override_mandatory_approval(self):
+        with self.assertRaisesRegex(ValueError, "组织要求工具审批"):
+            CodexAdapter().complete([], permission_mode="allow_all", require_tool_approval=True)
 
     def test_builds_structured_skill_input_with_text_marker(self):
         result = _text_input("Inspect the repository", [{

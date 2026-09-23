@@ -4,12 +4,43 @@ import { createConnectionApi, loadConnectionCollection } from '../chatConnection
 import { streamRunEvents } from '../runStream';
 import * as runStream from '../runStream';
 import { createConversationStore, useConversationStore } from '@/stores/useConversationStore';
-import type { RunEventSnapshotEnvelope } from '@/entities/run';
+import type { RunEventSnapshotEnvelope, RunEventEnvelope } from '@/entities/run';
 import { applicationPath } from '@/lib/applicationCatalog';
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('remote connection isolation and recovery', () => {
+  it('sends modes to the selected computer and routes Codex questions and answers back', async () => {
+    const store = createConversationStore({ deviceId: 'computer' });
+    store.setState({ currentConversation: { id: '1', title: 'chat', created_at: '', updated_at: '', messages: [] } });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ id: 'run-1', organization_id: 'local-org', status: 'queued' });
+    let emit: ((event: RunEventEnvelope) => void) | undefined;
+    vi.spyOn(runStream, 'streamRunEvents').mockImplementation(options => {
+      expect(options.connection).toEqual({ deviceId: 'computer' });
+      emit = options.onEvent;
+      return { abort: vi.fn(), done: new Promise(() => undefined), cursor: 0 };
+    });
+    try {
+      const controller = store.getState().sendMessageStream('1', 'Plan this', {
+        permissionMode: 'allow_all', collaborationMode: 'plan',
+      });
+      await (controller as AbortController & { submitted: Promise<void> }).submitted;
+      expect(post).toHaveBeenCalledWith('/remote/devices/computer/proxy/conversations/1/send_message/', {
+        content: 'Plan this', permission_mode: 'allow_all', collaboration_mode: 'plan',
+      }, expect.any(Object));
+      emit?.({ schema_version: 1, run_id: 'run-1', attempt_id: null, sequence: 1, created_at: '',
+        type: 'input.required', payload: { input_request_id: 'input-1', input_kind: 'answer',
+          questions: [{ id: 'framework', header: '框架', question: '选择哪个框架？', options: [{ label: 'React', value: 'React' }] }],
+        },
+      });
+      expect(store.getState().pendingQuestion?.question).toBe('选择哪个框架？');
+      await store.getState().answerQuestion('1', { answers: { framework: { answers: ['React'] } } });
+      expect(post).toHaveBeenLastCalledWith('/remote/devices/computer/proxy/organizations/local-org/runs/run-1/commands',
+        expect.objectContaining({ type: 'answer', input_request_id: 'input-1',
+          payload: { answers: { framework: { answers: ['React'] } } },
+        }), expect.any(Object));
+    } finally { store.getState().disconnect(); }
+  });
   it('loads catalog pages through the selected computer instead of following local absolute URLs', async () => {
     const get = vi.spyOn(api, 'get')
       .mockResolvedValueOnce({ results: [{ id: 1 }], next: 'http://127.0.0.1:8080/api/v1/apps/?page=2' })

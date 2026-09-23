@@ -15,6 +15,21 @@ from apps.remote_access.protocol import validate_request
 from apps.remote_access.security import decrypt_credentials, digest, encrypt_credentials
 
 
+def test_remote_allows_execution_settings_and_structured_answers():
+    path = "/api/v1/conversations/1/send_message/"
+    assert validate_request("POST", path, {
+        "content": "Plan a change", "permission_mode": "allow_all", "collaboration_mode": "plan",
+    }) == path
+    command_path = "/api/v1/runs/10000000-0000-0000-0000-000000000001/commands"
+    for command in ("answer", "grant_permission", "deny_permission"):
+        assert validate_request("POST", command_path, {
+            "type": command, "input_request_id": "question-1", "idempotency_key": "answer-1",
+            "payload": {"answers": {"framework": {"answers": ["React"]}}},
+        }) == command_path
+    with pytest.raises(ValueError):
+        validate_request("POST", path, {"content": "hello", "sandbox": "danger-full-access"})
+
+
 @pytest.fixture
 def grant(db, settings, tmp_path):
     settings.REMOTE_ACCESS_HOST_ENABLED = True

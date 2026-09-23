@@ -82,6 +82,48 @@ class DurableConversationRunTest(TestCase):
         content_type = "image/jpeg" if image_format == "JPEG" else "image/png"
         return SimpleUploadedFile(name, data.getvalue(), content_type=content_type)
 
+    @override_settings(AGENT_ENGINE_ADAPTER="codex")
+    def test_execution_settings_persist_and_participate_in_idempotency(self):
+        from apps.enterprise.models import GovernancePolicy
+        GovernancePolicy.objects.update_or_create(
+            organization=self.organization, defaults={"require_tool_approval": False})
+        url = f"/api/v1/conversations/{self.conversation.id}/send_message/"
+        body = {"content": "Plan a change", "permission_mode": "allow_all", "collaboration_mode": "plan"}
+        response = self.client.post(url, body, format="json", HTTP_IDEMPOTENCY_KEY="modes", **self.headers)
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        self.assertEqual(run.input["permission_mode"], "allow_all")
+        self.assertEqual(run.input["collaboration_mode"], "plan")
+        composer = Message.objects.get(conversation=self.conversation, role="user").metadata["composer"]
+        self.assertEqual(composer["permission_mode"], "allow_all")
+        self.assertEqual(composer["collaboration_mode"], "plan")
+        for field, value in (("permission_mode", "default"), ("collaboration_mode", "default")):
+            changed = self.client.post(url, {**body, field: value}, format="json",
+                                       HTTP_IDEMPOTENCY_KEY="modes", **self.headers)
+            self.assertEqual(changed.status_code, 409, changed.data)
+
+    def test_invalid_execution_settings_create_no_messages(self):
+        for field in ("permission_mode", "collaboration_mode"):
+            response = self.client.post(
+                f"/api/v1/conversations/{self.conversation.id}/send_message/",
+                {"content": "hello", field: "invalid"}, format="json",
+                HTTP_IDEMPOTENCY_KEY="invalid-mode", **self.headers)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn(field, response.data)
+        self.assertFalse(self.conversation.messages.exists())
+
+    def test_mandatory_approval_rejects_full_control_before_creating_run(self):
+        from apps.enterprise.models import GovernancePolicy
+        GovernancePolicy.objects.update_or_create(
+            organization=self.organization, defaults={"require_tool_approval": True})
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "hello", "permission_mode": "allow_all"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="blocked-mode", **self.headers)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("permission_mode", response.data)
+        self.assertFalse(self.conversation.messages.exists())
+
     def test_image_only_message_persists_attachment_and_run_input(self):
         with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
             response = self.client.post(
@@ -523,6 +565,8 @@ class DurableConversationRunTest(TestCase):
             content="inspect this repository",
         )
         self.assertEqual(message.metadata["composer"], {
+            "permission_mode": "default",
+            "collaboration_mode": "default",
             "agent_id": selected_agent.id,
             "skill_names": ["repo-audit"],
             "skills": ["repo-audit"],
