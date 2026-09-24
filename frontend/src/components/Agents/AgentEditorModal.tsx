@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Form, Input, Modal, Select, Switch, message } from 'antd';
 import { api } from '@/services/api';
+import './AgentEditorModal.css';
 
 interface AgentEditorModalProps {
   agentId: number | null;

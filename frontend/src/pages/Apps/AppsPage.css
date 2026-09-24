@@ -12,24 +12,6 @@
   gap: 24px;
 }
 
-.apps-result-summary {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: baseline;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-bg-card);
-  color: var(--color-text-dim);
-  font-size: 12px;
-}
-
-.apps-result-summary strong {
-  color: var(--color-text);
-  font: 700 17px/1 var(--font-display);
-}
-
 .apps-category-strip {
   display: flex;
   align-items: center;
@@ -69,7 +51,10 @@
 
 .apps-toolbar {
   justify-content: flex-start;
+  flex-wrap: wrap;
 }
+
+.apps-toolbar > * { min-width: 0; }
 
 .apps-view-switch {
   display: flex;
@@ -306,17 +291,19 @@
   transform: translateX(2px);
 }
 
-@media (max-width: 640px) {
-  .apps-heading,
+@media (max-width: 767px) {
   .apps-toolbar {
-    align-items: stretch;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
   }
-
-  .apps-result-summary { align-self: flex-start; }
 
   .apps-search,
   .apps-sort { width: 100%; margin-left: 0; }
+
+  /* Reserve the same height as the mobile selector, so it cannot overlap the next row. */
+  .apps-toolbar .apps-sort { min-height: 44px; }
+  .apps-search .ant-input-affix-wrapper > .ant-input { min-height: 0; }
 
   .apps-view-switch button { flex: 1; justify-content: center; }
 

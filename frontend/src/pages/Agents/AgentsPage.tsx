@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Empty, Input, Popconfirm, Select, Spin, message } from 'antd';
+import { Button, Empty, Input, Select, Spin } from 'antd';
 import {
   ArrowRightOutlined,
-  DeleteOutlined,
-  EditOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -11,7 +9,6 @@ import {
 import { useAgentStore } from '@/stores/useAgentStore';
 import AgentDetailModal from '@/components/Agents/AgentDetailModal';
 import AgentEditorModal from '@/components/Agents/AgentEditorModal';
-import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import './AgentsPage.css';
@@ -35,8 +32,6 @@ const AgentsPage: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
-  const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
   const [sort, setSort] = useState<AgentSort>('recommended');
   const {
     agents,
@@ -80,25 +75,6 @@ const AgentsPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  const openEditor = (agentId: number | null) => {
-    setEditingAgentId(agentId);
-    setEditorOpen(true);
-  };
-
-  const handleDelete = async (agentId: number) => {
-    setDeletingAgentId(agentId);
-    try {
-      await api.delete(`/agents/${agentId}/`);
-      message.success('智能体已删除');
-      await loadAgents(selectedCategory || undefined);
-      await loadCategories();
-    } catch (reason: any) {
-      message.error(reason?.response?.data?.detail || '删除智能体失败');
-    } finally {
-      setDeletingAgentId(null);
-    }
-  };
-
   const resetFilters = () => {
     selectCategory(null);
     setSearchQuery('');
@@ -111,7 +87,6 @@ const AgentsPage: React.FC = () => {
           <h1 className="page-title">智能体</h1>
           <p className="page-subtitle">选择智能体开始协作，或创建适合团队场景的专属智能体</p>
         </div>
-        <div className="agents-result-summary"><strong>{visibleAgents.length}</strong><span>个可用智能体</span></div>
       </div>
 
       <div className="agents-category-strip" aria-label="智能体分类">
@@ -132,7 +107,7 @@ const AgentsPage: React.FC = () => {
 
       <div className="page-toolbar agents-toolbar">
         {canCreateAgent && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditorOpen(true)}>
             新建智能体
           </Button>
         )}
@@ -196,25 +171,6 @@ const AgentsPage: React.FC = () => {
               role="button"
               tabIndex={0}
             >
-              {(agent.can_edit || agent.can_delete) && (
-                <div className="agent-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                  {agent.can_edit && (
-                    <Button type="text" size="small" icon={<EditOutlined />} aria-label={`编辑 ${agent.name}`} onClick={() => openEditor(agent.id)} />
-                  )}
-                  {agent.can_delete && (
-                    <Popconfirm
-                      title="删除智能体"
-                      description={`确定删除“${agent.name}”吗？此操作不可撤销。`}
-                      okText="删除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => handleDelete(agent.id)}
-                    >
-                      <Button type="text" danger size="small" icon={<DeleteOutlined />} loading={deletingAgentId === agent.id} aria-label={`删除 ${agent.name}`} />
-                    </Popconfirm>
-                  )}
-                </div>
-              )}
               <div className="agent-card-heading">
                 <span className={`agent-card-icon icon-gradient-${(index % 6) + 1}`}>
                   {agent.icon || AGENT_ICONS[index % AGENT_ICONS.length]}
@@ -240,9 +196,9 @@ const AgentsPage: React.FC = () => {
         onClose={() => { setModalOpen(false); setSelectedAgentId(null); }}
       />
       <AgentEditorModal
-        agentId={editingAgentId}
+        agentId={null}
         open={editorOpen}
-        onClose={() => { setEditorOpen(false); setEditingAgentId(null); }}
+        onClose={() => setEditorOpen(false)}
         onSaved={() => {
           void loadAgents(selectedCategory || undefined);
           void loadCategories();

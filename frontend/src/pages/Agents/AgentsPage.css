@@ -10,24 +10,6 @@
   gap: 24px;
 }
 
-.agents-result-summary {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: baseline;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-bg-card);
-  color: var(--color-text-dim);
-  font-size: 12px;
-}
-
-.agents-result-summary strong {
-  color: var(--color-text);
-  font: 700 17px/1 var(--font-display);
-}
-
 .agents-category-strip {
   display: flex;
   align-items: center;
@@ -64,7 +46,8 @@
   color: var(--color-primary);
 }
 
-.agents-toolbar { justify-content: flex-start; }
+.agents-toolbar { justify-content: flex-start; flex-wrap: wrap; }
+.agents-toolbar > * { min-width: 0; }
 .agents-search { width: min(360px, 100%); margin-left: auto; }
 .agents-sort { width: 132px; }
 
@@ -164,23 +147,6 @@
   -webkit-line-clamp: 3;
 }
 
-.agent-card-actions {
-  position: absolute;
-  z-index: 1;
-  top: 12px;
-  right: 12px;
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--border-radius-sm);
-  background: color-mix(in srgb, var(--color-bg-card) 94%, transparent);
-  opacity: 0;
-  transition: opacity .2s ease;
-}
-
-.agent-card:hover .agent-card-actions,
-.agent-card:focus-within .agent-card-actions { opacity: 1; }
-
 .agent-card-footer {
   display: flex;
   align-items: center;
@@ -196,26 +162,20 @@
 .agent-card-open { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-sec); }
 .agent-card:hover .agent-card-open { color: var(--color-primary); }
 
-.agent-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.agent-form-row-compact { grid-template-columns: 2fr 1fr; }
-.agent-system-prompt-input { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .modal-skill-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
-@media (max-width: 720px) {
-  .agents-heading,
-  .agents-toolbar { align-items: stretch; flex-direction: column; }
-  .agents-result-summary { align-self: flex-start; }
+@media (max-width: 767px) {
+  .agents-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
   .agents-search,
   .agents-sort { width: 100%; margin-left: 0; }
+  /* Reserve the same height as the mobile selector, so it cannot overlap the next row. */
+  .agents-toolbar .agents-sort { min-height: 44px; }
+  .agents-search .ant-input-affix-wrapper > .ant-input { min-height: 0; }
   .agents-category-strip button { min-height: 44px; padding: 8px 14px; }
-  .agent-form-row,
-  .agent-form-row-compact { grid-template-columns: 1fr; gap: 0; }
-  .agent-card-actions { top: 8px; right: 8px; gap: 8px; opacity: 1; }
   .agent-grid { grid-template-columns: 1fr; gap: 16px; }
 }
 

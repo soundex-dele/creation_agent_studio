@@ -209,7 +209,6 @@ const AppsPage: React.FC = () => {
           <h1 className="page-title">应用</h1>
           <p className="page-subtitle">选择应用即可开始工作；这里只提供使用入口，不承载接入和开发</p>
         </div>
-        <div className="apps-result-summary"><strong>{resultCount}</strong><span>个可用应用</span></div>
       </div>
 
       <div className="apps-category-strip" aria-label="应用分类">

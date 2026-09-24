@@ -1,0 +1,13 @@
+.agent-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.agent-form-row-compact { grid-template-columns: 2fr 1fr; }
+.agent-system-prompt-input { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+@media (max-width: 767px) {
+  .agent-form-row,
+  .agent-form-row-compact { grid-template-columns: 1fr; gap: 0; }
+}

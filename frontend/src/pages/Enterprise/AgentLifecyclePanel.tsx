@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type Key } from 'react';
 import {
-  Alert, Button, Card, Empty, Form, Input, Modal, Select, Space, Switch, Table,
+  Alert, Button, Card, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table,
   Tag, Typography, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { LockOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, LockOutlined } from '@ant-design/icons';
 import { api } from '@/services/api';
+import AgentEditorModal from '@/components/Agents/AgentEditorModal';
 import BulkResourcePermissionModal from '@/components/Permissions/BulkResourcePermissionModal';
 import ResourcePermissionModal, {
   type ResourceVisibility,
@@ -22,6 +23,7 @@ interface ManagedAgent extends Row {
   is_active: boolean;
   visibility: ResourceVisibility;
   can_edit: boolean;
+  can_delete: boolean;
   can_toggle: boolean;
   can_manage_permissions: boolean;
 }
@@ -51,6 +53,8 @@ export default function AgentLifecyclePanel() {
   const [permissionAgent, setPermissionAgent] = useState<ManagedAgent | null>(null);
   const [selectedPermissionKeys, setSelectedPermissionKeys] = useState<Key[]>([]);
   const [bulkPermissionOpen, setBulkPermissionOpen] = useState(false);
+  const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
+  const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
 
   const selectedAgent = agents.find((agent) => agent.id === agentId);
   const selectedPermissionAgents = agents.filter((agent) => (
@@ -150,6 +154,19 @@ export default function AgentLifecyclePanel() {
     message.success(`智能体已${isActive ? '启用' : '停用'}`);
   };
 
+  const deleteAgent = async (id: number) => {
+    setDeletingAgentId(id);
+    try {
+      await api.delete(`/agents/${id}/`);
+      message.success('智能体已删除');
+      await loadAgents();
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '删除智能体失败');
+    } finally {
+      setDeletingAgentId(null);
+    }
+  };
+
   const permissionColumns: ColumnsType<ManagedAgent> = [
     {
       title: '智能体',
@@ -179,14 +196,43 @@ export default function AgentLifecyclePanel() {
     },
     {
       title: '操作',
-      width: 130,
-      render: (_, agent) => agent.can_manage_permissions ? (
-        <Button
-          icon={<LockOutlined aria-hidden="true" />}
-          onClick={() => setPermissionAgent(agent)}
-        >
-          权限设置
-        </Button>
+      width: 320,
+      render: (_, agent) => (agent.can_edit || agent.can_delete || agent.can_manage_permissions) ? (
+        <Space wrap>
+          {agent.can_edit && (
+            <Button
+              icon={<EditOutlined aria-hidden="true" />}
+              disabled={!agent.is_active}
+              title={!agent.is_active ? '请先启用智能体再编辑' : undefined}
+              aria-label={`编辑 ${agent.name}`}
+              onClick={() => setEditingAgentId(agent.id)}
+            >编辑</Button>
+          )}
+          {agent.can_delete && (
+            <Popconfirm
+              title="删除智能体"
+              description={`确定删除“${agent.name}”吗？`}
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => deleteAgent(agent.id)}
+            >
+              <Button
+                danger
+                icon={<DeleteOutlined aria-hidden="true" />}
+                aria-label={`删除 ${agent.name}`}
+                loading={deletingAgentId === agent.id}
+                disabled={deletingAgentId !== null}
+              >删除</Button>
+            </Popconfirm>
+          )}
+          {agent.can_manage_permissions && (
+            <Button
+              icon={<LockOutlined aria-hidden="true" />}
+              onClick={() => setPermissionAgent(agent)}
+            >权限设置</Button>
+          )}
+        </Space>
       ) : '—',
     },
   ];
@@ -200,7 +246,7 @@ export default function AgentLifecyclePanel() {
         description="可执行的操作由当前组织角色和该智能体的资源授权共同决定。"
       />
 
-      <Card title="智能体权限">
+      <Card title="智能体列表">
         <div className="enterprise-bulk-toolbar">
           <Typography.Text type="secondary">
             勾选智能体后可统一覆盖可见范围和账号授权，支持表头全选。
@@ -229,7 +275,7 @@ export default function AgentLifecyclePanel() {
           dataSource={agents}
           columns={permissionColumns}
           pagination={false}
-          scroll={{ x: 720 }}
+          scroll={{ x: 920 }}
           rowSelection={{
             selectedRowKeys: selectedPermissionKeys,
             onChange: setSelectedPermissionKeys,
@@ -391,6 +437,15 @@ export default function AgentLifecyclePanel() {
         </Form>
       </Modal>
 
+      <AgentEditorModal
+        agentId={editingAgentId}
+        open={editingAgentId !== null}
+        onClose={() => setEditingAgentId(null)}
+        onSaved={async () => {
+          await loadAgents();
+          await loadDetails();
+        }}
+      />
       <ResourcePermissionModal
         resourceType="agent"
         resourceId={permissionAgent?.id ?? null}
