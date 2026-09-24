@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 import { useChatConnection } from '@/components/Chat/ChatConnectionContext';
@@ -46,14 +46,22 @@ async function click(label: string) {
   await act(async () => { button!.click(); });
 }
 
-it('keeps mobile navigation nested and retains the current draft while offline', async () => {
-  await act(async () => root.render(React.createElement(MemoryRouter, { initialEntries: ['/apps/my-computer'] },
+function LocationProbe() {
+  return React.createElement('output', { 'data-testid': 'location-search' }, useLocation().search);
+}
+
+it.each(['', '?entry=apps&standalone=1'])('keeps mobile navigation, launch presentation and offline drafts (%s)', async (search) => {
+  const expectPresentation = () => expect(container.querySelector('[data-testid="location-search"]')?.textContent).toBe(search);
+  await act(async () => root.render(React.createElement(MemoryRouter, { initialEntries: [`/apps/my-computer${search}`] },
+    React.createElement(LocationProbe),
     React.createElement(Routes, {}, ...[
       '/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId',
     ].map(path => React.createElement(Route, { key: path, path, element: React.createElement(MyComputerPage) }))))));
   await click('查看对话');
+  expectPresentation();
   expect(container.textContent).toContain('本机对话');
   await click('新建对话');
+  expectPresentation();
   const draft = container.querySelector<HTMLInputElement>('input[aria-label="draft"]')!;
   await act(async () => {
     draft.value = '保留的草稿';
@@ -64,8 +72,10 @@ it('keeps mobile navigation nested and retains the current draft while offline',
   expect(container.querySelector<HTMLInputElement>('input[aria-label="draft"]')?.value).toBe('保留的草稿');
   expect(container.querySelector<HTMLButtonElement>('[data-testid="send"]')?.disabled).toBe(true);
   await click('对话列表');
+  expectPresentation();
   expect(container.textContent).toContain('新建对话');
   await click('电脑列表');
+  expectPresentation();
   expect(container.textContent).toContain('绑定电脑');
 });
 

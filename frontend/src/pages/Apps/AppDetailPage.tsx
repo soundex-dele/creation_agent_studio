@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Result, Spin, Tag } from 'antd';
 import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { applicationPath } from '@/lib/applicationCatalog';
+import { applicationWindowPath, resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
 import './AppDetailPage.css';
@@ -11,6 +12,8 @@ import './AppDetailPage.css';
 const AppDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const { loadApp, categories } = useAppStore();
 
   const [app, setApp] = useState<AppItem | null>(null);
@@ -48,11 +51,11 @@ const AppDetailPage: React.FC = () => {
           status="404"
           title="应用不存在"
           subTitle="该应用可能已下线或链接有误。"
-          extra={
+          extra={showApplicationHeader && (
             <Button type="primary" onClick={() => navigate('/apps')}>
               返回应用中心
             </Button>
-          }
+          )}
         />
       </div>
     );
@@ -62,21 +65,21 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
-    window.open(applicationPath(app), '_blank', 'noopener,noreferrer');
+    window.open(applicationWindowPath(applicationPath(app)), '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div className="app-detail-page animate-fade-in">
       {/* Header */}
       <div className="app-detail-header">
-        <Button
+        {showApplicationHeader && <Button
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/apps')}
           className="app-detail-back"
         >
           返回
-        </Button>
+        </Button>}
 
         <div className="app-detail-title-row">
           <div

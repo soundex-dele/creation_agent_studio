@@ -6,7 +6,8 @@ import {
   FileTextOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplatesPage.css';
@@ -27,7 +28,7 @@ const formatSource = (platform?: string, author?: string) =>
   [platform, author].filter(Boolean).join(' · ') || '来源待补充';
 
 const TemplatesPage: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useApplicationNavigate();
   const [searchParams] = useSearchParams();
   const { entry, showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const {

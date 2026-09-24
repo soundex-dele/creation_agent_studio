@@ -10,8 +10,8 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { applicationPath } from '@/lib/applicationCatalog';
+import { applicationWindowPath } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
 import './AppsPage.css';
@@ -31,10 +31,7 @@ const EMPTY_PREFERENCES: ApplicationPreferences = { favorites: [], recent: {} };
 
 const AppsPage: React.FC = () => {
   const userId = useAuthStore((state) => state.user?.id || 'anonymous');
-  const layoutMode = usePreferencesStore((state) => state.layoutMode);
-  const conversationPath = layoutMode === 'left-right'
-    ? '/chat?entry=apps&standalone=1'
-    : '/chat?entry=apps';
+  const conversationPath = '/chat?entry=apps';
   const {
     apps,
     isLoading,
@@ -113,7 +110,7 @@ const AppsPage: React.FC = () => {
       ...preferences,
       recent: { ...preferences.recent, [id]: Date.now() },
     });
-    window.open(path, '_blank', 'noopener,noreferrer');
+    window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
   };
 
   const visibleApps = useMemo(() => {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, List, Popconfirm, Select, Space, Switch, Tag } from 'antd';
 import { ArrowLeftOutlined, DesktopOutlined, PlusOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { api } from '@/services/api';
 import { createConnectionApi, loadConnectionCollection } from '@/services/chatConnection';
 import { createConversationStore, type Conversation } from '@/stores/useConversationStore';
@@ -19,7 +20,7 @@ interface Device {
 interface ChatApp { id: number; name: string; kind: string }
 
 function ComputerWorkspace({ device, connectionKnown }: { device: Device; connectionKnown: boolean }) {
-  const navigate = useNavigate();
+  const navigate = useApplicationNavigate();
   const { conversationId } = useParams();
   const connection = useMemo(() => ({ deviceId: device.id }), [device.id]);
   const remoteApi = useMemo(() => createConnectionApi(connection), [connection]);
@@ -130,7 +131,7 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
 }
 
 export default function MyComputerPage() {
-  const navigate = useNavigate();
+  const navigate = useApplicationNavigate();
   const { deviceId } = useParams();
   const [devices, setDevices] = useState<Device[]>([]);
   const [known, setKnown] = useState(false);

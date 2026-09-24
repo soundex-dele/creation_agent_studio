@@ -43,7 +43,7 @@ export default function ChatApplicationRuntimePage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('slug') || '';
-  const { embedded, entry, showApplicationHeader } = resolveApplicationPresentation(searchParams);
+  const { embedded, showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const restoredConversationId = searchParams.get('conversation');
   const manualWorkflowId = searchParams.get('workflowId');
   const manualRunId = searchParams.get('manualRunId');
@@ -177,7 +177,7 @@ export default function ChatApplicationRuntimePage() {
           )}
         </header>
       )}
-      {!embedded && entry === 'home' && chatStarted && (
+      {!embedded && !showApplicationHeader && chatStarted && (
         <div className="chat-app-tools">
           <Button icon={<EditOutlined />} onClick={() => setChatStarted(false)}>
             重新填写

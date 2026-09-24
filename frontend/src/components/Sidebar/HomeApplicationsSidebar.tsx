@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
+import { applicationWindowPath } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import { scrollHorizontalWithWheel } from '@/lib/horizontalWheelScroll';
 import { useAppStore } from '@/stores/useAppStore';
@@ -103,11 +104,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
   const openApplication = (app: AppItem) => {
     const path = homeApplicationPath(app);
     if (openInNewWindow) {
-      const url = new URL(path, window.location.origin);
-      // Separate windows use the application's own navigation, like catalog launches.
-      url.searchParams.set('entry', 'apps');
-      url.searchParams.set('standalone', '1');
-      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+      window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
       return;
     }
     navigate(path);

@@ -10,7 +10,8 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplateDetailPage.css';
 
@@ -19,7 +20,7 @@ const formatDate = (date?: string | null) =>
 
 const TemplateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const navigate = useApplicationNavigate();
   const [searchParams] = useSearchParams();
   const libraryPath = `/apps/case-library?entry=${searchParams.get('entry') === 'home' ? 'home' : 'apps'}`;
   const { currentTemplate, isLoadingTemplate, loadTemplate, clearCurrentTemplate } =

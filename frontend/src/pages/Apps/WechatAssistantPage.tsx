@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { WechatAssistantApp } from '@wechat-assistant/main';
 import { api } from '@/services/api';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -8,7 +9,7 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 export default function WechatAssistantPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const organizationId = useOrganizationStore(state => state.currentOrganizationId);
-  const navigate = useNavigate();
+  const navigate = useApplicationNavigate();
   const requester = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
     const data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     if (init.method === 'PUT') return api.put<T>(path, data);
