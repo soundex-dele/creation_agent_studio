@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Sum
-from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
@@ -22,7 +21,7 @@ from .serializers import (
     OrganizationSerializer, ProviderConfigSerializer, QuotaPolicySerializer,
     RunTraceSerializer, SecretReferenceSerializer, UsageRecordSerializer,
 )
-from .services import dispatch_automation, start_evaluation
+from .services import dispatch_automation, monthly_usage_records, start_evaluation
 from .tenancy import (
     get_single_tenant_organization,
     provision_single_tenant_user,
@@ -82,12 +81,22 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     def members(self, request, pk=None):
         organization = self.get_object()
         if request.method == 'GET':
+            totals = monthly_usage_records(organization).order_by().values('user_id').annotate(
+                tokens=Sum('total_tokens'))
             return Response(MembershipSerializer(
-                organization.memberships.select_related('user'), many=True).data)
+                organization.memberships.select_related('user'), many=True,
+                context={'monthly_member_usage': {row['user_id']: row['tokens'] for row in totals}},
+            ).data)
         self._require_admin(organization)
         serializer = MembershipSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = get_user_model().objects.get(id=serializer.validated_data.pop('user_id'))
+        user = get_user_model().objects.filter(id=serializer.validated_data.pop('user_id')).first()
+        if user is None:
+            return Response({'user_id': ['User not found.']}, status=400)
+        existing = organization.memberships.filter(user=user).first()
+        if existing and existing.role == Membership.Role.OWNER and any(
+                key in serializer.validated_data for key in ('role', 'is_active')):
+            return Response({'detail': 'Organization owner role and status cannot be changed here.'}, status=409)
         member, _ = Membership.objects.update_or_create(
             organization=organization, user=user,
             defaults=serializer.validated_data)
@@ -101,7 +110,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         member = organization.memberships.filter(id=member_id).first()
         if member is None:
             return Response({'detail': 'Member not found.'}, status=404)
-        if member.role == Membership.Role.OWNER:
+        if member.role == Membership.Role.OWNER and (
+                request.method == 'DELETE' or any(
+                    key in request.data for key in ('role', 'is_active', 'user_id'))):
             return Response({'detail': 'Organization owner cannot be removed here.'}, status=409)
         if request.method == 'DELETE':
             member.is_active = False
@@ -309,9 +320,7 @@ class UsageViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request):
         organization = resolve_organization(request)
-        now = timezone.now()
-        records = self.get_queryset().filter(created_at__year=now.year,
-                                             created_at__month=now.month)
+        records = monthly_usage_records(organization)
         totals = records.aggregate(tokens=Sum('total_tokens'), cost=Sum('cost'))
         quota, _ = QuotaPolicy.objects.get_or_create(organization=organization)
         return Response({

@@ -2738,6 +2738,186 @@
                 }
             ]
         },
+        "/applications/{application_id}/ideas-todos/memos": {
+            "get": {
+                "operationId": "applications_ideas-todos_memos_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Memo"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_ideas-todos_memos_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Memo"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/ideas-todos/memos/{id}": {
+            "get": {
+                "operationId": "applications_ideas-todos_memos_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_ideas-todos_memos_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Memo"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_ideas-todos_memos_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/applications/{application_id}/ideas-todos/todos": {
             "get": {
                 "operationId": "applications_ideas-todos_todos_list",
@@ -11906,6 +12086,202 @@
                 }
             ]
         },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/memos": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_memos_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "A search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "count",
+                                        "results"
+                                    ],
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "next": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "previous": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "nullable": true
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Memo"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_ideas-todos_memos_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Memo"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/ideas-todos/memos/{id}": {
+            "get": {
+                "operationId": "organizations_applications_ideas-todos_memos_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_ideas-todos_memos_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Memo"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Memo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_ideas-todos_memos_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
         "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos": {
             "get": {
                 "operationId": "organizations_applications_ideas-todos_todos_list",
@@ -17850,6 +18226,16 @@
                 },
                 "required": true
             },
+            "Memo": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Memo"
+                        }
+                    }
+                },
+                "required": true
+            },
             "Configuration": {
                 "content": {
                     "application/json": {
@@ -18484,6 +18870,47 @@
                             "minLength": 1
                         },
                         "maxItems": 20
+                    },
+                    "is_pinned": {
+                        "title": "Is pinned",
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "Memo": {
+                "required": [
+                    "title"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 1
+                    },
+                    "body": {
+                        "title": "Body",
+                        "type": "string",
+                        "maxLength": 20000
                     },
                     "is_pinned": {
                         "title": "Is pinned",

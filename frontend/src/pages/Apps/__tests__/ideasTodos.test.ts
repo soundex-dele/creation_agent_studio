@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
-import { localDate, type Idea, type Todo } from '@/services/ideasTodos';
+import { localDate, type Entry, type Idea, type Memo, type Todo } from '@/services/ideasTodos';
 import { IdeasTodosWorkspace } from '../IdeasTodosPage';
 
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
@@ -13,7 +13,8 @@ vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi
 const base = '/organizations/org-1/applications/12/ideas-todos';
 const idea: Idea = { id: 'idea-1', title: '新灵感', body: '正文内容', tags: ['生活'], is_pinned: false, created_at: '2026-09-23T08:00:00Z', updated_at: '2026-09-23T08:00:00Z' };
 const todo: Todo = { id: 'todo-1', title: '买牛奶', description: '早餐用', priority: 2, due_date: null, is_completed: false, completed_at: null, created_at: idea.created_at, updated_at: idea.updated_at };
-const page = (results: Array<Idea | Todo>) => ({ count: results.length, next: null, previous: null, results });
+const memo: Memo = { id: 'memo-1', title: '会议备忘', body: '预算讨论\n带上资料', is_pinned: false, created_at: idea.created_at, updated_at: idea.updated_at };
+const page = (results: Entry[]) => ({ count: results.length, next: null, previous: null, results });
 let root: Root;
 let container: HTMLDivElement;
 const settle = async (delay = 20) => act(async () => { await new Promise((resolve) => setTimeout(resolve, delay)); });
@@ -72,6 +73,55 @@ afterEach(async () => {
 });
 
 describe('Ideas & Todos interactions', () => {
+  it('creates memos independently, validates titles and retains content after failure', async () => {
+    await render(); await tab('备忘');
+    expect(container.textContent).toContain('还没有备忘');
+    await click(button('新增备忘'));
+    expect(document.querySelector('#entry-tags')).toBeNull();
+    expect(document.querySelector('#entry-priority')).toBeNull();
+    expect(document.querySelector('#entry-due-date')).toBeNull();
+    await click(button('保存'));
+    expect(document.querySelector('#entry-title-error')?.textContent).toContain('请输入标题');
+    expect(api.post).not.toHaveBeenCalled();
+    await input('#entry-title', '会议备忘');
+    await input('#entry-body', memo.body);
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('offline'));
+    await click(button('保存'));
+    expect(document.querySelector<HTMLTextAreaElement>('#entry-body')?.value).toBe(memo.body);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('操作失败');
+    vi.mocked(api.get).mockResolvedValue(page([memo]));
+    await click(button('保存')); await settle();
+    expect(api.post).toHaveBeenLastCalledWith(`${base}/memos`, { title: memo.title, body: memo.body, is_pinned: false });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain(memo.title);
+  });
+
+  it('searches, pins, edits and deletes memos with their own tab state', async () => {
+    vi.mocked(api.get).mockImplementation(async (url) => page(url.endsWith('/memos') ? [memo] : []));
+    await render(); await tab('备忘');
+    expect(container.textContent).toContain(memo.body);
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+    await input('input[aria-label="搜索备忘"]', '预算'); await settle(280);
+    expect(api.get).toHaveBeenLastCalledWith(`${base}/memos`, { page: 1, search: '预算' }, expect.anything());
+    await tab('想法');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="搜索想法"]')?.value).toBe('');
+    await tab('备忘'); await settle(280);
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="搜索备忘"]')?.value).toBe('预算');
+    vi.mocked(api.get).mockResolvedValue(page([{ ...memo, is_pinned: true }]));
+    await click(button('置顶')); await settle(280);
+    expect(api.patch).toHaveBeenLastCalledWith(`${base}/memos/memo-1`, { is_pinned: true });
+    expect(button('取消置顶')).toBeDefined();
+    await click(button('编辑'));
+    expect(document.querySelector<HTMLTextAreaElement>('#entry-body')?.value).toBe(memo.body);
+    await input('#entry-title', '更新备忘');
+    await click(button('保存')); await settle(280);
+    expect(api.patch).toHaveBeenLastCalledWith(`${base}/memos/memo-1`, { title: '更新备忘', body: memo.body, is_pinned: true });
+    await click(button('删除', container));
+    expect(api.delete).not.toHaveBeenCalled();
+    await click(button('删除', document.querySelector('.ant-popover')!));
+    expect(api.delete).toHaveBeenCalledWith(`${base}/memos/memo-1`);
+  });
+
   it('creates ideas and todos independently with different fields and endpoints', async () => {
     await render();
     await click(button('新增想法'));

@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Idea, Todo
+from .models import Idea, Memo, Todo
 
 
 class IdeaSerializer(serializers.ModelSerializer):
@@ -17,6 +17,19 @@ class IdeaSerializer(serializers.ModelSerializer):
         model = Idea
         fields = ["id", "title", "body", "tags", "is_pinned", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class MemoSerializer(serializers.ModelSerializer):
+    body = serializers.CharField(required=False, allow_blank=True, max_length=20000)
+
+    class Meta:
+        model = Memo
+        fields = ["id", "title", "body", "is_pinned", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class MemoListFilters(serializers.Serializer):
+    search = serializers.CharField(required=False, allow_blank=True, max_length=200)
 
 
 class TodoSerializer(serializers.ModelSerializer):

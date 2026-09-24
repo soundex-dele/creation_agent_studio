@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import serializers
 
 from .models import (
@@ -6,6 +7,7 @@ from .models import (
     GovernancePolicy, IdentityProvider, Membership, Organization, ProviderConfig, QuotaPolicy, RunTrace,
     SecretReference, TraceSpan, UsageRecord,
 )
+from .services import monthly_usage_records
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -35,17 +37,33 @@ class MembershipSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     user_id = serializers.IntegerField(write_only=True)
+    monthly_token_limit = serializers.IntegerField(
+        min_value=0, max_value=9007199254740991, allow_null=True, required=False,
+        help_text='Monthly token limit; null disables the member limit, zero blocks new runs.')
+    monthly_tokens_used = serializers.SerializerMethodField()
 
     class Meta:
         model = Membership
         fields = ['id', 'user_id', 'username', 'email', 'role', 'is_active',
-                  'created_at', 'updated_at']
+                  'monthly_token_limit', 'monthly_tokens_used', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate_role(self, value):
         if value == Membership.Role.OWNER:
             raise serializers.ValidationError('Ownership must be transferred explicitly.')
         return value
+
+    def validate_user_id(self, value):
+        if self.instance and value != self.instance.user_id:
+            raise serializers.ValidationError('A membership cannot be reassigned.')
+        return value
+
+    def get_monthly_tokens_used(self, obj):
+        totals = self.context.get('monthly_member_usage')
+        if totals is not None:
+            return totals.get(obj.user_id, 0)
+        return monthly_usage_records(obj.organization).filter(user_id=obj.user_id).aggregate(
+            tokens=Sum('total_tokens'))['tokens'] or 0
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

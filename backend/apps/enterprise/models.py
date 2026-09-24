@@ -62,6 +62,7 @@ class Membership(TimeStampedModel):
     role = models.CharField(max_length=20, choices=Role.choices,
                             default=Role.VIEWER)
     is_active = models.BooleanField(default=True)
+    monthly_token_limit = models.PositiveBigIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'organization_memberships'

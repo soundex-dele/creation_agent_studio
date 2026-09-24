@@ -1,6 +1,6 @@
 # 想法&待办
 
-Personal notes and tasks, installed per organization. The application catalog is
+Personal ideas, tasks and memos, installed per organization. The application catalog is
 organization-visible; records are always scoped to organization, application,
 and authenticated owner, including for organization administrators.
 
@@ -13,13 +13,19 @@ Under `/api/v1/organizations/{organization_id}/applications/{application_id}/ide
 
 - `GET/POST /ideas`, `GET/PATCH/DELETE /ideas/{uuid}`
 - `GET/POST /todos`, `GET/PATCH/DELETE /todos/{uuid}`
+- `GET/POST /memos`, `GET/PATCH/DELETE /memos/{uuid}`
 
 Single-tenant deployments also expose the existing organization-free aliases.
 List responses use `{count, next, previous, results}`, with 20 rows per page.
-Both lists accept `page` and `search` (title and body/description).
+All lists accept `page` and `search` (title and body/description).
 
 Ideas contain `title`, `body`, `tags`, and `is_pinned`; `tag` filters by tag keyword.
 They are ordered by pinned status, then most recently updated.
+
+Memos contain `title`, `body`, and `is_pinned`, independently of ideas and todos.
+They are ordered by pinned status, then most recently updated and ID. The memo
+tab supports creating, editing, searching, pinning and deleting private records.
+Apply the migrations below when upgrading to version 1.1.0.
 
 Todos contain `title`, `description`, `priority` (1 low, 2 medium, 3 high),
 `due_date` (nullable YYYY-MM-DD), `is_completed`, and read-only `completed_at`.

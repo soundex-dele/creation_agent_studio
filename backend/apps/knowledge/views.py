@@ -11,7 +11,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 from apps.enterprise.models import Membership
 from apps.enterprise.models import QuotaPolicy
-from apps.enterprise.services import record_usage
+from apps.enterprise.services import enforce_member_token_quota, record_usage
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.application.errors import IdempotencyKeyReused
 from modules.execution.application.commands import submit_run_command
@@ -389,6 +389,7 @@ class KnowledgeSearchView(APIView):
         embedding_provider = ""
         configured = _compatible_embedding_base(bases)
         if configured:
+            enforce_member_token_quota(request.organization, request.user)
             try:
                 query_embedding, embedding_usage, embedding_model = _embed_query(
                     configured, values["query"])
@@ -459,6 +460,7 @@ class KnowledgeAnswerRunView(KnowledgeSearchView):
             }, status=202)
             response["Idempotent-Replay"] = "true"
             return response
+        enforce_member_token_quota(request.organization, request.user)
         bases = KnowledgeBase.objects.for_organization(organization_id).filter(is_active=True)
         if values["knowledge_base_ids"]:
             bases = bases.filter(id__in=values["knowledge_base_ids"])

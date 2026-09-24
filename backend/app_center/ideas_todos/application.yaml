@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: ideas-todos
-  version: 1.0.0
+  version: 1.1.0
   name: 想法&待办
-  description: 私有的灵感笔记与待办清单，分别记录想法、安排事项，让日常更有条理。
+  description: 私有的灵感笔记、待办清单与备忘，记录想法、安排事项、留存信息，让日常更有条理。
   category:
     slug: productivity
     name: 效率工具
@@ -13,7 +13,7 @@ metadata:
     order: 30
   icon: "想"
   color: "#0D9488"
-  tags: [想法, 待办, 笔记, 个人效率]
+  tags: [想法, 待办, 备忘, 笔记, 个人效率]
   developer: Agent Studio
 spec:
   application_kind: custom
@@ -35,7 +35,7 @@ spec:
     urlconf: app_center.ideas_todos.backend.urls
   database:
     mode: django-migrations
-    schema_version: 1
+    schema_version: 2
     tenant_scoped: true
   install:
     scope: per-organization

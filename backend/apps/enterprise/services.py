@@ -16,19 +16,41 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import Throttled
 
-from .models import QuotaPolicy, RunTrace, UsageRecord
+from .models import Membership, QuotaPolicy, RunTrace, UsageRecord
+
+
+def monthly_usage_records(organization):
+    """Use the configured timezone consistently for monthly quota accounting."""
+    now = timezone.now()
+    if timezone.is_aware(now):
+        now = timezone.localtime(now)
+    return UsageRecord.objects.filter(
+        organization=organization,
+        created_at__year=now.year,
+        created_at__month=now.month,
+    )
+
+
+def enforce_member_token_quota(organization, user):
+    if organization is None or user is None:
+        return
+    membership = Membership.objects.filter(
+        organization=organization, user=user, is_active=True,
+    ).first()
+    if membership is None or membership.monthly_token_limit is None:
+        return
+    used = monthly_usage_records(organization).filter(user=user).aggregate(
+        tokens=Sum('total_tokens'))['tokens'] or 0
+    if used >= membership.monthly_token_limit:
+        raise Throttled(detail='Member monthly token quota exceeded.')
 
 
 def enforce_quota(organization):
     if organization is None:
         return
     quota, _ = QuotaPolicy.objects.get_or_create(organization=organization)
-    now = timezone.now()
-    totals = UsageRecord.objects.filter(
-        organization=organization,
-        created_at__year=now.year,
-        created_at__month=now.month,
-    ).aggregate(tokens=Sum('total_tokens'), cost=Sum('cost'))
+    totals = monthly_usage_records(organization).aggregate(
+        tokens=Sum('total_tokens'), cost=Sum('cost'))
     from modules.execution.models import Run
     running = Run.objects.for_organization(organization.id).filter(
         status__in=[Run.Status.QUEUED, Run.Status.RUNNING,

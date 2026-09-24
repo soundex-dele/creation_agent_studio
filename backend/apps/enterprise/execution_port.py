@@ -7,6 +7,7 @@ from apps.enterprise.services import (
     apply_input_guardrails,
     apply_output_guardrails,
     enforce_model_policy,
+    enforce_member_token_quota,
     enforce_quota,
     enforce_skill_policy,
     execution_governance_snapshot,
@@ -39,6 +40,7 @@ class DjangoExecutionDomainPort:
         return Organization.objects.filter(is_active=True).values_list("id", flat=True)
 
     enforce_quota = staticmethod(enforce_quota)
+    enforce_member_token_quota = staticmethod(enforce_member_token_quota)
     enforce_model_policy = staticmethod(enforce_model_policy)
     enforce_skill_policy = staticmethod(enforce_skill_policy)
     governance_snapshot = staticmethod(execution_governance_snapshot)

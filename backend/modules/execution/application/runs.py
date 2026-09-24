@@ -24,6 +24,7 @@ from .errors import (
     LeaseLost,
     OrganizationMismatch,
 )
+from .ports import execution_domain_port
 
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,7 @@ def create_run(
         raise OrganizationMismatch("Parent Run belongs to another organization")
     if parent is not None and not node_key:
         raise ValueError("Child Runs require a node_key")
+    execution_domain_port().enforce_member_token_quota(organization, owner)
     now = timezone.now()
     with transaction.atomic():
         run = Run.objects.create(

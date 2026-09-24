@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 from apps.applications.models import Application, ApplicationAccessGrant, ApplicationCategory
 from apps.enterprise.models import Membership
 
-from ..models import Idea, Todo
+from ..models import Idea, Memo, Todo
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def create(context, kind, **data):
     return response.data
 
 
-@pytest.mark.parametrize("kind", ["ideas", "todos"])
+@pytest.mark.parametrize("kind", ["ideas", "todos", "memos"])
 def test_crud_and_required_title(context, kind):
     client, url = context["client"], f"{context['root']}/{kind}"
     for title in ("", "   ", "x" * 201):
@@ -70,6 +70,33 @@ def test_ideas_pin_search_tags_and_pagination(context):
     assert client.post(url, {"title": "test", "tags": ["x" * 41]}, format="json").status_code == 400
 
 
+def test_memos_pin_search_pagination_and_independent_storage(context):
+    client, url = context["client"], f"{context['root']}/memos"
+    first = create(context, "memos", title="会议备忘", body="下次讨论预算\n带上资料")
+    assert first["is_pinned"] is False
+    create(context, "ideas", title="会议备忘")
+    create(context, "todos", title="会议备忘")
+    for index in range(20):
+        create(context, "memos", title=f"备忘 {index}")
+    detail = f"{url}/{first['id']}"
+    assert client.patch(detail, {"is_pinned": True}, format="json").status_code == 200
+    page = client.get(url).data
+    assert page["count"] == 21 and len(page["results"]) == 20 and page["next"]
+    assert page["results"][0]["id"] == first["id"]
+    assert len(client.get(url, {"page": 2}).data["results"]) == 1
+    for search in ("会议", "预算"):
+        assert client.get(url, {"search": search}).data["count"] == 1
+    assert client.get(url, {"search": "不存在"}).data["count"] == 0
+    updated = client.patch(detail, {"body": "更新后的记录", "is_pinned": False}, format="json").data
+    assert updated["body"] == "更新后的记录" and updated["is_pinned"] is False
+    assert client.get(detail).data["body"] == updated["body"]
+    assert client.post(url, {"title": "过长", "body": "x" * 20001}, format="json").status_code == 400
+    assert client.get(url, {"search": "x" * 201}).status_code == 400
+    assert client.delete(detail).status_code == 204
+    assert client.get(f"{context['root']}/ideas").data["count"] == 1
+    assert client.get(f"{context['root']}/todos").data["count"] == 1
+
+
 def test_todo_dates_order_search_priority_and_completion(context):
     client, url = context["client"], f"{context['root']}/todos"
     no_date = create(context, "todos", title="无日期", priority=3)
@@ -99,7 +126,7 @@ def test_todo_dates_order_search_priority_and_completion(context):
     assert restored["completed_at"] is None and restored["due_date"] is None
 
 
-@pytest.mark.parametrize("kind,model", [("ideas", Idea), ("todos", Todo)])
+@pytest.mark.parametrize("kind,model", [("ideas", Idea), ("todos", Todo), ("memos", Memo)])
 def test_owner_is_server_assigned_and_private_even_to_org_owner(context, kind, model):
     item = create(context, kind, owner=context["other"].id, organization="fake", application=99999)
     record = model.objects.get(pk=item["id"])
@@ -117,7 +144,7 @@ def test_owner_is_server_assigned_and_private_even_to_org_owner(context, kind, m
         assert client.delete(detail).status_code == 404
 
 
-@pytest.mark.parametrize("kind", ["ideas", "todos"])
+@pytest.mark.parametrize("kind", ["ideas", "todos", "memos"])
 def test_organization_application_and_auth_boundaries(context, kind):
     item = create(context, kind)
     client = context["client"]
@@ -138,8 +165,9 @@ def test_organization_application_and_auth_boundaries(context, kind):
     assert client.get(f"{context['root']}/{kind}").status_code in (403, 404)
 
 
-def test_application_access_and_inactive_state(context):
-    client, url, application = context["client"], f"{context['root']}/ideas", context["app"]
+@pytest.mark.parametrize("kind", ["ideas", "todos", "memos"])
+def test_application_access_and_inactive_state(context, kind):
+    client, url, application = context["client"], f"{context['root']}/{kind}", context["app"]
     application.is_active = False
     application.save()
     assert client.get(url).status_code == 404
@@ -158,7 +186,7 @@ def test_application_access_and_inactive_state(context):
     assert client.get(url).status_code == 404
 
 
-@pytest.mark.parametrize("kind", ["ideas", "todos"])
+@pytest.mark.parametrize("kind", ["ideas", "todos", "memos"])
 def test_single_tenant_alias_keeps_user_records_private(context, settings, kind):
     settings.SINGLE_TENANT_MODE = True
     settings.SINGLE_TENANT_ORGANIZATION_ID = str(context["org"].id)

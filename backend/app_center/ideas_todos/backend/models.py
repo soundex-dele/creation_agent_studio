@@ -29,6 +29,16 @@ class Idea(PersonalEntry):
         indexes = [models.Index(fields=["organization", "application", "owner"], name="it_idea_scope")]
 
 
+class Memo(PersonalEntry):
+    body = models.TextField(blank=True)
+    is_pinned = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "ideas_todos_memos"
+        ordering = ["-is_pinned", "-updated_at", "id"]
+        indexes = [models.Index(fields=["organization", "application", "owner"], name="it_memo_scope")]
+
+
 class Todo(PersonalEntry):
     class Priority(models.IntegerChoices):
         LOW = 1, "低"

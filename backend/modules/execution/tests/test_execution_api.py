@@ -991,6 +991,35 @@ def test_answer_command_requires_current_request_id_and_requeues(
 
 
 @pytest.mark.django_db
+def test_member_quota_blocks_new_application_run_but_allows_idempotent_replay(
+    authenticated_client, api_actor, api_organization, deployed_application,
+):
+    url = (
+        f"/api/v1/organizations/{api_organization.id}/applications/"
+        f"{deployed_application.id}/runs"
+    )
+    body = {"input": {"files": ["one.mp4"]}}
+    created = authenticated_client.post(
+        url, body, format="json", HTTP_IDEMPOTENCY_KEY="quota-original",
+    )
+    assert created.status_code == 202
+    Membership.objects.filter(organization=api_organization, user=api_actor).update(
+        monthly_token_limit=0,
+    )
+    blocked = authenticated_client.post(
+        url, body, format="json", HTTP_IDEMPOTENCY_KEY="quota-blocked",
+    )
+    assert blocked.status_code == 429
+    assert not IdempotencyRecord.objects.filter(key="quota-blocked").exists()
+    assert Run.objects.for_organization(api_organization.id).count() == 1
+    replayed = authenticated_client.post(
+        url, body, format="json", HTTP_IDEMPOTENCY_KEY="quota-original",
+    )
+    assert replayed.status_code == 202
+    assert replayed.data['id'] == created.data['id']
+
+
+@pytest.mark.django_db
 def test_start_application_run_pins_deployed_revision_and_replays(
     authenticated_client, api_actor, api_organization, deployed_application
 ):

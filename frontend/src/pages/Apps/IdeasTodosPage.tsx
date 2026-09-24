@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, Modal, Pagination, Popconfirm, Select, Spin, Tabs, Tag } from 'antd';
-import { ArrowLeftOutlined, BulbOutlined, CheckSquareOutlined, PlusOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, BulbOutlined, CheckSquareOutlined, FileTextOutlined, PlusOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { tenantApiRoot } from '@/services/tenantContext';
-import { entryError, ideasTodosApi, localDate, type EntryKind, type Idea, type Priority, type Todo, type TodoStatus } from '@/services/ideasTodos';
+import { entryError, ideasTodosApi, localDate, type Entry, type EntryKind, type Idea, type Memo, type Priority, type Todo, type TodoStatus } from '@/services/ideasTodos';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import './IdeasTodosPage.css';
@@ -16,16 +16,19 @@ const statuses = [
 ];
 interface Filters { search: string; tag: string; status: TodoStatus; priority?: Priority; page: number }
 const initialFilters = (): Filters => ({ search: '', tag: '', status: 'pending', page: 1 });
-interface Editor { kind: EntryKind; entry?: Idea | Todo }
+const entryLabels: Record<EntryKind, string> = { ideas: '想法', todos: '待办', memos: '备忘' };
+interface Editor { kind: EntryKind; entry?: Entry }
 
 function EntryEditor({ editor, service, onClose, onSaved }: {
   editor: Editor; service: ReturnType<typeof ideasTodosApi>; onClose: () => void; onSaved: () => void;
 }) {
   const isIdea = editor.kind === 'ideas';
+  const isTodo = editor.kind === 'todos';
   const idea = isIdea ? editor.entry as Idea | undefined : undefined;
-  const todo = !isIdea ? editor.entry as Todo | undefined : undefined;
+  const todo = isTodo ? editor.entry as Todo | undefined : undefined;
+  const memo = editor.kind === 'memos' ? editor.entry as Memo | undefined : undefined;
   const [title, setTitle] = useState(editor.entry?.title || '');
-  const [body, setBody] = useState(idea?.body || todo?.description || '');
+  const [body, setBody] = useState(idea?.body || memo?.body || todo?.description || '');
   const [tags, setTags] = useState(idea?.tags || []);
   const [priority, setPriority] = useState<Priority>(todo?.priority || 2);
   const [dueDate, setDueDate] = useState(todo?.due_date || '');
@@ -33,7 +36,7 @@ function EntryEditor({ editor, service, onClose, onSaved }: {
   const savingRef = useRef(false);
   const [error, setError] = useState('');
   const [titleError, setTitleError] = useState('');
-  const label = isIdea ? '想法' : '待办';
+  const label = entryLabels[editor.kind];
 
   const save = async () => {
     if (savingRef.current) return;
@@ -44,10 +47,14 @@ function EntryEditor({ editor, service, onClose, onSaved }: {
         const input = { title: title.trim(), body, tags, is_pinned: idea?.is_pinned || false };
         if (idea) await service.updateIdea(idea.id, input);
         else await service.createIdea(input);
-      } else {
+      } else if (isTodo) {
         const input = { title: title.trim(), description: body, priority, due_date: dueDate || null };
         if (todo) await service.updateTodo(todo.id, input);
         else await service.createTodo(input);
+      } else {
+        const input = { title: title.trim(), body, is_pinned: memo?.is_pinned || false };
+        if (memo) await service.updateMemo(memo.id, input);
+        else await service.createMemo(input);
       }
       onSaved();
     } catch (failure) { setError(entryError(failure)); }
@@ -67,23 +74,23 @@ function EntryEditor({ editor, service, onClose, onSaved }: {
           <label htmlFor="entry-title">标题 <span aria-hidden="true">*</span></label>
           <Input id="entry-title" autoFocus maxLength={200} value={title} disabled={saving}
             aria-required="true" aria-invalid={!!titleError} aria-describedby={titleError ? 'entry-title-error' : undefined}
-            status={titleError ? 'error' : undefined} placeholder={isIdea ? '记下一个新想法' : '准备做什么？'}
+            status={titleError ? 'error' : undefined} placeholder={isIdea ? '记下一个新想法' : isTodo ? '准备做什么？' : '给备忘起个标题'}
             onChange={(event) => { setTitle(event.target.value); setTitleError(''); }} />
           {titleError && <div id="entry-title-error" className="ideas-todos-field-error" role="alert">{titleError}</div>}
         </div>
         <div>
-          <label htmlFor="entry-body">{isIdea ? '正文' : '说明'}</label>
+          <label htmlFor="entry-body">{isTodo ? '说明' : '正文'}</label>
           <Input.TextArea id="entry-body" value={body} maxLength={20000} rows={6} disabled={saving}
-            placeholder={isIdea ? '展开记录灵感、细节或思考…' : '补充需要注意的细节…'} onChange={(event) => setBody(event.target.value)} />
+            placeholder={isIdea ? '展开记录灵感、细节或思考…' : isTodo ? '补充需要注意的细节…' : '记下常用信息、会议记录或需要留存的内容…'} onChange={(event) => setBody(event.target.value)} />
         </div>
         {isIdea ? <div>
           <label htmlFor="entry-tags">标签</label>
           <Select id="entry-tags" mode="tags" value={tags} disabled={saving} maxCount={20}
             tokenSeparators={[',', '，']} placeholder="输入标签后按回车，最多 20 个" onChange={setTags} />
-        </div> : <div className="ideas-todos-form-row">
+        </div> : isTodo ? <div className="ideas-todos-form-row">
           <div><label htmlFor="entry-priority">优先级</label><Select id="entry-priority" value={priority} options={priorities} onChange={setPriority} disabled={saving} /></div>
           <div><label htmlFor="entry-due-date">截止日期</label><Input id="entry-due-date" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} disabled={saving} /></div>
-        </div>}
+        </div> : null}
       </form>
     </Modal>
   );
@@ -93,9 +100,9 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
   const navigate = useNavigate();
   const service = useMemo(() => ideasTodosApi(base), [base]);
   const [kind, setKind] = useState<EntryKind>('ideas');
-  const [filters, setFilters] = useState<Record<EntryKind, Filters>>({ ideas: initialFilters(), todos: initialFilters() });
+  const [filters, setFilters] = useState<Record<EntryKind, Filters>>({ ideas: initialFilters(), todos: initialFilters(), memos: initialFilters() });
   const active = filters[kind];
-  const [entries, setEntries] = useState<Array<Idea | Todo>>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -120,7 +127,7 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
       try {
         const result = await service.list(kind, {
           page: active.page, search: active.search || undefined,
-          ...(kind === 'ideas' ? { tag: active.tag || undefined } : { status: active.status, priority: active.priority, today }),
+          ...(kind === 'ideas' ? { tag: active.tag || undefined } : kind === 'todos' ? { status: active.status, priority: active.priority, today } : {}),
         }, controller.signal);
         if (controller.signal.aborted) return;
         setEntries(result.results); setCount(result.count);
@@ -146,46 +153,49 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
     catch (failure) { setActionError(entryError(failure)); }
     finally { mutationRef.current = false; setBusy(null); }
   };
-  const label = kind === 'ideas' ? '想法' : '待办';
+  const label = entryLabels[kind];
 
   return <div className="ideas-todos-page">
     <header className="ideas-todos-header">
       <div>
         {showHeader && <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>返回应用</Button>}
         <h1>想法<span className="ideas-todos-amp">&</span>待办</h1>
-        <p>留住灵感，安排日常。这里的内容仅自己可见。</p>
+        <p>留住灵感，安排日常，随手备忘。这里的内容仅自己可见。</p>
       </div>
       <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => { setActionError(''); setEditor({ kind }); }}>新增{label}</Button>
     </header>
     <Tabs activeKey={kind} onChange={(value) => { setKind(value as EntryKind); setEntries([]); setActionError(''); }} items={[
       { key: 'ideas', label: '想法', icon: <BulbOutlined /> },
       { key: 'todos', label: '待办', icon: <CheckSquareOutlined /> },
+      { key: 'memos', label: '备忘', icon: <FileTextOutlined /> },
     ]} />
     <section aria-label={`${label}列表`}>
       <div className="ideas-todos-toolbar">
         <Input prefix={<SearchOutlined aria-hidden />} aria-label={`搜索${label}`} maxLength={200} allowClear
-          placeholder={kind === 'ideas' ? '搜索标题或正文' : '搜索标题或说明'} value={active.search} onChange={(event) => changeFilter({ search: event.target.value })} />
-        {kind === 'ideas' ? <Input aria-label="筛选标签" placeholder="筛选标签关键词" maxLength={40} value={active.tag} allowClear onChange={(event) => changeFilter({ tag: event.target.value })} /> : <>
+          placeholder={kind === 'todos' ? '搜索标题或说明' : '搜索标题或正文'} value={active.search} onChange={(event) => changeFilter({ search: event.target.value })} />
+        {kind === 'ideas' ? <Input aria-label="筛选标签" placeholder="筛选标签关键词" maxLength={40} value={active.tag} allowClear onChange={(event) => changeFilter({ tag: event.target.value })} /> : kind === 'todos' ? <>
           <Select aria-label="待办状态" value={active.status} options={statuses} onChange={(status) => changeFilter({ status })} />
           <Select aria-label="筛选优先级" placeholder="全部优先级" allowClear value={active.priority} options={priorities} onChange={(priority) => changeFilter({ priority })} />
-        </>}
+        </> : null}
         <Button icon={<ReloadOutlined />} aria-label="刷新列表" onClick={() => setRevision((old) => old + 1)} disabled={loading} />
       </div>
       {actionError && <Alert type="error" showIcon message={actionError} role="alert" closable onClose={() => setActionError('')} />}
       {error ? <Alert type="error" showIcon message={error} role="alert" action={<Button onClick={() => setRevision((old) => old + 1)}>重试</Button>} /> : loading ?
         <div className="ideas-todos-loading" role="status" aria-label="正在加载"><Spin /><span>正在加载{label}…</span></div> : <>
-          {entries.length === 0 ? <Empty description={active.search || active.tag || (kind === 'todos' && (active.status !== 'pending' || active.priority)) ? '没有符合条件的记录' : kind === 'ideas' ? '还没有想法，记下第一份灵感吧' : '暂无未完成待办，添加一件准备做的事吧'} /> :
-            <ul className={`ideas-todos-list ${kind === 'ideas' ? 'ideas-todos-grid' : ''}`}>
+          {entries.length === 0 ? <Empty description={active.search || active.tag || (kind === 'todos' && (active.status !== 'pending' || active.priority)) ? '没有符合条件的记录' : kind === 'ideas' ? '还没有想法，记下第一份灵感吧' : kind === 'memos' ? '还没有备忘，记下需要留存的信息吧' : '暂无未完成待办，添加一件准备做的事吧'} /> :
+            <ul className={`ideas-todos-list ${kind !== 'todos' ? 'ideas-todos-grid' : ''}`}>
               {entries.map((entry) => {
                 const idea = kind === 'ideas' ? entry as Idea : undefined;
                 const todo = kind === 'todos' ? entry as Todo : undefined;
+                const memo = kind === 'memos' ? entry as Memo : undefined;
+                const note = idea || memo;
                 return <li key={entry.id} className={`ideas-todos-card ${todo?.is_completed ? 'is-completed' : ''}`}>
                   <div className="ideas-todos-card-title">
                     {todo && <Checkbox aria-label={`${todo.is_completed ? '恢复未完成' : '完成'}：${entry.title}`} checked={todo.is_completed} disabled={busy !== null}
                       onChange={() => void mutate(entry.id, () => service.updateTodo(entry.id, { is_completed: !todo.is_completed }))} />}
-                    <h2>{idea?.is_pinned && <PushpinOutlined aria-label="已置顶" />} {entry.title}</h2>
+                    <h2>{note?.is_pinned && <PushpinOutlined aria-label="已置顶" />} {entry.title}</h2>
                   </div>
-                  {(idea?.body || todo?.description) && <p className="ideas-todos-preview">{idea?.body || todo?.description}</p>}
+                  {(note?.body || todo?.description) && <p className="ideas-todos-preview">{note?.body || todo?.description}</p>}
                   <div className="ideas-todos-meta">
                     {idea?.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
                     {todo && <>
@@ -200,6 +210,7 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
                     <time dateTime={entry.updated_at}>{new Date(entry.updated_at).toLocaleDateString()}</time>
                     <div className="ideas-todos-actions">
                       {idea && <Button type="text" size="small" disabled={busy !== null} onClick={() => void mutate(entry.id, () => service.updateIdea(entry.id, { is_pinned: !idea.is_pinned }))}>{idea.is_pinned ? '取消置顶' : '置顶'}</Button>}
+                      {memo && <Button type="text" size="small" disabled={busy !== null} onClick={() => void mutate(entry.id, () => service.updateMemo(entry.id, { is_pinned: !memo.is_pinned }))}>{memo.is_pinned ? '取消置顶' : '置顶'}</Button>}
                       <Button type="text" size="small" disabled={busy !== null} onClick={() => setEditor({ kind, entry })}>编辑</Button>
                       <Popconfirm title={`删除这条${label}？`} description="删除后无法恢复。" okText="删除" cancelText="取消" onConfirm={() => mutate(entry.id, () => service.remove(kind, entry.id))}>
                         <Button type="text" danger size="small" disabled={busy !== null} loading={busy === entry.id}>删除</Button>

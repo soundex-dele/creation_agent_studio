@@ -10,7 +10,7 @@ from apps.enterprise.models import Membership
 from core.resource_access import accessible_resources
 from modules.tenancy.permissions import HasPathOrganizationRole
 
-from .serializers import IdeaSerializer, ListFilters, TodoSerializer
+from .serializers import IdeaSerializer, ListFilters, MemoListFilters, MemoSerializer, TodoSerializer
 
 
 class EntryPagination(PageNumberPagination):
@@ -69,6 +69,24 @@ class IdeaListView(PersonalEntryMixin, generics.ListCreateAPIView):
 
 class IdeaDetailView(PersonalEntryMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = IdeaSerializer
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+
+
+class MemoListView(PersonalEntryMixin, generics.ListCreateAPIView):
+    serializer_class = MemoSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        filters = MemoListFilters(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+        search = filters.validated_data.get("search")
+        if search:
+            queryset = queryset.filter(Q(title__icontains=search) | Q(body__icontains=search))
+        return queryset
+
+
+class MemoDetailView(PersonalEntryMixin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = MemoSerializer
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
 

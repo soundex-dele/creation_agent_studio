@@ -1223,6 +1223,43 @@ export interface paths {
         patch: operations["applications_ideas-todos_ideas_partial_update"];
         trace?: never;
     };
+    "/applications/{application_id}/ideas-todos/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_memos_list"];
+        put?: never;
+        post: operations["applications_ideas-todos_memos_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/ideas-todos/memos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_ideas-todos_memos_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_ideas-todos_memos_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_ideas-todos_memos_partial_update"];
+        trace?: never;
+    };
     "/applications/{application_id}/ideas-todos/todos": {
         parameters: {
             query?: never;
@@ -4876,6 +4913,45 @@ export interface paths {
         patch: operations["organizations_applications_ideas-todos_ideas_partial_update"];
         trace?: never;
     };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_memos_list"];
+        put?: never;
+        post: operations["organizations_applications_ideas-todos_memos_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/ideas-todos/memos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_ideas-todos_memos_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_ideas-todos_memos_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_ideas-todos_memos_partial_update"];
+        trace?: never;
+    };
     "/organizations/{organization_id}/applications/{application_id}/ideas-todos/todos": {
         parameters: {
             query?: never;
@@ -7485,6 +7561,29 @@ export interface components {
              */
             readonly updated_at?: string;
         };
+        Memo: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body?: string;
+            /** Is pinned */
+            is_pinned?: boolean;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+        };
         Todo: {
             /**
              * Id
@@ -9866,6 +9965,11 @@ export interface components {
                 "application/json": components["schemas"]["Idea"];
             };
         };
+        Memo: {
+            content: {
+                "application/json": components["schemas"]["Memo"];
+            };
+        };
         Configuration: {
             content: {
                 "application/json": components["schemas"]["Configuration"];
@@ -12136,6 +12240,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_memos_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Memo"][];
+                    };
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_memos_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Memo"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_memos_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
+                };
+            };
+        };
+    };
+    "applications_ideas-todos_memos_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_ideas-todos_memos_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Memo"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
                 };
             };
         };
@@ -18916,6 +19140,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Idea"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_memos_list": {
+        parameters: {
+            query?: {
+                /** @description A search term. */
+                search?: string;
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Memo"][];
+                    };
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_memos_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Memo"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_memos_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
+                };
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_memos_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_ideas-todos_memos_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Memo"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
                 };
             };
         };
