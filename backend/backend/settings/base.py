@@ -22,6 +22,15 @@ TEACHING_DATA_ROOT = Path(config(
 )).resolve()
 APP_CENTER_REGISTRY_HASH = app_center_registry_hash(APP_CENTER_ROOT)
 
+# Private drive data is never served by the public MEDIA_URL mapping.
+MY_DRIVE_ROOT = Path(config('MY_DRIVE_ROOT', default=str(BASE_DIR / 'my-drive-data')))
+MY_DRIVE_MAX_FILE_BYTES = config('MY_DRIVE_MAX_FILE_BYTES', default=20 * 1024 ** 3, cast=int)
+MY_DRIVE_QUOTA_BYTES = config('MY_DRIVE_QUOTA_BYTES', default=100 * 1024 ** 3, cast=int)
+MY_DRIVE_CHUNK_BYTES = 8 * 1024 ** 2
+MY_DRIVE_UPLOAD_TTL_DAYS = config('MY_DRIVE_UPLOAD_TTL_DAYS', default=7, cast=int)
+MY_DRIVE_ACCESS_TTL_SECONDS = config('MY_DRIVE_ACCESS_TTL_SECONDS', default=3600, cast=int)
+MY_DRIVE_X_ACCEL_REDIRECT = config('MY_DRIVE_X_ACCEL_REDIRECT', default=False, cast=bool)
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 

@@ -41,6 +41,7 @@ staticfiles/
 media/
 artifacts/
 agent_workspaces/
+backend/my-drive-data/
 logs/
 *.log
 

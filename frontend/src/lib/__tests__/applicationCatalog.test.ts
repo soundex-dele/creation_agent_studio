@@ -5,6 +5,11 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens My Drive from either catalog entry', () => {
+    const app = { id: 'my-drive', applicationId: 26, kind: 'custom' as const, rendererKey: 'my-drive' };
+    expect(applicationPath(app)).toBe('/applications/26/my-drive?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/applications/26/my-drive?entry=home');
+  });
   it('opens Ideas & Todos with a dedicated renderer from either catalog entry', () => {
     const app = { id: 'ideas-todos', applicationId: 25, kind: 'custom' as const, rendererKey: 'ideas-todos' };
     expect(applicationPath(app)).toBe('/applications/25/ideas-todos?entry=apps');

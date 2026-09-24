@@ -19,7 +19,7 @@ COPY backend/requirements/ /app/requirements/
 RUN pip install --no-cache-dir -r requirements/production.txt
 COPY --chown=agentstudio:agentstudio backend/ /app
 COPY --chown=agentstudio:agentstudio teaching_data/ /teaching_data
-RUN mkdir -p /data/artifacts /data/agent-workspaces /data/media \
+RUN mkdir -p /data/artifacts /data/agent-workspaces /data/media /data/my-drive \
         /home/agentstudio/.codex /app/staticfiles \
     && chown -R agentstudio:agentstudio /data /home/agentstudio /app/staticfiles
 USER agentstudio:agentstudio

@@ -34,6 +34,10 @@ package does not drop its tables or historical catalog records.
 
 ## Guided content applications
 
+The **我的网盘** (`my-drive`) workspace provides private file management,
+resumable large uploads, a recycle bin and native media previews. See
+[`my_drive/README.md`](my_drive/README.md) for storage and maintenance configuration.
+
 The **在线文档** (`documents`) dedicated workspace provides rich text editing,
 autosave, per-member sharing and a private AI sidebar. See
 [`documents/README.md`](documents/README.md) for deployment and runtime details.

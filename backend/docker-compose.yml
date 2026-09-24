@@ -60,6 +60,8 @@ services:
       AGENT_WORKSPACE_ROOT: /data/agent-workspaces
       MEDIA_ROOT: /data/media
       MEDIA_X_ACCEL_REDIRECT: "true"
+      MY_DRIVE_ROOT: /data/my-drive
+      MY_DRIVE_X_ACCEL_REDIRECT: "true"
       APPLICATION_RUNTIME_ALLOWED_ROOTS: /data/agent-workspaces,/data/media,/data/artifacts
       APPLICATION_RUNTIME_ALLOW_ALL_PATHS: "false"
       CREATION_MASTER_ALLOW_ALL_PATHS: "false"
@@ -252,6 +254,26 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  my-drive-maintenance:
+    <<: *backend-security
+    build: *backend-build
+    networks: [data]
+    restart: unless-stopped
+    command: python manage.py maintain_my_drive --loop
+    env_file: ${BACKEND_ENV_FILE:-.env}
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.production
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      MY_DRIVE_ROOT: /data/my-drive
+    volumes:
+      - runtime_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   scheduler:
     <<: *backend-security

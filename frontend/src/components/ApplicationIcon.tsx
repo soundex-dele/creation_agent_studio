@@ -1,4 +1,4 @@
-import { AppstoreOutlined, DesktopOutlined, WechatOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CloudOutlined, DesktopOutlined, WechatOutlined } from '@ant-design/icons';
 import type { AppItem } from '@/types';
 
 export default function ApplicationIcon({ app }: {
@@ -9,6 +9,9 @@ export default function ApplicationIcon({ app }: {
   }
   if (app.rendererKey === 'my-computer') {
     return <DesktopOutlined aria-hidden="true" />;
+  }
+  if (app.rendererKey === 'my-drive') {
+    return <CloudOutlined aria-hidden="true" />;
   }
   return <>{app.icon || <AppstoreOutlined aria-hidden="true" />}</>;
 }

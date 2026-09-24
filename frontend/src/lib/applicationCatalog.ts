@@ -12,6 +12,7 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
 
 /** Platform-owned renderer keys. Manifests select a key; they cannot inject JS. */
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
+  'my-drive': (app, entry) => withEntry(`/applications/${app.applicationId}/my-drive`, entry),
   documents: (app, entry) => withEntry(`/applications/${app.applicationId}/documents`, entry),
   'ideas-todos': (app, entry) => withEntry(`/applications/${app.applicationId}/ideas-todos`, entry),
   'my-computer': (_app, entry) => withEntry('/apps/my-computer', entry),

@@ -1,0 +1,32 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: my-drive
+  version: 1.0.0
+  name: 我的网盘
+  description: 私人文件与素材空间，支持大文件续传、目录管理和音视频预览。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: cloud
+  color: "#2563EB"
+  tags: [网盘, 文件管理, 视频素材, 断点续传]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: my-drive
+    executor_protocol_version: 1
+    renderer_key: my-drive
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {type: object}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.my_drive.backend.apps.MyDriveConfig
+    urlconf: app_center.my_drive.backend.urls
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

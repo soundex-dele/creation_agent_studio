@@ -1,0 +1,54 @@
+.drive-workspace { display: flex; min-height: 100%; background: var(--color-bg); color: var(--color-text); }
+.drive-sidebar { width: 230px; flex-shrink: 0; padding: 24px 18px; background: var(--color-bg-card); border-right: 1px solid var(--color-border); }
+.drive-sidebar header { display: flex; align-items: center; gap: 10px; margin: 24px 0 8px; color: var(--color-primary); }
+.drive-sidebar h1 { font-size: 22px; margin: 0; color: var(--color-text); }
+.drive-sidebar > p, .drive-title p { color: var(--color-text-sec); font-size: 13px; line-height: 1.7; }
+.drive-sidebar .ant-segmented { margin-top: 24px; }
+.drive-capacity { display: grid; gap: 8px; padding-top: 40px; font-size: 13px; }
+.drive-capacity small { color: var(--color-text-sec); line-height: 1.8; }
+.drive-main { flex: 1; min-width: 0; padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+.drive-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.drive-title h2 { margin: 0; font-size: 24px; }
+.drive-title p { margin: 6px 0 0; }
+.drive-upload .ant-upload-drag { background: var(--color-bg-card); }
+.drive-upload .ant-upload-btn { display: flex !important; justify-content: center; }
+.drive-upload .ant-upload-drag-container { display: flex !important; align-items: center; flex-wrap: wrap; justify-content: center; gap: 14px; padding: 8px; }
+.drive-upload svg { color: var(--color-primary); }
+.drive-upload span { color: var(--color-text-sec); font-size: 13px; }
+.drive-toolbar { display: flex; flex-wrap: wrap; gap: 12px; }
+.drive-toolbar .ant-input-search { flex: 1; min-width: 180px; }
+.drive-toolbar .ant-select { min-width: 120px; }
+.drive-file-name { border: 0; background: none; color: inherit; cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left; max-width: 100%; padding: 8px 0; }
+.drive-file-name svg { flex-shrink: 0; color: var(--color-primary); }
+.drive-file-name span { overflow-wrap: anywhere; }
+.drive-file-name:disabled { cursor: default; }
+.drive-workspace .ant-breadcrumb button, .drive-destinations .ant-breadcrumb button { background: none; border: 0; color: var(--color-primary); cursor: pointer; padding: 4px; }
+.drive-workspace button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.drive-transfers { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+.drive-transfers li { border: 1px solid var(--color-border); background: var(--color-bg-card); border-radius: 12px; padding: 20px; }
+.drive-transfer-title { display: flex; justify-content: space-between; gap: 12px; }
+.drive-transfer-title strong { overflow-wrap: anywhere; }
+.drive-transfer-title span { flex-shrink: 0; color: var(--color-text-sec); }
+.drive-transfers p { font-size: 13px; color: var(--color-text-sec); }
+.drive-transfers [role=alert] { color: var(--color-error, #b42318); }
+.drive-preview img, .drive-preview video { display: block; max-width: 100%; max-height: 65vh; margin: auto; }
+.drive-preview audio { width: 100%; }
+.drive-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
+.drive-destinations { display: grid; gap: 10px; }
+@media (max-width: 767px) {
+  .drive-workspace { flex-direction: column; }
+  .drive-sidebar { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-border); padding: 16px; }
+  .drive-sidebar header { margin: 8px 0; }
+  .drive-sidebar .ant-segmented { margin-top: 8px; }
+  .drive-sidebar .ant-segmented-group { flex-direction: row !important; }
+  .drive-sidebar .ant-segmented-item { flex: 1; }
+  .drive-capacity { padding-top: 12px; gap: 2px; }
+  .drive-main { padding: 16px; }
+  .drive-title h2 { font-size: 21px; }
+  .drive-toolbar .ant-input-search { flex-basis: 100%; }
+  .drive-table .ant-table-cell { padding: 8px !important; }
+  .drive-table .ant-table-cell:last-child { width: 115px; }
+  .drive-table .ant-btn { min-height: 40px; padding-inline: 6px; }
+  .drive-file-name { min-height: 44px; }
+  .drive-upload .ant-upload-drag-container { flex-direction: column; gap: 6px; }
+}
