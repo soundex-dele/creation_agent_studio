@@ -163,60 +163,84 @@ def delete_document_index(document_id):
         )
 
 
-def vector_candidates(organization_id, knowledge_base_ids, query_embedding, limit=50):
-    if not query_embedding or not knowledge_base_ids:
+def vector_candidates(organization_id, knowledge_base_ids, query_embedding, limit=50, *, document_ids=None):
+    if not query_embedding or not knowledge_base_ids or document_ids == []:
         return []
     if connection.vendor == "sqlite":
         load_sqlite_vec()
         placeholders = ",".join("%s" for _ in knowledge_base_ids)
         params = [json.dumps(query_embedding), limit, str(organization_id), *knowledge_base_ids]
+        document_filter = ""
+        if document_ids is not None:
+            document_filter = " AND document_id IN (" + ",".join("%s" for _ in document_ids) + ")"
+            params.extend(document_ids)
         sql = f"""
             SELECT rowid, distance FROM knowledge_vector_index
             WHERE embedding MATCH %s AND k = %s AND organization_id = %s
               AND knowledge_base_id IN ({placeholders})
+              {document_filter}
             ORDER BY distance
         """
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             return [(row[0], max(0.0, 1.0 - float(row[1]))) for row in cursor.fetchall()]
     if connection.vendor == "postgresql":
+        document_filter = " AND document_id = ANY(%s)" if document_ids is not None else ""
+        params = [json.dumps(query_embedding), organization_id, knowledge_base_ids]
+        if document_ids is not None:
+            params.append(document_ids)
+        params.extend([json.dumps(query_embedding), limit])
         with connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT chunk_id, 1 - (embedding <=> %s::vector) AS score
                 FROM knowledge_vector_index
                 WHERE organization_id = %s AND knowledge_base_id = ANY(%s)
+                {document_filter}
                 ORDER BY embedding <=> %s::vector LIMIT %s
-            """, [json.dumps(query_embedding), organization_id, knowledge_base_ids, json.dumps(query_embedding), limit])
+            """, params)
             return [(row[0], float(row[1])) for row in cursor.fetchall()]
     return []
 
 
-def lexical_candidates(organization_id, knowledge_base_ids, terms, limit=50):
-    if not terms or not knowledge_base_ids:
+def lexical_candidates(organization_id, knowledge_base_ids, terms, limit=50, *, document_ids=None):
+    if not terms or not knowledge_base_ids or document_ids == []:
         return []
     if connection.vendor == "sqlite":
         load_sqlite_vec()
         placeholders = ",".join("%s" for _ in knowledge_base_ids)
         match = " OR ".join(f'"{term}"' for term in terms)
+        document_filter = ""
+        params = [match, str(organization_id), *knowledge_base_ids]
+        if document_ids is not None:
+            document_filter = " AND document_id IN (" + ",".join("%s" for _ in document_ids) + ")"
+            params.extend(document_ids)
+        params.append(limit)
         with connection.cursor() as cursor:
             cursor.execute(f"""
                 SELECT chunk_id, -bm25(knowledge_lexical_index) AS score
                 FROM knowledge_lexical_index
                 WHERE knowledge_lexical_index MATCH %s AND organization_id = %s
                   AND knowledge_base_id IN ({placeholders})
+                  {document_filter}
                 ORDER BY bm25(knowledge_lexical_index) LIMIT %s
-            """, [match, str(organization_id), *knowledge_base_ids, limit])
+            """, params)
             return [(int(row[0]), float(row[1])) for row in cursor.fetchall()]
     if connection.vendor == "postgresql":
         query = " | ".join(terms)
+        document_filter = " AND document_id = ANY(%s)" if document_ids is not None else ""
+        params = [query, organization_id, knowledge_base_ids, query]
+        if document_ids is not None:
+            params.append(document_ids)
+        params.append(limit)
         with connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT chunk_id,
                        ts_rank_cd(to_tsvector('simple', lexical_text), to_tsquery('simple', %s)) AS score
                 FROM knowledge_lexical_index
                 WHERE organization_id = %s AND knowledge_base_id = ANY(%s)
                   AND to_tsvector('simple', lexical_text) @@ to_tsquery('simple', %s)
+                  {document_filter}
                 ORDER BY score DESC LIMIT %s
-            """, [query, organization_id, knowledge_base_ids, query, limit])
+            """, params)
             return [(row[0], float(row[1])) for row in cursor.fetchall()]
     return []

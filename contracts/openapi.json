@@ -18027,6 +18027,1536 @@
                     }
                 }
             ]
+        },
+        "/applications/{application_id}/research-assistant/imports": {
+            "get": {
+                "operationId": "applications_research-assistant_imports_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/integrations": {
+            "get": {
+                "operationId": "applications_research-assistant_integrations_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProjectPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_research-assistant_projects_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchProject"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_research-assistant_projects_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchProject"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_research-assistant_projects_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_results_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResultPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_research-assistant_projects_results_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchGenerateInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                        }
+                    }
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_results_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/cancel": {
+            "post": {
+                "operationId": "applications_research-assistant_projects_results_cancel_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/citations/{citation_id}": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_results_citations_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchCitation"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "citation_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/download": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_results_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/export": {
+            "post": {
+                "operationId": "applications_research-assistant_projects_results_export_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchExportInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchExportInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                        }
+                    }
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/sources": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_sources_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ResearchSource"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_research-assistant_projects_sources_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchSourceInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}": {
+            "delete": {
+                "operationId": "applications_research-assistant_projects_sources_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/content": {
+            "get": {
+                "operationId": "applications_research-assistant_projects_sources_content_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/retry": {
+            "post": {
+                "operationId": "applications_research-assistant_projects_sources_retry_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/imports": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_imports_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/integrations": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_integrations_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProjectPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchProject"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_research-assistant_projects_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchProject"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchProject"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_research-assistant_projects_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_results_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResultPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_results_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchGenerateInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                        }
+                    }
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_results_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/cancel": {
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_results_cancel_create",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/citations/{citation_id}": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_results_citations_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchCitation"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "citation_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/download": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_results_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/export": {
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_results_export_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchExportInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchExportInput"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                        }
+                    }
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "result_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_sources_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ResearchSource"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_sources_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/ResearchSourceInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}": {
+            "delete": {
+                "operationId": "organizations_applications_research-assistant_projects_sources_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/content": {
+            "get": {
+                "operationId": "organizations_applications_research-assistant_projects_sources_content_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/retry": {
+            "post": {
+                "operationId": "organizations_applications_research-assistant_projects_sources_retry_create",
+                "description": "",
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResearchSource"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "project_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "source_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
         }
     },
     "servers": [
@@ -18391,6 +19921,64 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/WorkflowDetail"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "ResearchSourceInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ResearchSourceInput"
+                        }
+                    },
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "file"
+                            ],
+                            "properties": {
+                                "file": {
+                                    "type": "string",
+                                    "format": "binary"
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                }
+                            }
+                        }
+                    }
+                },
+                "required": true
+            },
+            "ResearchExportInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ResearchExportInput"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "ResearchProject": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ResearchProject"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "ResearchGenerateInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ResearchGenerateInput"
                         }
                     }
                 },
@@ -23746,6 +25334,469 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
+                    }
+                }
+            },
+            "ResearchExportInput": {
+                "required": [
+                    "target",
+                    "application_id"
+                ],
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "title": "Target",
+                        "type": "string",
+                        "enum": [
+                            "document",
+                            "drive"
+                        ]
+                    },
+                    "application_id": {
+                        "title": "Application id",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "parent": {
+                        "title": "Parent",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                }
+            },
+            "ResearchProject": {
+                "required": [
+                    "title"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 1
+                    },
+                    "objective": {
+                        "title": "Objective",
+                        "type": "string",
+                        "maxLength": 8000
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "ResearchGenerateInput": {
+                "required": [
+                    "source_ids",
+                    "kind"
+                ],
+                "type": "object",
+                "properties": {
+                    "source_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "maxItems": 100,
+                        "minItems": 1
+                    },
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "enum": [
+                            "report",
+                            "comparison",
+                            "writing_pack"
+                        ]
+                    },
+                    "instruction": {
+                        "title": "Instruction",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 8000
+                    }
+                }
+            },
+            "ResearchCitation": {
+                "required": [
+                    "id",
+                    "number",
+                    "source_id",
+                    "document_id",
+                    "revision",
+                    "chunk_id",
+                    "title",
+                    "quote",
+                    "note",
+                    "page_number",
+                    "paragraph_number",
+                    "position",
+                    "section_path",
+                    "context",
+                    "origin",
+                    "filename"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "number": {
+                        "title": "Number",
+                        "type": "integer"
+                    },
+                    "source_id": {
+                        "title": "Source id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "document_id": {
+                        "title": "Document id",
+                        "type": "integer"
+                    },
+                    "revision": {
+                        "title": "Revision",
+                        "type": "integer"
+                    },
+                    "chunk_id": {
+                        "title": "Chunk id",
+                        "type": "integer"
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "quote": {
+                        "title": "Quote",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "note": {
+                        "title": "Note",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "page_number": {
+                        "title": "Page number",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "paragraph_number": {
+                        "title": "Paragraph number",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "position": {
+                        "title": "Position",
+                        "type": "integer"
+                    },
+                    "section_path": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "context": {
+                        "title": "Context",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "origin": {
+                        "title": "Origin",
+                        "type": "object"
+                    },
+                    "filename": {
+                        "title": "Filename",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "ResearchProjectPage": {
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ],
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "title": "Count",
+                        "type": "integer"
+                    },
+                    "next": {
+                        "title": "Next",
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "previous": {
+                        "title": "Previous",
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ResearchProject"
+                        }
+                    }
+                }
+            },
+            "ResearchSource": {
+                "required": [
+                    "id",
+                    "title",
+                    "filename",
+                    "byte_size",
+                    "status",
+                    "error",
+                    "error_code",
+                    "indexing_run_id",
+                    "origin",
+                    "metadata",
+                    "removed"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "filename": {
+                        "title": "Filename",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "byte_size": {
+                        "title": "Byte size",
+                        "type": "integer"
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "indexing",
+                            "ready",
+                            "failed"
+                        ]
+                    },
+                    "error": {
+                        "title": "Error",
+                        "type": "string"
+                    },
+                    "error_code": {
+                        "title": "Error code",
+                        "type": "string"
+                    },
+                    "indexing_run_id": {
+                        "title": "Indexing run id",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "origin": {
+                        "title": "Origin",
+                        "type": "object"
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "type": "object"
+                    },
+                    "removed": {
+                        "title": "Removed",
+                        "type": "boolean"
+                    },
+                    "reused": {
+                        "title": "Reused",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ResearchResultPage": {
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ],
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "title": "Count",
+                        "type": "integer"
+                    },
+                    "next": {
+                        "title": "Next",
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "previous": {
+                        "title": "Previous",
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ResearchResult"
+                        }
+                    }
+                }
+            },
+            "ResearchSourceInput": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "title": "Title",
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 1
+                    },
+                    "file": {
+                        "title": "File",
+                        "type": "string",
+                        "readOnly": true,
+                        "format": "uri"
+                    },
+                    "text": {
+                        "title": "Text",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "origin_type": {
+                        "title": "Origin type",
+                        "type": "string",
+                        "enum": [
+                            "drive",
+                            "document"
+                        ]
+                    },
+                    "origin_id": {
+                        "title": "Origin id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "application_id": {
+                        "title": "Application id",
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "ResearchResult": {
+                "required": [
+                    "id",
+                    "kind",
+                    "instruction",
+                    "objective",
+                    "source_ids",
+                    "created_at",
+                    "run_id",
+                    "status",
+                    "error",
+                    "progress"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "enum": [
+                            "report",
+                            "comparison",
+                            "writing_pack"
+                        ]
+                    },
+                    "instruction": {
+                        "title": "Instruction",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "objective": {
+                        "title": "Objective",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "source_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "run_id": {
+                        "title": "Run id",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "error": {
+                        "title": "Error",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "progress": {
+                        "title": "Progress",
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "output": {
+                        "title": "Output",
+                        "description": "schema_version=1; title, sections[{heading, items[{type,text,evidence_ids,source_id?,source_title?}]}], citations and coverage",
+                        "type": "object",
+                        "nullable": true
                     }
                 }
             }

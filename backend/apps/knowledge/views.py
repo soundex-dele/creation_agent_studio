@@ -54,12 +54,12 @@ def _role_at_least(request, role):
 
 
 def _knowledge_base(organization_id, pk):
-    return KnowledgeBase.objects.for_organization(organization_id).filter(pk=pk).first()
+    return KnowledgeBase.objects.for_organization(organization_id).filter(pk=pk, scope="organization").first()
 
 
 def _document(organization_id, pk, document_id):
     return KnowledgeDocument.objects.for_organization(organization_id).filter(
-        pk=document_id, knowledge_base_id=pk, is_deleted=False,
+        pk=document_id, knowledge_base_id=pk, is_deleted=False, knowledge_base__scope="organization",
     ).select_related("knowledge_base").first()
 
 
@@ -114,7 +114,7 @@ class KnowledgeBaseListView(APIView):
 
     @swagger_auto_schema(responses={200: KnowledgeBaseSummarySerializer(many=True)})
     def get(self, request, organization_id):
-        queryset = KnowledgeBase.objects.for_organization(organization_id).annotate(
+        queryset = KnowledgeBase.objects.for_organization(organization_id).filter(scope="organization").annotate(
             document_count=Count("documents", filter=Q(documents__is_deleted=False)),
         ).order_by("name")
         return Response(KnowledgeBaseSummarySerializer(queryset, many=True).data)
@@ -287,7 +287,7 @@ class KnowledgeDocumentDetailView(APIView):
         if not _role_at_least(request, Membership.Role.ADMIN):
             return Response({"detail": "Administrator role is required."}, status=403)
         value = KnowledgeDocument.objects.for_organization(organization_id).filter(
-            pk=document_id, knowledge_base_id=pk,
+            pk=document_id, knowledge_base_id=pk, knowledge_base__scope="organization",
         ).select_related("knowledge_base", "indexing_run").first()
         if value is None:
             return Response(status=204)
@@ -377,7 +377,7 @@ class KnowledgeSearchView(APIView):
         serializer = KnowledgeSearchRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
-        bases = KnowledgeBase.objects.for_organization(organization_id).filter(is_active=True)
+        bases = KnowledgeBase.objects.for_organization(organization_id).filter(is_active=True, scope="organization")
         if values["knowledge_base_ids"]:
             bases = bases.filter(id__in=values["knowledge_base_ids"])
         base_ids = list(bases.values_list("id", flat=True))
@@ -461,7 +461,7 @@ class KnowledgeAnswerRunView(KnowledgeSearchView):
             response["Idempotent-Replay"] = "true"
             return response
         enforce_member_token_quota(request.organization, request.user)
-        bases = KnowledgeBase.objects.for_organization(organization_id).filter(is_active=True)
+        bases = KnowledgeBase.objects.for_organization(organization_id).filter(is_active=True, scope="organization")
         if values["knowledge_base_ids"]:
             bases = bases.filter(id__in=values["knowledge_base_ids"])
         base_ids = list(bases.values_list("id", flat=True))

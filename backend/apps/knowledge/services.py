@@ -30,7 +30,7 @@ def source_object_key(document, revision):
 
 @transaction.atomic
 def create_document(*, knowledge_base, actor, title, source_type, filename,
-                    mime_type, content):
+                    mime_type, content, run_context=None):
     checksum = hashlib.sha256(content).hexdigest()
     duplicate = KnowledgeDocument.objects.filter(
         knowledge_base=knowledge_base,
@@ -71,7 +71,7 @@ def create_document(*, knowledge_base, actor, title, source_type, filename,
                 "embedding_provider": knowledge_base.embedding_provider,
                 "embedding_model": knowledge_base.embedding_model,
             },
-            input_data={"object_key": object_key},
+            input_data={"object_key": object_key, **(run_context or {})},
             max_attempts=3,
             retry_safe=True,
         )
@@ -106,7 +106,9 @@ def reindex_document(document, actor):
             "embedding_provider": document.knowledge_base.embedding_provider,
             "embedding_model": document.knowledge_base.embedding_model,
         },
-        input_data={"object_key": document.source_object_key},
+        input_data={"object_key": document.source_object_key,
+                    **({"research_project_id": document.metadata["research_project_id"]}
+                       if document.metadata.get("research_project_id") else {})},
         max_attempts=3,
         retry_safe=True,
     )

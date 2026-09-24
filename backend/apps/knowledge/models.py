@@ -5,6 +5,8 @@ from modules.tenancy.models import TenantOwnedQuerySet
 
 
 class KnowledgeBase(models.Model):
+    # Internal application collections must never appear in organization knowledge APIs.
+    scope = models.CharField(max_length=30, default="organization", db_index=True)
     organization = models.ForeignKey(
         "enterprise.Organization", on_delete=models.CASCADE,
         related_name="knowledge_bases",

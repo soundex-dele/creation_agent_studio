@@ -238,6 +238,12 @@ for _executor_kind, _entries in discover_executor_adapters(APP_CENTER_ROOT).item
         _target_entries[_executor_key] = _entrypoint
 KNOWLEDGE_EMBEDDING_DIMENSIONS = config(
     'KNOWLEDGE_EMBEDDING_DIMENSIONS', default=1024, cast=int)
+RESEARCH_MAX_SOURCES = config('RESEARCH_MAX_SOURCES', default=20, cast=int)
+RESEARCH_MAX_FILE_BYTES = config('RESEARCH_MAX_FILE_BYTES', default=50 * 1024 * 1024, cast=int)
+RESEARCH_MAX_TEXT_BYTES = config('RESEARCH_MAX_TEXT_BYTES', default=2 * 1024 * 1024, cast=int)
+RESEARCH_EMBEDDING_PROVIDER = config('RESEARCH_EMBEDDING_PROVIDER', default='')
+RESEARCH_EMBEDDING_MODEL = config('RESEARCH_EMBEDDING_MODEL', default='')
+RESEARCH_PUBLIC_URL = config('RESEARCH_PUBLIC_URL', default='')
 EXECUTION_DOMAIN_PORT = config(
     'EXECUTION_DOMAIN_PORT',
     default='apps.enterprise.execution_port.DjangoExecutionDomainPort',

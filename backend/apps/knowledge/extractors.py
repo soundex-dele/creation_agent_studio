@@ -15,6 +15,7 @@ class ExtractedSection:
     text: str
     page_number: int | None = None
     section_path: tuple[str, ...] = ()
+    paragraph_number: int | None = None
 
 
 def _decode_text(content):
@@ -62,28 +63,38 @@ def extract_document(content: bytes, filename: str, mime_type: str = ""):
             document = Document(io.BytesIO(content))
             sections = []
             heading = ()
-            for paragraph in document.paragraphs:
-                value = paragraph.text.strip()
+            from docx.text.paragraph import Paragraph
+            from docx.table import Table
+            for position, element in enumerate(document.element.body, start=1):
+                if element.tag.endswith('}p'):
+                    paragraph = Paragraph(element, document)
+                    value = paragraph.text.strip()
+                    if str(paragraph.style.name).lower().startswith("heading"):
+                        heading = (value,)
+                elif element.tag.endswith('}tbl'):
+                    table = Table(element, document)
+                    value = "\n".join(" | ".join(cell.text for cell in row.cells) for row in table.rows).strip()
+                else:
+                    continue
                 if not value:
                     continue
-                if str(paragraph.style.name).lower().startswith("heading"):
-                    heading = (value,)
-                sections.append(ExtractedSection(value, section_path=heading))
+                sections.append(ExtractedSection(value, section_path=heading, paragraph_number=position))
         except Exception as exc:
             raise DocumentExtractionError("invalid_docx", "Unable to parse the DOCX file.") from exc
     elif extension in {"md", "markdown"}:
         heading = ()
         sections = []
-        for block in re.split(r"\n\s*\n", _decode_text(content)):
+        for position, block in enumerate(re.split(r"\n\s*\n", _decode_text(content)), start=1):
             block = block.strip()
             if not block:
                 continue
             match = re.match(r"^#{1,6}\s+(.+)$", block.splitlines()[0])
             if match:
                 heading = (match.group(1).strip(),)
-            sections.append(ExtractedSection(block, section_path=heading))
+            sections.append(ExtractedSection(block, section_path=heading, paragraph_number=position))
     elif extension in {"txt", "text"} or mime_type.startswith("text/"):
-        sections = [ExtractedSection(_decode_text(content).strip())]
+        sections = [ExtractedSection(block.strip(), paragraph_number=index)
+                    for index, block in enumerate(re.split(r"\n\s*\n", _decode_text(content)), start=1)]
     else:
         raise DocumentExtractionError("unsupported_type", "Only PDF, DOCX, Markdown and TXT are supported.")
     sections = [section for section in sections if section.text.strip()]

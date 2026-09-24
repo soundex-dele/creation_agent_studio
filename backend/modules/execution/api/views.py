@@ -186,6 +186,12 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    if root.executor_key == "research-assistant" or (root.input or {}).get("research_project_id"):
+        from django.apps import apps
+        if not apps.is_installed("app_center.research_assistant.backend"):
+            return False
+        from app_center.research_assistant.backend.access import can_access_run as research_access
+        return research_access(request.user, root)
     if root.executor_key == "ai-drawing":
         if root.owner_id != request.user.id:
             return False
@@ -279,7 +285,8 @@ class OrganizationRunView(ProblemDetailsAPIView):
 
     def delete(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
-        if run is None or (run.executor_key == "ai-drawing" and not _can_access_run(request, run)):
+        if run is None or ((run.executor_key in {"ai-drawing", "research-assistant"}
+                            or (run.input or {}).get("research_project_id")) and not _can_access_run(request, run)):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -651,7 +658,8 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
             )
         ttl_seconds = int(getattr(settings, "ARTIFACT_ACCESS_TTL_SECONDS", 300))
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
-        access_url = external_artifact_access_url(
+        private_research = artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")
+        access_url = None if private_research else external_artifact_access_url(
             request=request,
             artifact=artifact,
             expires_at=expires_at,
@@ -710,6 +718,9 @@ class RunArtifactContentView(ProblemDetailsAPIView):
             run_id=run_id,
             content_hash=claims.get("content_hash"),
         ).first()
+        if artifact and (artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")):
+            if not _can_access_run(request, artifact.run):
+                artifact = None
         if artifact is None:
             return _problem(
                 request,

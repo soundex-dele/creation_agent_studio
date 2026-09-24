@@ -73,6 +73,7 @@ def chunk_sections(sections, size, overlap):
                     "page_number": section.page_number,
                     "section_path": list(section.section_path),
                     "lexical_text": lexical_text(value),
+                    "metadata": {"paragraph_number": section.paragraph_number, "start": start, "end": end},
                 })
             if end >= len(section.text):
                 break
@@ -90,7 +91,17 @@ def cosine_similarity(left, right):
     return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
 
 
-def search(*, organization_id, query, knowledge_base_ids=None, limit=10, query_embedding=None):
+def search(*, organization_id, query, knowledge_base_ids=None, limit=10, query_embedding=None,
+           document_ids=None, internal=False):
+    from .models import KnowledgeBase
+    bases = KnowledgeBase.objects.filter(organization_id=organization_id, is_active=True)
+    if not internal:
+        bases = bases.filter(scope="organization")
+    if knowledge_base_ids is not None:
+        bases = bases.filter(pk__in=knowledge_base_ids)
+    knowledge_base_ids = list(bases.values_list("pk", flat=True))
+    if not knowledge_base_ids or document_ids == []:
+        return "lexical", []
     terms = tokenize(query)
     queryset = KnowledgeChunk.objects.filter(
         organization_id=organization_id,
@@ -100,11 +111,13 @@ def search(*, organization_id, query, knowledge_base_ids=None, limit=10, query_e
     ).select_related("document", "document__knowledge_base")
     if knowledge_base_ids:
         queryset = queryset.filter(document__knowledge_base_id__in=knowledge_base_ids)
+    if document_ids is not None:
+        queryset = queryset.filter(document_id__in=document_ids)
 
     lexical_rows = lexical_candidates(
-        organization_id, knowledge_base_ids or [], terms, 50)
+        organization_id, knowledge_base_ids or [], terms, 50, document_ids=document_ids)
     vector_rows = vector_candidates(
-        organization_id, knowledge_base_ids or [], query_embedding, 50)
+        organization_id, knowledge_base_ids or [], query_embedding, 50, document_ids=document_ids)
     candidate_ids = {item[0] for item in [*lexical_rows, *vector_rows]}
     chunks = {item.id: item for item in queryset.filter(id__in=candidate_ids)}
     lexical = [

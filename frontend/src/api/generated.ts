@@ -7337,6 +7337,564 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/research-assistant/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_imports_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_integrations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_list"];
+        put?: never;
+        post: operations["applications_research-assistant_projects_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_research-assistant_projects_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_research-assistant_projects_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_results_list"];
+        put?: never;
+        post: operations["applications_research-assistant_projects_results_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_results_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_research-assistant_projects_results_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/citations/{citation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+                citation_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_results_citations_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_results_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_research-assistant_projects_results_export_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_sources_list"];
+        put?: never;
+        post: operations["applications_research-assistant_projects_sources_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["applications_research-assistant_projects_sources_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_research-assistant_projects_sources_content_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_research-assistant_projects_sources_retry_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_imports_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_integrations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_list"];
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_research-assistant_projects_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_research-assistant_projects_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_results_list"];
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_results_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_results_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_results_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/citations/{citation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+                citation_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_results_citations_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_results_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/results/{result_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_results_export_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_sources_list"];
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_sources_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_research-assistant_projects_sources_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_research-assistant_projects_sources_content_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/research-assistant/projects/{project_id}/sources/{source_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_research-assistant_projects_sources_retry_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -9866,6 +10424,213 @@ export interface components {
              */
             readonly updated_at?: string;
         };
+        ResearchExportInput: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "document" | "drive";
+            /** Application id */
+            application_id: number;
+            /**
+             * Parent
+             * Format: uuid
+             */
+            parent?: string | null;
+        };
+        ResearchProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Title */
+            title: string;
+            /** Objective */
+            objective?: string;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+        };
+        ResearchGenerateInput: {
+            source_ids: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "report" | "comparison" | "writing_pack";
+            /**
+             * Instruction
+             * @default
+             */
+            instruction: string;
+        };
+        ResearchCitation: {
+            /** Id */
+            id: string;
+            /** Number */
+            number: number;
+            /**
+             * Source id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Document id */
+            document_id: number;
+            /** Revision */
+            revision: number;
+            /** Chunk id */
+            chunk_id: number;
+            /** Title */
+            title: string;
+            /** Quote */
+            quote: string;
+            /** Note */
+            note: string;
+            /** Page number */
+            page_number: number | null;
+            /** Paragraph number */
+            paragraph_number: number | null;
+            /** Position */
+            position: number;
+            section_path: string[];
+            /** Context */
+            context: string;
+            /** Origin */
+            origin: Record<string, never>;
+            /** Filename */
+            filename: string;
+        };
+        ResearchProjectPage: {
+            /** Count */
+            count: number;
+            /**
+             * Next
+             * Format: uri
+             */
+            next: string | null;
+            /**
+             * Previous
+             * Format: uri
+             */
+            previous: string | null;
+            results: components["schemas"]["ResearchProject"][];
+        };
+        ResearchSource: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Filename */
+            filename: string;
+            /** Byte size */
+            byte_size: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "indexing" | "ready" | "failed";
+            /** Error */
+            error: string;
+            /** Error code */
+            error_code: string;
+            /** Indexing run id */
+            indexing_run_id: string;
+            /** Origin */
+            origin: Record<string, never>;
+            /** Metadata */
+            metadata: Record<string, never>;
+            /** Removed */
+            removed: boolean;
+            /** Reused */
+            reused?: boolean;
+        };
+        ResearchResultPage: {
+            /** Count */
+            count: number;
+            /**
+             * Next
+             * Format: uri
+             */
+            next: string | null;
+            /**
+             * Previous
+             * Format: uri
+             */
+            previous: string | null;
+            results: components["schemas"]["ResearchResult"][];
+        };
+        ResearchSourceInput: {
+            /** Title */
+            title?: string;
+            /**
+             * File
+             * Format: uri
+             */
+            readonly file?: string;
+            /** Text */
+            text?: string;
+            /**
+             * Origin type
+             * @enum {string}
+             */
+            origin_type?: "drive" | "document";
+            /**
+             * Origin id
+             * Format: uuid
+             */
+            origin_id?: string;
+            /** Application id */
+            application_id?: number;
+        };
+        ResearchResult: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "report" | "comparison" | "writing_pack";
+            /** Instruction */
+            instruction: string;
+            /** Objective */
+            objective: string;
+            source_ids: string[];
+            /**
+             * Created at
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Run id
+             * Format: uuid
+             */
+            run_id: string | null;
+            /** Status */
+            status: string;
+            /** Error */
+            error: string;
+            /** Progress */
+            progress: Record<string, never> | null;
+            /**
+             * Output
+             * @description schema_version=1; title, sections[{heading, items[{type,text,evidence_ids,source_id?,source_title?}]}], citations and coverage
+             */
+            output?: Record<string, never> | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -10048,6 +10813,31 @@ export interface components {
         WorkflowDetail: {
             content: {
                 "application/json": components["schemas"]["WorkflowDetail"];
+            };
+        };
+        ResearchSourceInput: {
+            content: {
+                "application/json": components["schemas"]["ResearchSourceInput"];
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    title?: string;
+                };
+            };
+        };
+        ResearchExportInput: {
+            content: {
+                "application/json": components["schemas"]["ResearchExportInput"];
+            };
+        };
+        ResearchProject: {
+            content: {
+                "application/json": components["schemas"]["ResearchProject"];
+            };
+        };
+        ResearchGenerateInput: {
+            content: {
+                "application/json": components["schemas"]["ResearchGenerateInput"];
             };
         };
     };
@@ -23119,6 +23909,887 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_imports_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_integrations_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_projects_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProjectPage"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchProject"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_projects_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchProject"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResultPage"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_create": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchGenerateInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_cancel_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_citations_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+                citation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchCitation"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_download_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_projects_results_export_create": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchExportInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchExportInput"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_sources_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"][];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_sources_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchSourceInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
+                };
+            };
+        };
+    };
+    "applications_research-assistant_projects_sources_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_projects_sources_content_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_research-assistant_projects_sources_retry_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_imports_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_integrations_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProjectPage"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchProject"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchProject"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProject"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResultPage"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_create": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchGenerateInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_cancel_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchResult"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_citations_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+                citation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchCitation"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_download_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_results_export_create": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchExportInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchExportInput"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_sources_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_sources_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ResearchSourceInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
+                };
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_sources_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_sources_content_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_research-assistant_projects_sources_retry_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                project_id: string;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSource"];
                 };
             };
         };
