@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: markdown-to-html
-  version: 1.0.0
+  version: 1.0.1
   name: Markdown 转 HTML
   description: 将 Markdown 转为带内联样式的 HTML，支持四种主题、代码高亮、数学公式和可选文末引用。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: convert-markdown}
+    default_config:
+      guided_entry_prompt_key: convert-markdown
+      brand_reference:
+        enabled: true
+        default_modules: [visual]
+        fields: {color: visual.primary_color, font: visual.body_font, requirements: visual}
     chat_profile:
       welcome_message: 提供 Markdown 正文或文件路径，选择主题后生成可用于公众号的 HTML 文件。
       input_placeholder: 继续调整主题、主色、字号或引用方式…

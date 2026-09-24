@@ -33,6 +33,7 @@ const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'))
 const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
+const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
 const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
 const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
@@ -291,6 +292,14 @@ const router = createBrowserRouter([
         <ApplicationShell fullBleed>
           {page(<MyDrivePage />)}
         </ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/brand-library',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>{page(<BrandLibraryPage />)}</ApplicationShell>
       </ProtectedRoute>
     ),
   },

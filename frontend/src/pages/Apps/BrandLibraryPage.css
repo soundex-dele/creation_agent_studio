@@ -1,0 +1,15 @@
+.brand-library-page { padding: 28px; height: 100%; overflow: auto; background: var(--color-bg-void); color: var(--color-text); }
+.brand-library-header, .brand-library-detail-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.brand-library-header h1 { font-size: 26px; margin: 12px 0 8px; }
+.brand-library-header p { color: var(--color-text-sec); margin: 0; }
+.brand-library-columns { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 28px; margin-top: 20px; }
+.brand-library-list, .brand-library-detail { min-width: 0; }
+.brand-library-select { width: 100%; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 14px; text-align: left; color: inherit; cursor: pointer; }
+.brand-library-select:hover, .brand-library-select.is-selected { background: var(--color-bg-elevated); border-color: var(--color-border-lit); }
+.brand-library-select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.brand-library-select strong, .brand-library-select span { display: block; overflow-wrap: anywhere; }
+.brand-library-select span { margin-top: 6px; font-size: 12px; color: var(--color-text-sec); }
+.brand-library-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.brand-library-value, .brand-library-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }
+.brand-library-excerpt { max-height: 150px; overflow: auto; }
+@media (max-width: 768px) { .brand-library-page { padding: 16px; } .brand-library-columns, .brand-library-fields { grid-template-columns: 1fr; } }

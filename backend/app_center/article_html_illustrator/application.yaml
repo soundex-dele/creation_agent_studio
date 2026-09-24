@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: article-html-illustrator
-  version: 2.0.0
+  version: 2.0.1
   name: 文章 HTML 配图
   description: 通过引导表单生成配图提示词，再由内容创作专家使用 Skill 分析文章并生成整套可编辑 HTML/CSS 配图。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: illustrate-article}
+    default_config:
+      guided_entry_prompt_key: illustrate-article
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, visual]
+        fields: {requirements: visual}
     chat_profile:
       welcome_message: 填写文章与视觉偏好，我会生成提示词并在确认后制作整套 HTML 配图。
       input_placeholder: 继续修改配图、文字、布局或配色…

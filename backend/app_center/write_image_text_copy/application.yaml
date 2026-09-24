@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: write-image-text-copy
-  version: 1.0.0
+  version: 1.0.1
   name: 图文文案
   description: 将主题、照片或长文转成图文作品，生成标题、封面短句、逐页文案和发布配文。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: write-image-text-copy}
+    default_config:
+      guided_entry_prompt_key: write-image-text-copy
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, voice]
+        fields: {audience: positioning.audience, requirements: voice}
     chat_profile:
       welcome_message: 填写主题或素材，选择平台与交付范围，预览提示词后开始创作。
       input_placeholder: 继续调整标题、页数、上图文字或发布配文…

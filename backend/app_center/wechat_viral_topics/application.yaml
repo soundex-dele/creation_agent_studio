@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: wechat-viral-topics
-  version: 1.0.0
+  version: 1.0.1
   name: 公众号爆款选题
   description: 使用公众号爆款写作 Skill，结合账号定位、目标读者和近期方向生成可执行的爆款选题方案。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: generate-viral-topics}
+    default_config:
+      guided_entry_prompt_key: generate-viral-topics
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, voice]
+        fields: {positioning: positioning, audience: positioning.audience, direction: positioning.topics, requirements: voice}
     chat_profile:
       welcome_message: 填写账号定位、目标读者和选题方向，我会调用公众号爆款写作 Skill 生成可直接进入创作的选题方案。
       input_placeholder: 继续调整选题方向、数量、受众、标题或内容角度…

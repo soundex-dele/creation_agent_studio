@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: html-cover-generator
-  version: 2.0.0
+  version: 2.0.1
   name: HTML 封面生成器
   description: 通过引导表单生成封面提示词，再由内容创作专家使用 Skill 制作像素级、可编辑的 HTML/CSS/SVG 封面。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: generate-cover}
+    default_config:
+      guided_entry_prompt_key: generate-cover
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, visual]
+        fields: {palette: visual.primary_color, style: visual.style, font: visual.heading_font}
     chat_profile:
       welcome_message: 填写文章内容与画面偏好，我会提取主题和标题并制作 HTML 封面。
       input_placeholder: 继续修改标题、构图、字体、配色或装饰…

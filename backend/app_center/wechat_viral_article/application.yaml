@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: wechat-viral-article
-  version: 1.0.0
+  version: 1.0.1
   name: 公众号爆款写作
   description: 由内容创作专家使用 Skill 完成公众号选题、标题、正文、改写优化与发布前合规检查。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: write-wechat-article}
+    default_config:
+      guided_entry_prompt_key: write-wechat-article
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, voice]
+        fields: {positioning: positioning, audience: positioning.audience, requirements: voice}
     chat_profile:
       welcome_message: 填写写作任务、素材与账号定位，我会生成可编辑提示词并调用 Skill 完成创作。
       input_placeholder: 继续调整标题、结构、语气、细节或合规表述…

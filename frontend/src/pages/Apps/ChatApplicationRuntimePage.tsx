@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -12,6 +12,11 @@ import { EditOutlined, RocketOutlined } from '@ant-design/icons';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import ChatContainer from '@/components/Chat/ChatContainer';
+import BrandReferencePicker from '@/components/BrandReferencePicker';
+import { inheritedBrandFields, type BrandConfig, type BrandSelection } from '@/services/brandLibrary';
+import { tenantApiRoot } from '@/services/tenantContext';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { guidedPromptIdentifier } from '@/lib/guidedPrompts';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { api } from '@/services/api';
@@ -40,6 +45,13 @@ const initialAnswers = (prompt: GuidedPrompt | null): Record<string, AnswerValue
 );
 
 export default function ChatApplicationRuntimePage() {
+  const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
+  const userId = useAuthStore((state) => state.user?.id);
+  const { applicationId } = useParams();
+  return <ChatApplicationWorkspace key={`${organizationId}:${userId}:${applicationId}`} organizationId={organizationId} />;
+}
+
+function ChatApplicationWorkspace({ organizationId }: { organizationId: string | null }) {
   const { applicationId } = useParams<{ applicationId: string }>();
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('slug') || '';
@@ -58,6 +70,11 @@ export default function ChatApplicationRuntimePage() {
   const [chatStarted, setChatStarted] = useState(Boolean(restoredConversationId));
   const [conversationId, setConversationId] = useState<string | null>(restoredConversationId);
   const [draftRequestId, setDraftRequestId] = useState(0);
+  const [brandSelection, setBrandSelection] = useState<BrandSelection | null>(null);
+  const [explicitFields, setExplicitFields] = useState<string[]>([]);
+  const composeVersion = useRef(0);
+  const invalidatePreview = () => { composeVersion.current += 1; setGeneratedPrompt(''); };
+  useEffect(() => () => { composeVersion.current += 1; }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +97,8 @@ export default function ChatApplicationRuntimePage() {
   const prompts = useMemo(() => (
     [...(runtime?.guided_prompts ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   ), [runtime]);
+  const brandConfig = runtime?.default_config.brand_reference as BrandConfig | undefined;
+  const inheritedFields = inheritedBrandFields(brandConfig, brandSelection, explicitFields);
   const selectedPrompt = prompts.find(
     (prompt) => guidedPromptIdentifier(prompt) === selectedPromptId,
   )
@@ -94,9 +113,14 @@ export default function ChatApplicationRuntimePage() {
     setSelectedPromptId(guidedPromptIdentifier(selectedPrompt));
     setAnswers(initialAnswers(selectedPrompt));
     setGeneratedPrompt('');
+    composeVersion.current += 1;
+    setExplicitFields([]);
+    setBrandSelection(null);
   }, [selectedPrompt]);
 
   const setAnswer = (question: GuidedQuestion, value: AnswerValue | null) => {
+    invalidatePreview();
+    setExplicitFields((current) => [...new Set([...current, question.key])]);
     setAnswers((current) => ({
       ...current,
       [question.key]: value === null ? '' : value,
@@ -106,6 +130,7 @@ export default function ChatApplicationRuntimePage() {
   const composePrompt = async () => {
     if (!selectedPrompt || !application) return;
     const missing = selectedPrompt.questions.filter((question) => {
+      if (inheritedFields.includes(question.key)) return false;
       if (!question.required) return false;
       const value = answers[question.key];
       return value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
@@ -114,13 +139,20 @@ export default function ChatApplicationRuntimePage() {
       message.warning(`请填写：${missing.map((question) => question.label).join('、')}`);
       return;
     }
+    if (brandSelection && !brandSelection.reference.modules.length) {
+      message.warning('请选择品牌资料模块，或取消引用。');
+      return;
+    }
     setComposing(true);
+    const version = ++composeVersion.current;
     try {
       const response = await api.post<ComposePromptResponse>(
         `/apps/${application.id}/compose-prompt/`,
-        { prompt_id: guidedPromptIdentifier(selectedPrompt), answers },
+        { prompt_id: guidedPromptIdentifier(selectedPrompt), answers,
+          ...(brandConfig?.enabled && brandSelection ? { brand_reference: brandSelection.reference, explicit_fields: explicitFields } : {}),
+        },
       );
-      setGeneratedPrompt(response.prompt);
+      if (version === composeVersion.current) setGeneratedPrompt(response.prompt);
     } catch (error: any) {
       const detail = error?.response?.data;
       message.error(detail?.detail || Object.values(detail || {}).flat()[0] || '生成提示词失败');
@@ -227,6 +259,8 @@ export default function ChatApplicationRuntimePage() {
             )}
             {selectedPrompt ? (
               <>
+                {brandConfig?.enabled && organizationId && <BrandReferencePicker root={tenantApiRoot(organizationId)}
+                  config={brandConfig} value={brandSelection} onChange={(selection) => { invalidatePreview(); setBrandSelection(selection); }} />}
                 <div className="chat-app-form-title">
                   <span>{selectedPrompt.icon || '📝'}</span>
                   <div>
@@ -239,7 +273,10 @@ export default function ChatApplicationRuntimePage() {
                     <label className="chat-app-field" key={question.id}>
                       <span>{question.label}{question.required && <b>*</b>}</span>
                       {question.help_text && <small>{question.help_text}</small>}
-                      {question.type === 'single_choice' || question.type === 'multi_choice' ? (
+                      {inheritedFields.includes(question.key) ? <div>
+                        <Alert type="info" message="使用品牌资料" description="生成提示词时读取档案中的对应资料。" />
+                        <Button type="link" onClick={() => { invalidatePreview(); setExplicitFields((current) => [...current, question.key]); }}>改为本次填写</Button>
+                      </div> : question.type === 'single_choice' || question.type === 'multi_choice' ? (
                         <Select
                           mode={question.type === 'multi_choice' ? 'multiple' : undefined}
                           value={answers[question.key] || undefined}
@@ -265,6 +302,9 @@ export default function ChatApplicationRuntimePage() {
                           autoSize={{ minRows: question.key === 'topic' ? 2 : 3, maxRows: 8 }}
                           onChange={(event) => setAnswer(question, event.target.value)}
                         />
+                      )}
+                      {brandSelection && explicitFields.includes(question.key) && inheritedBrandFields(brandConfig, brandSelection, []).includes(question.key) && (
+                        <Button type="link" onClick={() => { invalidatePreview(); setExplicitFields((current) => current.filter((key) => key !== question.key)); }}>使用品牌资料</Button>
                       )}
                     </label>
                   ))}

@@ -39,6 +39,10 @@ into timestamped transcripts, summaries and interview material. Users explicitly
 confirm action items before creating todos, and can save results as online documents.
 See [`meeting_assistant/README.md`](meeting_assistant/README.md) for setup and checks.
 
+The **品牌资料库** (`brand-library`) workspace stores private structured brand
+profiles, products and writing examples. Ten creative applications can reference
+selected material in their prompt previews. See [`brand_library/README.md`](brand_library/README.md).
+
 The **AI 绘图** (`ai-drawing`) dedicated workspace uses native Codex image
 generation for text-to-image and reference-image editing. It keeps private Run
 history and durable image artifacts. See [`ai_drawing/README.md`](ai_drawing/README.md)

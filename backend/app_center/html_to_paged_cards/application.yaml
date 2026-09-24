@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: html-to-paged-cards
-  version: 1.0.0
+  version: 1.0.1
   name: HTML 分页图文
   description: 将已有文章 HTML 拆成多页图文，保留正文顺序与样式，生成独立页面、预览索引和校验报告。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: paginate-html}
+    default_config:
+      guided_entry_prompt_key: paginate-html
+      brand_reference:
+        enabled: true
+        default_modules: [visual]
+        fields: {}
     chat_profile:
       welcome_message: 提供已有 HTML 文件，选择画幅与分页策略，预览提示词后生成多页图文。
       input_placeholder: 继续调整画幅、正文范围、页面留白或导出格式…

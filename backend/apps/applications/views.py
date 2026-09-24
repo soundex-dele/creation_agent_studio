@@ -103,11 +103,20 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
         application = self.get_object()
         serializer = ComposeGuidedPromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        prompts = application_definition(application).get('guided_prompts', [])
+        definition = application_definition(application)
+        prompts = definition.get('guided_prompts', [])
         prompt_id = str(serializer.validated_data['prompt_id'])
         prompt = next((item for item in prompts if str(item.get('id') or item.get('key')) == prompt_id), None)
         if prompt is None:
             return Response({'detail': '引导问题不存在。'}, status=404)
+        if serializer.validated_data.get('brand_reference'):
+            from app_center.brand_library.backend.context import compose_brand_prompt
+            return Response(compose_brand_prompt(
+                request=request, application=application, definition=definition, prompt=prompt,
+                answers=serializer.validated_data['answers'],
+                reference=serializer.validated_data['brand_reference'],
+                explicit_fields=serializer.validated_data['explicit_fields'],
+            ))
         return Response(compose_guided_prompt(
             prompt, serializer.validated_data['answers'],
             application_id=application.id))

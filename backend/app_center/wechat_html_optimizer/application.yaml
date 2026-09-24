@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: wechat-html-optimizer
-  version: 2.0.0
+  version: 2.0.1
   name: 公众号 HTML 优化器
   description: 通过引导表单生成优化提示词，再由内容创作专家使用 Skill 处理已有 HTML，保留原文与视觉意图。
   category:
@@ -30,6 +30,10 @@ spec:
     output_schema: {}
     default_config:
       guided_entry_prompt_key: optimize-html
+      brand_reference:
+        enabled: true
+        default_modules: [visual]
+        fields: {}
     chat_profile:
       welcome_message: 上传或填写 HTML 文件路径，我会先审计，再生成保留原文的微信兼容版本。
       input_placeholder: 继续补充优化要求或调整反馈…

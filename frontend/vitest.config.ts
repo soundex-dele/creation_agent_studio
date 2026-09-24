@@ -11,5 +11,5 @@ export default defineConfig({
     '@wechat-assistant': path.resolve(__dirname, '../backend/app_center/wechat_assistant/react/src'),
     '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
   } },
-  test: { environment: 'node', include: ['src/**/__tests__/**/*.test.ts'] },
+  test: { environment: 'node', include: ['src/**/__tests__/**/*.test.{ts,tsx}'] },
 });

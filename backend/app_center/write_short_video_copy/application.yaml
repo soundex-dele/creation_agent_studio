@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: write-short-video-copy
-  version: 1.0.0
+  version: 1.0.1
   name: 短视频文案
   description: 将主题或素材转成口播、旁白、字幕或拍摄脚本，配套标题、封面短句与预计时长。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: write-short-video-copy}
+    default_config:
+      guided_entry_prompt_key: write-short-video-copy
+      brand_reference:
+        enabled: true
+        default_modules: [positioning, voice]
+        fields: {audience: positioning.audience, requirements: voice}
     chat_profile:
       welcome_message: 填写主题、素材与目标时长，预览提示词后生成适合录制或拍摄的文案。
       input_placeholder: 继续调整开场、口播、时长、分镜或发布配文…

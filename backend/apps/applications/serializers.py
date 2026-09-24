@@ -306,5 +306,9 @@ class GenerateImageSerializer(serializers.Serializer):
 
 
 class ComposeGuidedPromptSerializer(serializers.Serializer):
+    from app_center.brand_library.backend.serializers import BrandReferenceSerializer
+
     prompt_id = serializers.CharField()
     answers = serializers.DictField(required=False, default=dict)
+    brand_reference = BrandReferenceSerializer(required=False, allow_null=True)
+    explicit_fields = serializers.ListField(child=serializers.CharField(max_length=100), required=False, default=list, max_length=100)

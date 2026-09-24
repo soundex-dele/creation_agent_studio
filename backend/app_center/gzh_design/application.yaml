@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: gzh-design
-  version: 1.0.0
+  version: 1.0.1
   name: 公众号排版引擎
   description: 由内容创作专家使用 Skill 将 Markdown、Word、PDF 或纯文本转换为公众号可直接粘贴的 HTML。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -23,7 +23,12 @@ spec:
     retry_policy: {max_attempts: 3, retry_safe: true}
     input_schema: {}
     output_schema: {}
-    default_config: {guided_entry_prompt_key: format-wechat-article}
+    default_config:
+      guided_entry_prompt_key: format-wechat-article
+      brand_reference:
+        enabled: true
+        default_modules: [visual]
+        fields: {theme: visual, requirements: visual}
     chat_profile:
       welcome_message: 提供文章正文或文件路径并选择主题，我会生成提示词并制作公众号 HTML 与复制预览页。
       input_placeholder: 继续调整主题、组件、强调层级、署名或排版细节…

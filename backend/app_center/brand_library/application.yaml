@@ -1,0 +1,32 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: brand-library
+  version: 1.0.0
+  name: 品牌资料库
+  description: 保存账号定位、产品事实、品牌语气、优秀范文和视觉规范，让每次创作保持一致。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "品"
+  color: "#0D9488"
+  tags: [品牌, 账号定位, 产品事实, 视觉规范]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: brand-library
+    executor_protocol_version: 1
+    renderer_key: brand-library
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {type: object}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.brand_library.backend.apps.BrandLibraryConfig
+    urlconf: app_center.brand_library.backend.urls
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}
