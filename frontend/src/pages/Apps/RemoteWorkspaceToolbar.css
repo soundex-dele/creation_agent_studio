@@ -1,0 +1,33 @@
+.remote-workspace-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.remote-workspace-toolbar > .ant-select {
+  flex: 0 1 240px;
+  width: 240px;
+  min-width: 0;
+  max-width: 100%;
+  /* Match the selector's mobile height so wrapped buttons keep their gap. */
+  min-height: 44px;
+}
+
+.remote-workspace-toolbar > .ant-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+@media (max-width: 767px) {
+  .remote-workspace-toolbar > .ant-select {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .remote-workspace-toolbar > .ant-btn {
+    flex-grow: 1;
+  }
+}

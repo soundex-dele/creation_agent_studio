@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Empty, Input, List, Popconfirm, Select, Space, Switch, Tag } from 'antd';
+import { Alert, Button, Card, Empty, Input, List, Popconfirm, Select, Switch, Tag } from 'antd';
 import { ArrowLeftOutlined, DesktopOutlined, PlusOutlined, MessageOutlined, CodeOutlined, FolderOutlined, RightOutlined } from '@ant-design/icons';
 import { useLocation, useParams } from 'react-router-dom';
 import useApplicationNavigate from '@/hooks/useApplicationNavigate';
@@ -9,6 +9,7 @@ import { createConversationStore, type Conversation } from '@/stores/useConversa
 import ChatContainer from '@/components/Chat/ChatContainer';
 import { ChatConnectionContext } from '@/components/Chat/ChatConnectionContext';
 import './MyComputerPage.css';
+import './RemoteWorkspaceToolbar.css';
 
 const RemoteTerminalPage = lazy(() => import('./RemoteTerminalPage'));
 const RemoteFilesPage = lazy(() => import('./RemoteFilesPage'));
@@ -109,14 +110,14 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
         emptyDescription="对话和任务保存在电脑上，离开页面后任务会继续运行。"
         suggestions={[]}
       /> : <div className="my-computer-content">
-        <Space wrap>
+        <div className="remote-workspace-toolbar">
           <Select aria-label="选择电脑上的对话应用" value={applicationId} allowClear placeholder="普通对话"
-            onChange={setApplicationId} style={{ minWidth: 200 }} disabled={!value.online}
+            onChange={setApplicationId} disabled={!value.online}
             options={apps.map(app => ({ value: app.id, label: app.name }))} />
           <Button type="primary" icon={<PlusOutlined />} disabled={!value.online}
             onClick={() => navigate(`${root}/conversations/new`)}>新建对话</Button>
           <Button disabled={!value.online} loading={isLoading} onClick={() => void fetchConversations().catch(() => undefined)}>刷新</Button>
-        </Space>
+        </div>
         {error && <Alert type="error" showIcon message={error} />}
         <List loading={isLoading} dataSource={[...conversations, ...olderConversations]}
           locale={{ emptyText: <Empty description={online ? '这台电脑还没有对话' : '电脑离线，暂时无法读取对话'} /> }}

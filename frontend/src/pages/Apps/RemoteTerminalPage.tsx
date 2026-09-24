@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Empty, Popconfirm, Select, Space, Tag } from 'antd';
+import { Alert, Button, Empty, Popconfirm, Select, Tag } from 'antd';
 import { useParams } from 'react-router-dom';
 import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { api } from '@/services/api';
@@ -8,6 +8,7 @@ import { terminalError, terminalKey, terminalPath, terminalPost, terminalStream,
   type TerminalCapability, type TerminalSession } from '@/services/remoteTerminal';
 import type { Terminal } from '@xterm/xterm';
 import './RemoteTerminalPage.css';
+import './RemoteWorkspaceToolbar.css';
 
 function TerminalView({ deviceId, sessionId, online, onExit }: {
   deviceId: string; sessionId: string; online: boolean; onExit: () => void;
@@ -205,8 +206,8 @@ export default function RemoteTerminalPage({ deviceId, online }: { deviceId: str
     } finally { setBusy(false); }
   };
   return <section ref={workspace} className="remote-terminal-workspace">
-    <Space wrap className="remote-terminal-toolbar">
-      <Select aria-label="选择终端会话" placeholder="选择已有终端" value={sessionId} style={{ minWidth: 210 }}
+    <div className="remote-workspace-toolbar remote-terminal-toolbar">
+      <Select aria-label="选择终端会话" placeholder="选择已有终端" value={sessionId}
         onChange={id => navigate(`${root}/${id}`)} options={sessions.map((session, index) => ({ value: session.id,
           label: `终端 ${index + 1} · ${session.shell}${session.exited ? ' · 已退出' : ''}` }))} />
       <Button type="primary" disabled={!ready} loading={busy} onClick={() => void create()}>新建终端</Button>
@@ -217,7 +218,7 @@ export default function RemoteTerminalPage({ deviceId, online }: { deviceId: str
         } catch (failure) { setError(terminalError(failure)); }
       }}><Button danger disabled={!ready || !sessionId}>关闭终端</Button></Popconfirm>
       <Button disabled={!online} onClick={() => setRefresh(value => value + 1)}>刷新</Button>
-    </Space>
+    </div>
     {error && <Alert type="error" showIcon message={error} closable onClose={() => setError('')} />}
     {loaded && !capability && <Alert type="info" showIcon message="这台电脑尚不支持远程终端，请升级电脑端。" />}
     {capability && !capability.supported && <Alert type="warning" showIcon message="电脑端的终端组件不可用，请安装终端依赖并重启本机服务。" />}

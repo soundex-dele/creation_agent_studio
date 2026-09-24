@@ -11,6 +11,5 @@
 .remote-terminal-keys button { min-width: 44px; }
 @media (max-width: 600px) {
   .remote-terminal-workspace { padding-inline: 8px; }
-  .remote-terminal-toolbar { gap: 8px; }
   .remote-terminal-status > span:last-child { flex-basis: 100%; }
 }
