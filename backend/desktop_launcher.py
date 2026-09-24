@@ -134,6 +134,9 @@ def _child_command(mode: str) -> list[str]:
 
 def _spawn(mode: str) -> subprocess.Popen:
     creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    if mode == 'remote-connector':
+        return subprocess.Popen(_child_command(mode), creationflags=creation_flags, stdin=subprocess.PIPE,
+                                env=dict(os.environ, REMOTE_CONNECTOR_STOP_STDIN='1'))
     return subprocess.Popen(_child_command(mode), creationflags=creation_flags)
 
 
@@ -196,6 +199,15 @@ def _run_tray(children: list[subprocess.Popen]) -> None:
 
 
 def _stop_children(children: list[subprocess.Popen]) -> None:
+    # Let the connector reap PTYs while Django is still available.
+    for child in children:
+        if child.poll() is None and child.stdin:
+            try:
+                child.stdin.write(b'stop\n')
+                child.stdin.flush()
+                child.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
     for child in children:
         if child.poll() is None:
             child.terminate()

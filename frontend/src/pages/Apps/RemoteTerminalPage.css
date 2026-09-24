@@ -1,0 +1,16 @@
+.remote-terminal-workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 16px 8px; overflow-y: auto; }
+.remote-terminal-toolbar { padding: 8px 0; }
+.remote-terminal-workspace button { min-height: 44px; }
+.remote-terminal-view { flex: 1; min-height: 180px; display: flex; flex-direction: column; gap: 8px; }
+.remote-terminal-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.remote-terminal-status > span:last-child, .remote-terminal-exit-note { color: var(--color-text-sec); font-size: 13px; }
+.remote-terminal-screen { flex: 1; min-height: 120px; overflow: hidden; padding: 8px; background: #000; border-radius: 8px; }
+.remote-terminal-screen .xterm { height: 100%; }
+.remote-terminal-screen:focus-within { outline: 2px solid var(--color-primary, #1677ff); outline-offset: 2px; }
+.remote-terminal-keys { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: env(safe-area-inset-bottom); }
+.remote-terminal-keys button { min-width: 44px; }
+@media (max-width: 600px) {
+  .remote-terminal-workspace { padding-inline: 8px; }
+  .remote-terminal-toolbar { gap: 8px; }
+  .remote-terminal-status > span:last-child { flex-basis: 100%; }
+}

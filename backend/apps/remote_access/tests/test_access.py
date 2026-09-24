@@ -66,6 +66,26 @@ def test_local_settings_persist_and_never_expose_credentials(grant):
     assert APIClient().get('/api/v1/remote-access/').status_code in {401, 403}
 
 
+def test_terminal_opt_in_preserves_legacy_updates_and_requires_admin(grant):
+    user, org, config = grant
+    assert config.terminal_enabled is False
+    client = APIClient()
+    client.force_authenticate(user)
+    payload = {'enabled': True, 'computer_name': '书房电脑', 'server_url': 'https://relay.example',
+               'local_user_id': user.id, 'organization_id': str(org.id)}
+    response = client.put('/api/v1/remote-access/', {**payload, 'terminal_enabled': True}, format='json')
+    assert response.status_code == 200
+    assert response.data['terminal_enabled'] is True
+    assert client.put('/api/v1/remote-access/', payload, format='json').data['terminal_enabled'] is True
+    remote = APIClient()
+    remote.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    assert remote.get('/api/v1/remote-access/context/').data['terminal']['enabled'] is True
+    assert remote.put('/api/v1/remote-access/', {**payload, 'terminal_enabled': False}, format='json').status_code == 403
+    user.role = 'member'
+    user.save()
+    assert client.put('/api/v1/remote-access/', {**payload, 'terminal_enabled': False}, format='json').status_code == 403
+
+
 def test_server_capability_hidden_and_non_admin_cannot_configure(grant, settings):
     user, _, _ = grant
     client = APIClient()

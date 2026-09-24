@@ -82,6 +82,7 @@ def main():
     parser.add_argument('--server-port', type=int, default=18080)
     parser.add_argument('--client-port', type=int, default=18081)
     parser.add_argument('--keep-running', action='store_true')
+    parser.add_argument('--terminal', action='store_true', help='Also exercise native PTYs through the real relay.')
     parser.add_argument('--production-server', action='store_true',
                         help='Test production settings with explicit HTTP and memory relay enabled.')
     args = parser.parse_args()
@@ -237,6 +238,62 @@ def main():
             body = ''.join(response.iter_text())
         check('local-stream-marker' in body and 'event: run.succeeded' in body, 'Missing streamed events')
         print('PASS: real HTTP → WebSocket → local HTTP SSE forwarding', flush=True)
+
+        if args.terminal:
+            terminal_path = proxy + 'remote-access/terminals/'
+            api(server, 'POST', terminal_path, expected=403, json={'cols': 80, 'rows': 24},
+                headers={'Idempotency-Key': 'disabled-terminal'})
+            config['terminal_enabled'] = True
+            api(host, 'PUT', '/api/v1/remote-access/', json=config)
+            wait_for(lambda: server.get(terminal_path).status_code == 200, 'terminal enabled', processes)
+            headers = {'Idempotency-Key': 'terminal-smoke-create'}
+            terminal = api(server, 'POST', terminal_path, expected=201, json={'cols': 80, 'rows': 24}, headers=headers).json()
+            repeated = api(server, 'POST', terminal_path, expected=201, json={'cols': 80, 'rows': 24}, headers=headers).json()
+            check(terminal['id'] == repeated['id'], 'Terminal creation is not idempotent')
+            session_path = terminal_path + terminal['id'] + '/'
+
+            def terminal_output_until(marker, after=0):
+                text, cursor = '', after
+                with server.stream('GET', session_path + f'stream/?after={after}',
+                                   headers={'Accept': 'text/event-stream'}, timeout=25) as response:
+                    check(response.status_code == 200, 'Terminal SSE failed')
+                    for line in response.iter_lines():
+                        if not line.startswith('data: '):
+                            continue
+                        event = json.loads(line[6:])
+                        if event['type'] == 'output':
+                            text += event['data']
+                            cursor = event['sequence']
+                            if marker in text:
+                                return text, cursor
+                        check(event['type'] != 'exit', 'Terminal exited unexpectedly')
+                raise RuntimeError('Missing terminal marker')
+
+            if os.name == 'nt':
+                terminal_output_until('>')
+            command = "Write-Output ('RELAY_'+'TERMINAL_OK')\r" if os.name == 'nt' else "printf 'RELAY_%s\\n' TERMINAL_OK\r"
+            body = {'client_id': 'a' * 32, 'sequence': 1, 'data': command}
+            headers = {'Idempotency-Key': 'terminal-input-one'}
+            api(server, 'POST', session_path + 'input/', json=body, headers=headers)
+            api(server, 'POST', session_path + 'input/', json=body, headers=headers)
+            text, cursor = terminal_output_until('RELAY_TERMINAL_OK')
+            check(text.count('RELAY_TERMINAL_OK') == 1, 'Duplicate terminal input was executed')
+            api(server, 'POST', session_path + 'resize/', json={'cols': 100, 'rows': 30},
+                headers={'Idempotency-Key': 'terminal-resize'})
+            api(host, 'POST', '/api/v1/remote-access/reconnect/', json={})
+            wait_for(lambda: server.get(terminal_path).status_code == 200, 'terminal reconnected', processes)
+            # The browser detached above; both detach and connector reconnect keep the same PTY.
+            check(any(s['id'] == terminal['id'] for s in api(server, 'GET', terminal_path).json()['sessions']),
+                  'Terminal disappeared after detach/reconnect')
+            body.update(sequence=2, data="Write-Output ('REPLAY_'+'OK')\r" if os.name == 'nt' else "printf 'REPLAY_%s\\n' OK\r")
+            api(server, 'POST', session_path + 'input/', json=body, headers={'Idempotency-Key': 'terminal-input-two'})
+            terminal_output_until('REPLAY_OK', cursor)
+            api(host, 'PUT', '/api/v1/remote-access/', json={**config, 'terminal_enabled': False})
+            time.sleep(2)
+            api(host, 'PUT', '/api/v1/remote-access/', json=config)
+            wait_for(lambda: server.get(terminal_path).status_code == 200, 'terminal re-enabled', processes)
+            check(not api(server, 'GET', terminal_path).json()['sessions'], 'Disabling terminal did not clear sessions')
+            print('PASS: real terminal opt-in, PTY output, input deduplication, resize, detach/reconnect and revocation', flush=True)
 
         api(host, 'PUT', '/api/v1/remote-access/', json={**config, 'enabled': False})
         wait_for(lambda: not online(), 'device offline', processes)

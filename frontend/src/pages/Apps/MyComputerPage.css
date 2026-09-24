@@ -2,6 +2,8 @@
 .my-computer-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 16px; }
 .my-computer-toolbar strong { min-width: 0; overflow-wrap: anywhere; flex: 1; }
 .my-computer-toolbar h2 { margin: 0; flex: 1; font-size: 20px; }
+.my-computer-mode { display: flex; gap: 8px; padding: 0 16px 8px; }
+.my-computer-mode button { min-height: 44px; }
 .my-computer-devices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
 .my-computer-devices > .ant-card { min-width: 0; }
 .my-computer-name { display: block; white-space: normal; overflow-wrap: anywhere; padding: 12px 0; }

@@ -121,6 +121,7 @@ async def test_relay_ownership_offline_allowlist_and_revoke(connected_device):
         assert blocked.status_code == 400
         assert await ws.receive_nothing(timeout=0.05)
         await RemoteDevice.objects.filter(pk=device.id).aupdate(revoked_at=timezone.now())
+        assert (await ws.receive_json_from(timeout=3))['type'] == 'revoked'
         message = await ws.receive_output(timeout=3)
         assert message['type'] == 'websocket.close'
     finally:

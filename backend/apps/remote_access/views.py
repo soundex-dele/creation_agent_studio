@@ -84,6 +84,7 @@ def config_data(config):
         "host_enabled": True, "manageable": True,
         "server_url": config.server_url, "computer_name": config.computer_name,
         "enabled": config.enabled, "local_user_id": config.local_user_id,
+        "terminal_enabled": config.terminal_enabled,
         "organization_id": str(config.organization_id) if config.organization_id else None,
         "device_id": str(config.device_id) if config.device_id else None,
         "bound_account": config.bound_account,
@@ -97,6 +98,7 @@ class ConfigInput(serializers.Serializer):
     server_url = serializers.CharField(max_length=200)
     computer_name = serializers.CharField(max_length=100)
     enabled = serializers.BooleanField()
+    terminal_enabled = serializers.BooleanField(required=False)
     local_user_id = serializers.IntegerField()
     organization_id = serializers.UUIDField()
 
@@ -213,7 +215,9 @@ class LocalContextView(APIView):
         if not getattr(request, "remote_connector", False):
             raise exceptions.PermissionDenied()
         config = local_config()
-        return Response({"organization_id": str(config.organization_id), "computer_name": config.computer_name})
+        from .terminal_process import terminal_capability
+        return Response({"organization_id": str(config.organization_id), "computer_name": config.computer_name,
+                         "terminal": {**terminal_capability(), "enabled": config.terminal_enabled}})
 
 
 class PairingThrottle(AnonRateThrottle):

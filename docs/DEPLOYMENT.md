@@ -122,6 +122,21 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1 -DryRun
 
 ## 远程访问 / 我的电脑
 
+### 远程终端
+
+升级顺序：先升级中继服务器，再升级被控电脑，执行数据库迁移并重启本机后端与连接器，最后由本机管理员在 **设置 → 远程访问 → 允许远程终端** 开启。已有绑定默认不会自动获得终端权限。电脑卡片上的 **远程终端** 可进入多会话工作区；旧版电脑显示升级提示。
+
+后端依赖已纳入 `requirements/base.txt`：Windows 使用 `pywinpty`/ConPTY（需支持 ConPTY 的 Windows），Linux/macOS 使用 `ptyprocess` 和 `psutil`。Windows 首选 `pwsh`，否则使用 Windows PowerShell；Linux/macOS 使用运行账号的默认 Shell。初始目录为该账号主目录。前端使用按需加载的 xterm 与 Fit 插件；无需新增端口或 SSH 服务。桌面包包含终端依赖并通过退出通知及 Windows Job Object 清理终端子进程。
+
+Windows 更新命令（仓库根目录）：
+
+```powershell
+backend\venv\Scripts\python.exe -m pip install -r backend\requirements\base.txt
+backend\venv\Scripts\python.exe backend\manage.py migrate
+```
+
+终端命令以本机服务的操作系统账号执行。退出网页或中继断网后程序继续运行；关闭终端、关闭远程终端权限、关闭远程访问或停止本机服务会结束会话。每电脑最多 8 个运行终端，输出仅保留最近 1 MiB，不跨连接器重启恢复。生产反向代理沿用现有 SSE 禁缓冲与 WebSocket 配置；中继、代理及 APM 不应记录终端正文。
+
 更新时执行迁移、重新构建前端，并与其他应用一起同步 `my-computer` 应用。常规 Compose 初始化流程已执行迁移和所有应用的 `sync_app_center`。内置 Nginx 支持 `/ws/remote/connector/` 的 WebSocket 升级，并关闭 HTTP/SSE 代理缓冲。
 
 服务器配置：

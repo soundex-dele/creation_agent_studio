@@ -9,6 +9,7 @@ interface Configuration {
   server_url: string;
   computer_name: string;
   enabled: boolean;
+  terminal_enabled: boolean;
   local_user_id: number | null;
   organization_id: string | null;
   device_id: string | null;
@@ -115,6 +116,15 @@ export default function RemoteAccessSettings({ onAvailable }: { onAvailable: (av
       </div>
       <div role="status"><Tag color={config.status === 'online' ? 'green' : 'default'}>{statuses[config.status] || config.status}</Tag>
         {config.bound_account ? `绑定账号：${config.bound_account}` : '尚未绑定账号'}
+      </div>
+      <div className="settings-row">
+        <div><strong>允许远程终端</strong><p>绑定账号可使用运行本机服务的操作系统账号执行命令。离开页面后程序继续运行；关闭此开关会结束所有终端会话。</p></div>
+        <Switch aria-label="允许远程终端" checked={Boolean(config.terminal_enabled)} loading={busy} disabled={!config.server_url}
+          onChange={terminal_enabled => void perform(() => api.put('/remote-access/', {
+            server_url: config.server_url, computer_name: config.computer_name,
+            local_user_id: config.local_user_id, organization_id: config.organization_id,
+            enabled: config.enabled, terminal_enabled,
+          }))} />
       </div>
       {config.pairing_code && <Alert type="info" showIcon message={<>
         配对码：<Typography.Text copyable strong>{config.pairing_code}</Typography.Text>

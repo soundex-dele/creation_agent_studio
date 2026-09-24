@@ -7,7 +7,7 @@
   "required": ["v", "type"],
   "properties": {
     "v": {"const": 1},
-    "type": {"enum": ["ready", "hello", "request", "start", "chunk", "ack", "end", "error", "cancel", "ping", "pong"]},
+    "type": {"enum": ["ready", "hello", "request", "start", "chunk", "ack", "end", "error", "cancel", "ping", "pong", "revoked"]},
     "id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 100},
     "method": {"enum": ["GET", "POST"]},

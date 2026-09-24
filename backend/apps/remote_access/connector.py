@@ -11,10 +11,12 @@ from channels.db import database_sync_to_async
 from django.conf import settings
 from django.utils import timezone
 from websockets.asyncio.client import connect
+from websockets.exceptions import InvalidStatus
 
 from .models import LocalRemoteConfig
-from .protocol import HEARTBEAT, MAX_BODY, MAX_CHUNK, MAX_INFLIGHT, VERSION, validate_request
+from .protocol import HEARTBEAT, MAX_BODY, MAX_CHUNK, MAX_INFLIGHT, VERSION, TERMINAL_ROOT, validate_request
 from .security import authorized_user, decrypt_credentials
+from .terminals import TerminalError, TerminalManager
 
 
 @database_sync_to_async
@@ -38,7 +40,7 @@ def local_origin():
     return value
 
 
-async def run_connection(config):
+async def run_connection(config, terminals=None):
     credentials = decrypt_credentials(config.credentials)
     endpoint = config.server_url.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
     tasks = {}
@@ -66,6 +68,41 @@ async def run_connection(config):
                     headers = {"Authorization": "RemoteLocal " + credentials["local_token"],
                                "X-Organization-ID": str(config.organization_id),
                                "Idempotency-Key": frame.get("idempotency_key", "")}
+                    if frame['path'].startswith(TERMINAL_ROOT) and terminals is not None:
+                        # PTYs live here, but authorization still goes through the local API
+                        # (including licenses). Never trust a relay-supplied grant or flag.
+                        context = await client.get('/api/v1/remote-access/context/', headers=headers)
+                        capability = context.json().get('terminal', {}) if context.status_code == 200 else {}
+                        if not capability.get('enabled') or not capability.get('supported'):
+                            raise TerminalError(403, '本机未允许远程终端或终端组件不可用。')
+                        operation = asyncio.create_task(terminals.request(
+                            frame['method'], frame['path'], frame.get('body'), frame.get('idempotency_key')))
+                        try:
+                            status, result, stream = await asyncio.shield(operation)
+                        except asyncio.CancelledError:
+                            # A lost HTTP response must not interrupt a PTY creation/write.
+                            await operation
+                            raise
+                        await wire({'type': 'start', 'id': request_id, 'status': status,
+                                    'content_type': 'text/event-stream' if stream else 'application/json'})
+
+                        async def send_block(block):
+                            for offset in range(0, len(block), MAX_CHUNK):
+                                credits[request_id].clear()
+                                await wire({'type': 'chunk', 'id': request_id,
+                                            'body': base64.b64encode(block[offset:offset + MAX_CHUNK]).decode()})
+                                await asyncio.wait_for(credits[request_id].wait(), 60)
+
+                        if stream:
+                            try:
+                                async for block in stream:
+                                    await send_block(block)
+                            finally:
+                                await stream.aclose()
+                        else:
+                            await send_block(json.dumps(result).encode())
+                        await wire({'type': 'end', 'id': request_id})
+                        return
                     async with client.stream(frame["method"], frame["path"],
                                              json=frame.get("body") if frame["method"] == "POST" else None,
                                              headers=headers) as response:
@@ -82,6 +119,14 @@ async def run_connection(config):
                         await wire({"type": "end", "id": request_id})
                 except asyncio.CancelledError:
                     raise
+                except TerminalError as exc:
+                    await wire({'type': 'start', 'id': request_id, 'status': exc.status,
+                                'content_type': 'application/json'})
+                    credits[request_id].clear()
+                    await wire({'type': 'chunk', 'id': request_id,
+                                'body': base64.b64encode(json.dumps({'detail': exc.detail}).encode()).decode()})
+                    await asyncio.wait_for(credits[request_id].wait(), 60)
+                    await wire({'type': 'end', 'id': request_id})
                 except Exception:
                     # Never include local URLs, response bodies or exception text.
                     await wire({"type": "error", "id": request_id, "detail": "本机请求失败，请检查权限、许可证与连接。"})
@@ -101,6 +146,10 @@ async def run_connection(config):
                         await wire({"type": "hello", "name": config.computer_name})
                     elif kind == "pong":
                         last_pong = time.monotonic()
+                    elif kind == 'revoked':
+                        if terminals:
+                            await terminals.close_all()
+                        return
                     elif kind == "request":
                         if not isinstance(request_id, str) or len(request_id) != 32 or request_id in tasks:
                             raise ValueError("Invalid request identifier")
@@ -143,7 +192,43 @@ async def run_connection(config):
                 await asyncio.gather(*remaining, return_exceptions=True)
 
 
+async def monitor_terminals(terminals):
+    """Runs even during relay backoff/offline periods."""
+    async with httpx.AsyncClient(base_url=local_origin(), trust_env=False, timeout=3) as client:
+        while True:
+            try:
+                config = await read_config()
+                grant = (str(config.device_id), config.credentials, config.local_user_id, config.organization_id)
+                if terminals.grant != grant:
+                    await terminals.close_all()
+                    terminals.grant = grant
+                if not config.enabled or not config.bound_account or not config.terminal_enabled:
+                    await terminals.close_all()
+                elif terminals.sessions:
+                    credentials = decrypt_credentials(config.credentials)
+                    response = await client.get('/api/v1/remote-access/context/', headers={
+                        'Authorization': 'RemoteLocal ' + credentials['local_token']})
+                    if response.status_code != 200 or not response.json().get('terminal', {}).get('enabled'):
+                        await terminals.close_all()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                await terminals.close_all()
+            await asyncio.sleep(1)
+
+
 async def run_connector():
+    terminals = TerminalManager()
+    monitor = asyncio.create_task(monitor_terminals(terminals))
+    try:
+        await connection_loop(terminals)
+    finally:
+        monitor.cancel()
+        await asyncio.gather(monitor, return_exceptions=True)
+        await terminals.close_all()
+
+
+async def connection_loop(terminals):
     delay = 1
     while True:
         config = None
@@ -156,11 +241,15 @@ async def run_connector():
                 continue
             await report("connecting")
             started = time.monotonic()
-            await run_connection(config)
+            await run_connection(config, terminals)
             if time.monotonic() - started > 60:
                 delay = 1
         except asyncio.CancelledError:
             raise
+        except InvalidStatus as exc:
+            if exc.response.status_code in {401, 403, 404, 410}:
+                await terminals.close_all()
+            await report('reconnecting')
         except Exception:
             await report("reconnecting")
         # Configuration changes interrupt the backoff promptly.

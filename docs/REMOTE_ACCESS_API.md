@@ -79,6 +79,7 @@ GET /api/v1/remote/devices/<device_id>/proxy/organizations/<本机组织ID>/runs
 | error | 双向内部转发 | 固定错误说明，不包含业务正文或原始异常 |
 | cancel | 服务器 → 电脑 | 结束指定 HTTP 订阅；不会创建停止任务命令 |
 | ping / pong | 电脑 → 服务器 / 返回 | 20 秒心跳，60 秒无响应离线 |
+| revoked | 服务器 → 电脑 | 绑定或账号被撤销，立即清理终端，再关闭连接 |
 
 每个连接最多 32 个并行请求，每个请求最多 1 MiB 正文；每次仅允许一个未确认响应块。慢客户端会在超时后断开订阅，任务继续在本机执行。重连采用带抖动的退避，最多 30 秒；配置变化可提前结束等待。
 
@@ -129,3 +130,28 @@ backend/.venv/bin/python backend/scripts/test_remote_local.py --production-serve
 空闲对话每 5 秒检查一次状态，发现活动 Run 后复用事件投影订阅；离开页面只撤销订阅。设备离线时禁用发送并保留当前页面草稿。导航为“对话 → 对话列表 → 电脑列表”。附件和 Markdown 内嵌文件只显示名称或说明，不在手机直接加载电脑文件。
 
 机器可读的 WebSocket 帧契约为 `contracts/remote-connector-v1.json`。对话列表传入 `?page=1` 时返回 `count/next/previous/results`，不传 `page` 保留原有数组响应。应用和智能体列表使用原有分页；手机只读取分页编号并通过当前电脑客户端加载下一页，不直接请求本机绝对链接。远程目录读取额外限制为授权组织及全局资源，即使授权用户是平台管理员也不会列出其他组织的资源。
+
+## 远程终端
+
+本机配置增加 `terminal_enabled`（默认 `false`）。只有本机管理员可修改；旧客户端 PUT 省略此字段时保留原值。`context/` 返回 `terminal: {supported, enabled, shell, platform, max_sessions}`。远程用户不能通过代理修改开关。终端使用运行本机服务的操作系统账号，不模拟 Django 用户的操作系统身份，也不自动提权。
+
+浏览器通过 `/api/v1/remote/devices/{device_id}/proxy/remote-access/terminals/` 访问。下表的路径相对该前缀；它们是连接器分派的接口，不在本机 Django 请求中启动 PTY。
+
+| 方法与路径 | 请求 | 返回 |
+| --- | --- | --- |
+| GET 根路径 | 无 | `{sessions: [{id, shell, created_at, exited, exit_code}]}` |
+| POST 根路径 | `{cols, rows}` | 201，单个会话信息 |
+| POST `{id}/input/` | `{client_id, sequence, data}` | `{sequence}` |
+| POST `{id}/resize/` | `{cols, rows}` | `{resized: true}` |
+| POST `{id}/close/` | `{}` | `{closed: true}`，重复关闭成功 |
+| GET `{id}/stream/?after=0` | 输出序号 | SSE 输出与退出状态 |
+
+所有 POST 必须携带 `Idempotency-Key`。会话 ID 和输入客户端 ID 为 32 位小写十六进制。尺寸范围为 2–500，单批输入不超过 16 KiB UTF-8。新建请求相同 key/参数返回原会话，更改参数返回 409，已关闭的创建请求返回 410，不能复活已关闭会话。输入按客户端从 1 递增；同序号、同内容重试只确认，不再次写入；冲突或跳号返回 409。不同批次即使内容相同也正常执行。输入失败结果不明时前端暂停输入，要求检查执行结果后重新连接。
+
+SSE 的 `data` 为 JSON：`output` 携带 `sequence/data`，`truncated` 携带最近保留范围之前的 `sequence`，`ready` 表示回放完成可开始输入，`exit` 携带 `exit_code`。每 15 秒发送 SSE 注释心跳；输出继续使用现有 chunk/ack 背压。前端只在 `ready` 后发送输入，避免回放旧终端查询序列时生成新输入。
+
+每电脑最多 8 个运行会话，另保留最多 8 个已退出会话；每会话保留最近 1 MiB 原始输出。慢订阅者不会阻塞 PTY 读取，超出保留范围时明确报告截断。会话不写数据库，不跨连接器重启保留。每会话最多 128 个输入客户端，连接器单次授权生命周期内最多记录 4096 个创建幂等键；达到上限返回 409。
+
+关闭页面只取消输出订阅。网络掉线、请求取消和配置中的“重新连接”保留终端；关闭终端开关、远程访问、授权失效或本机 API 停止时，独立监测任务清理会话。服务器撤销绑定通过 `revoked` 或后续认证拒绝通知电脑；断网时不能立即获知服务器侧撤销。多页面输入由会话锁串行处理，尺寸采用最近一次有效调整。
+
+运行 `backend\venv\Scripts\python.exe backend\scripts\test_remote_local.py --terminal` 可在临时数据库与真实双后端环境中验证终端启用、创建/输入幂等、PTY 输出、缩放、订阅退出、通道重连和关闭权限。该脚本不会操作日常开发数据库。

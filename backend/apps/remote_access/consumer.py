@@ -99,6 +99,7 @@ async def connector_socket(scope, receive, send):
             if not await RemoteDevice.objects.filter(
                     pk=device.id, session_id=session, revoked_at__isnull=True,
                     owner__is_active=True, confirmed=True).aexists():
+                await wire({'type': 'revoked'})
                 return
 
     try:

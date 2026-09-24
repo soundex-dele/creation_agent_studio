@@ -16,6 +16,7 @@ class LocalRemoteConfig(models.Model):
     server_url = models.URLField(blank=True)
     computer_name = models.CharField(max_length=100, default=default_computer_name)
     enabled = models.BooleanField(default=False)
+    terminal_enabled = models.BooleanField(default=False)
     local_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     organization = models.ForeignKey("enterprise.Organization", null=True, on_delete=models.SET_NULL)
     device_id = models.UUIDField(null=True)

@@ -5,7 +5,7 @@ import os
 import shutil
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs
 
 
 BACKEND_ROOT = Path(SPECPATH)
@@ -87,6 +87,13 @@ for package in ("app_center.batch_transcribe", "app_center.wechat_assistant"):
 hiddenimports += collect_submodules("whitenoise", filter=runtime_module)
 hiddenimports += collect_submodules("websockets.asyncio", filter=runtime_module)
 hiddenimports += ["pystray._win32"]
+if os.name == 'nt':
+    hiddenimports += collect_submodules('winpty')
+    datas += collect_data_files('winpty')
+    binaries += collect_dynamic_libs('winpty')
+else:
+    hiddenimports += collect_submodules('ptyprocess')
+    hiddenimports += collect_submodules('psutil')
 
 a = Analysis(
     [str(BACKEND_ROOT / "desktop_launcher.py")],
