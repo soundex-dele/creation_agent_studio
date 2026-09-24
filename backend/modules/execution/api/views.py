@@ -192,17 +192,6 @@ def _can_access_run(request, run):
             return False
         from app_center.research_assistant.backend.access import can_access_run as research_access
         return research_access(request.user, root)
-    if root.executor_key == "ai-drawing":
-        if root.owner_id != request.user.id:
-            return False
-        from django.http import Http404
-        from rest_framework.exceptions import APIException
-        from app_center.ai_drawing.backend.access import application_for
-        try:
-            application_for(request.user, root.organization_id, root.source_id)
-        except (Http404, APIException, ValueError):
-            return False
-        return True
     if root.executor_key == "meeting-assistant":
         if root.owner_id != request.user.id:
             return False
@@ -212,6 +201,17 @@ def _can_access_run(request, run):
         try:
             recording_for(request.user, root.organization_id, root.source_id,
                           (root.input or {}).get("record_id"))
+        except (Http404, APIException, ValueError):
+            return False
+        return True
+    if root.executor_key == "ai-drawing":
+        if root.owner_id != request.user.id:
+            return False
+        from django.http import Http404
+        from rest_framework.exceptions import APIException
+        from app_center.ai_drawing.backend.access import application_for
+        try:
+            application_for(request.user, root.organization_id, root.source_id)
         except (Http404, APIException, ValueError):
             return False
         return True
