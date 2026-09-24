@@ -1,0 +1,41 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: ai-drawing
+  version: 1.0.0
+  name: AI 绘图
+  description: 使用 Codex 生成图片、参考原图修改，并保存每一次创作。
+  category: {slug: image, name: 图片工具, order: 25}
+  icon: "绘"
+  color: "#7c3aed"
+  tags: [AI 绘图, Codex, 文生图, 参考图编辑]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: ai-drawing
+    executor_protocol_version: 1
+    renderer_key: ai-drawing
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [prompt]
+      properties:
+        prompt: {type: string, minLength: 1, maxLength: 8000}
+        orientation: {type: string, enum: [auto, square, landscape, portrait]}
+        reference_id: {type: string, format: uuid}
+        source_artifact_id: {type: string, format: uuid}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated, timeout_seconds: 600}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.ai_drawing.backend.apps.AIDrawingConfig
+    urlconf: app_center.ai_drawing.backend.urls
+    executor_entrypoint: app_center.ai_drawing.runtime.execute
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

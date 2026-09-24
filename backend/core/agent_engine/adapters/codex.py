@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -125,6 +126,13 @@ def _codex_tool_payload(item):
         payload["input"] = input_value
     if result_value is not None:
         payload["result"] = result_value
+    if item_type == "imageGeneration":
+        # Binary image results can be enormous. Consumers archive the saved file
+        # and must sanitize local paths before publishing events to a client.
+        payload.pop("result", None)
+        payload["saved_path"] = raw.get("savedPath")
+        payload["revised_prompt"] = raw.get("revisedPrompt")
+        payload["status"] = raw.get("status")
     error = raw.get("error")
     if isinstance(error, dict) and error.get("message"):
         payload["error_message"] = str(error["message"])
@@ -135,7 +143,7 @@ def _codex_tool_payload(item):
 
 def _consume_codex_turn(
     thread, text, *, model="", skills=None, image_paths=None, on_event=None,
-    cancelled=None, collaboration_mode=None,
+    cancelled=None, collaboration_mode=None, timeout_seconds=None,
 ):
     """Consume one Codex turn while preserving text and tool notifications."""
 
@@ -147,6 +155,8 @@ def _consume_codex_turn(
             image_paths=image_paths,
             collaboration_mode=collaboration_mode,
         )
+        if timeout_seconds is not None:
+            turn.deadline = time.monotonic() + float(timeout_seconds)
     else:
         if collaboration_mode == "plan":
             raise RuntimeError("Plan 模式需要 CODEX_TRANSPORT=app-server。")
@@ -536,6 +546,7 @@ class _AppServerTurn:
         self._collaboration_mode = collaboration_mode
         self._reasoning_effort = reasoning_effort
         self.id = ""
+        self.deadline = None
 
     def _start(self) -> None:
         if self.id:
@@ -565,7 +576,14 @@ class _AppServerTurn:
     def stream(self):
         self._start()
         while True:
-            message = self._transport.next_notification()
+            remaining = None if self.deadline is None else self.deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise TimeoutError("Codex 图像生成超时，请稍后重试。")
+            try:
+                message = (self._transport.next_notification() if remaining is None
+                           else self._transport.next_notification(timeout=remaining))
+            except queue.Empty:
+                raise TimeoutError("Codex 图像生成超时，请稍后重试。") from None
             if message["method"] == "agentStudio/inputRequired":
                 return
             params = message.get("params") or {}
@@ -694,6 +712,7 @@ class _AppServerCodex:
         cwd: str,
         model: Optional[str],
         sandbox: str,
+        config: Optional[dict] = None,
     ) -> _AppServerThread:
         approval_policy, approvals_reviewer = _approval_settings(approval_mode)
         params = {
@@ -704,6 +723,8 @@ class _AppServerCodex:
             "baseInstructions": base_instructions,
             "model": model,
         }
+        if config:
+            params["config"] = config
         params = {
             key: value for key, value in params.items() if value not in (None, "")
         }
@@ -949,6 +970,10 @@ class CodexAdapter(AgentAdapter):
                 "model": self.model or None,
                 "sandbox": sandbox,
             }
+            if options.get("thread_config"):
+                if sdk is not _AppServerSdk or requested_thread_id:
+                    raise ValueError("Thread config requires a new app-server thread")
+                thread_options["config"] = options["thread_config"]
             if requested_thread_id:
                 try:
                     thread = client.thread_resume(
@@ -975,6 +1000,7 @@ class CodexAdapter(AgentAdapter):
                 on_event=options.get("on_event"),
                 cancelled=options.get("cancelled"),
                 collaboration_mode=collaboration_mode,
+                timeout_seconds=options.get("timeout_seconds"),
             )
             input_request = getattr(client, "input_request", None)
         finally:

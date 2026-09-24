@@ -186,6 +186,17 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    if root.executor_key == "ai-drawing":
+        if root.owner_id != request.user.id:
+            return False
+        from django.http import Http404
+        from rest_framework.exceptions import APIException
+        from app_center.ai_drawing.backend.access import application_for
+        try:
+            application_for(request.user, root.organization_id, root.source_id)
+        except (Http404, APIException, ValueError):
+            return False
+        return True
     if (root.input or {}).get("document_id"):
         if root.owner_id != request.user.id:
             return False
@@ -256,7 +267,7 @@ class OrganizationRunView(ProblemDetailsAPIView):
 
     def delete(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
-        if run is None:
+        if run is None or (run.executor_key == "ai-drawing" and not _can_access_run(request, run)):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,

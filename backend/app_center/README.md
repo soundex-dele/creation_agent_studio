@@ -34,6 +34,11 @@ package does not drop its tables or historical catalog records.
 
 ## Guided content applications
 
+The **AI 绘图** (`ai-drawing`) dedicated workspace uses native Codex image
+generation for text-to-image and reference-image editing. It keeps private Run
+history and durable image artifacts. See [`ai_drawing/README.md`](ai_drawing/README.md)
+for host requirements, installation and validation.
+
 The **我的网盘** (`my-drive`) workspace provides private file management,
 resumable large uploads, a recycle bin and native media previews. See
 [`my_drive/README.md`](my_drive/README.md) for storage and maintenance configuration.

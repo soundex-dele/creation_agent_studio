@@ -1,0 +1,46 @@
+.drawing-workspace { display: grid; grid-template-columns: 330px minmax(0, 1fr); height: 100%; min-height: 0; overflow-y: auto; background: var(--color-bg-surface, #f8f9fc); color: var(--color-text, #20212b); }
+.drawing-form { display: flex; flex-direction: column; gap: 14px; padding: 26px; border-right: 1px solid var(--color-border, #e4e5ed); background: var(--color-bg-card, #fff); }
+.drawing-back { display: flex; align-items: center; gap: 7px; color: var(--color-text-sec, #626679); font-size: 13px; margin-bottom: 15px; }
+.drawing-form header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.drawing-app-icon { display: grid; place-items: center; width: 48px; height: 48px; background: #ede9fe; border-radius: 14px; color: #6d28d9; }
+.drawing-form h1 { font-size: 23px; margin: 0 0 3px; }
+.drawing-form header p, .drawing-preview-header p { color: var(--color-text-sec, #626679); margin: 0; font-size: 13px; }
+.drawing-form label, .drawing-reference-title { font-size: 14px; font-weight: 600; }
+.drawing-form textarea { resize: vertical; min-height: 170px; width: 100%; padding: 13px; line-height: 1.8; border: 1px solid var(--color-border, #d9dce7); border-radius: 10px; background: var(--color-bg-surface, #fff); color: inherit; font: inherit; }
+.drawing-form textarea:focus-visible, .drawing-history-select:focus-visible, .drawing-upload:focus-within { outline: 2px solid #7c3aed; outline-offset: 3px; }
+.drawing-prompt-count { text-align: right; font-size: 12px; color: var(--color-text-sec, #626679); margin-top: -9px; }
+.drawing-hint { color: var(--color-text-sec, #626679); font-size: 12px; line-height: 1.7; margin: -5px 0 6px; }
+.drawing-reference-title { display: flex; justify-content: space-between; align-items: center; }
+.drawing-reference-title span { font-size: 12px; font-weight: 400; color: var(--color-text-sec, #626679); }
+.drawing-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; position: relative; padding: 24px 12px; border: 1px dashed var(--color-border, #c7c9d8); border-radius: 12px; cursor: pointer; margin-bottom: 10px; }
+.drawing-upload:hover { border-color: #7c3aed; }
+.drawing-upload span { font-size: 11px; color: var(--color-text-sec, #626679); font-weight: 400; }
+.drawing-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.drawing-reference { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--color-border, #e4e5ed); border-radius: 10px; }
+.drawing-reference img { width: 56px; height: 56px; object-fit: contain; border-radius: 5px; }
+.drawing-reference span { flex: 1; font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
+.drawing-results { padding: 30px clamp(20px, 4vw, 60px); min-width: 0; }
+.drawing-preview-header, .drawing-history-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.drawing-results h2 { font-size: 18px; font-weight: 600; margin: 0 0 7px; }
+.drawing-canvas { display: flex; align-items: center; justify-content: center; min-height: 370px; height: min(55vh, 620px); padding: 20px; border: 1px solid var(--color-border, #e4e5ed); border-radius: 16px; background: var(--color-bg-card, #fff); margin: 18px 0; overflow: hidden; }
+.drawing-canvas > img { width: 100%; height: 100%; object-fit: contain; }
+.drawing-empty { text-align: center; color: var(--color-text-sec, #626679); padding: 25px; }
+.drawing-empty > svg { color: #8b7dbb; }
+.drawing-empty h3 { font-size: 22px; font-weight: 500; color: var(--color-text, #303244); }
+.drawing-empty span { font-size: 12px; line-height: 1.7; }
+.drawing-result-info > p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 150px; overflow: auto; color: var(--color-text-sec, #626679); line-height: 1.7; font-size: 13px; }
+.drawing-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.drawing-actions > span { margin-right: auto; font-size: 12px; color: var(--color-text-sec, #626679); }
+.drawing-history-header { margin-top: 36px; }
+.drawing-history-header h2 span { margin-left: 8px; color: var(--color-text-sec, #626679); font-size: 13px; font-weight: 400; }
+.drawing-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 16px; list-style: none; padding: 0; }
+.drawing-gallery li { display: flex; flex-direction: column-reverse; border: 1px solid var(--color-border, #e4e5ed); border-radius: 12px; overflow: hidden; background: var(--color-bg-card, #fff); }
+.drawing-gallery li.is-selected { border-color: #7c3aed; box-shadow: 0 0 0 1px #7c3aed; }
+.drawing-history-select { border: 0; background: transparent; color: inherit; text-align: left; padding: 12px; cursor: pointer; min-height: 60px; }
+.drawing-history-select span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; margin-bottom: 6px; }
+.drawing-history-select time { color: var(--color-text-sec, #626679); font-size: 11px; }
+.drawing-thumb { aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; background: var(--color-bg-surface, #f2f2f7); overflow: hidden; }
+.drawing-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.drawing-image-error { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; font-size: 12px; }
+@media (max-width: 900px) { .drawing-workspace { grid-template-columns: 280px minmax(0, 1fr); } .drawing-form { padding: 20px; } .drawing-canvas { min-height: 300px; } }
+@media (max-width: 680px) { .drawing-workspace { display: block; } .drawing-form { border-right: 0; border-bottom: 1px solid var(--color-border, #e4e5ed); } .drawing-form header { margin-bottom: 8px; } .drawing-form textarea { font-size: 16px; } .drawing-results { padding: 24px 18px; } .drawing-canvas { height: 360px; min-height: 240px; } .drawing-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .drawing-workspace .ant-btn { min-height: 44px; } }

@@ -34,6 +34,7 @@ const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
+const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
 const MyDrivePage = lazy(() => import('@/pages/Apps/MyDrivePage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
@@ -268,6 +269,10 @@ const router = createBrowserRouter([
         </ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/ai-drawing',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<AIDrawingPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/my-drive',
