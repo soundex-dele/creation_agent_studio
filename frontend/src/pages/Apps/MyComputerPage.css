@@ -16,10 +16,57 @@
 .my-computer-conversation span { white-space: normal; overflow-wrap: anywhere; }
 .my-computer-conversation small { color: var(--color-text-sec); }
 .my-computer-content button, .my-computer-toolbar button, .my-computer-pairing input { min-height: 44px; }
+.my-computer-home { gap: 20px; }
+.my-computer-heading { display: flex; align-items: center; gap: 14px; }
+.my-computer-heading-icon { display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; background: var(--color-bg-elevated); color: var(--color-primary); font-size: 25px; }
+.my-computer-heading .page-subtitle { margin: 4px 0 0; }
+.my-computer-overview { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.my-computer-overview strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.my-computer-overview-total { color: var(--color-text-sec); }
+.my-computer-pairing-panel[hidden] { display: none; }
+.my-computer-pairing-panel p { color: var(--color-text-sec); margin-bottom: 16px; line-height: 1.7; }
+.my-computer-list-heading { padding: 0; }
+.my-computer-list-heading h2 { font-size: 17px; }
+.my-computer-manage { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.my-computer-list-heading .ant-switch { min-height: 24px; }
+.my-computer-device-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
+.my-computer-device-status .ant-tag { margin: 0; }
+.my-computer-device-status > span:last-child { font-size: 13px; color: var(--color-text-sec); overflow-wrap: anywhere; }
+.my-computer-device-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.my-computer-device-actions .ant-btn { padding-inline: 8px; }
+.my-computer-device-chat { grid-column: 1 / -1; }
+.my-computer-device-chat > .anticon:last-child { margin-left: auto; }
+.my-computer-name { display: flex; align-items: center; gap: 10px; }
+.my-computer-name > .anticon { color: var(--color-primary); flex-shrink: 0; }
+.my-computer-home .ant-card { border-radius: 16px; background: var(--color-bg-card); box-shadow: var(--shadow-sm); }
+.my-computer-home .ant-card-head { border-bottom: 0; }
+.my-computer-home .ant-card-body { padding-top: 8px; }
 @media (max-width: 767px) {
+  .my-computer-home { padding: 20px 16px calc(24px + env(safe-area-inset-bottom)); background: var(--color-bg-surface); }
+  .my-computer-heading .page-title { font-size: 24px; }
+  .my-computer-heading .page-subtitle { font-size: 13px; }
+  .my-computer-home .ant-card-head { padding-inline: 16px; }
+  .my-computer-home .ant-card-body { padding: 8px 16px 16px; }
+  .my-computer-pairing input { font-size: 16px; letter-spacing: 0.06em; }
+  .my-computer-toolbar { gap: 8px; padding: 12px 16px; }
+  .my-computer-toolbar strong { font-size: 14px; }
+  .my-computer-toolbar .ant-tag { margin-inline-end: 0; }
+  .my-computer-list-heading { padding: 0; }
+  .my-computer-mode { gap: 4px; margin: 0 16px 12px; padding: 4px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-surface); }
+  .my-computer-mode .ant-btn { flex: 1; min-width: 0; border: 0; box-shadow: none; border-radius: 10px; }
+  .my-computer-workspace > .my-computer-content { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .my-computer-workspace .ant-list-item { border-bottom: 0; padding: 6px 0; }
+  .my-computer-content .my-computer-conversation { padding: 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-card); }
+  .my-computer-conversation > span { font-size: 15px; font-weight: 500; }
+  .my-computer-conversation small { font-size: 12px; }
+  .my-computer-content .ant-btn, .my-computer-mode .ant-btn { touch-action: manipulation; }
+  .my-computer-content .ant-btn:active:not(:disabled) { filter: brightness(0.94); }
   .my-computer-workspace--chat > .my-computer-toolbar { padding-top: calc(12px + env(safe-area-inset-top)); }
 }
 @media (max-width: 600px) {
-  .my-computer-content { padding: 16px; }
+  .my-computer-content { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
   .my-computer-conversation { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .my-computer-home *, .my-computer-mode * { transition: none !important; }
 }

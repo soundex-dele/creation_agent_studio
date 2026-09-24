@@ -51,6 +51,29 @@ function LocationProbe() {
   return React.createElement('output', { 'data-testid': 'location-search' }, useLocation().search);
 }
 
+it('opens pairing on demand and keeps an entered code when the panel is collapsed', async () => {
+  await act(async () => root.render(React.createElement(MemoryRouter, {}, React.createElement(MyComputerPage))));
+  const panel = container.querySelector<HTMLElement>('#my-computer-pairing-panel')!;
+  expect(panel.hidden).toBe(true);
+  await click('绑定电脑');
+  expect(panel.hidden).toBe(false);
+  const field = container.querySelector<HTMLInputElement>('#remote-pairing-code')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, 'abcd1234');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('绑定电脑');
+  expect(panel.hidden).toBe(true);
+  await click('绑定电脑');
+  expect(field.value).toBe('ABCD1234');
+});
+
+it('shows pairing immediately when there are no bound computers', async () => {
+  vi.mocked(api.get).mockResolvedValue([]);
+  await act(async () => root.render(React.createElement(MemoryRouter, {}, React.createElement(MyComputerPage))));
+  expect(container.querySelector<HTMLElement>('#my-computer-pairing-panel')?.hidden).toBe(false);
+});
+
 it('opens the files deep link with application navigation parameters and without loading chat history', async () => {
   await act(async () => root.render(React.createElement(MemoryRouter, { initialEntries: ['/apps/my-computer/computer/files/?entry=apps&standalone=1'] },
     React.createElement(LocationProbe), React.createElement(Routes, {},

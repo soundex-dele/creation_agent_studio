@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, Modal, Pagination, Popconfirm, Select, Spin, Tabs, Tag } from 'antd';
-import { ArrowLeftOutlined, BulbOutlined, CheckSquareOutlined, FileTextOutlined, PlusOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, BulbOutlined, CheckSquareOutlined, FileTextOutlined, PlusOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -62,7 +62,7 @@ function EntryEditor({ editor, service, onClose, onSaved }: {
   };
 
   return (
-    <Modal open title={`${editor.entry ? '编辑' : '新增'}${label}`} onCancel={onClose}
+    <Modal open rootClassName="ideas-todos-editor" title={`${editor.entry ? '编辑' : '新增'}${label}`} onCancel={onClose}
       closable={!saving} maskClosable={false} keyboard={!saving}
       footer={[
         <Button key="cancel" onClick={onClose} disabled={saving}>取消</Button>,
@@ -111,6 +111,7 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
   const mutationRef = useRef(false);
   const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [today, setToday] = useState(localDate);
 
   useEffect(() => {
@@ -154,6 +155,8 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
     finally { mutationRef.current = false; setBusy(null); }
   };
   const label = entryLabels[kind];
+  const filterCount = kind === 'ideas' ? Number(!!active.tag) : kind === 'todos' ? Number(active.status !== 'pending') + Number(!!active.priority) : 0;
+  const filtered = !!active.search || filterCount > 0;
 
   return <div className="ideas-todos-page">
     <header className="ideas-todos-header">
@@ -162,7 +165,7 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
         <h1>想法<span className="ideas-todos-amp">&</span>待办</h1>
         <p>留住灵感，安排日常，随手备忘。这里的内容仅自己可见。</p>
       </div>
-      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => { setActionError(''); setEditor({ kind }); }}>新增{label}</Button>
+      <Button className="ideas-todos-create" type="primary" size="large" icon={<PlusOutlined />} onClick={() => { setActionError(''); setEditor({ kind }); }}>新增{label}</Button>
     </header>
     <Tabs activeKey={kind} onChange={(value) => { setKind(value as EntryKind); setEntries([]); setActionError(''); }} items={[
       { key: 'ideas', label: '想法', icon: <BulbOutlined /> },
@@ -171,13 +174,21 @@ export function IdeasTodosWorkspace({ base, showHeader = true }: { base: string;
     ]} />
     <section aria-label={`${label}列表`}>
       <div className="ideas-todos-toolbar">
-        <Input prefix={<SearchOutlined aria-hidden />} aria-label={`搜索${label}`} maxLength={200} allowClear
+        <Input className="ideas-todos-search" prefix={<SearchOutlined aria-hidden />} aria-label={`搜索${label}`} maxLength={200} allowClear
           placeholder={kind === 'todos' ? '搜索标题或说明' : '搜索标题或正文'} value={active.search} onChange={(event) => changeFilter({ search: event.target.value })} />
+        {kind !== 'memos' && <Button className="ideas-todos-filter-toggle" icon={<FilterOutlined />} type={filtersOpen || filterCount ? 'primary' : 'default'}
+          aria-expanded={filtersOpen} aria-controls="ideas-todos-filters" onClick={() => setFiltersOpen(open => !open)}>筛选{filterCount > 0 ? ` · ${filterCount}` : ''}</Button>}
+        <Button className="ideas-todos-refresh" icon={<ReloadOutlined />} aria-label="刷新列表" onClick={() => setRevision((old) => old + 1)} disabled={loading} />
+        {kind !== 'memos' && <div id="ideas-todos-filters" className={`ideas-todos-filters${filtersOpen ? ' is-open' : ''}`}>
         {kind === 'ideas' ? <Input aria-label="筛选标签" placeholder="筛选标签关键词" maxLength={40} value={active.tag} allowClear onChange={(event) => changeFilter({ tag: event.target.value })} /> : kind === 'todos' ? <>
           <Select aria-label="待办状态" value={active.status} options={statuses} onChange={(status) => changeFilter({ status })} />
           <Select aria-label="筛选优先级" placeholder="全部优先级" allowClear value={active.priority} options={priorities} onChange={(priority) => changeFilter({ priority })} />
         </> : null}
-        <Button icon={<ReloadOutlined />} aria-label="刷新列表" onClick={() => setRevision((old) => old + 1)} disabled={loading} />
+        </div>}
+      </div>
+      <div className="ideas-todos-list-summary">
+        <span>{loading ? `正在整理${label}…` : error ? '暂时无法读取记录' : `${filtered ? '筛选结果' : `我的${label}`} · ${count} 条`}</span>
+        {filtered && <Button type="text" size="small" onClick={() => changeFilter(initialFilters())}>清除筛选</Button>}
       </div>
       {actionError && <Alert type="error" showIcon message={actionError} role="alert" closable onClose={() => setActionError('')} />}
       {error ? <Alert type="error" showIcon message={error} role="alert" action={<Button onClick={() => setRevision((old) => old + 1)}>重试</Button>} /> : loading ?

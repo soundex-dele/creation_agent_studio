@@ -73,6 +73,30 @@ afterEach(async () => {
 });
 
 describe('Ideas & Todos interactions', () => {
+  it('keeps filters when collapsed and clears only the current tab filters', async () => {
+    await render();
+    const toggle = container.querySelector<HTMLButtonElement>('[aria-controls="ideas-todos-filters"]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    await input('input[aria-label="筛选标签"]', '生活');
+    await input('input[aria-label="搜索想法"]', '公园');
+    await settle(280);
+    await click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent).toContain('1');
+    await tab('待办');
+    await click(container.querySelector<HTMLButtonElement>('[aria-controls="ideas-todos-filters"]')!);
+    await choose('待办状态', '已完成');
+    await click(button('清除筛选')); await settle();
+    expect(api.get).toHaveBeenLastCalledWith(`${base}/todos`, expect.objectContaining({ status: 'pending', page: 1 }), expect.anything());
+    await tab('想法'); await settle(280);
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="搜索想法"]')?.value).toBe('公园');
+    await click(button('清除筛选')); await settle();
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="筛选标签"]')?.value).toBe('');
+    expect(api.get).toHaveBeenLastCalledWith(`${base}/ideas`, { page: 1, search: undefined, tag: undefined }, expect.anything());
+  });
+
   it('creates memos independently, validates titles and retains content after failure', async () => {
     await render(); await tab('备忘');
     expect(container.textContent).toContain('还没有备忘');

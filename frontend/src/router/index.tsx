@@ -247,7 +247,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/applications/:applicationId/wechat-assistant',
-    element: <ProtectedRoute><ApplicationShell>{page(<WechatAssistantPage />)}</ApplicationShell></ProtectedRoute>,
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<WechatAssistantPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/creation-toolbox',

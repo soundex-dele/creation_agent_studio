@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, List, Popconfirm, Select, Space, Switch, Tag } from 'antd';
-import { ArrowLeftOutlined, DesktopOutlined, PlusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DesktopOutlined, PlusOutlined, MessageOutlined, CodeOutlined, FolderOutlined, RightOutlined } from '@ant-design/icons';
 import { useLocation, useParams } from 'react-router-dom';
 import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { api } from '@/services/api';
@@ -90,9 +90,9 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
         <Tag color={online ? 'green' : 'default'}>{!connectionKnown ? '重连中' : online ? '在线' : '离线'}</Tag>
       </header>
       <nav className="my-computer-mode" aria-label="电脑工作区">
-        <Button type={!terminalMode && !filesMode ? 'primary' : 'default'} onClick={() => navigate(root)}>对话</Button>
-        <Button type={terminalMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/terminals`)}>终端</Button>
-        <Button type={filesMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/files`)}>文件</Button>
+        <Button icon={<MessageOutlined />} aria-current={!terminalMode && !filesMode ? 'page' : undefined} type={!terminalMode && !filesMode ? 'primary' : 'default'} onClick={() => navigate(root)}>对话</Button>
+        <Button icon={<CodeOutlined />} aria-current={terminalMode ? 'page' : undefined} type={terminalMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/terminals`)}>终端</Button>
+        <Button icon={<FolderOutlined />} aria-current={filesMode ? 'page' : undefined} type={filesMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/files`)}>文件</Button>
       </nav>
       {!online && !filesMode && <Alert showIcon type="warning" message={terminalMode ? '电脑暂时离线，终端输入已暂停，恢复连接后自动重连。' : '电脑暂时离线，当前草稿会保留。恢复连接后可继续发送。'} />}
       {online && !contextReady && <Alert showIcon type="info" message="正在检查本机访问权限与连接…" />}
@@ -153,6 +153,7 @@ export default function MyComputerPage() {
   const [manage, setManage] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pairingOpen, setPairingOpen] = useState<boolean | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -178,6 +179,7 @@ export default function MyComputerPage() {
   }, []);
 
   const claim = async () => {
+    if (busy || code.replace('-', '').length !== 8) return;
     setBusy(true); setError(''); setNotice('');
     try {
       await api.post('/remote/claim/', { code });
@@ -196,37 +198,49 @@ export default function MyComputerPage() {
     <Alert type="info" message={loaded ? '这台电脑尚未绑定或已被解绑。' : '正在加载电脑…'} />
   </div>;
 
-  return <section className="my-computer-content">
-    <header><h1 className="page-title">我的电脑</h1><p className="page-subtitle">选择已绑定的电脑，继续对话、使用终端或传输文件。</p></header>
+  const showPairing = pairingOpen ?? (loaded && devices.length === 0);
+  return <section className="my-computer-content my-computer-home">
+    <header className="my-computer-heading">
+      <div className="my-computer-heading-icon"><DesktopOutlined aria-hidden /></div>
+      <div><h1 className="page-title">我的电脑</h1><p className="page-subtitle">电脑在身边，工作随时继续。</p></div>
+    </header>
+    <div className="my-computer-overview">
+      <span>{!loaded ? '正在查找已绑定的电脑…' : !known ? '正在恢复连接…' : <><strong>{devices.filter(item => item.online && item.confirmed).length}</strong> 台在线<span className="my-computer-overview-total"> / {devices.length} 台已绑定</span></>}</span>
+      <Button icon={<PlusOutlined />} aria-expanded={showPairing} aria-controls="my-computer-pairing-panel"
+        onClick={() => setPairingOpen(!showPairing)}>绑定电脑</Button>
+    </div>
     {error && <Alert closable onClose={() => setError('')} showIcon type="error" message={error} />}
     {notice && <Alert showIcon type="success" message={notice} />}
-    <Card title="绑定电脑">
+    <Card id="my-computer-pairing-panel" className="my-computer-pairing-panel" title="绑定电脑" hidden={!showPairing}>
       <p>在每台电脑上生成配对码，逐台添加到当前账号。电脑名称可在该电脑的“设置 → 远程访问”中修改。</p>
       <form onSubmit={event => { event.preventDefault(); void claim(); }}>
         <label htmlFor="remote-pairing-code">电脑“设置 → 远程访问”中的配对码</label>
         <div className="my-computer-pairing">
-          <Input id="remote-pairing-code" value={code} maxLength={9} autoComplete="off" autoCapitalize="characters"
-            placeholder="输入 8 位配对码" onChange={event => setCode(event.target.value.toUpperCase())} />
+          <Input id="remote-pairing-code" value={code} maxLength={9} autoComplete="off" autoCapitalize="characters" spellCheck={false} disabled={busy}
+            placeholder="输入 8 位配对码" onChange={event => setCode(event.target.value.trim().toUpperCase())} />
           <Button type="primary" htmlType="submit" disabled={code.replace('-', '').length !== 8} loading={busy}>配对</Button>
         </div>
       </form>
     </Card>
-    <div className="my-computer-toolbar"><h2>电脑列表{loaded ? `（${devices.length}）` : ''}</h2>
-      <Space><span>管理电脑</span><Switch aria-label="管理电脑" checked={manage} onChange={setManage} /></Space>
+    <div className="my-computer-toolbar my-computer-list-heading"><h2>电脑列表{loaded ? `（${devices.length}）` : ''}</h2>
+      <label className="my-computer-manage" htmlFor="manage-computers"><span>管理电脑</span><Switch id="manage-computers" aria-label="管理电脑" checked={manage} onChange={setManage} /></label>
     </div>
     {!devices.length && <Empty description={loaded ? '尚未绑定电脑，请输入电脑上的配对码' : '正在加载电脑…'} />}
     <div className="my-computer-devices">{devices.map(item => <Card key={item.id} title={<span className="my-computer-name"><DesktopOutlined aria-hidden="true" /> {item.name}</span>}>
-      <Space direction="vertical" size="middle">
-        <Tag color={item.online ? 'green' : 'default'}>{!item.confirmed ? '等待电脑确认' : item.online ? '在线' : '离线'}</Tag>
-        <Button type="primary" disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}`)}>查看对话</Button>
-        <Button disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/terminals`)}>远程终端</Button>
-        <Button disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/files`)}>文件传输</Button>
+      <div className="my-computer-device-status">
+        <Tag color={known && item.confirmed && item.online ? 'green' : 'default'}>{!known ? '重连中' : !item.confirmed ? '等待电脑确认' : item.online ? '在线' : '离线'}</Tag>
+        <span>{!item.confirmed ? '请在电脑上确认绑定' : !known ? '正在恢复连接' : item.online ? '可以远程访问' : item.last_seen_at ? `最近在线 ${new Date(item.last_seen_at).toLocaleString('zh-CN')}` : '电脑上线后即可连接'}</span>
+      </div>
+      <div className="my-computer-device-actions">
+        <Button className="my-computer-device-chat" type="primary" icon={<MessageOutlined />} disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}`)}>查看对话<RightOutlined aria-hidden /></Button>
+        <Button icon={<CodeOutlined />} disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/terminals`)}>远程终端</Button>
+        <Button icon={<FolderOutlined />} disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/files`)}>文件传输</Button>
         {manage && <Popconfirm title={`解绑“${item.name}”？`} description="此账号将无法继续访问该电脑。"
           onConfirm={async () => {
             await api.delete(`/remote/devices/${item.id}/`);
             setDevices(current => current.filter(value => value.id !== item.id));
           }}><Button danger>解绑</Button></Popconfirm>}
-      </Space>
+      </div>
     </Card>)}</div>
   </section>;
 }

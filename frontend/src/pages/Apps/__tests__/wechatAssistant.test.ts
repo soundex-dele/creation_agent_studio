@@ -34,6 +34,19 @@ afterEach(async () => {
 });
 
 describe('微信助手', () => {
+  it('shows refresh progress while retaining the current connection and tasks', async () => {
+    await render();
+    let resolveStatus!: (value: Binding) => void;
+    request.mockImplementation(async (url: string) => url === base
+      ? new Promise<Binding>(resolve => { resolveStatus = resolve; }) : []);
+    await act(async () => button('刷新').click());
+    expect(button('刷新').classList.contains('ant-btn-loading')).toBe(true);
+    expect(element.textContent).toContain('已连接');
+    await act(async () => resolveStatus(binding));
+    await settle();
+    expect(button('刷新').classList.contains('ant-btn-loading')).toBe(false);
+  });
+
   it('opens a dedicated application and an existing conversation', async () => {
     expect(applicationPath({ id: 'wechat-assistant', applicationId: 21, kind: 'custom', rendererKey: 'wechat-assistant' })).toBe('/applications/21/wechat-assistant?entry=apps');
     await render();
