@@ -4,6 +4,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TableKit } from '@tiptap/extension-table';
 import { Markdown } from '@tiptap/markdown';
+import { Check, Copy, Download, Save, Share2, Sparkles } from 'lucide-react';
 import { documentError, documentsApi, downloadText, type DocumentAIContext, type OnlineDocument } from '@/services/documents';
 import { DocumentDraft } from './DocumentDraft';
 import { DocumentShares } from './DocumentShares';
@@ -82,13 +83,13 @@ export function DocumentEditor({ base, document: initial, onDraft, onSaved, onOp
     <section className="documents-editor-main">
       <header className="documents-document-header">
         <Input aria-label="文档标题" value={draft.body.title} disabled={readonly} maxLength={200} onCompositionStart={() => draft.composition(true)} onCompositionEnd={() => draft.composition(false)} onChange={(e) => draft.update({ title: e.target.value })} />
-        <div className="documents-document-meta"><span role="status" aria-live="polite">{readonly ? '只读文档' : { saved: '已保存', dirty: '尚未保存', saving: '保存中…', error: '保存失败', conflict: '版本冲突' }[draft.status]}</span><span>{documentPlainText(draft.body.content).length} 字符</span><Tag>{initial.owner_name}</Tag></div>
+        <div className="documents-document-meta"><span className="documents-save-status" role="status" aria-live="polite">{!readonly && draft.status === 'saved' && <Check size={14} aria-hidden="true" />}{readonly ? '只读文档' : { saved: '已保存', dirty: '尚未保存', saving: '保存中…', error: '保存失败', conflict: '版本冲突' }[draft.status]}</span><span>{documentPlainText(draft.body.content).length} 字符</span><Tag>{initial.owner_name}</Tag></div>
         <Space wrap>
-          {!readonly && <Button disabled={busy || !draft.hasChanges} onClick={() => void run(async () => { await draft.save(); })}>保存</Button>}
-          <Button disabled={busy} onClick={() => void run(async () => { await draft.save(); const fresh = await client.get(initial.id); downloadText(fresh.title, fresh.plain_text); })}>下载文本</Button>
-          <Button disabled={busy} onClick={() => void run(async () => { await draft.save(); onOpen(await client.copy(initial.id)); })}>复制</Button>
-          {draft.document.permission === 'owner' && <Button onClick={() => setSharesOpen(true)}>共享</Button>}
-          <Button type={aiOpen ? 'primary' : 'default'} onClick={() => setAiOpen((value) => !value)}>AI 助手</Button>
+          {!readonly && <Button icon={<Save size={15} aria-hidden="true" />} disabled={busy || !draft.hasChanges} onClick={() => void run(async () => { await draft.save(); })}>保存</Button>}
+          <Button icon={<Download size={15} aria-hidden="true" />} disabled={busy} onClick={() => void run(async () => { await draft.save(); const fresh = await client.get(initial.id); downloadText(fresh.title, fresh.plain_text); })}>下载文本</Button>
+          <Button icon={<Copy size={15} aria-hidden="true" />} disabled={busy} onClick={() => void run(async () => { await draft.save(); onOpen(await client.copy(initial.id)); })}>复制</Button>
+          {draft.document.permission === 'owner' && <Button icon={<Share2 size={15} aria-hidden="true" />} onClick={() => setSharesOpen(true)}>共享</Button>}
+          <Button icon={<Sparkles size={15} aria-hidden="true" />} aria-pressed={aiOpen} type={aiOpen ? 'primary' : 'default'} onClick={() => setAiOpen((value) => !value)}>AI 助手</Button>
         </Space>
       </header>
       {(draft.status === 'error' || draft.status === 'conflict') && <Alert type="error" showIcon message={draft.error} description={<Space wrap>
@@ -111,7 +112,7 @@ export function DocumentEditor({ base, document: initial, onDraft, onSaved, onOp
         {tool('撤销', () => { editor.chain().focus().undo().run(); })}{tool('重做', () => { editor.chain().focus().redo().run(); })}
       </div>
       <div className="documents-paper-scroll"><EditorContent editor={editor} className="documents-paper" /></div>
-      {draft.document.permission === 'owner' && <footer><Button danger type="text" disabled={busy} onClick={() => void run(async () => {
+      {draft.document.permission === 'owner' && <footer><span>安心书写，编辑后自动保存</span><Button danger type="text" disabled={busy} onClick={() => void run(async () => {
         if (await modal.confirm({ title: '永久删除这份文档？', content: '正文、共享授权和关联对话将被删除，无法恢复。', okText: '删除', okButtonProps: { danger: true }, cancelText: '取消' })) { await client.remove(initial.id); onDraft(null); onDelete(); }
       })}>删除文档</Button></footer>}
     </section>

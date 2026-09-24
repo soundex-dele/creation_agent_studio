@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router-dom';
 import { Alert, Button, Drawer, Empty, Grid, Input, Pagination, Segmented, Spin, message } from 'antd';
-import { FileText, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Clock3, FileText, Menu, PenLine, Plus, Sparkles, Users } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -54,22 +54,32 @@ export function DocumentsWorkspace({ base, showHeader = true }: { base: string; 
     finally { setOpening(false); }
   };
   const list = <aside className="documents-list" aria-label="文档列表">
-    {showHeader && <Link to="/apps">返回应用</Link>}
-    <header><FileText size={22} aria-hidden="true" /><h1>在线文档</h1></header>
-    <Button type="primary" icon={<Plus size={16} />} block loading={opening} onClick={() => void open()}>新建文档</Button>
+    {showHeader && <Link className="documents-back" to="/apps"><ArrowLeft size={14} aria-hidden="true" />返回应用</Link>}
+    <header><div className="documents-app-icon"><FileText size={23} aria-hidden="true" /></div><div><h1>在线文档</h1><p>记录灵感，沉淀每一个想法</p></div></header>
+    <Button className="documents-create" type="primary" icon={<Plus size={17} aria-hidden="true" />} block loading={opening} onClick={() => void open()}>新建文档</Button>
     <Segmented block aria-label="文档范围" value={scope} onChange={(value) => { setScope(String(value)); setPage(1); }} options={[{ label: '我的文档', value: 'mine' }, { label: '共享给我', value: 'shared' }]} />
     <Input.Search aria-label="搜索文档" placeholder="搜索标题或正文" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} allowClear />
-    <p className="documents-list-caption">最近更新 · {listing.count} 份文档</p>
+    <p className="documents-list-caption"><span><Clock3 size={13} aria-hidden="true" />最近更新</span><span>{listing.count} 份文档</span></p>
     {error ? <Alert type="error" message={error} action={<Button onClick={refresh}>重试</Button>} /> : loading ? <div className="documents-list-loading"><Spin /></div> : listing.results.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={search ? '没有找到匹配的文档' : scope === 'mine' ? '新建文档，开始记录想法' : '还没有成员向你共享文档'} /> : <ul>
       {listing.results.map((doc) => <li key={doc.id}><button className={selected?.id === doc.id ? 'is-selected' : ''} disabled={opening} onClick={() => void open(doc.id)} aria-current={selected?.id === doc.id ? 'page' : undefined}>
-        <strong>{doc.title}</strong><p>{doc.plain_text || '空白文档'}</p><span>{new Date(doc.updated_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {doc.permission === 'viewer' ? '只读' : doc.permission === 'editor' ? '可编辑' : '我的文档'}</span>
+        <div className="documents-item-title"><FileText size={17} aria-hidden="true" /><strong>{doc.title}</strong></div><p>{doc.plain_text || '空白文档，等待你的第一个想法'}</p><div className="documents-item-meta"><time dateTime={doc.updated_at}>{new Date(doc.updated_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time><span>{doc.permission === 'viewer' ? '只读' : doc.permission === 'editor' ? '可编辑' : '我的文档'}</span></div>
       </button></li>)}
     </ul>}
     <Pagination size="small" current={page} total={listing.count} pageSize={20} showSizeChanger={false} onChange={setPage} hideOnSinglePage />
   </aside>;
   return <section className="documents-workspace" aria-label="在线文档工作台">
-    {screens.lg ? list : <><div className="documents-mobile-nav"><Button onClick={() => setListOpen(true)}>文档列表</Button><span>在线文档</span></div><Drawer title="在线文档" open={listOpen} onClose={() => setListOpen(false)} placement="left">{list}</Drawer></>}
-    {selected ? <DocumentEditor key={`${selected.id}:${editorKey}`} base={base} document={selected} onDraft={onDraft} onSaved={refresh} onOpen={onOpen} onDelete={() => { setSelected(null); refresh(); }} /> : <section className="documents-welcome"><FileText size={48} aria-hidden="true" /><h2>让想法成为文档</h2><p>在线编辑、与成员共享，用 AI 完善每一段表达。</p><Button type="primary" loading={opening} onClick={() => void open()}>新建第一份文档</Button><Button type="link" onClick={() => setListOpen(true)} className="documents-mobile-list-link">查看文档列表</Button></section>}
+    {screens.lg ? list : <><div className="documents-mobile-nav"><Button icon={<Menu size={17} aria-hidden="true" />} onClick={() => setListOpen(true)}>文档列表</Button><span>在线文档</span><Button type="text" aria-label="新建文档" icon={<Plus size={19} aria-hidden="true" />} loading={opening} onClick={() => void open()} /></div><Drawer title="在线文档" open={listOpen} onClose={() => setListOpen(false)} placement="left">{list}</Drawer></>}
+    {selected ? <DocumentEditor key={`${selected.id}:${editorKey}`} base={base} document={selected} onDraft={onDraft} onSaved={refresh} onOpen={onOpen} onDelete={() => { setSelected(null); refresh(); }} /> : <section className="documents-welcome">
+      <div className="documents-welcome-content">
+        <span className="documents-eyebrow"><PenLine size={15} aria-hidden="true" />你的灵感，从这里开始</span>
+        <div className="documents-paper-art" aria-hidden="true"><div className="documents-art-sheet"><FileText size={28} /><i /><i /><i /><div><span /><span /><span /></div></div><span className="documents-art-spark"><Sparkles size={23} /></span></div>
+        <h2>让想法成为文档<span>让创作自然发生。</span></h2>
+        <p>从一闪而过的灵感，到值得分享的作品。<br />在这里安心书写，用 AI 完善每一段表达。</p>
+        <Button type="primary" size="large" icon={<Plus size={18} aria-hidden="true" />} loading={opening} onClick={() => void open()}>{listing.count > 0 ? '开始一份新文档' : '新建第一份文档'}</Button>
+        <Button type="link" onClick={() => setListOpen(true)} className="documents-mobile-list-link">查看文档列表<ArrowUpRight size={15} aria-hidden="true" /></Button>
+      </div>
+      <div className="documents-features"><div><PenLine size={20} aria-hidden="true" /><strong>专注书写</strong><p>丰富格式，自动保存</p></div><div><Users size={20} aria-hidden="true" /><strong>轻松共享</strong><p>与成员分享每一份灵感</p></div><div><Sparkles size={20} aria-hidden="true" /><strong>AI 随行</strong><p>润色、续写，拓展思路</p></div></div>
+    </section>}
   </section>;
 }
 

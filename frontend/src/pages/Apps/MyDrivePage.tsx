@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Alert, Breadcrumb, Button, Empty, Input, Modal, Pagination, Progress, Segmented, Select, Space, Spin, Table, Upload, message } from 'antd';
-import { Cloud, File, Folder, FolderPlus, UploadCloud } from 'lucide-react';
+import { ArrowDownUp, ArrowLeft, Cloud, File, FileText, Folder, FolderOpen, FolderPlus, HardDrive, Image, LockKeyhole, Music2, RefreshCw, Trash2, UploadCloud, Video } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -12,6 +12,20 @@ import './MyDrivePage.css';
 
 const statuses = { queued: '等待上传', checking: '校验原文件', uploading: '上传中', paused: '已暂停', error: '上传失败', completed: '已完成', cancelling: '等待清理', cancelled: '已取消' };
 const blankListing: DriveListing = { count: 0, results: [], breadcrumbs: [], capacity: { used: 0, reserved: 0, limit: 0, max_file_size: 0 } };
+const fileTypes = [
+  { value: 'all', label: '全部类型', icon: FolderOpen },
+  { value: 'folder', label: '文件夹', icon: Folder },
+  { value: 'image', label: '图片', icon: Image },
+  { value: 'video', label: '视频', icon: Video },
+  { value: 'audio', label: '音频', icon: Music2 },
+  { value: 'other', label: '其他文件', icon: FileText },
+];
+
+function FileIcon({ entry }: { entry: DriveEntry }) {
+  const kind = entry.kind === 'folder' ? 'folder' : entry.media_type.split('/')[0];
+  const Icon = kind === 'folder' ? Folder : kind === 'image' ? Image : kind === 'video' ? Video : kind === 'audio' ? Music2 : File;
+  return <span className={`drive-entry-icon drive-entry-icon--${['folder', 'image', 'video', 'audio'].includes(kind) ? kind : 'file'}`}><Icon size={21} aria-hidden="true" /></span>;
+}
 
 function Preview({ entry, client, close, download }: { entry: DriveEntry; client: DriveClient; close: () => void; download: () => void }) {
   const [content, setContent] = useState<{ url: string; kind: PreviewKind; text?: string }>();
@@ -149,19 +163,20 @@ export function MyDriveWorkspace({ base, showHeader = true }: { base: string; sh
   const capacity = listing.capacity;
   return <section className="drive-workspace" aria-label="我的网盘">
     <aside className="drive-sidebar">
-      {showHeader && <Link to="/apps">返回应用</Link>}
-      <header><Cloud aria-hidden="true" size={28} /><h1>我的网盘</h1></header>
+      {showHeader && <Link className="drive-back" to="/apps"><ArrowLeft size={14} aria-hidden="true" />返回应用</Link>}
+      <header><div className="drive-app-icon"><Cloud aria-hidden="true" size={25} /></div><h1>我的网盘</h1></header>
       <p>属于你的文件与素材空间</p>
-      <Segmented vertical block value={scope} onChange={(value) => changeScope(String(value))} options={[{ label: '全部文件', value: 'files' }, { label: '传输列表', value: 'transfers' }, { label: '回收站', value: 'trash' }]} />
-      <div className="drive-capacity"><strong>存储空间</strong><Progress percent={capacity.limit ? Math.min(100, Math.round((capacity.used + capacity.reserved) / capacity.limit * 100)) : 0} showInfo={false} /><span>{formatBytes(capacity.used)} / {formatBytes(capacity.limit)}</span><small>上传预留 {formatBytes(capacity.reserved)} · 回收站占用容量</small></div>
+      <Segmented aria-label="网盘导航" vertical block value={scope} onChange={(value) => changeScope(String(value))} options={[{ label: '全部文件', value: 'files', icon: <FolderOpen size={18} aria-hidden="true" /> }, { label: '传输列表', value: 'transfers', icon: <ArrowDownUp size={18} aria-hidden="true" /> }, { label: '回收站', value: 'trash', icon: <Trash2 size={18} aria-hidden="true" /> }]} />
+      <div className="drive-capacity"><strong><HardDrive size={16} aria-hidden="true" />存储空间</strong><span><b>{formatBytes(capacity.used)}</b> / {formatBytes(capacity.limit)}</span><Progress strokeColor="var(--color-primary)" percent={capacity.limit ? Math.min(100, Math.round((capacity.used + capacity.reserved) / capacity.limit * 100)) : 0} showInfo={false} /><small>上传预留 {formatBytes(capacity.reserved)}<br />回收站中的文件也占用容量</small></div>
+      <div className="drive-private-note"><LockKeyhole size={13} aria-hidden="true" />私人空间 · 文件仅自己可见</div>
     </aside>
     <main className="drive-main">
-      <header className="drive-title"><div><h2>{scope === 'files' ? '全部文件' : scope === 'trash' ? '回收站' : '传输列表'}</h2><p>{scope === 'trash' ? '文件会保留至你永久删除，删除清理完成后释放空间。' : scope === 'transfers' ? '刷新页面后，重新选择原文件即可续传。离开页面会暂停传输。' : '文件仅本人可见，支持大文件分片上传。'}</p></div><Button onClick={() => { refresh(); void manager.current?.load().catch((e) => setTransferError(driveError(e))); }}>刷新</Button></header>
+      <header className="drive-title"><div><span className="drive-eyebrow">{scope === 'files' ? '你的云端素材库' : scope === 'trash' ? '找回需要的文件' : '每一份文件，有迹可循'}</span><h2>{scope === 'files' ? '全部文件' : scope === 'trash' ? '回收站' : '传输列表'}</h2><p>{scope === 'trash' ? '文件会保留至你永久删除，删除清理完成后释放空间。' : scope === 'transfers' ? '刷新页面后，重新选择原文件即可续传。离开页面会暂停传输。' : '收好每一份灵感，让文件与素材井井有条。'}</p></div><Button icon={<RefreshCw size={15} aria-hidden="true" />} onClick={() => { refresh(); void manager.current?.load().catch((e) => setTransferError(driveError(e))); }}>刷新</Button></header>
       {transferError && <Alert type="error" closable onClose={() => setTransferError('')} message={transferError} />}
       {scope !== 'transfers' && tasks.some((task) => ['queued', 'checking', 'uploading', 'error'].includes(task.status)) && <Alert type="info" message={`${tasks.filter((task) => ['queued', 'checking', 'uploading'].includes(task.status)).length} 个文件正在传输${tasks.some((task) => task.status === 'error') ? '，部分任务需要处理' : ''}`} action={<Button onClick={() => changeScope('transfers')}>查看传输</Button>} />}
       {scope === 'transfers' ? <>
         <input type="file" ref={resumeInput} hidden aria-label="重新选择原文件" onChange={(event) => { const file = event.target.files?.[0]; if (file) { try { manager.current?.resume(resumeId.current, file); } catch (e) { setTransferError(driveError(e)); } } event.target.value = ''; }} />
-        {!tasks.length ? <Empty description="还没有传输任务" /> : <ul className="drive-transfers">{tasks.map((task) => <li key={task.upload.id}>
+        {!tasks.length ? <div className="drive-empty-panel"><span className="drive-empty-icon"><ArrowDownUp size={30} aria-hidden="true" /></span><h3>还没有传输任务</h3><p>上传进度与续传操作都会显示在这里</p><Button onClick={() => changeScope('files')}>前往上传文件</Button></div> : <ul className="drive-transfers">{tasks.map((task) => <li key={task.upload.id}>
           <div className="drive-transfer-title"><strong>{task.upload.name}</strong><span>{statuses[task.status]}</span></div>
           <Progress percent={task.upload.size ? Math.floor(task.upload.offset / task.upload.size * 100) : task.status === 'completed' ? 100 : 0} status={task.status === 'error' ? 'exception' : task.status === 'completed' ? 'success' : 'normal'} />
           <p>{formatBytes(task.upload.offset)} / {formatBytes(task.upload.size)}{task.speed > 0 && ` · ${formatBytes(task.speed)}/s`}</p>
@@ -171,17 +186,19 @@ export function MyDriveWorkspace({ base, showHeader = true }: { base: string; sh
       </> : <>
         {scope === 'files' && <>
           <Breadcrumb items={[{ title: <button onClick={() => navigate(null)}>全部文件</button> }, ...listing.breadcrumbs.map((crumb) => ({ title: <button onClick={() => navigate(crumb.id)}>{crumb.name}</button> }))]} />
-          <div className="drive-upload"><Upload.Dragger multiple showUploadList={false} beforeUpload={(file) => { void addFiles(file); return false; }}><UploadCloud size={28} aria-hidden="true" /><strong>点击或拖拽文件到这里上传</strong><span>单文件上限 {formatBytes(capacity.max_file_size)} · 支持断点续传</span></Upload.Dragger></div>
+          <div className="drive-upload"><Upload.Dragger multiple showUploadList={false} beforeUpload={(file) => { void addFiles(file); return false; }}><span className="drive-upload-icon"><UploadCloud size={28} aria-hidden="true" /></span><div className="drive-upload-copy"><strong>把灵感与素材，放在这里</strong><span>点击或拖拽文件上传 · 单文件上限 {formatBytes(capacity.max_file_size)}</span></div><span className="drive-upload-cta">上传文件</span><span className="drive-upload-hint">支持大文件 · 断点续传</span></Upload.Dragger></div>
+          <div className="drive-file-types" role="group" aria-label="文件分类">{fileTypes.map(({ value, label, icon: Icon }) => <button key={value} type="button" aria-pressed={type === value} className={type === value ? 'is-active' : ''} onClick={() => { setType(value); setPage(1); setSelected([]); }}><Icon size={19} aria-hidden="true" /><span>{label}</span></button>)}</div>
         </>}
         <div className="drive-toolbar">
           <Input.Search placeholder="搜索整个网盘的文件名" aria-label="搜索文件" allowClear value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); setSelected([]); }} />
-          <Select aria-label="文件类型" value={type} onChange={(value) => { setType(value); setPage(1); setSelected([]); }} options={[{ value: 'all', label: '全部类型' }, { value: 'folder', label: '文件夹' }, { value: 'image', label: '图片' }, { value: 'video', label: '视频' }, { value: 'audio', label: '音频' }, { value: 'other', label: '其他文件' }]} />
+          {scope === 'trash' && <Select aria-label="文件类型" value={type} onChange={(value) => { setType(value); setPage(1); setSelected([]); }} options={fileTypes.map(({ value, label }) => ({ value, label }))} />}
           <Select aria-label="文件排序" value={sort} onChange={(value) => { setSort(value); setPage(1); }} options={[{ value: '-updated_at', label: '最近更新' }, { value: 'name', label: '名称升序' }, { value: '-size', label: '大小降序' }]} />
           {scope === 'files' && <Button icon={<FolderPlus size={16} />} onClick={() => openEdit('folder', [])}>新建文件夹</Button>}
         </div>
-        {selected.length > 0 && <Space wrap><span>已选 {selected.length} 项</span>{scope === 'files' ? <><Button onClick={() => openEdit('move', selected)}>批量移动</Button><Button danger onClick={() => setConfirm({ action: 'trash', ids: selected })}>移入回收站</Button></> : <><Button onClick={() => void act('restore', selected).catch((e) => message.error(driveError(e)))}>恢复</Button><Button danger onClick={() => setConfirm({ action: 'purge', ids: selected })}>永久删除</Button></>}</Space>}
+        <div className="drive-list-heading"><h3>{search ? '搜索结果' : scope === 'trash' ? '已删除文件' : parent ? listing.breadcrumbs[listing.breadcrumbs.length - 1]?.name || '当前文件夹' : '文件列表'}<span>{loading ? '加载中…' : `${listing.count} 项`}</span></h3><span>{search ? '搜索范围：整个网盘' : '选择文件可批量管理'}</span></div>
+        {selected.length > 0 && <Space className="drive-selection-bar" wrap><span>已选 {selected.length} 项</span>{scope === 'files' ? <><Button onClick={() => openEdit('move', selected)}>批量移动</Button><Button danger onClick={() => setConfirm({ action: 'trash', ids: selected })}>移入回收站</Button></> : <><Button onClick={() => void act('restore', selected).catch((e) => message.error(driveError(e)))}>恢复</Button><Button danger onClick={() => setConfirm({ action: 'purge', ids: selected })}>永久删除</Button></>}</Space>}
         {error ? <Alert type="error" message={error} action={<Button onClick={refresh}>重试</Button>} /> : <Table<DriveEntry> className="drive-table" rowKey="id" loading={loading} dataSource={listing.results} pagination={false} rowSelection={{ selectedRowKeys: selected, onChange: (keys) => setSelected(keys.map(String)) }} locale={{ emptyText: <Empty description={search ? '没有找到匹配的文件' : scope === 'trash' ? '回收站是空的' : '上传文件或创建文件夹，开始整理素材'} /> }} columns={[
-          { title: '名称', dataIndex: 'name', render: (_, entry) => <button className="drive-file-name" disabled={scope === 'trash'} onClick={() => fileAction(entry)}>{entry.kind === 'folder' ? <Folder size={20} aria-hidden="true" /> : <File size={20} aria-hidden="true" />}<span>{entry.name}</span></button> },
+          { title: '名称', dataIndex: 'name', render: (_, entry) => <button className="drive-file-name" disabled={scope === 'trash'} onClick={() => fileAction(entry)}><FileIcon entry={entry} /><span>{entry.name}</span></button> },
           { title: '大小', width: 110, responsive: ['md'], render: (_, entry) => entry.kind === 'folder' ? '—' : formatBytes(entry.size) },
           { title: '更新时间', width: 155, responsive: ['lg'], render: (_, entry) => new Date(entry.updated_at).toLocaleString('zh-CN') },
           { title: '操作', width: 210, render: (_, entry) => <Space wrap size={0}>{scope === 'trash' ? <><Button type="link" onClick={() => void act('restore', [entry.id]).catch((e) => message.error(driveError(e)))}>恢复</Button><Button type="link" danger onClick={() => setConfirm({ action: 'purge', ids: [entry.id] })}>永久删除</Button></> : <>{entry.kind === 'file' && <Button type="link" onClick={() => void download(entry)}>下载</Button>}<Button type="link" onClick={() => openEdit('rename', [entry.id], entry.name)}>重命名</Button><Button type="link" onClick={() => openEdit('move', [entry.id])}>移动</Button><Button type="link" danger onClick={() => setConfirm({ action: 'trash', ids: [entry.id] })}>删除</Button></>}</Space> },
