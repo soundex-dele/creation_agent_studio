@@ -255,6 +255,11 @@
 }
 
 @media (max-width: 767px) {
+  .chat-input-box--focused {
+    border-color: var(--color-border);
+    box-shadow: none;
+  }
+
   .chat-input-textarea {
     font-size: 16px;
   }

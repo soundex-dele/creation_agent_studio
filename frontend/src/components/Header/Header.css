@@ -148,9 +148,13 @@
 
 @media (max-width: 767px) {
   .app-header {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     height: calc(var(--header-h) + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) 8px 0;
+  }
+
+  .app-header--with-mobile-menu {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
   }
 
   .header-mobile-menu {
@@ -177,10 +181,6 @@
   .header-user:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
-  }
-
-  .header-mobile-menu--placeholder {
-    visibility: hidden;
   }
 
   .header-logo {

@@ -94,18 +94,18 @@ const Header: React.FC<HeaderProps> = ({
   const currentPath = location.pathname;
 
   return (
-    <header className="app-header">
-      <button
-        type="button"
-        className={`header-mobile-menu${showMobileMenu ? '' : ' header-mobile-menu--placeholder'}`}
-        aria-label="打开当前页面导航"
-        aria-expanded={showMobileMenu ? mobileMenuOpen : undefined}
-        aria-hidden={showMobileMenu ? undefined : true}
-        tabIndex={showMobileMenu ? 0 : -1}
-        onClick={showMobileMenu ? onMobileMenuClick : undefined}
-      >
-        <MenuOutlined aria-hidden="true" />
-      </button>
+    <header className={`app-header${showMobileMenu ? ' app-header--with-mobile-menu' : ''}`}>
+      {showMobileMenu && (
+        <button
+          type="button"
+          className="header-mobile-menu"
+          aria-label="打开当前页面导航"
+          aria-expanded={mobileMenuOpen}
+          onClick={onMobileMenuClick}
+        >
+          <MenuOutlined aria-hidden="true" />
+        </button>
+      )}
 
       {/* Left: Logo */}
       <button type="button" className="header-logo" onClick={() => navigate('/')}>
