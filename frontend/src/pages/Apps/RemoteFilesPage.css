@@ -1,0 +1,11 @@
+.remote-files { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.remote-files p { margin: 0; color: var(--color-text-sec); }
+.remote-files-path { display: flex; gap: 8px; }
+.remote-files-path input { min-width: 0; }
+.remote-files-entry { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; padding-right: 12px; overflow-wrap: anywhere; }
+.remote-files-entry button { white-space: normal; height: auto; text-align: left; justify-content: flex-start; }
+.remote-files-entry small { color: var(--color-text-sec); }
+.remote-files .remote-files-task { display: flex; flex-direction: column; align-items: stretch; gap: 8px; overflow-wrap: anywhere; }
+.remote-files .ant-breadcrumb { overflow-wrap: anywhere; }
+.remote-files .ant-breadcrumb button { height: auto; white-space: normal; }
+.remote-files h2 { font-size: 18px; margin: 0; }

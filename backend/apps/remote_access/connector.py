@@ -4,6 +4,7 @@ import base64
 import json
 import random
 import time
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
@@ -14,9 +15,10 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import InvalidStatus
 
 from .models import LocalRemoteConfig
-from .protocol import HEARTBEAT, MAX_BODY, MAX_CHUNK, MAX_INFLIGHT, VERSION, TERMINAL_ROOT, validate_request
+from .protocol import HEARTBEAT, MAX_BODY, MAX_CHUNK, MAX_INFLIGHT, VERSION, TERMINAL_ROOT, FILE_ROOT, validate_request
 from .security import authorized_user, decrypt_credentials
 from .terminals import TerminalError, TerminalManager
+from .files import FileManager
 
 
 @database_sync_to_async
@@ -40,7 +42,7 @@ def local_origin():
     return value
 
 
-async def run_connection(config, terminals=None):
+async def run_connection(config, terminals=None, files=None):
     credentials = decrypt_credentials(config.credentials)
     endpoint = config.server_url.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
     tasks = {}
@@ -68,14 +70,15 @@ async def run_connection(config, terminals=None):
                     headers = {"Authorization": "RemoteLocal " + credentials["local_token"],
                                "X-Organization-ID": str(config.organization_id),
                                "Idempotency-Key": frame.get("idempotency_key", "")}
-                    if frame['path'].startswith(TERMINAL_ROOT) and terminals is not None:
+                    manager = files if frame['path'].startswith(FILE_ROOT) else terminals if frame['path'].startswith(TERMINAL_ROOT) else None
+                    if manager is not None:
                         # PTYs live here, but authorization still goes through the local API
                         # (including licenses). Never trust a relay-supplied grant or flag.
                         context = await client.get('/api/v1/remote-access/context/', headers=headers)
-                        capability = context.json().get('terminal', {}) if context.status_code == 200 else {}
+                        capability = context.json().get('files' if manager is files else 'terminal', {}) if context.status_code == 200 else {}
                         if not capability.get('enabled') or not capability.get('supported'):
-                            raise TerminalError(403, '本机未允许远程终端或终端组件不可用。')
-                        operation = asyncio.create_task(terminals.request(
+                            raise TerminalError(403, '本机未允许文件传输。' if manager is files else '本机未允许远程终端或终端组件不可用。')
+                        operation = asyncio.create_task(manager.request(
                             frame['method'], frame['path'], frame.get('body'), frame.get('idempotency_key')))
                         try:
                             status, result, stream = await asyncio.shield(operation)
@@ -149,6 +152,8 @@ async def run_connection(config, terminals=None):
                     elif kind == 'revoked':
                         if terminals:
                             await terminals.close_all()
+                        if files:
+                            await files.close_all()
                         return
                     elif kind == "request":
                         if not isinstance(request_id, str) or len(request_id) != 32 or request_id in tasks:
@@ -217,18 +222,51 @@ async def monitor_terminals(terminals):
             await asyncio.sleep(1)
 
 
+async def monitor_files(files):
+    async with httpx.AsyncClient(base_url=local_origin(), trust_env=False, timeout=3) as client:
+        last_cleanup = 0
+        while True:
+            try:
+                config = await read_config()
+                grant = (str(config.device_id), config.credentials, config.local_user_id, config.organization_id)
+                if files.grant != grant:
+                    await files.close_all()
+                    files.grant = grant
+                if not config.enabled or not config.bound_account or not config.file_transfer_enabled:
+                    await files.close_all()
+                elif files.transfers:
+                    credentials = decrypt_credentials(config.credentials)
+                    response = await client.get('/api/v1/remote-access/context/', headers={
+                        'Authorization': 'RemoteLocal ' + credentials['local_token']})
+                    if response.status_code != 200 or not response.json().get('files', {}).get('enabled'):
+                        await files.close_all()
+                if time.monotonic() - last_cleanup > 60:
+                    await asyncio.to_thread(files.cleanup)
+                    last_cleanup = time.monotonic()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                await files.close_all()
+            await asyncio.sleep(1)
+
+
 async def run_connector():
     terminals = TerminalManager()
+    files = FileManager(Path(settings.REMOTE_CONNECTOR_LOCK_PATH).resolve().parent / 'remote-file-transfers')
+    await asyncio.to_thread(files.cleanup)
     monitor = asyncio.create_task(monitor_terminals(terminals))
+    file_monitor = asyncio.create_task(monitor_files(files))
     try:
-        await connection_loop(terminals)
+        await connection_loop(terminals, files)
     finally:
         monitor.cancel()
-        await asyncio.gather(monitor, return_exceptions=True)
+        file_monitor.cancel()
+        await asyncio.gather(monitor, file_monitor, return_exceptions=True)
         await terminals.close_all()
+        await files.close_all()
 
 
-async def connection_loop(terminals):
+async def connection_loop(terminals, files=None):
     delay = 1
     while True:
         config = None
@@ -241,7 +279,7 @@ async def connection_loop(terminals):
                 continue
             await report("connecting")
             started = time.monotonic()
-            await run_connection(config, terminals)
+            await run_connection(config, terminals, files)
             if time.monotonic() - started > 60:
                 delay = 1
         except asyncio.CancelledError:
@@ -249,6 +287,8 @@ async def connection_loop(terminals):
         except InvalidStatus as exc:
             if exc.response.status_code in {401, 403, 404, 410}:
                 await terminals.close_all()
+                if files:
+                    await files.close_all()
             await report('reconnecting')
         except Exception:
             await report("reconnecting")

@@ -100,7 +100,7 @@ async def test_connector_detects_saved_enable_without_backend_restart(monkeypatc
     monkeypatch.setattr(connector.asyncio, 'sleep', AsyncMock())
     with pytest.raises(asyncio.CancelledError):
         await connector.run_connector()
-    connect.assert_awaited_once_with(enabled, ANY)
+    connect.assert_awaited_once_with(enabled, ANY, ANY)
 
 
 def test_single_instance_lock_released_on_exit(tmp_path):
@@ -174,6 +174,40 @@ async def test_terminal_dispatch_rechecks_local_permission_and_preserves_session
     finally:
         running.cancel()
         await asyncio.gather(running, return_exceptions=True)
+        await manager.close_all()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('change', ['file-disabled', 'host-disabled', 'license-denied', 'host-stopped', 'grant-changed', 'unbind'])
+async def test_file_monitor_cleans_up_without_relay_connection(settings, monkeypatch, tmp_path, change):
+    from apps.remote_access.files import FileManager
+    from .test_files import create
+    settings.REMOTE_CONNECTOR_LOCAL_URL = 'http://127.0.0.1:8080'
+    config = SimpleNamespace(device_id='device', credentials=encrypt_credentials({'local_token': 'local'}),
+                             local_user_id=1, organization_id='org', enabled=True, bound_account='user', file_transfer_enabled=True)
+    manager = FileManager(tmp_path / 'journal')
+    manager.grant = (config.device_id, config.credentials, config.local_user_id, config.organization_id)
+    create(manager, tmp_path, 1)
+    if change == 'file-disabled': config.file_transfer_enabled = False
+    if change == 'host-disabled': config.enabled = False
+    if change == 'grant-changed': config.local_user_id = 2
+    if change == 'unbind': config.bound_account = ''
+    async def local_http(request):
+        if change == 'host-stopped': raise httpx.ConnectError('stopped')
+        return httpx.Response(403 if change == 'license-denied' else 200, json={'files': {'enabled': True}})
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(connector.httpx, 'AsyncClient', lambda **kwargs: real_client(transport=httpx.MockTransport(local_http), **kwargs))
+    monkeypatch.setattr(connector, 'read_config', AsyncMock(return_value=config))
+    monitor = asyncio.create_task(connector.monitor_files(manager))
+    try:
+        for _ in range(100):
+            if not manager.transfers: break
+            await asyncio.sleep(.02)
+        assert not manager.transfers
+        assert not list(tmp_path.glob('.agent-studio-upload-*.part'))
+    finally:
+        monitor.cancel()
+        await asyncio.gather(monitor, return_exceptions=True)
         await manager.close_all()
 
 

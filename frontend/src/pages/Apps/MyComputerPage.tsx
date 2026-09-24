@@ -11,6 +11,7 @@ import { ChatConnectionContext } from '@/components/Chat/ChatConnectionContext';
 import './MyComputerPage.css';
 
 const RemoteTerminalPage = lazy(() => import('./RemoteTerminalPage'));
+const RemoteFilesPage = lazy(() => import('./RemoteFilesPage'));
 
 interface Device {
   id: string;
@@ -25,6 +26,7 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
   const navigate = useApplicationNavigate();
   const { conversationId } = useParams();
   const terminalMode = useLocation().pathname.includes('/terminals');
+  const filesMode = useLocation().pathname.replace(/\/+$/, '').endsWith('/files');
   const connection = useMemo(() => ({ deviceId: device.id }), [device.id]);
   const remoteApi = useMemo(() => createConnectionApi(connection), [connection]);
   const store = useMemo(() => createConversationStore(connection), [connection]);
@@ -64,7 +66,7 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
 
   useEffect(() => {
     let cancelled = false;
-    if (online && !terminalMode) {
+    if (online && !terminalMode && !filesMode) {
       if (!conversationId) void fetchConversations().catch(() => undefined);
       void loadConnectionCollection<ChatApp>(remoteApi, '/apps/', { kind: 'chat' })
         .then(result => {
@@ -72,7 +74,7 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
         }).catch(() => { if (!cancelled) setApps([]); });
     }
     return () => { cancelled = true; };
-  }, [online, remoteApi, fetchConversations, conversationId, terminalMode]);
+  }, [online, remoteApi, fetchConversations, conversationId, terminalMode, filesMode]);
 
   useEffect(() => () => store.getState().disconnect(), [store]);
   const value = useMemo(() => ({ store, api: remoteApi, remote: true, online: online && contextReady }),
@@ -88,12 +90,15 @@ function ComputerWorkspace({ device, connectionKnown }: { device: Device; connec
         <Tag color={online ? 'green' : 'default'}>{!connectionKnown ? '重连中' : online ? '在线' : '离线'}</Tag>
       </header>
       <nav className="my-computer-mode" aria-label="电脑工作区">
-        <Button type={!terminalMode ? 'primary' : 'default'} onClick={() => navigate(root)}>对话</Button>
+        <Button type={!terminalMode && !filesMode ? 'primary' : 'default'} onClick={() => navigate(root)}>对话</Button>
         <Button type={terminalMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/terminals`)}>终端</Button>
+        <Button type={filesMode ? 'primary' : 'default'} onClick={() => navigate(`${root}/files`)}>文件</Button>
       </nav>
-      {!online && <Alert showIcon type="warning" message={terminalMode ? '电脑暂时离线，终端输入已暂停，恢复连接后自动重连。' : '电脑暂时离线，当前草稿会保留。恢复连接后可继续发送。'} />}
+      {!online && !filesMode && <Alert showIcon type="warning" message={terminalMode ? '电脑暂时离线，终端输入已暂停，恢复连接后自动重连。' : '电脑暂时离线，当前草稿会保留。恢复连接后可继续发送。'} />}
       {online && !contextReady && <Alert showIcon type="info" message="正在检查本机访问权限与连接…" />}
-      {terminalMode ? <Suspense fallback={<div className="my-computer-content">正在加载终端…</div>}>
+      {filesMode ? <Suspense fallback={<div className="my-computer-content">正在加载文件…</div>}>
+        <RemoteFilesPage deviceId={device.id} online={online && contextReady} />
+      </Suspense> : terminalMode ? <Suspense fallback={<div className="my-computer-content">正在加载终端…</div>}>
         <RemoteTerminalPage deviceId={device.id} online={online && contextReady} />
       </Suspense> : conversationId ? <ChatContainer
         conversationId={conversationId === 'new' ? null : conversationId}
@@ -192,7 +197,7 @@ export default function MyComputerPage() {
   </div>;
 
   return <section className="my-computer-content">
-    <header><h1 className="page-title">我的电脑</h1><p className="page-subtitle">一个账号可绑定多台电脑，选择电脑继续对话与任务。</p></header>
+    <header><h1 className="page-title">我的电脑</h1><p className="page-subtitle">选择已绑定的电脑，继续对话、使用终端或传输文件。</p></header>
     {error && <Alert closable onClose={() => setError('')} showIcon type="error" message={error} />}
     {notice && <Alert showIcon type="success" message={notice} />}
     <Card title="绑定电脑">
@@ -215,6 +220,7 @@ export default function MyComputerPage() {
         <Tag color={item.online ? 'green' : 'default'}>{!item.confirmed ? '等待电脑确认' : item.online ? '在线' : '离线'}</Tag>
         <Button type="primary" disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}`)}>查看对话</Button>
         <Button disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/terminals`)}>远程终端</Button>
+        <Button disabled={!known || !item.online || !item.confirmed} onClick={() => navigate(`/apps/my-computer/${item.id}/files`)}>文件传输</Button>
         {manage && <Popconfirm title={`解绑“${item.name}”？`} description="此账号将无法继续访问该电脑。"
           onConfirm={async () => {
             await api.delete(`/remote/devices/${item.id}/`);

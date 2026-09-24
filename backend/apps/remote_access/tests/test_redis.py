@@ -16,6 +16,16 @@ from apps.remote_access.broker import Subscription, publish
 
 @pytest.fixture
 def redis_url(tmp_path):
+    external = os.environ.get('REMOTE_TEST_REDIS_URL')
+    if external:
+        client = redis.Redis.from_url(external)
+        assert client.ping() and client.dbsize() == 0, 'Use a disposable empty Redis instance'
+        try:
+            yield external
+            assert client.dbsize() == 0, 'Relay must not persist request or response bodies'
+        finally:
+            client.close()
+        return
     binary = os.environ.get('REMOTE_TEST_REDIS_BINARY') or shutil.which('redis-server')
     if not binary:
         pytest.skip('Set REMOTE_TEST_REDIS_BINARY to run real Redis cross-process tests')

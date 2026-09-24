@@ -55,7 +55,7 @@ GET /api/v1/remote/devices/<device_id>/proxy/organizations/<本机组织ID>/runs
 - 对话列表、详情、composer options、新建对话和发送消息。
 - 智能体、应用列表及数字 ID 读取端点。
 - Run 详情、子 Run、事件分页、快照、SSE，以及 answer、grant_permission、deny_permission、cancel 命令。
-- 禁止上传、附件下载、workspace 文件读取、系统目录操作、任意 URL、组织查询覆盖及其他命令。
+- 文件传输仅开放文末列出的独立接口；禁止复用附件、workspace 和运行目录接口，禁止任意 URL、组织查询覆盖及其他命令。
 
 本机认证还检查 loopback 来源、启用状态、授权用户/组织、活动成员关系和许可证，然后复用原 API 的业务权限。服务器认证失败仍返回 401；本机认证失败对手机返回 403，避免错误退出服务器账号。
 
@@ -79,7 +79,7 @@ GET /api/v1/remote/devices/<device_id>/proxy/organizations/<本机组织ID>/runs
 | error | 双向内部转发 | 固定错误说明，不包含业务正文或原始异常 |
 | cancel | 服务器 → 电脑 | 结束指定 HTTP 订阅；不会创建停止任务命令 |
 | ping / pong | 电脑 → 服务器 / 返回 | 20 秒心跳，60 秒无响应离线 |
-| revoked | 服务器 → 电脑 | 绑定或账号被撤销，立即清理终端，再关闭连接 |
+| revoked | 服务器 → 电脑 | 绑定或账号被撤销，清理终端、未完成上传及下载任务，再关闭连接 |
 
 每个连接最多 32 个并行请求，每个请求最多 1 MiB 正文；每次仅允许一个未确认响应块。慢客户端会在超时后断开订阅，任务继续在本机执行。重连采用带抖动的退避，最多 30 秒；配置变化可提前结束等待。
 
@@ -155,3 +155,48 @@ SSE 的 `data` 为 JSON：`output` 携带 `sequence/data`，`truncated` 携带�
 关闭页面只取消输出订阅。网络掉线、请求取消和配置中的“重新连接”保留终端；关闭终端开关、远程访问、授权失效或本机 API 停止时，独立监测任务清理会话。服务器撤销绑定通过 `revoked` 或后续认证拒绝通知电脑；断网时不能立即获知服务器侧撤销。多页面输入由会话锁串行处理，尺寸采用最近一次有效调整。
 
 运行 `backend\venv\Scripts\python.exe backend\scripts\test_remote_local.py --terminal` 可在临时数据库与真实双后端环境中验证终端启用、创建/输入幂等、PTY 输出、缩放、订阅退出、通道重连和关闭权限。该脚本不会操作日常开发数据库。
+
+## 文件传输（v1 帧兼容扩展）
+
+本机 `PUT /api/v1/remote-access/` 接受独立字段 `file_transfer_enabled`，默认关闭；仅本机管理员可以设置，旧客户端省略时保持原值。`context/` 增加 `files: {supported: true, enabled: boolean, max_file_size: 2147483648, chunk_size: 262144}`，缺少此能力字段的电脑应提示升级。文件操作不依赖终端开关，仍检查绑定账号、本地用户、组织成员和许可证；使用运行本机服务的操作系统账号读写，不会模拟或提升操作系统身份。
+
+电脑工作区路径为 `/apps/my-computer/:deviceId/files`。下面路径相对 `/api/v1/remote/devices/{device_id}/proxy/remote-access/files/`。全部 POST 使用 JSON，必须提供显式 `Idempotency-Key`（1–160 字符）；传输和下载流 ID 为 32 位小写十六进制。服务器、连接器和本机认证共享具体路径及字段白名单，不开放原有运行目录接口。
+
+| 方法与路径 | 请求 | 返回 |
+| --- | --- | --- |
+| GET `roots/` | 无 | `{roots: [{name, path}], home}`，OS 磁盘根与账号主目录 |
+| POST `list/` | `{path, cursor}`，首页 cursor 为空字符串 | `{path, parent, entries, next_cursor}`，每页最多 100 项，实际路径、上级目录及不透明游标 |
+| POST `uploads/` | `{path, name, size}`，path 是目标目录 | 传输对象；同 key 同参数返回原对象，冲突 409 |
+| POST `uploads/{id}/chunk/` | `{offset, data, sha256}`，Base64 数据与原始字节 SHA-256 小写十六进制 | 传输对象，offset 是电脑已接收的字节数 |
+| POST `uploads/{id}/complete/` | `{}` | 校验大小、同步磁盘并提交后的传输对象，包含实际文件名 |
+| POST `downloads/` | `{path}`，普通文件绝对路径 | 下载任务对象；浏览器应使用下述专用创建入口取得 Cookie |
+| GET `transfers/{id}/` | 无 | 传输对象 |
+| GET `transfers/` | 无 | `{transfers: [...]}`，最多 4 个未完成任务，刷新网页后可找回取消入口 |
+| POST `transfers/{id}/cancel/` | `{}` | 取消后的对象；清理未完成上传，已完成上传保留 |
+
+目录项为 `{name, path, directory, size, modified_at}`；目录 size 为 null，修改时间是 Unix 秒。目录链接解析后的实际位置返回在列表顶层 path。仅列出目录与普通文件，隐藏本模块临时上传。拒绝设备、命名管道、Windows 设备路径、保留文件名及备用数据流。
+
+传输对象为 `{id, direction, name, size, offset, state, path, etag, detail}`。direction 为 upload/download；state 为 ready/transferring/completed/cancelled/failed。下载 offset 为已发送给浏览器的去重字节数，不表示浏览器已保存到磁盘。源文件签名变化会使下载失败。每台电脑最多 2 个未完成上传和 2 个未完成下载，另外最多 2 个活动二进制下载流；超限返回 429，网页在本地排队。
+
+上传数据块固定为 256 KiB，最后一块可以更小；空文件直接 complete。单文件最大 2 GiB。每块检查偏移、边界和 SHA-256；同偏移同内容重发只确认，不同内容或跳跃偏移返回 409，SHA 不匹配返回 400。重试使用原操作键，手动恢复先查询电脑确认偏移。目标目录内临时文件以独占方式创建；完成时使用不覆盖已有路径的提交操作，碰到同名自动尝试 `文件 (1).扩展名`。POSIX 使用硬链接提交，目标文件系统不支持硬链接时报告失败并保留原文件。中继保持原 1 MiB 正文限制；前端逐块读取 File，不持有整文件内存副本。
+
+### 浏览器原生下载
+
+已登录用户 `POST /api/v1/remote/devices/{device_id}/downloads/`，正文 `{path}`，携带 `Idempotency-Key`。返回下载任务及 `download_url`，并设置 `remote_file_download` 签名 Cookie：HttpOnly、SameSite=Strict、有效期 1 小时，Path 仅为该任务的 content 地址，Secure 跟随部署的 `JWT_REFRESH_COOKIE_SECURE`。下载链接没有 JWT、本机凭证或长期访问令牌；要求网页与 API 同源部署。
+
+浏览器直接 GET/HEAD `/api/v1/remote/devices/{device_id}/downloads/{transfer_id}/content/`，通过 Cookie 鉴权，且每块重新检查设备归属及本机授权/文件访问权限。返回 `application/octet-stream`、安全的 `Content-Disposition`、`Content-Length`、`ETag`、`Accept-Ranges: bytes`。支持单个闭合、开放或尾部 Range；206 返回 Content-Range，非法或多区间范围返回 416。If-Range 与任务 ETag 不符时按完整请求处理；源文件与任务快照不一致则失败，不能拼接不同版本。响应禁缓存、禁代理缓冲，不将整文件读取为 Blob。
+
+中继与电脑间仍使用有界 JSON/Base64 RPC，内部接口为：POST `downloads/{id}/open/` 与 `release/`，正文 `{stream_id}`；GET `downloads/{id}/read/?offset=0&length=262144&stream_id=…`，返回 `{data, offset, etag}`；POST `downloads/{id}/progress/`，正文 `{offset, length, stream_id}`，在 ASGI 消费当前二进制块之后确认进度。read 最多读取 256 KiB，响应继续以 32 KiB chunk/ack 转发。活动流租约 90 秒过期，读块/进度请求刷新或重新争取名额，防止崩溃的中继永久占用下载名额。
+
+瞬时断线从当前未确认操作重试，单次最长等待 60 秒；超时结束响应，后续续传由浏览器 Range 请求完成，具体支持取决于浏览器。网页取消会撤销电脑任务和活动流，浏览器保存过程仍由浏览器管理。离开文件页不会撤销网页队列，刷新/关闭网页不保证上传恢复；退出账号会清空该账号在网页内的任务和文件引用。
+
+任务、幂等记录与下载流只在单实例连接器内存中保存（最多 1024 条任务记录），不跨连接器重启恢复。未完成上传闲置 24 小时后清理；状态轮询不延长闲置期限。启动及定时扫描 `REMOTE_CONNECTOR_LOCK_PATH` 同目录下的 `remote-file-transfers` 清理日志，按文件标识核对并移除模块遗留的过期临时文件；日志不包含文件正文。关闭文件权限、远程访问、授权失效、确认解绑或停止连接器时清理未完成上传，保留已完成文件。服务器解绑在通知抵达或明确认证失败后清理；本机授权监测独立于中继重连。
+
+双后端验证（Windows，项目虚拟环境）：
+
+```powershell
+backend\venv\Scripts\python.exe backend\scripts\test_remote_local.py --terminal --files --production-server
+backend\venv\Scripts\python.exe backend\scripts\test_remote_local.py --terminal --files --production-server --redis-url redis://127.0.0.1:16389/0
+```
+
+第二条使用自行准备的临时 Redis。pytest 可设置 `REMOTE_TEST_REDIS_BINARY` 自动创建测试实例，或 `REMOTE_TEST_REDIS_URL` 指向专用空 Redis 实例；测试检查 Pub/Sub 没有持久化任何数据键。

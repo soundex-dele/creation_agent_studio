@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: my-computer
-  version: 1.1.0
+  version: 1.2.0
   name: 我的电脑
-  description: 连接已绑定的电脑，继续本机对话、任务与远程终端会话。
+  description: 连接已绑定的电脑，继续本机对话、使用远程终端，浏览目录并上传和下载文件。
   category:
     slug: productivity
     name: 效率工具
@@ -13,7 +13,7 @@ metadata:
     order: 30
   icon: desktop
   color: "#2563eb"
-  tags: [远程访问, 电脑, 对话, 终端]
+  tags: [远程访问, 电脑, 对话, 终端, 文件传输]
   developer: Agent Studio
 spec:
   application_kind: custom

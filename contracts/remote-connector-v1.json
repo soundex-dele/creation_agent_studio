@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:agent-studio:remote-connector:v1",
   "title": "Remote connector frame v1",
-  "description": "HTTP contract: docs/REMOTE_ACCESS_API.md. Payloads are transient. cancel ends only a subscription; cancel Run requires a whitelisted command request.",
+  "description": "HTTP contract: docs/REMOTE_ACCESS_API.md. Chat, terminal and file operations retain frame version 1. File chunks are bounded JSON/Base64; only the dedicated cookie-authorized browser download endpoint emits binary HTTP. Payloads are transient. cancel ends only a subscription; cancelling a Run or file transfer requires its whitelisted operation.",
   "type": "object",
   "required": ["v", "type"],
   "properties": {

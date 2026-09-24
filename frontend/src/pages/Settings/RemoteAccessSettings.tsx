@@ -10,6 +10,7 @@ interface Configuration {
   computer_name: string;
   enabled: boolean;
   terminal_enabled: boolean;
+  file_transfer_enabled: boolean;
   local_user_id: number | null;
   organization_id: string | null;
   device_id: string | null;
@@ -124,6 +125,15 @@ export default function RemoteAccessSettings({ onAvailable }: { onAvailable: (av
             server_url: config.server_url, computer_name: config.computer_name,
             local_user_id: config.local_user_id, organization_id: config.organization_id,
             enabled: config.enabled, terminal_enabled,
+          }))} />
+      </div>
+      <div className="settings-row">
+        <div><strong>允许文件传输</strong><p>绑定账号可浏览运行本机服务的操作系统账号有权访问的目录，上传和下载文件。无需开启终端；关闭会停止传输并清理未完成上传，保留已完成文件。</p></div>
+        <Switch aria-label="允许文件传输" checked={Boolean(config.file_transfer_enabled)} loading={busy} disabled={!config.server_url}
+          onChange={file_transfer_enabled => void perform(() => api.put('/remote-access/', {
+            server_url: config.server_url, computer_name: config.computer_name,
+            local_user_id: config.local_user_id, organization_id: config.organization_id,
+            enabled: config.enabled, file_transfer_enabled,
           }))} />
       </div>
       {config.pairing_code && <Alert type="info" showIcon message={<>

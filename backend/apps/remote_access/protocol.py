@@ -11,7 +11,9 @@ OFFLINE_AFTER = 60
 UUID = r"[0-9a-fA-F-]{36}"
 TERMINAL_ROOT = "/api/v1/remote-access/terminals/"
 TERMINAL_ID = r"[0-9a-f]{32}"
+FILE_ROOT = '/api/v1/remote-access/files/'
 READ_PATHS = (
+    rf'{FILE_ROOT}(?:roots/|transfers/(?:{TERMINAL_ID}/)?|downloads/{TERMINAL_ID}/read/)',
     rf"{TERMINAL_ROOT}(?:{TERMINAL_ID}/stream/)?",
     r"/api/v1/remote-access/context/",
     r"/api/v1/conversations/(?:[0-9]+/|composer-options/)?",
@@ -20,6 +22,7 @@ READ_PATHS = (
     rf"/api/v1/(?:organizations/{UUID}/)?runs/{UUID}(?:/(?:events|stream|snapshot|children))?",
 )
 WRITE_PATHS = (
+    rf'{FILE_ROOT}(?:list/|uploads/|downloads/|uploads/{TERMINAL_ID}/(?:chunk|complete)/|downloads/{TERMINAL_ID}/(?:open|release|progress)/|transfers/{TERMINAL_ID}/cancel/)',
     rf"{TERMINAL_ROOT}(?:{TERMINAL_ID}/(?:input|resize|close)/)?",
     r"/api/v1/conversations/",
     r"/api/v1/conversations/[0-9]+/send_message/",
@@ -36,6 +39,10 @@ def validate_request(method, target, body=None, organization_id=None):
     if parsed.scheme or parsed.netloc or '%' in parsed.path or not any(re.fullmatch(p, parsed.path) for p in patterns):
         raise ValueError("Remote endpoint is not allowed")
     query = parse_qsl(parsed.query, keep_blank_values=True)
+    if parsed.path.startswith(FILE_ROOT):
+        from .file_protocol import validate_file_request
+        validate_file_request(method, parsed.path, query, body)
+        return parsed.path
     if any(k not in QUERY_KEYS for k, _ in query) or len(query) != len({k for k, _ in query}):
         raise ValueError("Remote query is not allowed")
     if organization_id and "/organizations/" in parsed.path:

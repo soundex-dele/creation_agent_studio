@@ -1,10 +1,13 @@
-"""Exercise two real local ASGI backends and a connector, without Redis.
+"""Exercise two real local ASGI backends and a connector, with memory or Redis Pub/Sub.
 
 Run with backend/.venv/bin/python backend/scripts/test_remote_local.py.
+On Windows use backend/venv/Scripts/python.exe from the repository root.
 Use --keep-running for manual API testing after the smoke checks pass.
 All databases, credentials and logs live in a fresh private temporary directory.
 """
 import argparse
+import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -83,6 +86,8 @@ def main():
     parser.add_argument('--client-port', type=int, default=18081)
     parser.add_argument('--keep-running', action='store_true')
     parser.add_argument('--terminal', action='store_true', help='Also exercise native PTYs through the real relay.')
+    parser.add_argument('--files', action='store_true', help='Exercise chunk uploads and cookie-authorized native downloads.')
+    parser.add_argument('--redis-url', default='', help='Use a disposable Redis Pub/Sub relay instead of memory.')
     parser.add_argument('--production-server', action='store_true',
                         help='Test production settings with explicit HTTP and memory relay enabled.')
     args = parser.parse_args()
@@ -98,7 +103,7 @@ def main():
     processes, logs, clients = [], [], []
     common = {
         **os.environ, 'DJANGO_SETTINGS_MODULE': 'backend.settings.development',
-        'DATABASE_ENGINE': 'sqlite', 'REDIS_ENABLED': 'False', 'REMOTE_RELAY_REDIS_URL': '',
+        'DATABASE_ENGINE': 'sqlite', 'REDIS_ENABLED': 'False', 'REMOTE_RELAY_REDIS_URL': args.redis_url,
         'SINGLE_TENANT_MODE': 'False', 'LICENSE_AUTH_ENABLED': 'False',
         'ALLOWED_HOSTS': 'localhost,127.0.0.1', 'OTEL_ENABLED': 'False',
         'SENTRY_DSN': '', 'API_RATE_THROTTLING_ENABLED': 'False', 'PYTHONUNBUFFERED': '1',
@@ -239,6 +244,38 @@ def main():
         check('local-stream-marker' in body and 'event: run.succeeded' in body, 'Missing streamed events')
         print('PASS: real HTTP → WebSocket → local HTTP SSE forwarding', flush=True)
 
+        if args.files:
+            file_path = proxy + 'remote-access/files/'
+            api(server, 'GET', file_path + 'roots/', expected=403)
+            config['file_transfer_enabled'] = True
+            api(host, 'PUT', '/api/v1/remote-access/', json=config)
+            wait_for(lambda: server.get(file_path + 'roots/').status_code == 200, 'file permission enabled', processes)
+            target = root / 'client' / 'transfers'
+            target.mkdir()
+            original = target / '中文传输.bin'
+            original.write_bytes(b'preserve existing file')
+            file_data = secrets.token_bytes(256 * 1024 * 8 + 73)
+
+            def file_post(suffix, body, key=None, expected=200):
+                return api(server, 'POST', file_path + suffix, json=body, expected=expected,
+                           headers={'Idempotency-Key': key or secrets.token_hex(16)}).json()
+
+            listed = file_post('list/', {'path': str(target), 'cursor': ''})
+            check(listed['entries'][0]['name'] == original.name, 'Missing Chinese filename')
+            upload = file_post('uploads/', {'path': str(target), 'name': original.name, 'size': len(file_data)}, 'file-create')
+            repeated = file_post('uploads/', {'path': str(target), 'name': original.name, 'size': len(file_data)}, 'file-create')
+            check(upload['id'] == repeated['id'], 'Upload creation is not idempotent')
+            upload_path = 'uploads/' + upload['id'] + '/'
+
+            def send_file_chunk(offset):
+                data = file_data[offset:offset + 256 * 1024]
+                return file_post(upload_path + 'chunk/', {'offset': offset, 'data': base64.b64encode(data).decode(),
+                                                        'sha256': hashlib.sha256(data).hexdigest()})
+            send_file_chunk(0)
+            check(send_file_chunk(0)['offset'] == 256 * 1024, 'Duplicate upload block appended twice')
+            # Keep this unfinished upload alive while chatting and exercising the terminal below.
+            api(server, 'GET', proxy + 'conversations/?page=1')
+
         if args.terminal:
             terminal_path = proxy + 'remote-access/terminals/'
             api(server, 'POST', terminal_path, expected=403, json={'cols': 80, 'rows': 24},
@@ -295,6 +332,47 @@ def main():
             check(not api(server, 'GET', terminal_path).json()['sessions'], 'Disabling terminal did not clear sessions')
             print('PASS: real terminal opt-in, PTY output, input deduplication, resize, detach/reconnect and revocation', flush=True)
 
+        if args.files:
+            wait_for(lambda: server.get(file_path + 'roots/').status_code == 200, 'file reconnect', processes)
+            status = api(server, 'GET', file_path + 'transfers/' + upload['id'] + '/').json()
+            check(status['offset'] == 256 * 1024, 'Upload did not survive reconnect')
+            for offset in range(status['offset'], len(file_data), 256 * 1024):
+                send_file_chunk(offset)
+            finished = file_post(upload_path + 'complete/', {})
+            check(finished['name'] == '中文传输 (1).bin', 'Upload overwrote an existing filename')
+            check(original.read_bytes() == b'preserve existing file', 'Existing file was changed')
+            check(Path(finished['path']).read_bytes() == file_data, 'Upload hash mismatch')
+            download = api(server, 'POST', f'/api/v1/remote/devices/{device_id}/downloads/',
+                           json={'path': finished['path']}, headers={'Idempotency-Key': 'file-download'})
+            cookie_header = download.headers['set-cookie']
+            check('HttpOnly' in cookie_header and 'Max-Age=3600' in cookie_header, 'Missing scoped download cookie')
+            native_url = download.json()['download_url']
+            check(f'Path={native_url}' in cookie_header, 'Download cookie scope is too wide')
+            with httpx.Client(base_url=server.base_url, cookies=server.cookies, timeout=70, trust_env=False) as browser:
+                with browser.stream('GET', native_url) as response:
+                    check(response.status_code == 200, 'Cookie-only browser download failed')
+                    digest = hashlib.sha256()
+                    for index, chunk in enumerate(response.iter_bytes(256 * 1024)):
+                        digest.update(chunk)
+                        if index == 0:
+                            api(host, 'POST', '/api/v1/remote-access/reconnect/', json={})
+                    check(digest.digest() == hashlib.sha256(file_data).digest(), 'Download changed across reconnect')
+                resumed = api(browser, 'GET', native_url, expected=206, headers={'Range': 'bytes=262144-262216'})
+                check(resumed.content == file_data[262144:262217], 'Range resume mismatch')
+            empty = file_post('uploads/', {'path': str(target), 'name': 'empty.txt', 'size': 0})
+            file_post('uploads/' + empty['id'] + '/complete/', {})
+            cancelled = file_post('uploads/', {'path': str(target), 'name': 'cancelled.txt', 'size': 1})
+            file_post('transfers/' + cancelled['id'] + '/cancel/', {})
+            unfinished = file_post('uploads/', {'path': str(target), 'name': 'unfinished.txt', 'size': 1})
+            api(host, 'PUT', '/api/v1/remote-access/', json={**config, 'file_transfer_enabled': False})
+            wait_for(lambda: not list(target.glob('.agent-studio-upload-*.part')), 'permission cleanup', processes)
+            check(Path(finished['path']).exists(), 'Disabling permission deleted a completed file')
+            config['file_transfer_enabled'] = True
+            api(host, 'PUT', '/api/v1/remote-access/', json=config)
+            wait_for(lambda: server.get(file_path + 'roots/').status_code == 200, 'file re-enabled', processes)
+            api(server, 'GET', file_path + 'transfers/' + unfinished['id'] + '/', expected=404)
+            print('PASS: real file listing, chunks, retries, rename, cookie download, Range, reconnect, cancel and permission cleanup', flush=True)
+
         api(host, 'PUT', '/api/v1/remote-access/', json={**config, 'enabled': False})
         wait_for(lambda: not online(), 'device offline', processes)
         api(server, 'GET', proxy + 'conversations/', expected=503)
@@ -321,7 +399,7 @@ def main():
         access_path = root / 'access.json'
         with open(access_path, 'w', opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
             json.dump(access, output, indent=2)
-        print(f'All checks passed without Redis. Access details: {access_path}', flush=True)
+        print(f'All checks passed ({"Redis" if args.redis_url else "memory"} relay). Access details: {access_path}', flush=True)
         if args.keep_running:
             print('Backends and connector remain running. Press Ctrl+C to stop all three.', flush=True)
             while True:

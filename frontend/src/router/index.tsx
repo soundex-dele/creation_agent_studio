@@ -76,7 +76,7 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 
 const router = createBrowserRouter([
   ...['/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId',
-    '/apps/my-computer/:deviceId/terminals', '/apps/my-computer/:deviceId/terminals/:sessionId'].map(path => ({
+    '/apps/my-computer/:deviceId/terminals', '/apps/my-computer/:deviceId/terminals/:sessionId', '/apps/my-computer/:deviceId/files'].map(path => ({
     path,
     element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<MyComputerPage />)}</MainLayout></ProtectedRoute>,
   })),

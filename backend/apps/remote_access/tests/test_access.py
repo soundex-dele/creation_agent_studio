@@ -86,6 +86,27 @@ def test_terminal_opt_in_preserves_legacy_updates_and_requires_admin(grant):
     assert client.put('/api/v1/remote-access/', {**payload, 'terminal_enabled': False}, format='json').status_code == 403
 
 
+def test_file_opt_in_independent_from_terminal_and_legacy_updates(grant):
+    user, org, config = grant
+    assert not config.file_transfer_enabled and not config.terminal_enabled
+    client = APIClient()
+    client.force_authenticate(user)
+    payload = {'enabled': True, 'computer_name': '文件测试电脑', 'server_url': 'https://relay.example',
+               'local_user_id': user.id, 'organization_id': str(org.id)}
+    response = client.put('/api/v1/remote-access/', {**payload, 'file_transfer_enabled': True}, format='json')
+    assert response.status_code == 200
+    assert response.data['file_transfer_enabled'] and not response.data['terminal_enabled']
+    assert client.put('/api/v1/remote-access/', payload, format='json').data['file_transfer_enabled']
+    remote = APIClient()
+    remote.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    capability = remote.get('/api/v1/remote-access/context/').data['files']
+    assert capability == {'supported': True, 'enabled': True, 'max_file_size': 2147483648, 'chunk_size': 262144}
+    assert remote.put('/api/v1/remote-access/', {**payload, 'file_transfer_enabled': False}, format='json').status_code == 403
+    user.role = 'member'
+    user.save()
+    assert client.put('/api/v1/remote-access/', {**payload, 'file_transfer_enabled': False}, format='json').status_code == 403
+
+
 def test_server_capability_hidden_and_non_admin_cannot_configure(grant, settings):
     user, _, _ = grant
     client = APIClient()

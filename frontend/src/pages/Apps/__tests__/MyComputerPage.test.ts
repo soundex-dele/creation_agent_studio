@@ -14,6 +14,7 @@ vi.mock('@/components/Chat/ChatContainer', () => ({ default: function ChatStub()
     React.createElement('input', { 'aria-label': 'draft', value: draft, onInput: (event: React.FormEvent<HTMLInputElement>) => setDraft(event.currentTarget.value) }),
     React.createElement('button', { disabled: !online, 'data-testid': 'send' }, '发送'));
 } }));
+vi.mock('../RemoteFilesPage', () => ({ default: ({ deviceId }: { deviceId: string }) => React.createElement('div', {}, `files:${deviceId}`) }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -49,6 +50,16 @@ async function click(label: string) {
 function LocationProbe() {
   return React.createElement('output', { 'data-testid': 'location-search' }, useLocation().search);
 }
+
+it('opens the files deep link with application navigation parameters and without loading chat history', async () => {
+  await act(async () => root.render(React.createElement(MemoryRouter, { initialEntries: ['/apps/my-computer/computer/files/?entry=apps&standalone=1'] },
+    React.createElement(LocationProbe), React.createElement(Routes, {},
+      React.createElement(Route, { path: '/apps/my-computer/:deviceId/files', element: React.createElement(MyComputerPage) })))));
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(container.textContent).toContain('files:computer');
+  expect(container.querySelector('[data-testid="location-search"]')?.textContent).toBe('?entry=apps&standalone=1');
+  expect(vi.mocked(api.get).mock.calls.some(call => call[0].endsWith('/conversations/'))).toBe(false);
+});
 
 it.each(['', '?entry=apps&standalone=1'])('keeps mobile navigation, launch presentation and offline drafts (%s)', async (search) => {
   const expectPresentation = () => expect(container.querySelector('[data-testid="location-search"]')?.textContent).toBe(search);

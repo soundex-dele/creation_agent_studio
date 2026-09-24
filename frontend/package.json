@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
+    "@noble/hashes": "^1.8.0",
     "@phosphor-icons/react": "^2.1.10",
     "@tiptap/extension-table": "^3.31.3",
     "@tiptap/markdown": "^3.31.3",
