@@ -1,96 +1,50 @@
-import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   BackHandler,
   Linking,
+  Modal,
   Platform,
   Pressable,
-  Share,
+  ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView as NativeWebView } from 'react-native-webview';
-import type {
-  AndroidWebViewProps,
-  FileDownloadEvent,
-  IOSWebViewProps,
-  ShouldStartLoadRequest,
-  WebViewSharedProps,
-  WebViewErrorEvent,
-  WebViewHttpErrorEvent,
-  WebViewMessageEvent,
-  WebViewNavigation,
-  WebViewOpenWindowEvent,
-} from 'react-native-webview/lib/WebViewTypes';
 
 import { APP_CONFIG } from './appConfig';
-import { ConnectionProblem } from './ConnectionProblem';
-import {
-  nativeBridgeBootstrap,
-  parseNativeBridgeMessage,
-} from './nativeBridge';
-import {
-  classifyNavigation,
-  classifyBrowserNavigation,
-  isSafeExternalUrl,
-  resolveDeepLink,
-} from './navigationPolicy';
+import { resolveDeepLink } from './navigationPolicy';
 import { COLORS } from './theme';
+import { WebWindow, type WebWindowHandle } from './WebWindow';
+import { SettingsScreen } from './SettingsScreen';
+import {
+  House,
+  RotateCw,
+  Globe,
+  Settings,
+  PanelsTopLeft,
+  X,
+} from 'lucide-react-native';
 
-interface LoadProblem {
-  detail: string;
+interface BrowserWindow {
+  id: number;
+  loadVersion: number;
+  sourceUrl: string;
+  url: string;
+  title: string;
+  canGoBack: boolean;
 }
 
-interface WebViewHandle {
-  goBack: () => void;
-  injectJavaScript: (script: string) => void;
-  reload: () => void;
-}
-
-type MobileWebViewProps = WebViewSharedProps &
-  Pick<
-    AndroidWebViewProps,
-    | 'allowFileAccess'
-    | 'allowUniversalAccessFromFileURLs'
-    | 'domStorageEnabled'
-    | 'mixedContentMode'
-    | 'onOpenWindow'
-    | 'onRenderProcessGone'
-    | 'setSupportMultipleWindows'
-    | 'thirdPartyCookiesEnabled'
-  > &
-  Pick<
-    IOSWebViewProps,
-    | 'allowsBackForwardNavigationGestures'
-    | 'contentInsetAdjustmentBehavior'
-    | 'mediaCapturePermissionGrantType'
-    | 'onContentProcessDidTerminate'
-    | 'onFileDownload'
-    | 'sharedCookiesEnabled'
-  >;
-
-const WebView = NativeWebView as unknown as React.ForwardRefExoticComponent<
-  MobileWebViewProps & React.RefAttributes<WebViewHandle>
->;
-
-async function openExternalUrl(url: string): Promise<void> {
-  if (!isSafeExternalUrl(url)) return;
-  try {
-    await Linking.openURL(url);
-  } catch {
-    Alert.alert('无法打开链接', '设备上没有可以处理这个链接的应用。');
-  }
+function createWindow(id: number, url: string): BrowserWindow {
+  return {
+    id,
+    loadVersion: 0,
+    sourceUrl: url,
+    url,
+    title: '',
+    canGoBack: false,
+  };
 }
 
 interface WebAppScreenProps {
@@ -102,300 +56,382 @@ export function WebAppScreen({
   startUrl,
   onClose,
 }: WebAppScreenProps): React.JSX.Element {
-  const webViewRef = useRef<WebViewHandle>(null);
-  const netInfo = useNetInfo();
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? COLORS.dark : COLORS.light;
+  const colors = useColorScheme() === 'dark' ? COLORS.dark : COLORS.light;
   const appOrigin = new URL(startUrl).origin;
-  const [sourceUrl, setSourceUrl] = useState(startUrl);
-  const [currentUrl, setCurrentUrl] = useState(startUrl);
-  const [canGoBack, setCanGoBack] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [retrying, setRetrying] = useState(false);
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
-  // An Internet reachability probe can fail even when a LAN website is reachable.
-  const offline = netInfo.isConnected === false;
+  const [windows, setWindows] = useState(() => [createWindow(0, startUrl)]);
+  const [activeId, setActiveId] = useState(0);
+  const [showWindows, setShowWindows] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const nextId = useRef(1);
+  const windowRefs = useRef(new Map<number, WebWindowHandle>());
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  const activeWindow = windows.find(window => window.id === activeId);
 
-  const injectedJavaScript = useMemo(
-    () => nativeBridgeBootstrap(Platform.OS),
-    [],
-  );
-
-  const loadInternalUrl = useCallback((url: string) => {
-    if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(
-        `window.location.assign(${JSON.stringify(url)}); true;`,
-      );
-      return;
-    }
-    setSourceUrl(url);
+  const openWindow = useCallback((url: string) => {
+    const id = nextId.current++;
+    setWindows(previous => [...previous, createWindow(id, url)]);
+    setActiveId(id);
   }, []);
 
-  const navigateFromDeepLink = useCallback(
-    (incomingUrl: string) => {
-      const resolved = resolveDeepLink(
+  const closeWindow = useCallback(
+    (id: number) => {
+      const remaining = windows.filter(window => window.id !== id);
+      if (!remaining.length) {
+        setShowWindows(false);
+        onClose();
+        return;
+      }
+      if (id === activeId) {
+        const index = windows.findIndex(window => window.id === id);
+        setActiveId(remaining[Math.max(0, index - 1)].id);
+      }
+      setWindows(remaining);
+    },
+    [activeId, onClose, windows],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const navigate = (incomingUrl: string) => {
+      if (!mounted) return;
+      const url = resolveDeepLink(
         incomingUrl,
         appOrigin,
         APP_CONFIG.customUrlScheme,
       );
-      if (!resolved) return;
-      setProblem(null);
-      loadInternalUrl(resolved);
-    },
-    [appOrigin, loadInternalUrl],
-  );
-
-  useEffect(() => {
-    Linking.getInitialURL().then(url => {
-      if (url) navigateFromDeepLink(url);
-    });
-    const subscription = Linking.addEventListener('url', event => {
-      navigateFromDeepLink(event.url);
-    });
-    return () => subscription.remove();
-  }, [navigateFromDeepLink]);
+      if (url) windowRefs.current.get(activeIdRef.current)?.navigate(url);
+    };
+    Linking.getInitialURL()
+      .then(url => {
+        if (url) navigate(url);
+      })
+      .catch(() => undefined);
+    const subscription = Linking.addEventListener('url', event =>
+      navigate(event.url),
+    );
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [appOrigin]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (canGoBack) webViewRef.current?.goBack();
-        else onClose();
+        if (activeWindow?.canGoBack) windowRefs.current.get(activeId)?.goBack();
+        else closeWindow(activeId);
         return true;
       },
     );
     return () => subscription.remove();
-  }, [canGoBack, onClose]);
-
-  const retry = useCallback(async () => {
-    setRetrying(true);
-    try {
-      const state = await NetInfo.fetch();
-      if (state.isConnected === false) return;
-      setProblem(null);
-      webViewRef.current?.reload();
-    } catch {
-      setProblem({ detail: '无法检查网络连接，请稍后重试。' });
-    } finally {
-      setRetrying(false);
-    }
-  }, []);
-
-  const handleNavigationRequest = useCallback(
-    (request: ShouldStartLoadRequest) => {
-      const decision = classifyBrowserNavigation(request.url);
-      if (decision === 'internal') return true;
-      if (decision === 'external')
-        openExternalUrl(request.url).catch(() => undefined);
-      return false;
-    },
-    [],
-  );
-
-  const handleNavigationChange = useCallback(
-    (navigation: WebViewNavigation) => {
-      setCanGoBack(navigation.canGoBack);
-      if (navigation.url) setCurrentUrl(navigation.url);
-      setLoading(navigation.loading);
-    },
-    [],
-  );
-
-  const handleMessage = useCallback(
-    async (event: WebViewMessageEvent) => {
-      // Visiting another website does not grant it access to this site's bridge.
-      if (
-        !/^https?:\/\//i.test(event.nativeEvent.url) ||
-        classifyNavigation(
-          event.nativeEvent.url,
-          appOrigin,
-          APP_CONFIG.trustedAuthOrigins,
-        ) !== 'internal'
-      )
-        return;
-      const message = parseNativeBridgeMessage(event.nativeEvent.data);
-      if (!message) return;
-
-      if (message.type === 'reload') {
-        setProblem(null);
-        webViewRef.current?.reload();
-        return;
-      }
-      if (message.type === 'openExternal') {
-        await openExternalUrl(message.url);
-        return;
-      }
-      await Share.share({
-        title: message.title,
-        message: message.url
-          ? `${message.message}\n${message.url}`
-          : message.message,
-        url: message.url,
-      });
-    },
-    [appOrigin],
-  );
-
-  const handleLoadError = useCallback((event: WebViewErrorEvent) => {
-    setLoading(false);
-    setProblem({ detail: event.nativeEvent.description || '网络请求失败。' });
-  }, []);
-
-  const handleHttpError = useCallback(
-    (event: WebViewHttpErrorEvent) => {
-      const { statusCode, url } = event.nativeEvent;
-      if (statusCode >= 500 && url === currentUrl) {
-        setLoading(false);
-        setProblem({ detail: `服务器返回了 HTTP ${statusCode}。` });
-      }
-    },
-    [currentUrl],
-  );
-
-  const handleOpenWindow = useCallback(
-    (event: WebViewOpenWindowEvent) => {
-      const targetUrl = event.nativeEvent.targetUrl;
-      const decision = classifyBrowserNavigation(targetUrl);
-      if (decision === 'internal') loadInternalUrl(targetUrl);
-      if (decision === 'external')
-        openExternalUrl(targetUrl).catch(() => undefined);
-    },
-    [loadInternalUrl],
-  );
+  }, [activeId, activeWindow?.canGoBack, closeWindow]);
 
   return (
     <SafeAreaView
       edges={['top', 'bottom', 'left', 'right']}
-      style={[styles.safeArea, { backgroundColor: colors.surface }]}
+      style={[styles.screen, { backgroundColor: colors.surface }]}
     >
       <View style={[styles.toolbar, { borderBottomColor: colors.border }]}>
-        <Text
-          accessibilityLabel={`当前网址：${currentUrl}`}
-          numberOfLines={1}
-          ellipsizeMode="middle"
-          style={[styles.address, { color: colors.text }]}
-        >
-          {currentUrl}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="更换网址"
-          onPress={onClose}
-          style={({ pressed }) => [
-            styles.changeButton,
-            { opacity: pressed ? 0.65 : 1 },
-          ]}
-        >
-          <Text style={[styles.changeLabel, { color: colors.primary }]}>
-            更换网址
-          </Text>
-        </Pressable>
-      </View>
-      <View style={styles.webContent}>
-        <WebView
-          ref={webViewRef}
-          source={{ uri: sourceUrl }}
-          style={[styles.webView, { backgroundColor: colors.background }]}
-          // Route every scheme through our policy instead of WebView opening it automatically.
-          originWhitelist={['*']}
-          applicationNameForUserAgent={APP_CONFIG.userAgentSuffix}
-          webviewDebuggingEnabled={__DEV__}
-          injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
-          javaScriptEnabled
-          domStorageEnabled
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled={false}
-          allowFileAccess={false}
-          allowUniversalAccessFromFileURLs={false}
-          mixedContentMode="never"
-          setSupportMultipleWindows={false}
-          contentInsetAdjustmentBehavior="never"
-          allowsBackForwardNavigationGestures
-          mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
-          onShouldStartLoadWithRequest={handleNavigationRequest}
-          onNavigationStateChange={handleNavigationChange}
-          onMessage={handleMessage}
-          onOpenWindow={handleOpenWindow}
-          onFileDownload={(event: FileDownloadEvent) => {
-            openExternalUrl(event.nativeEvent.downloadUrl).catch(
-              () => undefined,
-            );
-          }}
-          onLoadStart={event => {
-            // Android also emits this for pushState/popstate, without a load-end event.
-            setLoading(event.nativeEvent.loading);
-            setProblem(null);
-          }}
-          onLoadProgress={event => {
-            if (event.nativeEvent.progress >= 1) setLoading(false);
-          }}
-          onLoadEnd={() => setLoading(false)}
-          onError={handleLoadError}
-          onHttpError={handleHttpError}
-          onContentProcessDidTerminate={() => {
-            setProblem({ detail: '网页进程已停止，请重新加载。' });
-          }}
-          onRenderProcessGone={() => {
-            setProblem({ detail: '网页进程异常退出，请重新加载。' });
-          }}
-        />
-
-        {loading && !problem && !offline ? (
-          <View
-            accessibilityLabel="页面加载中"
-            accessibilityRole="progressbar"
-            style={[
-              styles.loadingOverlay,
-              { backgroundColor: colors.background },
+        {[
+          {
+            label: '主页',
+            icon: House,
+            action: () =>
+              setWindows(previous =>
+                previous.map(window =>
+                  window.id === activeId
+                    ? {
+                        ...createWindow(window.id, startUrl),
+                        loadVersion: window.loadVersion + 1,
+                      }
+                    : window,
+                ),
+              ),
+          },
+          {
+            label: '刷新',
+            icon: RotateCw,
+            action: () => windowRefs.current.get(activeId)?.reload(),
+          },
+          { label: '更换网址', icon: Globe, action: onClose },
+          {
+            label: '设置',
+            icon: Settings,
+            action: () => setShowSettings(true),
+          },
+          {
+            label: `切换窗口 (${windows.length})`,
+            icon: PanelsTopLeft,
+            badge: windows.length,
+            action: () => setShowWindows(true),
+          },
+        ].map(button => (
+          <Pressable
+            key={button.label}
+            accessibilityRole="button"
+            accessibilityLabel={button.label}
+            onPress={button.action}
+            style={({ pressed }) => [
+              styles.toolbarButton,
+              { opacity: pressed ? 0.6 : 1 },
             ]}
           >
-            <ActivityIndicator color={colors.primary} size="large" />
-          </View>
-        ) : null}
-
-        {problem || offline ? (
-          <ConnectionProblem
-            detail={problem?.detail}
-            offline={offline}
-            retrying={retrying}
-            onRetry={retry}
-          />
-        ) : null}
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <button.icon
+                size={24}
+                color={colors.primary}
+                accessible={false}
+              />
+              {button.badge !== undefined ? (
+                <View
+                  style={[styles.badge, { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.badgeText, { color: colors.onPrimary }]}>
+                    {button.badge > 99 ? '99+' : button.badge}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+        ))}
       </View>
+      <View style={styles.screen}>
+        {windows.map(window => (
+          <View
+            // A fresh WebView requests home even after a load failure or on the same URL.
+            key={`${window.id}:${window.loadVersion}`}
+            testID={`window-${window.id}`}
+            // Keep inactive WebViews mounted so switching preserves forms and history.
+            style={[
+              styles.window,
+              window.id !== activeId && styles.hiddenWindow,
+            ]}
+            pointerEvents={window.id === activeId ? 'auto' : 'none'}
+            accessibilityElementsHidden={window.id !== activeId}
+            importantForAccessibility={
+              window.id === activeId ? 'auto' : 'no-hide-descendants'
+            }
+          >
+            <WebWindow
+              ref={handle => {
+                if (handle) windowRefs.current.set(window.id, handle);
+                else windowRefs.current.delete(window.id);
+              }}
+              startUrl={window.sourceUrl}
+              appOrigin={appOrigin}
+              active={window.id === activeId}
+              onChangeServer={onClose}
+              onOpenWindow={openWindow}
+              onNavigationChange={navigation =>
+                setWindows(previous =>
+                  previous.map(item =>
+                    item.id === window.id
+                      ? {
+                          ...item,
+                          url: navigation.url || item.url,
+                          title: navigation.title || '',
+                          canGoBack: navigation.canGoBack,
+                        }
+                      : item,
+                  ),
+                )
+              }
+            />
+          </View>
+        ))}
+      </View>
+      <Modal
+        visible={showWindows}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowWindows(false)}
+      >
+        <SafeAreaView style={styles.modalBackdrop}>
+          <View
+            accessibilityViewIsModal
+            style={[styles.windowList, { backgroundColor: colors.surface }]}
+          >
+            <View style={styles.listHeader}>
+              <Text
+                accessibilityRole="header"
+                style={[styles.heading, { color: colors.text }]}
+              >
+                窗口列表 ({windows.length})
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="关闭窗口列表"
+                onPress={() => setShowWindows(false)}
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <X size={24} color={colors.primary} accessible={false} />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.listContent}>
+              {windows.map((window, index) => {
+                const title =
+                  window.title ||
+                  (window.id === 0 ? '首页' : `窗口 ${index + 1}`);
+                const selected = window.id === activeId;
+                return (
+                  <View
+                    key={window.id}
+                    style={[
+                      styles.listRow,
+                      {
+                        borderColor: selected ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`切换到${title}`}
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        setActiveId(window.id);
+                        setShowWindows(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.windowOption,
+                        { opacity: pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.windowTitle, { color: colors.text }]}
+                      >
+                        {title}
+                      </Text>
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.windowUrl, { color: colors.muted }]}
+                      >
+                        {window.url}
+                      </Text>
+                      {selected ? (
+                        <Text
+                          style={[
+                            styles.currentLabel,
+                            { color: colors.primary },
+                          ]}
+                        >
+                          当前窗口
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`关闭${title}`}
+                      onPress={() => closeWindow(window.id)}
+                      style={({ pressed }) => [
+                        styles.closeButton,
+                        { opacity: pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.buttonLabel, { color: colors.error }]}
+                      >
+                        关闭
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+      {showSettings ? (
+        <Modal
+          visible
+          animationType="slide"
+          onRequestClose={() => setShowSettings(false)}
+        >
+          <SettingsScreen onBack={() => setShowSettings(false)} />
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  webView: {
-    flex: 1,
-  },
-  webContent: { flex: 1 },
+  screen: { flex: 1 },
   toolbar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 12,
+    gap: 8,
+    paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  address: { flex: 1, fontSize: 14, lineHeight: 22 },
-  changeButton: {
+  toolbarButton: {
+    flex: 1,
     minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  changeLabel: { fontSize: 15, fontWeight: '600' },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  badge: {
+    position: 'absolute',
+    right: -10,
+    top: -6,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 3,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { fontSize: 10, fontWeight: '700' },
+  buttonLabel: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  window: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  hiddenWindow: { display: 'none' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  windowList: {
+    maxHeight: '85%',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    borderRadius: 20,
+    padding: 16,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700' },
+  listContent: { gap: 12 },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingRight: 8,
+  },
+  windowOption: { flex: 1, minHeight: 64, padding: 12, gap: 4 },
+  windowTitle: { fontSize: 16, fontWeight: '600' },
+  windowUrl: { fontSize: 13, lineHeight: 20 },
+  currentLabel: { fontSize: 13, fontWeight: '600' },
+  closeButton: {
+    minHeight: 48,
+    minWidth: 48,
+    paddingHorizontal: 8,
     justifyContent: 'center',
   },
 });

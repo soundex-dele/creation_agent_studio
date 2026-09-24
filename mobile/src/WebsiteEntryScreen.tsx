@@ -20,12 +20,14 @@ import { normalizeWebsiteUrl } from './websiteUrl';
 interface WebsiteEntryScreenProps {
   initialUrl: string;
   initialError?: string;
+  history?: string[];
   onOpen: (url: string) => Promise<void>;
 }
 
 export function WebsiteEntryScreen({
   initialUrl,
   initialError = '',
+  history = [],
   onOpen,
 }: WebsiteEntryScreenProps): React.JSX.Element {
   const colors = useColorScheme() === 'dark' ? COLORS.dark : COLORS.light;
@@ -35,9 +37,9 @@ export function WebsiteEntryScreen({
   const [saving, setSaving] = useState(false);
   const submitting = useRef(false);
 
-  const openWebsite = async () => {
+  const openWebsite = async (selectedAddress = address) => {
     if (submitting.current) return;
-    const url = normalizeWebsiteUrl(address);
+    const url = normalizeWebsiteUrl(selectedAddress);
     if (!url) {
       setError('请输入有效的网站地址，例如 https://example.com');
       return;
@@ -106,7 +108,7 @@ export function WebsiteEntryScreen({
               }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              onSubmitEditing={openWebsite}
+              onSubmitEditing={() => openWebsite()}
               style={[
                 styles.input,
                 {
@@ -134,7 +136,7 @@ export function WebsiteEntryScreen({
               accessibilityLabel={saving ? '正在保存网址' : '打开网页'}
               accessibilityState={{ disabled: saving, busy: saving }}
               disabled={saving}
-              onPress={openWebsite}
+              onPress={() => openWebsite()}
               style={({ pressed }) => [
                 styles.openButton,
                 {
@@ -154,6 +156,47 @@ export function WebsiteEntryScreen({
             <Text style={[styles.footer, { color: colors.muted }]}>
               自动记住网址，下次启动直接打开。可随时在顶部更换。
             </Text>
+            {history.length > 0 ? (
+              <View style={styles.history}>
+                <Text
+                  accessibilityRole="header"
+                  style={[styles.label, { color: colors.text }]}
+                >
+                  历史服务器
+                </Text>
+                {history.map((url, index) => (
+                  <Pressable
+                    key={url}
+                    accessibilityRole="button"
+                    accessibilityLabel={`连接历史服务器：${url}`}
+                    accessibilityState={{ disabled: saving }}
+                    disabled={saving}
+                    onPress={() => {
+                      setAddress(url);
+                      return openWebsite(url);
+                    }}
+                    style={({ pressed }) => [
+                      styles.historyItem,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        opacity: pressed || saving ? 0.65 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      numberOfLines={2}
+                      style={[styles.historyUrl, { color: colors.text }]}
+                    >
+                      {url}
+                    </Text>
+                    <Text style={[styles.historyHint, { color: colors.muted }]}>
+                      {index === 0 ? '最近使用 · 点击连接' : '点击连接'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -197,4 +240,14 @@ const styles = StyleSheet.create({
   },
   openLabel: { fontSize: 16, fontWeight: '600' },
   footer: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 20 },
+  history: { marginTop: 32, gap: 8 },
+  historyItem: {
+    minHeight: 64,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
+  },
+  historyUrl: { fontSize: 16, lineHeight: 24 },
+  historyHint: { fontSize: 13, lineHeight: 20 },
 });

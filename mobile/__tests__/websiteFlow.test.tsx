@@ -168,4 +168,39 @@ describe('website entry flow', () => {
       'https://example.com/',
     );
   });
+
+  it('restores server history and connects directly from a history entry', async () => {
+    await act(async () => renderer.unmount());
+    await saveWebsiteUrl('https://first.example.com/');
+    await saveWebsiteUrl('http://192.168.1.20:3030/');
+    await act(async () => {
+      renderer = TestRenderer.create(<App />);
+    });
+    await act(async () =>
+      renderer.root.findByType(WebAppScreen).props.onClose(),
+    );
+    expect(renderer.root.findByType(WebsiteEntryScreen).props.history).toEqual([
+      'http://192.168.1.20:3030/',
+      'https://first.example.com/',
+    ]);
+    await act(async () => {
+      await renderer.root
+        .findAll(node => typeof node.props.onPress === 'function')
+        .find(
+          button =>
+            button.props.accessibilityLabel ===
+            '连接历史服务器：https://first.example.com/',
+        )!
+        .props.onPress();
+    });
+    expect(renderer.root.findByType(WebAppScreen).props.startUrl).toBe(
+      'https://first.example.com/',
+    );
+    await act(async () =>
+      renderer.root.findByType(WebAppScreen).props.onClose(),
+    );
+    expect(renderer.root.findByType(WebsiteEntryScreen).props.history[0]).toBe(
+      'https://first.example.com/',
+    );
+  });
 });

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Divider, Form, Input, Button, message, Modal, Select, Spin, Typography } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Checkbox, Divider, Form, Input, Button, message, Modal, Select, Spin, Typography } from 'antd';
 import { api } from '@/services/api';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { getNativeCredentialRequest } from '@/services/nativeCredentials';
 
 const { Text } = Typography;
 
@@ -16,6 +17,11 @@ interface AuthMode {
 }
 
 const LoginPage: React.FC = () => {
+  const [form] = Form.useForm();
+  const [rememberPassword, setRememberPassword] = useState(true);
+  const [nativePasswords, setNativePasswords] = useState(false);
+  const [clearingPassword, setClearingPassword] = useState(false);
+  const allowPasswordRestore = useRef(true);
   const [loading, setLoading] = useState(false);
   const [modeLoading, setModeLoading] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
@@ -35,10 +41,60 @@ const LoginPage: React.FC = () => {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (authMode?.mode !== 'account') return;
+    let active = true;
+    let requested = false;
+    const restorePassword = () => {
+      const request = getNativeCredentialRequest();
+      if (!request || requested) return;
+      requested = true;
+      setNativePasswords(true);
+      request('load').then(saved => {
+        // A delayed read must never replace what the user has already entered.
+        if (active && allowPasswordRestore.current && saved && !form.isFieldsTouched(['username', 'password'])) {
+          form.setFieldsValue(saved);
+        }
+      }).catch(() => {
+        if (active) message.warning('无法读取已保存的密码，请手动输入。');
+      });
+    };
+    restorePassword();
+    window.addEventListener('agentstudio:native-ready', restorePassword);
+    return () => {
+      active = false;
+      window.removeEventListener('agentstudio:native-ready', restorePassword);
+    };
+  }, [authMode?.mode, form]);
+
+  const changeRememberPassword = async (checked: boolean) => {
+    setRememberPassword(checked);
+    if (checked) return;
+    allowPasswordRestore.current = false;
+    setClearingPassword(true);
+    try {
+      await getNativeCredentialRequest()?.('clear');
+    } catch {
+      setRememberPassword(true);
+      message.error('未能删除已保存的密码，请重试。');
+    } finally {
+      setClearingPassword(false);
+    }
+  };
+
   const onFinish = async (values: { username: string; password: string }) => {
+    if (loading || clearingPassword) return;
     setLoading(true);
     try {
       await login(values.username, values.password);
+      const request = getNativeCredentialRequest();
+      if (request) {
+        try {
+          await request(rememberPassword ? 'save' : 'clear', rememberPassword ? values : undefined);
+        } catch {
+          message.warning(rememberPassword ? '登录成功，但密码未能保存。' : '登录成功，但已保存的密码未能删除。');
+        }
+      }
       message.success('登录成功');
       navigate('/');
     } catch (error: any) {
@@ -126,11 +182,12 @@ const LoginPage: React.FC = () => {
         </Form>
       )}
 
-      {!modeLoading && authMode?.mode === 'account' && <Form name="login" onFinish={onFinish} autoComplete="off" size="large" layout="vertical">
+      {!modeLoading && authMode?.mode === 'account' && <Form form={form} name="login" onFinish={onFinish} autoComplete="on" size="large" layout="vertical">
         <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
           <Input
             prefix={<UserOutlined className="text-text-dim" />}
             placeholder="用户名"
+            autoComplete="username"
             className="rounded-lg"
           />
         </Form.Item>
@@ -139,9 +196,17 @@ const LoginPage: React.FC = () => {
           <Input.Password
             prefix={<LockOutlined className="text-text-dim" />}
             placeholder="密码"
+            autoComplete="current-password"
             className="rounded-lg"
           />
         </Form.Item>
+
+        {nativePasswords && <Form.Item>
+          <Checkbox checked={rememberPassword} disabled={loading || clearingPassword}
+            onChange={event => { void changeRememberPassword(event.target.checked); }}>
+            记住密码
+          </Checkbox>
+        </Form.Item>}
 
         <Form.Item>
           <Button
@@ -149,6 +214,7 @@ const LoginPage: React.FC = () => {
             htmlType="submit"
             block
             loading={loading}
+            disabled={clearingPassword}
             className="animate-glow-pulse h-10 rounded-lg border-none font-medium"
             style={{
               background: 'var(--color-primary)',

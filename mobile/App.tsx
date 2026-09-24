@@ -11,7 +11,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WebAppScreen } from './src/WebAppScreen';
 import { WebsiteEntryScreen } from './src/WebsiteEntryScreen';
 import { COLORS } from './src/theme';
-import { loadWebsiteUrl, saveWebsiteUrl } from './src/websiteStorage';
+import {
+  loadWebsiteHistory,
+  loadWebsiteUrl,
+  recentWebsiteUrls,
+  saveWebsiteUrl,
+} from './src/websiteStorage';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -19,14 +24,19 @@ function App(): React.JSX.Element {
   const [lastUrl, setLastUrl] = useState('');
   const [restoring, setRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
     loadWebsiteUrl()
-      .then(url => {
-        if (!active || !url) return;
-        setLastUrl(url);
-        setWebsiteUrl(url);
+      .then(async url => {
+        if (!active) return;
+        if (url) {
+          setLastUrl(url);
+          setWebsiteUrl(url);
+        }
+        const savedHistory = await loadWebsiteHistory();
+        if (active) setHistory(savedHistory);
       })
       .catch(() => {
         if (active) setRestoreError('无法读取已保存的网址，请重新输入。');
@@ -41,6 +51,7 @@ function App(): React.JSX.Element {
 
   const openWebsite = async (url: string) => {
     await saveWebsiteUrl(url);
+    setHistory(previous => recentWebsiteUrls([url, ...previous]));
     setRestoreError('');
     setLastUrl(url);
     setWebsiteUrl(url);
@@ -79,6 +90,7 @@ function App(): React.JSX.Element {
           <WebsiteEntryScreen
             initialUrl={lastUrl}
             initialError={restoreError}
+            history={history}
             onOpen={openWebsite}
           />
         )}
