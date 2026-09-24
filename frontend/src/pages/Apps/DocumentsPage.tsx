@@ -13,6 +13,8 @@ import './DocumentsPage.css';
 
 export function DocumentsWorkspace({ base, showHeader = true }: { base: string; showHeader?: boolean }) {
   const client = useMemo(() => documentsApi(base), [base]);
+  const [params] = useSearchParams();
+  const linkedDocument = params.get('document');
   const [scope, setScope] = useState('mine');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -47,6 +49,15 @@ export function DocumentsWorkspace({ base, showHeader = true }: { base: string; 
     return () => { clearTimeout(timer); controller.abort(); };
   }, [client, scope, search, page, revision]);
   const onOpen = useCallback((value: OnlineDocument) => { setSelected(value); setEditorKey((n) => n + 1); setListOpen(false); refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!linkedDocument) return;
+    let active = true;
+    setOpening(true);
+    void client.get(linkedDocument).then(value => { if (active) onOpen(value); })
+      .catch(e => { if (active) void message.error(documentError(e)); })
+      .finally(() => { if (active) setOpening(false); });
+    return () => { active = false; };
+  }, [client, linkedDocument, onOpen]);
   const open = async (id?: string) => {
     setOpening(true);
     try { await draft.current?.save(); onOpen(id ? await client.get(id) : await client.create()); }

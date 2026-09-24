@@ -197,6 +197,18 @@ def _can_access_run(request, run):
         except (Http404, APIException, ValueError):
             return False
         return True
+    if root.executor_key == "meeting-assistant":
+        if root.owner_id != request.user.id:
+            return False
+        from django.http import Http404
+        from rest_framework.exceptions import APIException
+        from app_center.meeting_assistant.backend.access import recording_for
+        try:
+            recording_for(request.user, root.organization_id, root.source_id,
+                          (root.input or {}).get("record_id"))
+        except (Http404, APIException, ValueError):
+            return False
+        return True
     if (root.input or {}).get("document_id"):
         if root.owner_id != request.user.id:
             return False

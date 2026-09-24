@@ -366,6 +366,7 @@ DATA_UPLOAD_MAX_NUMBER_FILES = config(
 # Media files (User uploaded content)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
+MEETING_AUDIO_ROOT = Path(config('MEETING_AUDIO_ROOT', default=str(MEDIA_ROOT.parent / 'meeting-audio')))
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

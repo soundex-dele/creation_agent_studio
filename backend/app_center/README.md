@@ -34,6 +34,11 @@ package does not drop its tables or historical catalog records.
 
 ## Guided content applications
 
+The **会议与访谈助手** (`meeting-assistant`) workspace turns private recordings
+into timestamped transcripts, summaries and interview material. Users explicitly
+confirm action items before creating todos, and can save results as online documents.
+See [`meeting_assistant/README.md`](meeting_assistant/README.md) for setup and checks.
+
 The **AI 绘图** (`ai-drawing`) dedicated workspace uses native Codex image
 generation for text-to-image and reference-image editing. It keeps private Run
 history and durable image artifacts. See [`ai_drawing/README.md`](ai_drawing/README.md)

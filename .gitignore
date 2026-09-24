@@ -42,6 +42,7 @@ media/
 artifacts/
 agent_workspaces/
 backend/my-drive-data/
+backend/meeting-audio/
 logs/
 *.log
 

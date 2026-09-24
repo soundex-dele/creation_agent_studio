@@ -1,0 +1,40 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: meeting-assistant
+  version: 1.0.0
+  name: 会议与访谈助手
+  description: 上传录音，生成可回听的逐字稿、主题摘要、决策与行动项，将访谈沉淀为文章素材。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: "会"
+  color: "#0D9488"
+  tags: [会议, 访谈, 转录, 文章素材, 待办]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: meeting-assistant
+    executor_protocol_version: 1
+    renderer_key: meeting-assistant
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      required: [record_id, version, operation]
+      properties:
+        record_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        operation: {enum: [process, analyze]}
+      additionalProperties: false
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.meeting_assistant.backend.apps.MeetingAssistantConfig
+    urlconf: app_center.meeting_assistant.backend.urls
+    executor_entrypoint: app_center.meeting_assistant.runtime.execute_meeting
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

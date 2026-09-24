@@ -34,6 +34,7 @@ const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
+const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
 const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
 const MyDrivePage = lazy(() => import('@/pages/Apps/MyDrivePage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
@@ -259,6 +260,10 @@ const router = createBrowserRouter([
         </ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/meeting-assistant',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<MeetingAssistantPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/documents',
