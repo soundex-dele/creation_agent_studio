@@ -252,6 +252,106 @@ def test_remote_folder_browsing_and_creation_respect_runtime_roots(grant, settin
         assert 'working_directory' in response.data
 
 
+def test_remote_workspace_update_allowlist():
+    path = '/api/v1/conversations/1/workspace/'
+    assert validate_request('POST', path, {'project_id': None, 'working_directory': '/tmp'}) == path
+    with pytest.raises(ValueError):
+        validate_request('POST', path, {'user_id': 2})
+
+
+def test_remote_existing_conversation_can_switch_workspace(grant, settings, tmp_path):
+    from apps.conversations.models import Conversation, Message
+    from apps.projects.models import Project
+    user, org, _ = grant
+    settings.APPLICATION_RUNTIME_ALLOW_ALL_PATHS = False
+    settings.APPLICATION_RUNTIME_ALLOWED_ROOTS = [str(tmp_path)]
+    selected = tmp_path / 'selected'
+    selected.mkdir()
+    project = Project.objects.create(user=user, organization=org, title='Workspace')
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    created = client.post('/api/v1/conversations/', {}, format='json')
+    conversation = Conversation.objects.get(pk=created.data['id'])
+    Message.objects.create(conversation=conversation, role='user', content='Keep history')
+    conversation.agent_thread_provider = 'codex'
+    conversation.agent_thread_id = 'old-thread'
+    conversation.save()
+    path = f'/api/v1/conversations/{conversation.id}/workspace/'
+    response = client.post(path, {'working_directory': str(selected)}, format='json')
+    assert response.status_code == 200, response.data
+    assert response.data['workspace_locked'] is False
+    assert response.data['working_directory'] == str(selected)
+    assert response.data['messages'][0]['content'] == 'Keep history'
+    conversation.refresh_from_db()
+    assert conversation.agent_thread_id == conversation.agent_thread_provider == ''
+    response = client.post(path, {'project_id': project.id}, format='json')
+    assert response.status_code == 200, response.data
+    assert response.data['project'] == project.id
+    response = client.post(path, {'project_id': None, 'working_directory': ''}, format='json')
+    assert response.status_code == 200, response.data
+    assert response.data['project'] is None
+    assert response.data['working_directory'] == created.data['working_directory']
+
+
+def test_remote_workspace_update_rejects_invalid_and_foreign_selections(grant, settings, tmp_path):
+    from apps.conversations.models import Conversation
+    from apps.enterprise.models import Organization
+    from apps.projects.models import Project
+    user, org, _ = grant
+    other = get_user_model().objects.create_user(username='other-workspace')
+    other_org = Organization.objects.create(owner=other, name='Other workspace org', slug='other-workspace-org')
+    own = Conversation.objects.create(user=user, organization=org, working_directory=str(tmp_path))
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    path = f'/api/v1/conversations/{own.id}/workspace/'
+    settings.APPLICATION_RUNTIME_ALLOW_ALL_PATHS = False
+    settings.APPLICATION_RUNTIME_ALLOWED_ROOTS = [str(tmp_path)]
+    for payload in ({}, {'working_directory': str(tmp_path / 'missing')},
+                    {'working_directory': str(tmp_path.parent)},
+                    {'project_id': 1, 'working_directory': str(tmp_path)}):
+        assert client.post(path, payload, format='json').status_code == 400
+    for owner, organization in ((other, org), (user, other_org)):
+        project = Project.objects.create(user=owner, organization=organization, title='Foreign')
+        assert client.post(path, {'project_id': project.id}, format='json').status_code == 404
+        foreign = Conversation.objects.create(user=owner, organization=organization)
+        assert client.post(f'/api/v1/conversations/{foreign.id}/workspace/',
+                           {'working_directory': ''}, format='json').status_code == 404
+    own.refresh_from_db()
+    assert own.working_directory == str(tmp_path)
+
+
+@pytest.mark.parametrize('source', ['conversation', 'supervisor', 'supervisor_task', 'workflow_step'])
+@pytest.mark.parametrize('status', ['queued', 'running', 'waiting_input', 'waiting_children', 'cancelling'])
+def test_remote_workspace_update_rejects_active_tasks(grant, source, status):
+    from uuid import uuid4
+    from apps.conversations.models import Conversation
+    from modules.execution.models import Run
+    user, org, _ = grant
+    conversation = Conversation.objects.create(user=user, organization=org)
+    Run.objects.create(owner=user, organization=org, executor_kind='agent',
+                       source_type=source, source_id=str(conversation.id), status=status,
+                       pending_input_request_id=uuid4() if status == 'waiting_input' else None,
+                       pending_input_kind='answer' if status == 'waiting_input' else '',
+                       pending_input_expires_at=timezone.now() + timedelta(minutes=5) if status == 'waiting_input' else None,
+                       definition_snapshot={'conversation_id': str(conversation.id)})
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    response = client.post(f'/api/v1/conversations/{conversation.id}/workspace/',
+                           {'working_directory': ''}, format='json')
+    assert response.status_code == 409, response.data
+
+
+def test_remote_workspace_update_rejects_fixed_workspaces(grant):
+    from apps.conversations.models import Conversation
+    user, org, _ = grant
+    conversation = Conversation.objects.create(user=user, organization=org, process_id='workflow:1')
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    response = client.post(f'/api/v1/conversations/{conversation.id}/workspace/',
+                           {'working_directory': ''}, format='json')
+    assert response.status_code == 409, response.data
+
+
 def test_pairing_requires_local_confirmation_and_is_single_use(grant):
     user, _, _ = grant
     public = APIClient()

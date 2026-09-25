@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Alert, message } from 'antd';
 import { DownOutlined, MessageOutlined, StopOutlined, UpOutlined } from '@ant-design/icons';
 import { useChatConnection } from './ChatConnectionContext';
@@ -74,7 +74,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   inputAccessory,
   renderAssistantContent,
 }) => {
-  const { store: useConversationStore, remote, online } = useChatConnection();
+  const { store: useConversationStore, api, remote, online } = useChatConnection();
   const { user } = useAuthStore();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const composerId = useId();
@@ -107,6 +107,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const stoppingRef = useRef(false);
+  const workspaceChangingRef = useRef(false);
+  const [workspaceChanging, setWorkspaceChanging] = useState(false);
 
   const ownsConversation = Boolean(storedConversation && (
     String(storedConversation.id) === conversationId
@@ -116,6 +118,29 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const streamingMessageId = ownsConversation ? storedStreamingMessageId : null;
   const pendingQuestion = ownsConversation ? storedPendingQuestion : null;
   const agentActivity = ownsConversation ? storedAgentActivity : null;
+  const workspace = useMemo(() => currentConversation ? {
+    projectId: currentConversation.project ?? undefined,
+    workingDirectory: currentConversation.working_directory,
+  } : undefined, [currentConversation]);
+
+  const handleWorkspaceChange = async (selection: Pick<ComposerContext, 'projectId' | 'workingDirectory'>) => {
+    if (!conversationId || !online || workspaceChangingRef.current) throw new Error('工作空间暂不可修改');
+    workspaceChangingRef.current = true;
+    setWorkspaceChanging(true);
+    try {
+      const updated = await api.post<ConversationDetail>(`/conversations/${conversationId}/workspace/`, {
+        project_id: selection.projectId ?? null,
+        working_directory: selection.workingDirectory || '',
+      });
+      const state = useConversationStore.getState();
+      if (String(state.currentConversation?.id) === conversationId) {
+        setCurrentConversation({ ...state.currentConversation!, ...updated, id: conversationId });
+      }
+    } finally {
+      workspaceChangingRef.current = false;
+      setWorkspaceChanging(false);
+    }
+  };
 
   useEffect(() => {
     setComposerExpanded(false);
@@ -167,7 +192,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     composer: ComposerContext,
     images: File[],
   ) => {
-    if (creatingConversationRef.current || !online) throw new Error('电脑当前不可用，草稿已保留。');
+    if (creatingConversationRef.current || workspaceChangingRef.current || !online) throw new Error('电脑当前不可用，草稿已保留。');
     shouldAutoScrollRef.current = true;
 
     let targetConversationId = conversationId;
@@ -384,6 +409,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           )}
           <div id={composerId} hidden={!composerVisible}>
             <MessageInput
+              key={remote ? conversationId || 'new' : 'local'}
               value={inputValue}
               onValueChange={setInputValue}
               onSendMessage={handleSendMessage}
@@ -393,13 +419,16 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               isStopping={isStopping}
               visible={composerVisible}
               currentAgent={currentConversation?.agent || defaultAgent}
+              workspace={remote ? workspace : undefined}
+              onWorkspaceChange={remote && conversationId ? handleWorkspaceChange : undefined}
               workspaceLocked={Boolean(
-                conversationId || projectId || creationContext?.applicationId
+                (conversationId && (!remote || !currentConversation || currentConversation.workspace_locked !== false))
+                || projectId || creationContext?.applicationId
                 || creationContext?.workflowStepRunId
               )}
               mode={composerMode}
               disabled={
-                !user || !online || isLoading || isCreatingConversation || isRunning
+                !user || !online || isLoading || isCreatingConversation || isRunning || workspaceChanging
                 || (!conversationId && !createOnFirstSend)
               }
               placeholder={user ? (inputPlaceholder || '描述你的需求...') : '请先登录'}

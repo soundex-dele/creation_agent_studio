@@ -48,6 +48,7 @@ from .serializers import (
     ConversationListSerializer,
     CreateConversationSerializer,
     SendMessageSerializer,
+    UpdateWorkspaceSerializer,
 )
 from .services import prepare_image_specs
 from .idempotency import idempotent_creation
@@ -296,6 +297,39 @@ class ConversationViewSet(viewsets.ViewSet):
             "messages__attachments",
             "skill_bindings__skill",
         ).get(pk=conversation.pk)
+        return Response(ConversationDetailSerializer(conversation).data)
+
+    @action(detail=True, methods=["post"])
+    def workspace(self, request, pk=None):
+        conversation = self.get_conversation(request, pk)
+        serializer = UpdateWorkspaceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        with transaction.atomic():
+            conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+            if conversation.workspace_locked:
+                return Response({'detail': '此对话使用应用或流程的固定工作空间。'}, status=409)
+            if ConversationDetailSerializer().get_active_run(conversation):
+                return Response({'detail': '请等待当前任务结束后再切换工作空间。'}, status=409)
+            project = None
+            if data.get('project_id') is not None:
+                project = get_object_or_404(
+                    Project.objects.filter(
+                        organization_id=conversation.organization_id,
+                        user=request.user,
+                    ), pk=data['project_id'],
+                )
+            previous = (conversation.project_id, conversation.working_directory)
+            conversation.project = project
+            conversation.working_directory = data.get('working_directory', '')
+            conversation_working_directory(conversation)
+            if previous != (conversation.project_id, conversation.working_directory):
+                conversation.agent_thread_provider = ''
+                conversation.agent_thread_id = ''
+            conversation.save(update_fields=(
+                'project', 'working_directory', 'agent_thread_provider',
+                'agent_thread_id', 'updated_at',
+            ))
         return Response(ConversationDetailSerializer(conversation).data)
 
     @action(detail=True, methods=["get"], url_path="workspace-files")

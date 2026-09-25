@@ -70,6 +70,16 @@ class Conversation(models.Model):
         )]
 
     @property
+    def workspace_locked(self):
+        return bool(
+            self.chat_application_id or self.process_id or self.agent_locked
+            or hasattr(self, 'document_session')
+            or (self.project_id and (
+                self.project.application_id or self.project.workflow_id
+            ))
+        )
+
+    @property
     def application_id(self):
         return self.chat_application_id
 

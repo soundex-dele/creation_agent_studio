@@ -58,6 +58,8 @@ interface MessageInputProps {
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
   workspaceLocked?: boolean;
+  workspace?: Pick<ComposerContext, 'projectId' | 'workingDirectory'>;
+  onWorkspaceChange?: (workspace: Pick<ComposerContext, 'projectId' | 'workingDirectory'>) => Promise<void>;
   mode?: 'default' | 'study' | 'document';
 }
 
@@ -74,6 +76,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = '输入消息...',
   currentAgent = null,
   workspaceLocked = false,
+  workspace,
+  onWorkspaceChange,
   mode = 'default',
 }) => {
   const { api, remote, online = true } = useChatConnection();
@@ -115,6 +119,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const { projects: localProjects, loadProjects } = useProjectStore();
   const [remoteProjects, setRemoteProjects] = useState<Project[]>([]);
   const projects = remote ? remoteProjects : localProjects;
+  useEffect(() => {
+    if (!workspace) return;
+    setSelectedProject(projects.find(project => project.id === workspace.projectId) || null);
+    setSelectedSystemDirectory(workspace.workingDirectory || '');
+  }, [workspace?.projectId, workspace?.workingDirectory, projects, workspace]);
   const { agents: serverAgents, loadAgents } = useAgentStore();
   const [remoteAgents, setRemoteAgents] = useState<ComposerAgent[]>([]);
   const agents = remote ? remoteAgents : serverAgents;
@@ -252,8 +261,19 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setSelectedImages((current) => current.filter((item) => item.previewUrl !== previewUrl));
   };
 
+  const changeWorkspace = async (project: Project | null, directory = '') => {
+    if (disabled || workspaceLocked) return;
+    try {
+      await onWorkspaceChange?.({ projectId: project?.id, workingDirectory: directory });
+      setSelectedProject(project);
+      setSelectedSystemDirectory(directory);
+    } catch {
+      message.error('切换工作空间失败，原工作空间保持不变，请重试。');
+    }
+  };
+
   const workspaceItems: MenuProps['items'] = [
-    { key: 'none', label: '不使用工作空间' },
+    { key: 'none', label: onWorkspaceChange ? '使用默认会话目录' : '不使用工作空间' },
     { key: 'system-directory', label: '选择系统目录…' },
     ...(projects.length
       ? projects.map((project) => ({ key: String(project.id), label: project.title }))
@@ -438,15 +458,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
                 setFolderPickerOpen(true);
                 return;
               }
-              setSelectedSystemDirectory('');
-              setSelectedProject(
+              void changeWorkspace(
                 key === 'none' ? null
                   : projects.find((project) => String(project.id) === key) || null,
               );
             },
           }}
         >
-          <button className="chat-composer-action" disabled={disabled || workspaceLocked} aria-label="选择工作空间">
+          <button className="chat-composer-action" disabled={disabled || workspaceLocked} aria-label="选择工作空间"
+            title={workspaceLocked ? '当前对话不支持切换工作空间' : selectedProject?.title || selectedSystemDirectory || '选择工作空间'}>
             <FolderOutlined />
             <span>{selectedProject?.title
               || (selectedSystemDirectory ? selectedSystemDirectory : '选择工作空间')}</span>
@@ -512,8 +532,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         open={folderPickerOpen}
         onClose={() => setFolderPickerOpen(false)}
         onSelect={(path) => {
-          setSelectedSystemDirectory(path);
-          setSelectedProject(null);
+          void changeWorkspace(null, path);
           setFolderPickerOpen(false);
         }}
       />

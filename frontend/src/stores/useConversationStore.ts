@@ -42,6 +42,8 @@ export interface Conversation {
   title: string;
   agent?: any;
   project?: number | null;
+  working_directory?: string;
+  workspace_locked?: boolean;
   process_id?: string;
   created_at: string;
   updated_at: string;

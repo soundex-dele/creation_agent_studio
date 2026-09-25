@@ -100,6 +100,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
     active_run = serializers.SerializerMethodField()
     latest_run = serializers.SerializerMethodField()
     organization_id = serializers.UUIDField(read_only=True)
+    workspace_locked = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Conversation
@@ -108,7 +109,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
                   'application_id',
                   'working_directory',
                   'skills', 'created_at', 'updated_at',
-                  'messages', 'active_run', 'latest_run']
+                  'messages', 'active_run', 'latest_run', 'workspace_locked']
 
     def get_skills(self, obj):
         return [{
@@ -172,6 +173,21 @@ class CreateConversationSerializer(serializers.Serializer):
             return validate_system_working_directory(value)
         except ValueError as exc:
             raise serializers.ValidationError(str(exc)) from exc
+
+
+class UpdateWorkspaceSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField(required=False, allow_null=True)
+    working_directory = serializers.CharField(
+        required=False, allow_blank=True, max_length=1000)
+
+    validate_working_directory = CreateConversationSerializer.validate_working_directory
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('请选择工作空间。')
+        if attrs.get('project_id') is not None and attrs.get('working_directory'):
+            raise serializers.ValidationError('工作空间和系统目录不能同时选择。')
+        return attrs
 
 
 class SendMessageSerializer(serializers.Serializer):

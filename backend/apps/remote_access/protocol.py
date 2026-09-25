@@ -29,6 +29,7 @@ WRITE_PATHS = (
     rf"{TERMINAL_ROOT}(?:{TERMINAL_ID}/(?:input|resize|close)/)?",
     r"/api/v1/conversations/",
     r"/api/v1/conversations/[0-9]+/send_message/",
+    r"/api/v1/conversations/[0-9]+/workspace/",
     rf"/api/v1/(?:organizations/{UUID}/)?runs/{UUID}/commands",
 )
 QUERY_KEYS = {"after", "limit", "page", "page_size", "search", "kind", "application_id", "agent_id", "ordering"}
@@ -67,6 +68,8 @@ def validate_request(method, target, body=None, organization_id=None):
             allowed = {"type", "idempotency_key", "input_request_id", "payload"}
         elif parsed.path.endswith("/send_message/"):
             allowed = {"content", "agent_id", "skill_names", "permission_mode", "collaboration_mode"}
+        elif parsed.path.endswith("/workspace/"):
+            allowed = {"project_id", "working_directory"}
         else:
             allowed = {"title", "agent_id", "application_id", "skill_ids", "project_id", "working_directory"}
         if set(body) - allowed:
