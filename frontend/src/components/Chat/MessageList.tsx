@@ -83,10 +83,7 @@ const MessageList: React.FC<MessageListProps> = ({
   };
 
   const renderToolCall = (toolCall: AgentToolCall, index: number) => {
-    const displayName = (toolCall.name || '未知工具')
-      .split(' / ')
-      .map((name) => name.charAt(0).toUpperCase() + name.slice(1))
-      .join(' / ');
+    const displayName = toolCall.name || '未知工具';
     const statusText: Record<string, string> = {
       running: '调用中',
       inProgress: '调用中',

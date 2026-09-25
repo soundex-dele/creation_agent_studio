@@ -196,6 +196,23 @@ it('queues a stop during submission, prevents duplicate requests and allows retr
   expect(button('.chat-send-btn').disabled).toBe(false);
 });
 
+it.each(['agent', 'graphflow'] as const)('preserves tool name casing in %s messages', async (source) => {
+  const names = ['web.run', 'functions / exec_command', 'readFile / HTTPRequest', ''];
+  await act(async () => root.render(React.createElement(MessageList, {
+    messages: [{
+      ...historyMessage,
+      role: 'assistant',
+      metadata: {
+        [source]: {
+          tool_calls: names.map((name, index) => ({ id: `tool-${index}`, name, status: 'completed' })),
+        },
+      },
+    }],
+  })));
+  expect(Array.from(host.querySelectorAll('.tool-call-name'), element => element.textContent))
+    .toEqual(['web.run', 'functions / exec_command', 'readFile / HTTPRequest', '未知工具']);
+});
+
 it('groups time and copy below the bubble and copies only the message content', async () => {
   const writeText = vi.fn(async () => {});
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
