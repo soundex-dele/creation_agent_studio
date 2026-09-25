@@ -23,19 +23,25 @@ afterEach(() => {
   delete NativeModules.DownloadStatus;
 });
 
-it('reads system tasks and keeps active downloads above finished ones', async () => {
-  Platform.OS = 'android';
-  const completed = { ...task, id: '2', status: 'completed', updatedAt: 20 };
-  const list = jest.fn(async () => [completed, task]);
-  NativeModules.DownloadStatus = { listDownloads: list };
-  expect(await listDownloads()).toEqual([task, completed]);
-  expect(list).toHaveBeenCalledTimes(1);
-});
+it.each(['android', 'ios'] as const)(
+  'reads %s tasks and keeps active downloads above finished ones',
+  async platform => {
+    Platform.OS = platform;
+    const completed = { ...task, id: '2', status: 'completed', updatedAt: 20 };
+    const list = jest.fn(async () => [completed, task]);
+    NativeModules.DownloadStatus = { listDownloads: list };
+    expect(await listDownloads()).toEqual([task, completed]);
+    expect(list).toHaveBeenCalledTimes(1);
+  },
+);
 
-it('reports a missing native module instead of pretending the list is empty', async () => {
-  Platform.OS = 'android';
-  await expect(listDownloads()).rejects.toThrow('下载管理器不可用');
-});
+it.each(['android', 'ios'] as const)(
+  'reports a missing %s native module instead of pretending the list is empty',
+  async platform => {
+    Platform.OS = platform;
+    await expect(listDownloads()).rejects.toThrow('下载管理器不可用');
+  },
+);
 
 it('does not invent progress for unknown size or claim success before the system finishes', () => {
   expect(downloadPercent(task)).toBe(50);

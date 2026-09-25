@@ -163,9 +163,11 @@ async def test_real_platform_pty_unicode_resize_interrupt_and_exit():
                     return
                 await asyncio.sleep(.05)
             pytest.fail(f'PTY did not produce expected marker {marker!r}')
-        await until('>' if os.name == 'nt' else '')
-        await session.input({'client_id': 'a' * 32, 'sequence': 1, 'data': '\x03'})
-        await asyncio.sleep(.2)
+        # Wait for command execution, not a prompt (which users can customize).
+        # Ctrl+C during zsh startup can terminate the shell before it is ready.
+        ready = "Write-Output ('SHELL_'+'READY')\r" if os.name == 'nt' else "printf 'SHELL_%s\\n' READY\r"
+        await session.input({'client_id': 'a' * 32, 'sequence': 1, 'data': ready})
+        await until('SHELL_READY')
         command = "Write-Output ('终端'+'验证'); Write-Output ('PTY_'+'OK')\r" if os.name == 'nt' else "printf '终端%s\\nPTY_%s\\n' '验证' 'OK'\r"
         await session.input({'client_id': 'a' * 32, 'sequence': 2, 'data': command})
         await until('PTY_OK')

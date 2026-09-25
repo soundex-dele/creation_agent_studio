@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AppState,
+  Alert,
   BackHandler,
   Linking,
   Modal,
@@ -153,6 +154,31 @@ describe('WebView loading state', () => {
     );
     expect(renderer.root.findAllByType(SettingsScreen)).toHaveLength(0);
     expect(webView()).toBe(page);
+  });
+
+  it('keeps iOS downloads inside the app and dismisses the page loading overlay', async () => {
+    const originalOS = Platform.OS;
+    Platform.OS = 'ios';
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      await act(async () => {
+        webView().props.onLoadStart({
+          nativeEvent: navigation('/report', true),
+        });
+        webView().props.onFileDownload({
+          nativeEvent: { downloadUrl: `${origin}/report` },
+        });
+      });
+      expect(open).not.toHaveBeenCalled();
+      expect(alert).toHaveBeenCalledWith(
+        '已开始下载',
+        expect.stringContaining('设置'),
+      );
+      expect(loadingOverlays()).toHaveLength(0);
+    } finally {
+      Platform.OS = originalOS;
+    }
   });
 
   it('opens, switches and closes independent windows without remounting existing pages', async () => {

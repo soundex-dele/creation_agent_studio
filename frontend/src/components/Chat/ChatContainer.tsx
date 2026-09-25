@@ -79,12 +79,12 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const isMobile = useMediaQuery('(max-width: 767px)');
   const composerId = useId();
   const {
-    currentConversation,
+    currentConversation: storedConversation,
     isLoading,
     error,
-    streamingMessageId,
-    pendingQuestion,
-    agentActivity,
+    streamingMessageId: storedStreamingMessageId,
+    pendingQuestion: storedPendingQuestion,
+    agentActivity: storedAgentActivity,
     fetchConversationDetail,
     createConversation,
     sendMessageStream,
@@ -107,6 +107,15 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const stoppingRef = useRef(false);
+
+  const ownsConversation = Boolean(storedConversation && (
+    String(storedConversation.id) === conversationId
+    || (!conversationId && skipNextFetchRef.current === String(storedConversation.id))
+  ));
+  const currentConversation = ownsConversation ? storedConversation : null;
+  const streamingMessageId = ownsConversation ? storedStreamingMessageId : null;
+  const pendingQuestion = ownsConversation ? storedPendingQuestion : null;
+  const agentActivity = ownsConversation ? storedAgentActivity : null;
 
   useEffect(() => {
     setComposerExpanded(false);
@@ -226,8 +235,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   const handleStop = async () => {
     if (!online || stoppingRef.current) return;
-    const targetId = useConversationStore.getState().currentConversation?.id;
-    if (!targetId) return;
+    const targetId = currentConversation?.id;
+    if (!targetId || useConversationStore.getState().currentConversation?.id !== targetId) return;
     stoppingRef.current = true;
     setIsStopping(true);
     try {

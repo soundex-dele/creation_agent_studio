@@ -233,6 +233,13 @@ def _can_access_run(request, run):
         except (Http404, APIException):
             return False
         return True
+    # Conversation APIs are owner-only, including for administrators. Apply
+    # the same boundary to Run history and every endpoint exposing its data.
+    # Workflow roots also expose their steps' conversations; checking the root
+    # protects descendants even when they have no conversation_id of their own.
+    # Access to a shared supervisor does not grant access to others' chats.
+    if root.source_type == "workflow" or RunSerializer._conversation_id(root):
+        return root.owner_id == request.user.id
     if root.source_type != "supervisor":
         return True
     if request.user.is_superuser or root.owner_id == request.user.id:
@@ -285,8 +292,7 @@ class OrganizationRunView(ProblemDetailsAPIView):
 
     def delete(self, request, organization_id, run_id):
         run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
-        if run is None or ((run.executor_key in {"ai-drawing", "research-assistant"}
-                            or (run.input or {}).get("research_project_id")) and not _can_access_run(request, run)):
+        if run is None or not _can_access_run(request, run):
             return _problem(
                 request,
                 status_code=status.HTTP_404_NOT_FOUND,

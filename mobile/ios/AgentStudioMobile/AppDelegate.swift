@@ -14,6 +14,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Register before any WebView can turn a response into a native download.
+    _ = WebDownloadManager.shared
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -60,9 +62,10 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
-#else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    if Bundle.main.object(forInfoDictionaryKey: "AgentStudioUseMetro") as? String == "YES" {
+      return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    }
 #endif
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
   }
 }

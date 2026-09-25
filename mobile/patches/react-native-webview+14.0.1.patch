@@ -1,0 +1,51 @@
+diff --git a/node_modules/react-native-webview/apple/RNCWebViewImpl.m b/node_modules/react-native-webview/apple/RNCWebViewImpl.m
+index 3890426..5ea3bdb 100644
+--- a/node_modules/react-native-webview/apple/RNCWebViewImpl.m
++++ b/node_modules/react-native-webview/apple/RNCWebViewImpl.m
+@@ -1395,8 +1395,12 @@ - (void)                  webView:(WKWebView *)webView
+                     }
+                 }
+ 
+-                // Allow all navigation by default
+-                decisionHandler(WKNavigationActionPolicyAllow);
++                // Preserve the original download request, including cookies and POST body.
++                if (self->_onFileDownload && navigationAction.shouldPerformDownload) {
++                    decisionHandler(WKNavigationActionPolicyDownload);
++                } else {
++                    decisionHandler(WKNavigationActionPolicyAllow);
++                }
+             });
+ 
+         }];
+@@ -1434,6 +1438,22 @@ - (void)                  webView:(WKWebView *)webView
+     decisionHandler(WKNavigationActionPolicyAllow);
+ }
+ 
++// Agent Studio owns the delegate before WebKit asks for a file destination.
++- (void)webView:(WKWebView *)webView navigationResponse:(WKNavigationResponse *)response didBecomeDownload:(WKDownload *)download
++{
++  [[NSNotificationCenter defaultCenter] postNotificationName:@"AgentStudioDownloadStarted" object:download];
++}
++
++- (void)webView:(WKWebView *)webView navigationAction:(WKNavigationAction *)action didBecomeDownload:(WKDownload *)download
++{
++  [[NSNotificationCenter defaultCenter] postNotificationName:@"AgentStudioDownloadStarted" object:download];
++  if (_onFileDownload) {
++    NSMutableDictionary<NSString *, id> *event = [self baseEvent];
++    event[@"downloadUrl"] = action.request.URL.absoluteString;
++    _onFileDownload(event);
++  }
++}
++
+ /**
+  * Called when the web view's content process is terminated.
+  * @see https://developer.apple.com/documentation/webkit/wknavigationdelegate/1455639-webviewwebcontentprocessdidtermi?language=objc
+@@ -1477,7 +1497,7 @@ - (void)                    webView:(WKWebView *)webView
+     BOOL isAttachment = disposition != nil && [disposition hasPrefix:@"attachment"];
+     if (isAttachment || !navigationResponse.canShowMIMEType) {
+       if (_onFileDownload) {
+-        policy = WKNavigationResponsePolicyCancel;
++        policy = WKNavigationResponsePolicyDownload;
+ 
+         NSMutableDictionary<NSString *, id> *downloadEvent = [self baseEvent];
+         [downloadEvent addEntriesFromDictionary: @{

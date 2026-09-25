@@ -8,6 +8,7 @@ export default defineConfig({
     '@': path.resolve(__dirname, './src'),
     'antd': path.resolve(__dirname, './node_modules/antd'),
     '@ant-design/icons': path.resolve(__dirname, './node_modules/@ant-design/icons'),
+    '@phosphor-icons/react': path.resolve(__dirname, './node_modules/@phosphor-icons/react'),
     '@wechat-assistant': path.resolve(__dirname, '../backend/app_center/wechat_assistant/react/src'),
     '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
   } },

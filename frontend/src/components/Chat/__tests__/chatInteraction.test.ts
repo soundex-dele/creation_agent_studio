@@ -79,6 +79,42 @@ async function enterDraft(text: string) {
   });
 }
 
+it('shows send instead of stop when leaving a running conversation for a new chat', async () => {
+  useConversationStore.setState({
+    disconnect: initialState.disconnect,
+    streamingMessageId: 'previous-account-reply',
+    agentActivity: 'Agent 正在运行…',
+  });
+  await renderChat({ conversationId: undefined, createOnFirstSend: true });
+  expect(host.querySelector('[aria-label="结束任务"]')).toBeNull();
+  await enterDraft('新账号的消息');
+  expect(button('[aria-label="发送消息"]').disabled).toBe(false);
+});
+
+it('does not show another conversation running state while switching views', async () => {
+  useConversationStore.setState({ streamingMessageId: 'c1-reply', agentActivity: 'Agent 正在运行…' });
+  await renderChat();
+  expect(host.querySelector('[aria-label="结束任务"]')).not.toBeNull();
+  await renderChat({ conversationId: 'c2' });
+  expect(host.querySelector('[aria-label="结束任务"]')).toBeNull();
+  expect(host.textContent).not.toContain('已有消息');
+  await enterDraft('第二个会话的消息');
+  expect(button('[aria-label="发送消息"]').disabled).toBe(false);
+  expect(cancelTurn).not.toHaveBeenCalled();
+  await renderChat({ conversationId: 'c1' });
+  expect(host.querySelector('[aria-label="结束任务"]')).not.toBeNull();
+});
+
+it('does not show another conversation pending question as a running task', async () => {
+  useConversationStore.setState({ pendingQuestion: {
+    id: 'c1-question', kind: 'question', header: 'Question', question: 'Continue?', options: [],
+  } });
+  await renderChat({ conversationId: 'c2' });
+  expect(host.querySelector('[aria-label="结束任务"]')).toBeNull();
+  await enterDraft('第二个会话');
+  expect(button('[aria-label="发送消息"]').disabled).toBe(false);
+});
+
 it('collapses mobile history and preserves a draft across repeated toggles', async () => {
   await renderChat();
   expect(host.querySelector('textarea')!.closest('[hidden]')).not.toBeNull();

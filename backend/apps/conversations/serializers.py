@@ -5,6 +5,7 @@ from django.db.models import Q
 from rest_framework import serializers
 from apps.agents.models import Agent
 from apps.projects.services.workspace_paths import validate_system_working_directory
+from core.agent_engine.tool_display import normalize_tool_metadata
 from modules.execution.api.serializers import RunSerializer
 from modules.execution.models import Run
 from .models import Conversation, Message, MessageAttachment
@@ -40,6 +41,11 @@ class MessageAttachmentSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     """消息序列化器"""
     attachments = MessageAttachmentSerializer(many=True, read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['metadata'] = normalize_tool_metadata(data.get('metadata'))
+        return data
 
     class Meta:
         model = Message

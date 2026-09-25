@@ -14,8 +14,9 @@ Android 和 iOS 共用的 React Native WebView 外壳。启动后输入网址，
 - 顶部提供主页、刷新、更换网址、切换窗口按钮，不再显示网址；主页会在当前窗口重新加载连接时输入的完整服务器网址，并重置当前窗口的浏览历史；窗口列表显示标题、网址和当前窗口标记，支持切换和关闭
 - 网页的新窗口链接在 APP 内创建独立 WebView，切换保留页面状态；返回键优先后退当前页面，无历史时关闭当前窗口，关闭最后一个窗口返回连接页
 - HTTP / HTTPS 网页及跨域跳转留在 WebView，电话和邮件链接交给系统应用
-- 顶部操作使用图标，窗口图标带数量角标；设置页可查看 Android 系统下载任务的文件名、大小、百分比、等待/暂停/完成/失败状态，每秒自动更新，保留系统中的历史任务
-- 下载进度仅涵盖本 APP 交给 Android DownloadManager 的任务（如 HTTP/HTTPS 附件下载）；外部浏览器、网页内存 Blob 或电脑端传输不属于此列表，iOS 暂不支持此进度查询
+- 顶部操作使用图标，窗口图标带数量角标；设置页可查看 Android / iOS 下载任务的文件名、大小、百分比与状态，每秒自动更新，保留下载历史
+- Android 使用系统 DownloadManager；iOS 使用 WKDownload，保留原始下载请求的 Cookie 和 POST 请求体，文件保存到“文件”App → 我的 iPhone / iPad → Agent Studio → Downloads，同名文件自动编号
+- 下载进度仅涵盖本 APP 接管的 HTTP/HTTPS 附件和下载链接；外部浏览器、网页内存 Blob 或电脑端传输不属于此列表。iOS 下载时请保持 APP 打开，进程终止后未完成的任务会标记为中断，需要回到网页重新下载
 - Android 物理返回键和 iOS 前进/后退手势
 - 联网检测、原生加载态、错误态与重新加载
 - 网络恢复或切回失败的窗口时重新请求失败网址；从后台返回后 15 秒内发生连接异常，最多延迟重试两次，正常页面保留状态；错误页提供中文说明、服务器地址和更换网址入口
@@ -36,7 +37,7 @@ http://192.168.1.20:3030/
 APP 会自动打开这个网址。“更换网址”后成功保存的新地址会替换原地址；网页内部
 跳转不会覆盖启动地址。域名不再写死在源码里，Debug 与 Release 使用相同行为。
 
-Release 安装包内置 APP 自身的 JavaScript，不需要 Metro、电脑或 USB 连接。
+Android 和 iOS 默认的 Debug / Release 安装包均内置 APP 自身的 JavaScript，不需要 Metro、电脑或 USB 连接。
 网站和 API 仍从服务器加载，手机需能访问对应地址。部署 Agent Studio 时，建议
 网页和 `/api/v1` 使用同一 HTTPS Origin，以支持 Secure Cookie 会话。
 
@@ -151,14 +152,30 @@ APK 输出到 `app/build/outputs/apk/release/`。未提供上述四项时会生�
 
 ### iOS
 
-iOS 必须在 macOS 上使用 Xcode 构建：
+iOS 必须在 macOS 上使用 Xcode 16.1 或更新版本构建（React Native 0.87 的最低要求），部署目标为 iOS 15.1：
 
 ```bash
 cd mobile
+npm ci
 bundle install
 cd ios && bundle exec pod install && cd ..
 npm run ios
 ```
+
+默认调试包（包括模拟器）内置 JavaScript，`npm run ios` 不启动 Metro。直接在
+Xcode 打开 `ios/AgentStudioMobile.xcworkspace` 并运行也可独立启动。
+开发 APP 的 TypeScript、需要 Fast Refresh 时，在单独终端运行 `npm start`，
+再运行 `npm run ios:metro`。也可在 Xcode 的 Build Settings 中将用户自定义设置
+`AGENT_STUDIO_USE_METRO` 改为 `YES`；完成后恢复 `NO` 并重新构建。
+Release 始终内置 JavaScript，即使传入 Metro 开关也不会依赖开发服务器。
+
+iOS 下载通过 `patches/react-native-webview+14.0.1.patch` 将 WebView 的下载响应
+直接交给 WKDownload，并由原生模块 `DownloadStatus` 提供进度；`npm ci` 自动应用
+补丁。升级 WebView 时需重新检查补丁及 Cookie、附件、POST 下载行为。下载继续使用
+WebKit 的网络策略，无需扩大 ATS 例外，也不会绕过 HTTPS 证书校验。
+
+macOS 上可额外运行 `npm run test:ios-native`，验证下载历史持久化、进程中断处理、
+文件名处理、WebKit 下载委托的类型检查，以及 Debug / Release 的打包开关。
 
 在 Xcode 中设置 Apple Team、正式 Bundle Identifier、签名和 Associated
 Domains。Universal Links 还需要服务端托管 `apple-app-site-association`；当前

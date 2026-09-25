@@ -12,7 +12,10 @@ UUID = r"[0-9a-fA-F-]{36}"
 TERMINAL_ROOT = "/api/v1/remote-access/terminals/"
 TERMINAL_ID = r"[0-9a-f]{32}"
 FILE_ROOT = '/api/v1/remote-access/files/'
+DIRECTORY_LIST = '/api/v1/apps/runtime-files/list/'
 READ_PATHS = (
+    DIRECTORY_LIST,
+    r"/api/v1/projects/",
     rf'{FILE_ROOT}(?:roots/|transfers/(?:{TERMINAL_ID}/)?|downloads/{TERMINAL_ID}/read/)',
     rf"{TERMINAL_ROOT}(?:{TERMINAL_ID}/stream/)?",
     r"/api/v1/remote-access/context/",
@@ -43,6 +46,10 @@ def validate_request(method, target, body=None, organization_id=None):
         from .file_protocol import validate_file_request
         validate_file_request(method, parsed.path, query, body)
         return parsed.path
+    if parsed.path == DIRECTORY_LIST:
+        if (len(query) > 1 or any(k != 'path' or len(v) > 1000 or '\x00' in v for k, v in query)):
+            raise ValueError('Invalid workspace directory query')
+        return parsed.path
     if any(k not in QUERY_KEYS for k, _ in query) or len(query) != len({k for k, _ in query}):
         raise ValueError("Remote query is not allowed")
     if organization_id and "/organizations/" in parsed.path:
@@ -61,7 +68,7 @@ def validate_request(method, target, body=None, organization_id=None):
         elif parsed.path.endswith("/send_message/"):
             allowed = {"content", "agent_id", "skill_names", "permission_mode", "collaboration_mode"}
         else:
-            allowed = {"title", "agent_id", "application_id", "skill_ids"}
+            allowed = {"title", "agent_id", "application_id", "skill_ids", "project_id", "working_directory"}
         if set(body) - allowed:
             raise ValueError("Remote request fields are not allowed")
     return parsed.path

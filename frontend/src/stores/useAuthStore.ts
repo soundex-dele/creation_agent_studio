@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { registerAuthSession } from '@/services/authSession';
+import { useConversationStore } from './useConversationStore';
 
 interface User {
   id: string;
@@ -145,6 +146,13 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id
+    || (previous.isAuthenticated && !state.isAuthenticated)) {
+    useConversationStore.getState().reset();
+  }
+});
 
 registerAuthSession({
   accessToken: () => useAuthStore.getState().token,

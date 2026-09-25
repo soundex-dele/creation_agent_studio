@@ -884,11 +884,18 @@
   .task-filter-group {
     display: grid;
     grid-template-columns: 132px minmax(0, 1fr);
+    gap: 12px;
   }
 
   .task-filter-group .ant-select,
   .task-filter-group .ant-input-affix-wrapper {
     width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .task-filter-group .ant-input-affix-wrapper > .ant-input {
+    min-height: 0;
   }
 
   .task-list-toolbar > .ant-btn {

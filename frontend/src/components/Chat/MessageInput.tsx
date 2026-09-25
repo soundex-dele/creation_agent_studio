@@ -76,7 +76,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   workspaceLocked = false,
   mode = 'default',
 }) => {
-  const { api, remote } = useChatConnection();
+  const { api, remote, online = true } = useChatConnection();
   const [internalValue, setInternalValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -91,23 +91,30 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const selectedImagesRef = useRef(selectedImages);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const defaultPermissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
+  const permissionMode = usePreferencesStore((state) => state.defaultPermissionMode);
+  const setPermissionMode = usePreferencesStore((state) => state.setDefaultPermissionMode);
   const sendShortcut = usePreferencesStore((state) => state.sendShortcut);
-  const [permissionMode, setPermissionMode] = useState<'default' | 'allow_all'>(defaultPermissionMode);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const [approvalPolicy, setApprovalPolicy] = useState<{
     api: typeof api;
     organizationId: string | null;
     required: boolean | undefined;
+    failed?: boolean;
   } | null>(null);
+  const [policyAttempt, setPolicyAttempt] = useState(0);
   // Never reuse a different computer's or organization's permission policy.
   const requireToolApproval = approvalPolicy?.api === api
     && approvalPolicy.organizationId === organizationId ? approvalPolicy.required : undefined;
   const fullControlAllowed = requireToolApproval === false;
-  const effectivePermissionMode = fullControlAllowed ? permissionMode : 'default';
+  const permissionPending = permissionMode === 'allow_all' && requireToolApproval === undefined;
+  const policyFailed = approvalPolicy?.api === api
+    && approvalPolicy.organizationId === organizationId && approvalPolicy.failed;
+  const effectivePermissionMode = requireToolApproval === true ? 'default' : permissionMode;
   const [collaborationMode, setCollaborationMode] = useState<'default' | 'plan'>('default');
   const [skills, setSkills] = useState<SkillOption[]>([]);
-  const { projects, loadProjects } = useProjectStore();
+  const { projects: localProjects, loadProjects } = useProjectStore();
+  const [remoteProjects, setRemoteProjects] = useState<Project[]>([]);
+  const projects = remote ? remoteProjects : localProjects;
   const { agents: serverAgents, loadAgents } = useAgentStore();
   const [remoteAgents, setRemoteAgents] = useState<ComposerAgent[]>([]);
   const agents = remote ? remoteAgents : serverAgents;
@@ -124,6 +131,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
     if (mode !== 'default') return;
     let cancelled = false;
     if (remote) {
+      setRemoteProjects([]);
+      void loadConnectionCollection<Project>(api, '/projects/')
+        .then(result => { if (!cancelled) setRemoteProjects(result); })
+        .catch(() => { if (!cancelled) setRemoteProjects([]); });
       loadConnectionCollection<ComposerAgent>(api, '/agents/')
         .then(result => { if (!cancelled) setRemoteAgents(result); })
         .catch(() => { if (!cancelled) setRemoteAgents([]); });
@@ -132,24 +143,27 @@ const MessageInput: React.FC<MessageInputProps> = ({
       void loadAgents();
     }
     return () => { cancelled = true; };
-  }, [loadAgents, loadProjects, mode, api, remote]);
+  }, [loadAgents, loadProjects, mode, api, remote, organizationId]);
 
   useEffect(() => {
     let cancelled = false;
     setApprovalPolicy(null);
+    if (!online) return;
     api.get<{ skills: SkillOption[]; require_tool_approval: boolean }>('/conversations/composer-options/')
       .then((response) => {
         if (cancelled) return;
         setSkills(response.skills || []);
-        setApprovalPolicy({ api, organizationId, required: response.require_tool_approval });
+        const required = typeof response.require_tool_approval === 'boolean'
+          ? response.require_tool_approval : undefined;
+        setApprovalPolicy({ api, organizationId, required, failed: required === undefined });
       })
       .catch(() => {
         if (cancelled) return;
         setSkills([]);
-        setApprovalPolicy(null);
+        setApprovalPolicy({ api, organizationId, required: undefined, failed: true });
       });
     return () => { cancelled = true; };
-  }, [api, organizationId]);
+  }, [api, organizationId, online, policyAttempt]);
 
   useEffect(() => {
     setSelectedAgent(currentAgent);
@@ -179,7 +193,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(autosizeTextarea, [content, visible]);
 
   const handleSend = async () => {
-    if ((content.trim() || selectedImages.length > 0) && !disabled && !isSubmitting && !isRunning) {
+    if ((content.trim() || selectedImages.length > 0) && !disabled && !permissionPending && !isSubmitting && !isRunning) {
       setIsSubmitting(true);
       try {
         await onSendMessage(content.trim(), {
@@ -331,14 +345,23 @@ const MessageInput: React.FC<MessageInputProps> = ({
           onClick={() => { if (isRunning) void onStop?.(); else void handleSend(); }}
           disabled={isRunning
             ? stopDisabled || isStopping || !onStop
-            : (!content.trim() && selectedImages.length === 0) || disabled || isSubmitting}
+            : (!content.trim() && selectedImages.length === 0) || disabled || permissionPending || isSubmitting}
           aria-label={isRunning ? '结束任务' : '发送消息'}
-          title={isRunning ? '结束任务' : '发送消息'}
+          title={isRunning ? '结束任务' : permissionPending ? '正在确认已保存的完全控制权限' : '发送消息'}
           aria-busy={isStopping || isSubmitting}
         >
           {isRunning ? (isStopping ? <LoadingOutlined /> : <StopOutlined />) : <SendOutlined />}
         </button>
       </div>
+
+      {permissionPending && (
+        <div role="status" className="chat-composer-attachments">
+          {policyFailed ? <button type="button" className="chat-composer-action"
+            onClick={() => setPolicyAttempt(attempt => attempt + 1)}>
+            权限校验失败，点击重试
+          </button> : <span>{online ? '正在确认已保存的完全控制权限…' : '连接恢复后确认已保存的完全控制权限'}</span>}
+        </div>
+      )}
 
       {selectedImages.length > 0 && (
         <div className="chat-composer-images" aria-label="待发送图片">
@@ -423,7 +446,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             },
           }}
         >
-          <button className="chat-composer-action" disabled={disabled || workspaceLocked || remote}>
+          <button className="chat-composer-action" disabled={disabled || workspaceLocked} aria-label="选择工作空间">
             <FolderOutlined />
             <span>{selectedProject?.title
               || (selectedSystemDirectory ? selectedSystemDirectory : '选择工作空间')}</span>
@@ -439,9 +462,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
             },
           }}
         >
-          <button className="chat-composer-action" disabled={disabled}>
+          <button className="chat-composer-action" disabled={disabled} aria-label="对话权限（所有会话）" title="修改后应用于所有会话的后续消息">
             <SafetyCertificateOutlined />
-            <span>{effectivePermissionMode === 'default' ? '默认权限' : '完全控制'}</span>
+            <span>{effectivePermissionMode === 'default' ? '默认权限'
+              : permissionPending ? '完全控制（待确认）' : '完全控制'}</span>
           </button>
         </Dropdown>
         <Dropdown
@@ -483,6 +507,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
       </div>
       }
       <FolderPickerModal
+        apiClient={api}
+        title={remote ? '选择电脑上的文件夹' : '选择文件夹'}
         open={folderPickerOpen}
         onClose={() => setFolderPickerOpen(false)}
         onSelect={(path) => {

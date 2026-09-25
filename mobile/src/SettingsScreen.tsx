@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -116,7 +117,9 @@ export function SettingsScreen({
         </Text>
         <Text style={[styles.description, { color: colors.muted }]}>
           {supported
-            ? '查看本 APP 的系统下载任务，进度每秒自动更新。'
+            ? Platform.OS === 'ios'
+              ? '进度每秒自动更新。下载时请保持 APP 打开；完成的文件可在“文件”App 的 Agent Studio / Downloads 中查看。'
+              : '查看本 APP 的系统下载任务，进度每秒自动更新。'
             : '当前平台的下载由系统处理，暂不支持在 APP 内查看进度。'}
         </Text>
       </View>

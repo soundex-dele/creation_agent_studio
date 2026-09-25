@@ -19,6 +19,7 @@ from django.conf import settings
 
 from ..messages import format_messages_for_query
 from ..models import LLMResponse, TokenUsage
+from ..tool_display import tool_display_name
 from .base import AgentAdapter
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,10 @@ def _codex_tool_payload(item):
         if raw.get(key) not in (None, "", [], {}):
             input_value = raw[key]
             break
+    if item_type in {"commandExecution", "fileChange"}:
+        name = tool_display_name(
+            name, input_value, command_actions=raw.get("commandActions"),
+        )
     result_value = None
     for key in ("result", "aggregatedOutput", "contentItems", "agentsStates"):
         if raw.get(key) not in (None, "", [], {}):

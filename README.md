@@ -159,6 +159,25 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 该脚本使用 `backend\venv`，同时管理前后端、执行 worker 和连接器。
 端口配置、日志位置及双端远程访问联调命令见 [部署指南](docs/DEPLOYMENT.md)。
 
+### 前端远程部署
+
+在仓库根目录执行（需要 Python 3.8+、Node.js/npm、OpenSSH，并已安装前端依赖）：
+
+```bash
+python3 deploy_frontend.py
+# 指定 SSH 私钥或端口
+python3 deploy_frontend.py -i ~/.ssh/id_ed25519 --port 22
+# 仅预览命令，不构建、不连接服务器
+python3 deploy_frontend.py --dry-run
+```
+
+Windows 可将 `python3` 替换为 `python`。脚本先在 `frontend` 中运行
+`npm run build`，成功后通过 SSH/SCP 将整个 `dist` 目录上传到
+`root@47.120.21.129:/root/creation_agent_studio/frontend/dist`。
+使用本机 SSH 配置、密钥或终端密码提示登录；首次连接需核对服务器指纹。
+构建或传输失败会以非零状态退出。同名文件覆盖，旧资源保留；上传为直接覆盖，
+不是原子切换，脚本不会重启远程服务。
+
 ## Android / iOS 移动端外壳
 
 `mobile` 目录提供 React Native WebView 外壳，Android 和 iOS 共用同一套

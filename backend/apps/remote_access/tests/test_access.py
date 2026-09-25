@@ -30,6 +30,14 @@ def test_remote_allows_execution_settings_and_structured_answers():
         validate_request("POST", path, {"content": "hello", "sandbox": "danger-full-access"})
 
 
+@pytest.mark.parametrize('directory', ['/Users/owner/项目 空间', 'C:\\Users\\owner\\Project'])
+def test_workspace_directory_queries_support_host_paths(directory):
+    from urllib.parse import urlencode
+    path = '/api/v1/apps/runtime-files/list/'
+    assert validate_request('GET', path + '?' + urlencode({'path': directory})) == path
+    assert validate_request('POST', '/api/v1/conversations/', {'working_directory': directory})
+
+
 @pytest.fixture
 def grant(db, settings, tmp_path):
     settings.REMOTE_ACCESS_HOST_ENABLED = True
@@ -187,6 +195,61 @@ def test_remote_catalog_is_limited_to_explicitly_authorized_organization(grant):
     assert agents.status_code == apps.status_code == 200
     assert {item['name'] for item in agents.data['results']} == {'allowed'}
     assert {item['name'] for item in apps.data['results']} == {'allowed'}
+
+
+def test_remote_workspace_selection_preserves_owner_and_organization_scope(grant):
+    from apps.projects.models import Project
+    from apps.conversations.models import Conversation
+    user, org, _ = grant
+    other = get_user_model().objects.create_user(username='other-workspace-owner')
+    own = Project.objects.create(user=user, organization=org, title='My workspace')
+    inaccessible = [
+        Project.objects.create(user=other, organization=org, title='Other owner'),
+        Project.objects.create(user=user, organization=other.owned_organizations.get(), title='Other org'),
+    ]
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    response = client.get('/api/v1/projects/', HTTP_X_ORGANIZATION_ID='wrong')
+    assert response.status_code == 200, response.data
+    assert [item['id'] for item in response.data['results']] == [own.id]
+    response = client.post('/api/v1/conversations/', {'title': 'Project chat', 'project_id': own.id}, format='json')
+    assert response.status_code == 201, response.data
+    conversation = Conversation.objects.get(pk=response.data['id'])
+    assert conversation.project_id == own.id
+    own.refresh_from_db()
+    assert conversation.working_directory == own.working_directory
+    history = client.get('/api/v1/conversations/?page=1')
+    assert conversation.id in {item['id'] for item in history.data['results']}
+    for project in inaccessible:
+        response = client.post('/api/v1/conversations/', {'project_id': project.id}, format='json')
+        assert response.status_code == 404
+
+
+def test_remote_folder_browsing_and_creation_respect_runtime_roots(grant, settings, tmp_path):
+    from apps.conversations.models import Conversation
+    allowed = tmp_path / 'allowed'
+    selected = allowed / '项目 空间'
+    selected.mkdir(parents=True)
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    settings.APPLICATION_RUNTIME_ALLOW_ALL_PATHS = False
+    settings.APPLICATION_RUNTIME_ALLOWED_ROOTS = [str(allowed)]
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION='RemoteLocal local-secret')
+    roots = client.get('/api/v1/apps/runtime-files/list/')
+    assert roots.status_code == 200, roots.data
+    assert [item['path'] for item in roots.data['roots']] == [str(allowed)]
+    listing = client.get('/api/v1/apps/runtime-files/list/', {'path': str(allowed)})
+    assert listing.status_code == 200, listing.data
+    assert listing.data['dirs'] == [{'name': selected.name, 'path': str(selected)}]
+    response = client.post('/api/v1/conversations/', {'working_directory': str(selected)}, format='json')
+    assert response.status_code == 201, response.data
+    assert Conversation.objects.get(pk=response.data['id']).working_directory == str(selected)
+    assert client.get('/api/v1/apps/runtime-files/list/', {'path': str(outside)}).status_code == 403
+    for path in (outside, allowed / 'missing'):
+        response = client.post('/api/v1/conversations/', {'working_directory': str(path)}, format='json')
+        assert response.status_code == 400
+        assert 'working_directory' in response.data
 
 
 def test_pairing_requires_local_confirmation_and_is_single_use(grant):
@@ -454,7 +517,14 @@ def test_invalid_device_credential_returns_401_with_device_challenge(grant):
     ('GET', '/api/v1/conversations/1/workspace-files/', None),
     ('POST', '/api/v1/conversations/1/open-workspace/', {}),
     ('POST', '/api/v1/conversations/1/send_message/', {'content': 'x', 'images': []}),
-    ('POST', '/api/v1/conversations/', {'working_directory': '/etc'}),
+    ('POST', '/api/v1/conversations/', {'process_id': 'workflow:other'}),
+    ('POST', '/api/v1/projects/', {'title': 'not-allowed'}),
+    ('GET', '/api/v1/projects/1/workspace-files/', None),
+    ('GET', '/api/v1/apps/runtime-files/list/?path=/tmp&path=/etc', None),
+    ('GET', '/api/v1/apps/runtime-files/list/?path=%00', None),
+    ('GET', '/api/v1/apps/runtime-files/list/?organization_id=other', None),
+    ('POST', '/api/v1/apps/runtime-files/scan/', {'path': '/tmp'}),
+    ('GET', '/api/v1/conversations/?path=/tmp', None),
     ('GET', '/api/v1/agents/?organization_id=other', None),
     ('DELETE', '/api/v1/conversations/1/', None),
 ])

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Button, Input, Spin, List, Typography, message } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -21,6 +21,8 @@ interface ListResp {
 }
 
 interface Props {
+  apiClient?: typeof api;
+  title?: string;
   open: boolean;
   onClose: () => void;
   onSelect: (path: string) => void;
@@ -33,27 +35,36 @@ interface Props {
  *
  * Click a row to descend; "选择此文件夹" confirms the folder currently in view.
  */
-const FolderPickerModal: React.FC<Props> = ({ open, onClose, onSelect }) => {
+const FolderPickerModal: React.FC<Props> = ({ apiClient = api, title = '选择文件夹', open, onClose, onSelect }) => {
   const [data, setData] = useState<ListResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [jump, setJump] = useState('');  // manual path entry for power users
+  const requestId = useRef(0);
 
   const load = useCallback(async (p: string) => {
+    const id = ++requestId.current;
     setLoading(true);
+    setData(null);
     try {
-      const resp = await api.get<ListResp>('/apps/runtime-files/list/', { path: p });
+      const resp = await apiClient.get<ListResp>('/apps/runtime-files/list/', { path: p });
+      if (id !== requestId.current) return;
       setData(resp);
       setJump(resp.path);
     } catch (e: any) {
+      if (id !== requestId.current) return;
       message.error(e.response?.data?.detail || '读取目录失败');
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
-  }, []);
+  }, [apiClient]);
 
   // Reset to roots each time the modal opens.
   useEffect(() => {
-    if (open) load('');
+    if (open) {
+      setJump('');
+      void load('');
+    }
+    return () => { requestId.current += 1; };
   }, [open, load]);
 
   const viewingRoots = !data?.path;
@@ -61,7 +72,7 @@ const FolderPickerModal: React.FC<Props> = ({ open, onClose, onSelect }) => {
 
   return (
     <Modal
-      title="选择文件夹"
+      title={title}
       open={open}
       onCancel={onClose}
       width={560}
@@ -72,7 +83,7 @@ const FolderPickerModal: React.FC<Props> = ({ open, onClose, onSelect }) => {
           key="select"
           type="primary"
           icon={<CheckOutlined />}
-          disabled={!data?.path}
+          disabled={loading || !data?.path}
           onClick={() => data?.path && onSelect(data.path)}
         >
           选择此文件夹
@@ -81,6 +92,7 @@ const FolderPickerModal: React.FC<Props> = ({ open, onClose, onSelect }) => {
     >
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <Input
+          aria-label="文件夹路径"
           prefix={<FolderOpenOutlined />}
           placeholder="直接输入路径，回车跳转"
           value={jump}

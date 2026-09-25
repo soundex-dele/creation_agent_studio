@@ -11,6 +11,10 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		DA2000000000000000000000 /* DownloadHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000000000000000000000 /* DownloadHistory.swift */; };
+		DA2000000000000000000001 /* WebDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000000000000000000001 /* WebDownloadManager.swift */; };
+		DA2000000000000000000002 /* DownloadStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000000000000000000002 /* DownloadStatus.swift */; };
+		DA2000000000000000000003 /* DownloadStatusBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = DA1000000000000000000003 /* DownloadStatusBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +28,10 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = AgentStudioMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = AgentStudioMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		DA1000000000000000000000 /* DownloadHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DownloadHistory.swift; path = AgentStudioMobile/DownloadHistory.swift; sourceTree = "<group>"; };
+		DA1000000000000000000001 /* WebDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WebDownloadManager.swift; path = AgentStudioMobile/WebDownloadManager.swift; sourceTree = "<group>"; };
+		DA1000000000000000000002 /* DownloadStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DownloadStatus.swift; path = AgentStudioMobile/DownloadStatus.swift; sourceTree = "<group>"; };
+		DA1000000000000000000003 /* DownloadStatusBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DownloadStatusBridge.m; path = AgentStudioMobile/DownloadStatusBridge.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +51,10 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				DA1000000000000000000003 /* DownloadStatusBridge.m */,
+				DA1000000000000000000002 /* DownloadStatus.swift */,
+				DA1000000000000000000001 /* WebDownloadManager.swift */,
+				DA1000000000000000000000 /* DownloadHistory.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -173,13 +185,14 @@
 			inputPaths = (
 				"$(SRCROOT)/.xcode.env.local",
 				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/bundle-javascript.sh",
 			);
 			name = "Bundle React Native code and images";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
+			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$SRCROOT/bundle-javascript.sh\"\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
 		};
 		00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -245,6 +258,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				DA2000000000000000000003 /* DownloadStatusBridge.m in Sources */,
+				DA2000000000000000000002 /* DownloadStatus.swift in Sources */,
+				DA2000000000000000000001 /* WebDownloadManager.swift in Sources */,
+				DA2000000000000000000000 /* DownloadHistory.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,6 +272,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-AgentStudioMobile.debug.xcconfig */;
 			buildSettings = {
+				AGENT_STUDIO_USE_METRO = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -285,6 +303,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-AgentStudioMobile.release.xcconfig */;
 			buildSettings = {
+				AGENT_STUDIO_USE_METRO = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;

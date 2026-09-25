@@ -247,11 +247,11 @@ export default function SettingsPage() {
             </div>
             <div className="settings-row settings-row--top">
               <div>
-                <strong>默认完全控制</strong>
-                <p>开启后，新对话（含“我的电脑”）默认给 Codex 完整文件访问权限；仍可在输入框中单独切换。</p>
+                <strong>所有会话完全控制</strong>
+                <p>修改后应用于所有已有和新建对话（含“我的电脑”）的后续消息；在输入框切换权限也会同步到所有会话。正在执行的任务不受影响。</p>
               </div>
               <Switch
-                aria-label="默认完全控制"
+                aria-label="所有会话完全控制"
                 checked={defaultPermissionMode === 'allow_all'}
                 onChange={(checked) => setDefaultPermissionMode(checked ? 'allow_all' : 'default')}
               />

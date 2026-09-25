@@ -448,6 +448,52 @@ class DurableConversationRunTest(TestCase):
             "id": "thread-1",
         })
 
+    def test_other_member_can_send_while_an_organization_conversation_is_running(self):
+        from apps.enterprise.models import Membership
+
+        first = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "first member task"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="parallel-member-first", **self.headers,
+        )
+        self.assertEqual(first.status_code, 202, first.data)
+        member = get_user_model().objects.create_user(username="parallel-chat-member")
+        Membership.objects.update_or_create(
+            organization=self.organization, user=member,
+            defaults={"role": Membership.Role.VIEWER, "is_active": True},
+        )
+        conversation = Conversation.objects.create(
+            user=member, organization=self.organization, agent=self.agent,
+            title="Other member chat",
+        )
+        client = APIClient()
+        client.force_authenticate(member)
+        detail = client.get(
+            f"/api/v1/conversations/{conversation.id}/", **self.headers,
+        )
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertIsNone(detail.data["active_run"])
+        self.assertIsNone(detail.data["latest_run"])
+        forbidden = client.get(
+            f"/api/v1/conversations/{self.conversation.id}/", **self.headers,
+        )
+        self.assertEqual(forbidden.status_code, 404)
+        second = client.post(
+            f"/api/v1/conversations/{conversation.id}/send_message/",
+            {"content": "second member task"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="parallel-member-second", **self.headers,
+        )
+        self.assertEqual(second.status_code, 202, second.data)
+        self.assertNotEqual(first.data["id"], second.data["id"])
+        for active_client, current, expected_run in (
+            (self.client, self.conversation, first.data["id"]),
+            (client, conversation, second.data["id"]),
+        ):
+            detail = active_client.get(
+                f"/api/v1/conversations/{current.id}/", **self.headers,
+            )
+            self.assertEqual(detail.data["active_run"]["id"], expected_run)
+
     def test_conversation_detail_exposes_active_run_for_refresh_recovery(self):
         sent = self.client.post(
             f"/api/v1/conversations/{self.conversation.id}/send_message/",

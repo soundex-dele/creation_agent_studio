@@ -40,7 +40,9 @@ from modules.execution.application.event_retention import (
     empty_projection,
 )
 from modules.execution.application.runs import append_event_and_transition
-from modules.execution.models import IdempotencyRecord, Run, RunArtifact, RunAttempt
+from modules.execution.models import (
+    IdempotencyRecord, Run, RunArtifact, RunAttempt, RunEventSnapshot,
+)
 from apps.enterprise.models import Membership, Organization
 from apps.applications.models import ApplicationCategory
 
@@ -346,6 +348,98 @@ def test_conversation_run_exposes_title_application_and_jump_identifiers(
     assert item["task_title"] == "选题讨论"
     assert item["conversation_id"] == str(conversation.id)
     assert item["application_id"] == str(deployed_application.id)
+
+
+@pytest.fixture(params=["conversation", "supervisor", "workflow"])
+def private_conversation_run(request, api_actor, api_organization):
+    conversation = Conversation.objects.create(
+        user=api_actor, organization=api_organization, title="Private discussion",
+    )
+    source_type = request.param
+    snapshot = {}
+    if source_type == "supervisor":
+        # Using a shared delegate must not share its users' conversations.
+        from apps.agents.models import Agent, AgentCategory
+
+        category = AgentCategory.objects.create(name="Privacy", slug="privacy")
+        supervisor = Agent.objects.create(
+            category=category, name="Shared delegate", slug="shared-privacy",
+            kind=Agent.Kind.SUPERVISOR, created_by=api_actor,
+            organization=api_organization, visibility=Agent.Visibility.ORGANIZATION,
+        )
+        source_id = str(supervisor.id)
+        snapshot["conversation_id"] = str(conversation.id)
+    else:
+        source_id = str(conversation.id) if source_type == "conversation" else "workflow"
+    root = create_run(
+        organization=api_organization, owner=api_actor,
+        executor_kind=Run.ExecutorKind.WORKFLOW,
+        source_type=source_type, source_id=source_id,
+        definition_snapshot=snapshot, input_data={"message": "Private input"},
+    )
+    child = create_run(
+        organization=api_organization, owner=api_actor, parent=root,
+        executor_kind=Run.ExecutorKind.AGENT,
+        source_type="workflow_step", source_id="writer", node_key="writer",
+        definition_snapshot={"conversation_id": str(conversation.id)},
+        input_data={"message": "Private child input"},
+    )
+    return root, child
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["developer", "admin", "superuser"])
+def test_conversation_run_history_is_private(
+    authenticated_client, api_organization, private_conversation_run, role,
+):
+    root, child = private_conversation_run
+    outsider = get_user_model().objects.create_user(
+        username="other-run-user", is_superuser=role == "superuser",
+    )
+    Membership.objects.create(
+        organization=api_organization, user=outsider,
+        role=Membership.Role.ADMIN if role == "superuser" else role,
+    )
+    url = f"/api/v1/organizations/{api_organization.id}/runs"
+
+    # The owner retains both the dashboard history and access to the run tree.
+    own_history = authenticated_client.get(url)
+    assert {str(root.id), str(child.id)} <= {item["id"] for item in own_history.data}
+    assert authenticated_client.get(f"{url}/{root.id}").status_code == 200
+    assert authenticated_client.get(f"{url}/{child.id}").status_code == 200
+    assert authenticated_client.get(f"{url}/{root.id}/children").data[0]["id"] == str(child.id)
+
+    authenticated_client.force_authenticate(outsider)
+    for query in ({}, {"collapse_conversations": "true"}, {"source_type": root.source_type}):
+        response = authenticated_client.get(url, query)
+        assert response.status_code == 200
+        assert response.data == []
+
+    for run in (root, child):
+        artifact = RunArtifact.objects.create(
+            organization=api_organization, run=run, kind="result",
+            object_key=f"runs/{run.id}/private.txt", content_hash="d" * 64,
+            mime_type="text/plain", size=7,
+        )
+        RunEventSnapshot.objects.create(
+            organization=api_organization, run=run, through_sequence=1,
+            projection={"text": "Private output"},
+        )
+        for suffix in (
+            "", "/events", "/attempts", "/artifacts", "/children", "/snapshot", "/stream",
+            f"/artifacts/{artifact.id}/access",
+        ):
+            response = authenticated_client.get(f"{url}/{run.id}{suffix}")
+            assert response.status_code == 404, (suffix, response.status_code)
+        response = authenticated_client.post(f"{url}/{run.id}/commands", {
+            "type": "cancel", "idempotency_key": f"cross-user-{run.id}",
+        }, format="json")
+        assert response.status_code == 404
+        response = authenticated_client.delete(f"{url}/{run.id}")
+        assert response.status_code == 404
+        run.refresh_from_db()
+        assert run.status == Run.Status.QUEUED
+        assert not run.commands.exists()
 
 
 @pytest.mark.django_db

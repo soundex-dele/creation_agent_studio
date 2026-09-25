@@ -180,7 +180,27 @@
 
 .swm-mobile-header h1 { max-width: 660px; font-size: clamp(26px, 5vw, 38px); }
 .swm-logo { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 15px 15px 15px 5px; }
-.swm-view { padding: 0 28px 36px; }
+.swm-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 16px;
+  padding: 0 28px 36px;
+}
+
+.swm-view > :is(
+  .swm-quick-start,
+  .swm-due-review,
+  .swm-insights,
+  .swm-week-check-in,
+  .swm-mistake-card,
+  .swm-review-card,
+  .swm-report-card
+) {
+  margin-block: 0;
+}
+
+.swm-view > .swm-section-title { margin: 16px 0 0; }
 
 .swm-hero-card {
   display: flex;

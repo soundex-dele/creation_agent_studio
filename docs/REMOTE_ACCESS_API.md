@@ -54,8 +54,9 @@ GET /api/v1/remote/devices/<device_id>/proxy/organizations/<本机组织ID>/runs
 
 - 对话列表、详情、composer options、新建对话和发送消息。
 - 智能体、应用列表及数字 ID 读取端点。
+- 工作空间列表 `GET /projects/`、文件夹列表 `GET /apps/runtime-files/list/?path=...`；创建对话可提交 `project_id` 或 `working_directory`。
 - Run 详情、子 Run、事件分页、快照、SSE，以及 answer、grant_permission、deny_permission、cancel 命令。
-- 文件传输仅开放文末列出的独立接口；禁止复用附件、workspace 和运行目录接口，禁止任意 URL、组织查询覆盖及其他命令。
+- 文件传输仅开放文末列出的独立接口；禁止复用附件和工作空间文件读写接口，禁止任意 URL、组织查询覆盖及其他命令。文件夹列表只返回目录名和路径，不读取文件内容。
 
 本机认证还检查 loopback 来源、启用状态、授权用户/组织、活动成员关系和许可证，然后复用原 API 的业务权限。服务器认证失败仍返回 401；本机认证失败对手机返回 403，避免错误退出服务器账号。
 
@@ -126,6 +127,10 @@ backend/.venv/bin/python backend/scripts/test_remote_local.py --production-serve
 ## 前端连接上下文
 
 每台电脑创建独立的 API 客户端与 conversation store；不修改全局组织、服务器客户端或服务器对话 store。电脑对话不写浏览器持久化 store。Run 流、事件补页和历史压缩快照始终经过同一设备代理，快照中的本机绝对地址会转换成对应设备的快照端点。
+
+新建普通对话可选择该电脑上的已有工作空间或系统目录，发送首条消息后固定目录；应用对话沿用应用工作目录。工作空间列表和创建校验均限定为本机授权用户及组织，系统目录继续遵守 `APPLICATION_RUNTIME_ALLOW_ALL_PATHS` 和 `APPLICATION_RUNTIME_ALLOWED_ROOTS`。电脑历史包含绑定工作空间的对话。
+
+对话权限与设置页共用浏览器持久化偏好，修改后用于所有会话的后续消息。重新进入电脑时保留已保存的选择；完全控制需等待该电脑的审批策略校验成功，失败可重试，重连后自动重新校验。组织要求审批时使用默认权限，不覆盖已保存的偏好。
 
 空闲对话每 5 秒检查一次状态，发现活动 Run 后复用事件投影订阅；离开页面只撤销订阅。设备离线时禁用发送并保留当前页面草稿。导航为“对话 → 对话列表 → 电脑列表”。附件和 Markdown 内嵌文件只显示名称或说明，不在手机直接加载电脑文件。
 

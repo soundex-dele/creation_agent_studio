@@ -176,6 +176,7 @@ const asToolCall = (event: RunEventEnvelope): AgentToolCall => ({
 
 interface ConversationState {
   disconnect: () => void;
+  reset: () => void;
   refreshIfIdle: (id: string) => Promise<void>;
   conversations: Conversation[];
   currentConversation: ConversationDetail | null;
@@ -232,6 +233,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
   const api = apiOverride ?? (connection ? createConnectionApi(connection) : defaultApi);
   const runTenantRoot = (id: string) => connection ? `/organizations/${id}` : tenantApiRoot(id);
   let latestConversationDetailRequest = 0;
+  let sessionVersion = 0;
   let restoredConversationRunStream: RunStreamHandle | null = null;
   let activeController: AbortController | null = null;
   return create<ConversationState>()(
@@ -248,6 +250,8 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         projection: RunEventState,
         event?: RunEventEnvelope,
       ) => {
+        if (get().currentConversation?.id !== conversationId
+          || get().activeRun?.id !== projection.runId) return;
         const pendingQuestion = projection.pendingInput
           ? asQuestion(projection.pendingInput)
           : null;
@@ -392,22 +396,26 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         }));
 
         let projection = createRunEventState(run.id);
+        const requestVersion = latestConversationDetailRequest;
         restoredConversationRunStream = streamRunEvents({
           connection,
           organizationId: run.organization_id,
           runId: run.id,
           onEvent: (event) => {
-            if (get().currentConversation?.id !== conversationId) return;
+            if (requestVersion !== latestConversationDetailRequest
+              || get().currentConversation?.id !== conversationId) return;
             projection = ingestRunEvent(projection, event).state;
             applyRunProjection(conversationId, projection, event);
           },
           onSnapshot: (snapshot) => {
-            if (get().currentConversation?.id !== conversationId) return;
+            if (requestVersion !== latestConversationDetailRequest
+              || get().currentConversation?.id !== conversationId) return;
             projection = restoreRunEventSnapshot(snapshot);
             applyRunProjection(conversationId, projection);
           },
           onError: (error) => {
-            if (get().currentConversation?.id === conversationId) {
+            if (requestVersion === latestConversationDetailRequest
+              && get().currentConversation?.id === conversationId) {
               set({ error: `Run 恢复失败: ${error.message}` });
             }
           },
@@ -421,6 +429,16 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
           restoredConversationRunStream = null;
           activeController?.abort();
           activeController = null;
+          set({
+            activeRun: null, streamingMessageId: null, pendingQuestion: null,
+            agentActivity: null, isLoading: false,
+          });
+        },
+        reset: () => {
+          sessionVersion += 1;
+          get().disconnect();
+          revokeOptimisticImageUrls(get().currentConversation?.messages);
+          set({ conversations: [], currentConversation: null, error: null });
         },
         refreshIfIdle: async (id) => {
           if (get().isLoading || get().streamingMessageId || get().activeRun || get().error) return;
@@ -440,21 +458,27 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         agentActivity: null,
 
         fetchConversations: async () => {
+          const version = sessionVersion;
           set({ isLoading: true, error: null });
           try {
             const response = await api.get<Conversation[] | { results?: Conversation[] }>('/conversations/');
+            if (version !== sessionVersion) return;
             set({ conversations: normalizeConversations(response), isLoading: false });
           } catch (error: any) {
-            set({ error: error.response?.data?.detail || '获取对话列表失败', isLoading: false });
+            if (version === sessionVersion) {
+              set({ error: error.response?.data?.detail || '获取对话列表失败', isLoading: false });
+            }
             throw error;
           }
         },
 
         fetchConversationDetail: async (id) => {
-          const requestId = ++latestConversationDetailRequest;
-          restoredConversationRunStream?.abort();
-          restoredConversationRunStream = null;
-          activeController?.abort();
+          get().disconnect();
+          const requestId = latestConversationDetailRequest;
+          if (get().currentConversation?.id !== id) {
+            revokeOptimisticImageUrls(get().currentConversation?.messages);
+            set({ currentConversation: null });
+          }
           set({ isLoading: true, error: null });
           try {
             const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
@@ -487,6 +511,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         },
 
         createConversation: async (title, agentId, projectId, processId, context = {}) => {
+          const version = sessionVersion;
           set({ isLoading: true, error: null });
           try {
             const payload: Record<string, unknown> = { title };
@@ -500,12 +525,15 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             const response = await api.post<Conversation>('/conversations/', payload, {
               headers: { 'Idempotency-Key': createIdempotencyKey('conversation') },
             });
+            if (version !== sessionVersion) throw new DOMException('登录状态已更改', 'AbortError');
             const conversation = normalizeConversation(response);
-            if (!projectId) set({ conversations: [conversation, ...get().conversations] });
+            if (!projectId || connection) set({ conversations: [conversation, ...get().conversations] });
             set({ isLoading: false });
             return conversation;
           } catch (error: any) {
-            set({ error: error.response?.data?.detail || '创建对话失败', isLoading: false });
+            if (version === sessionVersion) {
+              set({ error: error.response?.data?.detail || '创建对话失败', isLoading: false });
+            }
             throw error;
           }
         },
@@ -617,6 +645,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
               organizationId: run.organization_id,
               runId: run.id,
               onEvent: (event) => {
+                if (controller.signal.aborted) return;
                 if (!seenEventTypes.has(event.type)) {
                   seenEventTypes.add(event.type);
                   logTiming('first_event', { runId: run.id, type: event.type, sequence: event.sequence });
@@ -633,6 +662,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
                 applyRunProjection(conversationId, projection, event);
               },
               onSnapshot: (snapshot) => {
+                if (controller.signal.aborted) return;
                 projection = restoreRunEventSnapshot(snapshot);
                 applyRunProjection(conversationId, projection);
               },
@@ -718,6 +748,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         },
 
         answerQuestion: async (_conversationId, answer) => {
+          const requestVersion = latestConversationDetailRequest;
           const {
             activeRun, pendingQuestion, currentConversation, streamingMessageId,
           } = get();
@@ -763,17 +794,20 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
               },
             );
           } catch (error: any) {
-            set({
-              pendingQuestion,
-              currentConversation,
-              streamingMessageId,
-              error: error.response?.data?.detail || '提交回答失败',
-            });
+            if (requestVersion === latestConversationDetailRequest) {
+              set({
+                pendingQuestion,
+                currentConversation,
+                streamingMessageId,
+                error: error.response?.data?.detail || '提交回答失败',
+              });
+            }
             throw error;
           }
         },
 
-        cancelTurn: async (_conversationId) => {
+        cancelTurn: async (conversationId) => {
+          if (get().currentConversation?.id !== conversationId) return;
           const run = get().activeRun;
           if (!run) return;
           set({ agentActivity: '正在取消…', error: null });
@@ -817,7 +851,13 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
           }
         },
 
-        setCurrentConversation: (conversation) => set({ currentConversation: conversation }),
+        setCurrentConversation: (conversation) => {
+          if (!conversation || conversation.id !== get().currentConversation?.id) {
+            get().disconnect();
+            revokeOptimisticImageUrls(get().currentConversation?.messages);
+          }
+          set({ currentConversation: conversation, error: null });
+        },
         clearError: () => set({ error: null }),
       };
     },

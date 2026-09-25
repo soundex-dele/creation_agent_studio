@@ -424,6 +424,15 @@ export const WebWindow = React.forwardRef<WebWindowHandle, WebWindowProps>(
           onMessage={handleMessage}
           onOpenWindow={handleOpenWindow}
           onFileDownload={(event: FileDownloadEvent) => {
+            if (Platform.OS === 'ios') {
+              // WKDownload already owns the original request, including its cookies/body.
+              setLoading(false);
+              Alert.alert(
+                '已开始下载',
+                '可在设置中查看进度，完成后在“文件”App 的 Agent Studio / Downloads 中查看。',
+              );
+              return;
+            }
             openExternalUrl(event.nativeEvent.downloadUrl).catch(
               () => undefined,
             );

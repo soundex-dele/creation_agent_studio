@@ -123,7 +123,7 @@ class ConversationViewSet(viewsets.ViewSet):
             process_id = request.query_params.get("process_id")
             if process_id:
                 queryset = queryset.filter(process_id=process_id)
-        elif not application_id:
+        elif not application_id and not getattr(request, 'remote_connector', False):
             queryset = queryset.filter(project__isnull=True)
         search = request.query_params.get("search")
         if search:

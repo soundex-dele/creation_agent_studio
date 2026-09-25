@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android --no-packager",
-    "ios": "react-native run-ios",
+    "ios": "react-native run-ios --no-packager",
+    "ios:metro": "react-native run-ios --extra-params AGENT_STUDIO_USE_METRO=YES",
     "lint": "eslint .",
     "postinstall": "patch-package --error-on-fail",
     "start": "react-native start",
     "test": "jest --runInBand",
+    "test:ios-native": "sh ios/tests/run-tests.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
