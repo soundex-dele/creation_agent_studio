@@ -20,18 +20,91 @@ it('retries a lost response with the same explicit key, independent of input tex
 it('serializes input batches and discards pending input on disconnect', async () => {
   let resolve!: (value: unknown) => void;
   const post = vi.spyOn(api, 'post').mockImplementationOnce(() => new Promise(done => { resolve = done; })).mockResolvedValue({});
-  const input = new TerminalInput('computer', 'session', vi.fn());
+  const onError = vi.fn();
+  const input = new TerminalInput('computer', 'session', onError);
   input.setOnline(true); input.write('a');
   await vi.advanceTimersByTimeAsync(25);
   input.write('b'); input.setOnline(false); input.write('offline');
   resolve({}); await vi.advanceTimersByTimeAsync(30);
   expect(post).toHaveBeenCalledTimes(1);
+  expect(onError).toHaveBeenCalledOnce();
+  expect(onError.mock.calls[0][0].message).toContain('尚未发送的输入已取消');
   input.setOnline(true); input.write('a'); await vi.advanceTimersByTimeAsync(25);
   expect(post.mock.calls.map(call => call[1])).toEqual([
     { client_id: expect.any(String), sequence: 1, data: 'a' },
     { client_id: expect.any(String), sequence: 2, data: 'a' },
   ]);
   input.dispose();
+});
+
+it('splits large Unicode pastes into ordered byte-bounded batches without losing characters', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({});
+  const onError = vi.fn();
+  const input = new TerminalInput('computer', 'session', onError);
+  const text = '\ufeff' + 'a'.repeat(16379) + '😀中文'.repeat(6000) + '\ufeff\r';
+  input.setOnline(true); input.write(text);
+  await vi.advanceTimersByTimeAsync(25);
+  const batches = post.mock.calls.map(call => call[1] as { data: string; sequence: number; client_id: string });
+  expect(batches.length).toBeGreaterThan(1);
+  expect(batches.map(batch => batch.data).join('')).toBe(text);
+  expect(batches.map(batch => batch.sequence)).toEqual(batches.map((_, index) => index + 1));
+  expect(new Set(batches.map(batch => batch.client_id)).size).toBe(1);
+  expect(batches.every(batch => new TextEncoder().encode(batch.data).length <= 16384)).toBe(true);
+  expect(onError).not.toHaveBeenCalled();
+  input.dispose();
+});
+
+it('preserves all pending keystrokes while a slow batch is awaiting acknowledgement', async () => {
+  let resolve!: (value: unknown) => void;
+  const post = vi.spyOn(api, 'post').mockImplementationOnce(() => new Promise(done => { resolve = done; })).mockResolvedValue({});
+  const input = new TerminalInput('computer', 'session', vi.fn());
+  input.setOnline(true); input.write('start');
+  await vi.advanceTimersByTimeAsync(25);
+  const pending = '中文😀\x1b[A\t'.repeat(4000) + '\r';
+  for (const character of pending) input.write(character);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(post).toHaveBeenCalledTimes(1);
+  resolve({}); await vi.advanceTimersByTimeAsync(25);
+  expect(post.mock.calls.map(call => (call[1] as { data: string }).data).join('')).toBe('start' + pending);
+  input.dispose();
+});
+
+it('retries an input batch with the same sequence and key before draining the next batch', async () => {
+  const post = vi.spyOn(api, 'post').mockRejectedValueOnce({ response: { status: 503 } }).mockResolvedValue({});
+  const input = new TerminalInput('computer', 'session', vi.fn());
+  input.setOnline(true); input.write('first');
+  await vi.advanceTimersByTimeAsync(25);
+  input.write('next\r');
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(post).toHaveBeenCalledTimes(3);
+  expect(post.mock.calls[0][1]).toEqual(post.mock.calls[1][1]);
+  expect(post.mock.calls[0][2]?.headers?.['Idempotency-Key']).toBe(post.mock.calls[1][2]?.headers?.['Idempotency-Key']);
+  expect(post.mock.calls[2][1]).toMatchObject({ sequence: 2, data: 'next\r' });
+  input.dispose();
+});
+
+it('pauses on queue overflow instead of sending a command with missing characters', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({});
+  const onError = vi.fn();
+  const input = new TerminalInput('computer', 'session', onError);
+  input.setOnline(true); input.write('pending'); input.write('a'.repeat(256 * 1024)); input.write('\r');
+  await vi.advanceTimersByTimeAsync(25);
+  expect(input.paused).toBe(true);
+  expect(input.writable).toBe(false);
+  expect(post).not.toHaveBeenCalled();
+  expect(onError.mock.calls[0][0].message).toContain('输入已暂停');
+  input.dispose();
+});
+
+it('does not send or report discarded input after disposal', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({});
+  const onError = vi.fn();
+  const input = new TerminalInput('computer', 'session', onError);
+  input.setOnline(true); input.write('pending'); input.dispose(); input.setOnline(true); input.write('later');
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(post).not.toHaveBeenCalled();
+  expect(onError).not.toHaveBeenCalled();
+  expect(input.writable).toBe(false);
 });
 
 it('freezes new input after an uncertain write failure', async () => {

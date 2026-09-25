@@ -673,6 +673,9 @@ def finish_attempt(
             },
         )
         parent_id = run.parent_id
+        if outcome == Run.Status.CANCELLED:
+            from modules.execution.application.projections import project_terminal_run
+            project_terminal_run(run.id, run.output_summary)
         transaction.on_commit(
             lambda: _publish_event_notification(run.id, event.sequence)
         )

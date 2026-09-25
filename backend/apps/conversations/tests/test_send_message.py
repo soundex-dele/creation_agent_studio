@@ -936,6 +936,66 @@ class DurableConversationRunTest(TestCase):
         self.assertIn("**交付标准**", repaired.content)
         self.assertIn("**执行预算**：最大任务 12", repaired.content)
 
+    def test_cancelled_run_preserves_partial_output_on_repeated_detail_fetches(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "start answering"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="cancel-partial-answer", **self.headers,
+        )
+        run = Run.objects.get(pk=response.data["id"])
+        for sequence, event_type, payload in (
+            (2, "output.delta", {"text": "old draft"}),
+            (3, "output.snapshot", {"text": "已回答的部分"}),
+            (4, "output.delta", {"text": "请保留"}),
+            (5, "run.cancelled", {}),
+        ):
+            RunEvent.objects.create(
+                organization=self.organization, run=run, sequence=sequence,
+                type=event_type, payload=payload,
+            )
+        run.status = Run.Status.CANCELLED
+        run.next_event_sequence = 5
+        run.save(update_fields=("status", "next_event_sequence"))
+        self.conversation.agent_thread_provider = "codex"
+        self.conversation.agent_thread_id = "existing-thread"
+        self.conversation.save()
+        for _ in range(2):
+            detail = self.client.get(
+                f"/api/v1/conversations/{self.conversation.id}/", **self.headers,
+            )
+            self.assertEqual(detail.status_code, 200, detail.data)
+            messages = Message.objects.filter(run=run, role="assistant")
+            self.assertEqual(messages.count(), 1)
+            self.assertEqual(messages.get().content, "已回答的部分请保留")
+        self.conversation.refresh_from_db()
+        self.assertEqual(self.conversation.agent_thread_id, "existing-thread")
+
+    def test_cancelled_projection_only_preserves_current_answer_segment(self):
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "start answering"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="cancel-answer-segment", **self.headers,
+        )
+        run = Run.objects.get(pk=response.data["id"])
+        for sequence, event_type, payload in (
+            (2, "output.delta", {"text": "previous answer"}),
+            (3, "input.accepted", {}),
+            (4, "output.delta", {"text": "current partial answer"}),
+            (5, "run.cancelled", {}),
+        ):
+            RunEvent.objects.create(
+                organization=self.organization, run=run, sequence=sequence,
+                type=event_type, payload=payload,
+            )
+        run.status = Run.Status.CANCELLED
+        run.next_event_sequence = 5
+        run.save(update_fields=("status", "next_event_sequence"))
+        project_terminal_run(run.id, {})
+        self.assertEqual(
+            Message.objects.get(run=run, role="assistant").content,
+            "current partial answer",
+        )
+
     def test_detail_repairs_a_missing_terminal_message(self):
         response = self.client.post(
             f"/api/v1/conversations/{self.conversation.id}/send_message/",

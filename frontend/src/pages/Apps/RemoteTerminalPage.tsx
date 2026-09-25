@@ -23,10 +23,15 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
   const [error, setError] = useState('');
   const [generation, setGeneration] = useState(0);
   const [ctrl, setCtrl] = useState(false);
+  const [inputReady, setInputReady] = useState(false);
   const ctrlRef = useRef(false);
   onlineRef.current = online;
   useEffect(() => {
-    if (!online) { input.current?.setOnline(false); setStatus('重连中'); }
+    if (!online) {
+      input.current?.setOnline(false);
+      if (terminal.current) terminal.current.options.disableStdin = true;
+      setInputReady(false); setStatus('重连中');
+    }
   }, [online]);
 
   useEffect(() => {
@@ -37,19 +42,24 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
     let exited = false;
     let activeStream: AbortController | undefined;
     let connected = false;
-    setError(''); setStatus('连接中');
+    setError(''); setStatus('连接中'); setInputReady(false);
     const run = async () => {
       const [{ Terminal: XTerminal }, { FitAddon }] = await Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit')]);
       await import('@xterm/xterm/css/xterm.css');
       if (controller.signal.aborted || !host.current) return;
       const term = new XTerminal({ cursorBlink: true, fontSize: 15, fontFamily: 'Consolas, Menlo, monospace',
-        scrollback: 5000, screenReaderMode: true, allowProposedApi: false });
+        scrollback: 5000, screenReaderMode: true, allowProposedApi: false, disableStdin: true });
       const fit = new FitAddon();
       term.loadAddon(fit); term.open(host.current); terminal.current = term;
       const sender = new TerminalInput(deviceId, sessionId, failure => {
         setError(terminalError(failure));
-        if (terminalError(failure).includes('输入已暂停')) setStatus('输入已暂停');
+        if (sender.paused) { setStatus('输入已暂停'); syncInput(); }
       });
+      const syncInput = () => {
+        const ready = onlineRef.current && sender.writable && !exited;
+        term.options.disableStdin = !ready;
+        setInputReady(ready);
+      };
       input.current = sender;
       let resizeTimer: ReturnType<typeof setTimeout> | undefined;
       let lastSize = '';
@@ -77,7 +87,7 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
           data = data === '?' ? '\x7f' : String.fromCharCode(data.toUpperCase().charCodeAt(0) & 31);
           ctrlRef.current = false; setCtrl(false);
         }
-        if (connected && onlineRef.current) sender.write(data);
+        if (onlineRef.current && !exited) sender.write(data);
       });
       const checkOnline = setInterval(() => { if (!onlineRef.current) activeStream?.abort(); }, 250);
       dispose = () => {
@@ -94,13 +104,14 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
           await terminalStream(deviceId, sessionId, cursor, activeStream.signal, async event => {
             if (controller.signal.aborted) return;
             if (event.type === 'ready') {
-              connected = true; sender.setOnline(true); setStatus(sender.paused ? '输入已暂停' : '在线'); lastSize = ''; resize();
+              connected = true; sender.setOnline(onlineRef.current); syncInput();
+              setStatus(sender.paused ? '输入已暂停' : '在线'); lastSize = ''; resize();
             } else if (event.type === 'output' && event.sequence > cursor) {
               await new Promise<void>(resolve => term.write(event.data, resolve)); cursor = event.sequence;
             } else if (event.type === 'truncated') {
               term.reset(); cursor = event.sequence; setError('较早的输出已超出保留范围，仅显示最近输出。');
             } else if (event.type === 'exit') {
-              exited = true; sender.setOnline(false); setStatus(`进程已退出${event.exit_code === null ? '' : `（${event.exit_code}）`}`);
+              exited = true; sender.setOnline(false); syncInput(); setStatus(`进程已退出${event.exit_code === null ? '' : `（${event.exit_code}）`}`);
               onExitRef.current();
             }
           });
@@ -112,9 +123,14 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
           }
           if (!(failure instanceof DOMException && failure.name === 'AbortError')) setError(terminalError(failure));
         } finally {
-          connected = false; sender.setOnline(false);
-          if (!controller.signal.aborted && !exited) {
-            setStatus('重连中'); reconnectTimer = setTimeout(() => void connect(), 1500);
+          connected = false;
+          if (!controller.signal.aborted) {
+            if (exited || !onlineRef.current) sender.setOnline(false);
+            syncInput();
+            if (!exited) {
+              setStatus(sender.paused ? '输入已暂停' : sender.writable ? '输出重连中' : '重连中');
+              reconnectTimer = setTimeout(() => void connect(), 1500);
+            }
           }
         }
       };
@@ -124,19 +140,19 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
     return () => { controller.abort(); activeStream?.abort(); clearTimeout(reconnectTimer); dispose(); };
   }, [deviceId, sessionId, generation]);
 
-  const sendKey = (value: string) => { if (online) input.current?.write(value); terminal.current?.focus(); };
+  const sendKey = (value: string) => { if (online && inputReady) input.current?.write(value); terminal.current?.focus(); };
   return <div className="remote-terminal-view">
     <div className="remote-terminal-status"><Tag color={online && status === '在线' ? 'green' : 'default'}>{online ? status : '重连中'}</Tag>
       <Button onClick={() => setGeneration(value => value + 1)} disabled={!online}>重新连接</Button>
-      <span>离开页面后程序继续运行</span></div>
+      <span>{online && status === '输出重连中' ? '输出重连中，输入仍按顺序发送' : '离开页面后程序继续运行'}</span></div>
     {error && <Alert type="warning" showIcon message={error} closable onClose={() => setError('')} />}
     <div className="remote-terminal-screen" ref={host} role="region" aria-label="远程终端输出与输入" />
     <div className="remote-terminal-keys" aria-label="终端快捷键">
-      <Button disabled={!online || status !== '在线'} aria-pressed={ctrl} type={ctrl ? 'primary' : 'default'} onClick={() => {
+      <Button disabled={!online || !inputReady} aria-pressed={ctrl} type={ctrl ? 'primary' : 'default'} onClick={() => {
         ctrlRef.current = !ctrl; setCtrl(!ctrl); terminal.current?.focus();
       }}>Ctrl</Button>
       {([['Tab', '\t'], ['Esc', '\x1b'], ['↑', '\x1b[A'], ['↓', '\x1b[B'], ['←', '\x1b[D'], ['→', '\x1b[C'], ['Ctrl+C', '\x03']] as const)
-        .map(([label, value]) => <Button key={label} aria-label={`发送 ${label}`} disabled={!online || status !== '在线'} onClick={() => sendKey(value)}>{label}</Button>)}
+        .map(([label, value]) => <Button key={label} aria-label={`发送 ${label}`} disabled={!online || !inputReady} onClick={() => sendKey(value)}>{label}</Button>)}
     </div>
   </div>;
 }

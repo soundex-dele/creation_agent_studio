@@ -172,11 +172,41 @@ python3 deploy_frontend.py --dry-run
 ```
 
 Windows 可将 `python3` 替换为 `python`。脚本先在 `frontend` 中运行
-`npm run build`，成功后通过 SSH/SCP 将整个 `dist` 目录上传到
-`root@47.120.21.129:/root/creation_agent_studio/frontend/dist`。
+`npm run build`，成功后用 Python 将 `dist` 压缩为 `.tar.gz`，通过 SCP 上传，
+再通过 SSH 调用服务器的 `tar` 解压到
+`root@47.120.21.129:/root/creation_agent_studio/frontend/dist`（服务器需要安装 `tar`）。
+本地临时压缩包自动清理；远程压缩包在解压成功后删除，失败时保留以便排查。
 使用本机 SSH 配置、密钥或终端密码提示登录；首次连接需核对服务器指纹。
-构建或传输失败会以非零状态退出。同名文件覆盖，旧资源保留；上传为直接覆盖，
+构建、传输或解压失败会以非零状态退出。同名文件覆盖，旧资源保留；解压为直接覆盖，
 不是原子切换，脚本不会重启远程服务。
+
+### 使用 Git 推送源码到服务器
+
+本机需要 Python 3.8+、Git 和 OpenSSH，服务器需要 Git 和 SSH 登录权限。
+在仓库根目录执行：
+
+```bash
+python3 push_code.py --dry-run
+python3 push_code.py
+# 指定服务器当前分支、SSH 私钥和端口
+python3 push_code.py --branch main -i ~/.ssh/id_ed25519 --port 22
+```
+
+脚本将本地当前提交推送到 `root@47.120.21.129:/root/creation_agent_studio`
+的 `main` 分支（可用 `--branch` 修改）。本地未提交或未跟踪的文件不会上传，
+需要先自行提交；子模块的修改还需提交到其各自远程仓库，并在主仓库提交新的子模块引用。
+脚本沿用 SSH 配置、密钥或终端密码提示，不更改本地 `origin`。
+
+首次运行会在目标目录初始化普通 Git 仓库，并设置
+`receive.denyCurrentBranch=updateInstead`，让 `git push` 同时更新服务器工作目录。
+已有仓库必须检出 `--branch` 指定的分支；服务器工作区有未提交修改、历史不兼容，
+或原有未跟踪文件与首次推送冲突时，Git 会拒绝更新，需要先在服务器处理冲突。
+脚本不强制推送，也不清理服务器的 `.env`、数据库或构建产物等未跟踪文件。
+
+推送成功后自动执行 `git submodule sync --recursive` 和
+`git submodule update --init --recursive`，服务器需能访问子模块远程地址。
+子模块同步失败会返回非零状态，此时主仓库代码可能已更新。
+本脚本只更新源码；前端构建产物仍使用 `deploy_frontend.py` 部署，服务重启和数据库迁移另行执行。
 
 ## Android / iOS 移动端外壳
 

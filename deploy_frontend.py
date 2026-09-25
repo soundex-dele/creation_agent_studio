@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Build the frontend and copy dist to the remote server using OpenSSH."""
+"""Build, compress and upload the frontend, then extract it on the server."""
 
 import argparse
+from contextlib import nullcontext
 from pathlib import Path
 import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
+from uuid import uuid4
 
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
@@ -50,19 +54,38 @@ def main(argv=None):
     if not args.dry_run and not (dist / "index.html").is_file():
         raise RuntimeError(f"构建后找不到 {dist / 'index.html'}，停止上传。")
 
-    run(
-        [programs["ssh"], *options, "-p", str(args.port), REMOTE,
-         f"mkdir -p -- {shlex.quote(REMOTE_DIR)}"],
-        dry_run=args.dry_run,
+    ssh = [programs["ssh"], *options, "-p", str(args.port), REMOTE]
+    # A unique name avoids collisions between concurrent uploads.
+    archive_name = f".frontend-dist-{uuid4().hex}.tar.gz"
+    remote_archive = f"{REMOTE_DIR}/{archive_name}"
+    temporary = (
+        nullcontext(str(Path(tempfile.gettempdir()) / "frontend-deploy-preview"))
+        if args.dry_run else tempfile.TemporaryDirectory(prefix="frontend-deploy-")
     )
-    # Copy the directory itself so the destination is frontend/dist on every run.
-    # Existing files are overwritten; old hashed assets are retained.
-    run(
-        [programs["scp"], *options, "-P", str(args.port), "-r", "dist",
-         f"{REMOTE}:{REMOTE_DIR}/"],
-        cwd=FRONTEND,
-        dry_run=args.dry_run,
-    )
+    with temporary as temp_dir:
+        archive = Path(temp_dir) / archive_name
+        print(f"压缩：{dist} -> {archive}", flush=True)
+        if not args.dry_run:
+            with tarfile.open(archive, "w:gz") as bundle:
+                bundle.add(dist, arcname="dist")
+            print(f"压缩包大小：{archive.stat().st_size / 1024 / 1024:.2f} MB", flush=True)
+
+        run(
+            [*ssh, f"mkdir -p -- {shlex.quote(REMOTE_DIR)}"],
+            dry_run=args.dry_run,
+        )
+        run(
+            [programs["scp"], *options, "-P", str(args.port), str(archive),
+             f"{REMOTE}:{remote_archive}"],
+            dry_run=args.dry_run,
+        )
+        # The archive contains dist/, so extraction produces frontend/dist/.
+        # Retain the remote archive on extraction failure for troubleshooting.
+        run(
+            [*ssh, f"tar -xzf {shlex.quote(remote_archive)} -C {shlex.quote(REMOTE_DIR)}"
+             f" && rm -f -- {shlex.quote(remote_archive)}"],
+            dry_run=args.dry_run,
+        )
     if args.dry_run:
         print("预览完成，未执行构建或上传。")
     else:
@@ -75,7 +98,7 @@ if __name__ == "__main__":
     except subprocess.CalledProcessError as exc:
         print(f"命令执行失败（退出码 {exc.returncode}），部署已停止。", file=sys.stderr)
         sys.exit(1)
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, tarfile.TarError) as exc:
         print(f"部署失败：{exc}", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:

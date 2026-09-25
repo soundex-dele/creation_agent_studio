@@ -88,30 +88,53 @@ export class TerminalInput {
   private client = terminalKey();
   private sequence = 0;
   private pending = '';
+  private pendingBytes = 0;
+  private encoder = new TextEncoder();
+  private decoder = new TextDecoder('utf-8', { ignoreBOM: true });
   private sending = false;
   private timer?: ReturnType<typeof setTimeout>;
   private controller = new AbortController();
   private enabled = false;
   private failed = false;
   get paused() { return this.failed; }
+  get writable() { return this.enabled && !this.controller.signal.aborted; }
   constructor(private device: string, private session: string, private onError: (error: unknown) => void) {}
   setOnline(online: boolean) {
-    this.enabled = online && !this.failed;
-    if (!online) this.pending = '';
+    this.enabled = online && !this.failed && !this.controller.signal.aborted;
+    if (!online) {
+      const discarded = Boolean(this.pending);
+      this.pending = '';
+      this.pendingBytes = 0;
+      clearTimeout(this.timer); this.timer = undefined;
+      if (discarded && !this.failed && !this.controller.signal.aborted) {
+        this.onError(new Error('连接已断开，尚未发送的输入已取消。请检查终端内容后重新输入。'));
+      }
+    }
   }
   write(data: string) {
-    if (!this.enabled) return;
-    if (new TextEncoder().encode(this.pending + data).length > 16384) {
-      this.onError(new Error('输入过长或连接繁忙，请分段粘贴。'));
+    if (!this.writable || !data) return;
+    let addedBytes = this.encoder.encode(data).length;
+    const previousCode = this.pending.charCodeAt(this.pending.length - 1);
+    const nextCode = data.charCodeAt(0);
+    if (previousCode >= 0xd800 && previousCode <= 0xdbff && nextCode >= 0xdc00 && nextCode <= 0xdfff) addedBytes -= 2;
+    if (this.pendingBytes + addedBytes > 256 * 1024) {
+      this.failed = true;
+      this.setOnline(false);
+      this.onError(new Error('输入缓冲区已满，输入已暂停。请检查已输入内容后重新连接，并分段粘贴。'));
       return;
     }
     this.pending += data;
+    this.pendingBytes += addedBytes;
     if (!this.timer && !this.sending) this.timer = setTimeout(() => { this.timer = undefined; void this.flush(); }, 20);
   }
   private async flush() {
     if (!this.enabled || this.sending || !this.pending) return;
-    const data = this.pending;
-    this.pending = '';
+    const encoded = this.encoder.encode(this.pending);
+    let boundary = Math.min(encoded.length, 16384);
+    while (boundary < encoded.length && (encoded[boundary] & 0xc0) === 0x80) boundary--;
+    const data = this.decoder.decode(encoded.subarray(0, boundary));
+    this.pending = this.pending.slice(data.length);
+    this.pendingBytes -= boundary;
     this.sending = true;
     try {
       await terminalPost(this.device, `${this.session}/input/`, {
@@ -128,5 +151,5 @@ export class TerminalInput {
       if (!this.controller.signal.aborted) void this.flush();
     }
   }
-  dispose() { this.setOnline(false); clearTimeout(this.timer); this.controller.abort(); }
+  dispose() { this.controller.abort(); this.setOnline(false); }
 }

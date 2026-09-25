@@ -350,6 +350,12 @@ def project_terminal_run(run_id, output):
     run = Run.objects.get(pk=run_id)
     if not _conversation_id_for_run(run):
         return
+    start = _segment_start(run, run.next_event_sequence)
+    content = str(output.get("result") or "")
+    if run.status == Run.Status.CANCELLED and not content:
+        content = _output_segment(
+            run, after_sequence=start, through_sequence=run.next_event_sequence,
+        )
     from apps.conversations.models import Conversation, Message
 
     with transaction.atomic():
@@ -389,7 +395,7 @@ def project_terminal_run(run_id, output):
         if not provider or not thread_id:
             provider = ""
             thread_id = ""
-        if (
+        if (run.status != Run.Status.CANCELLED or thread_id) and (
             conversation.agent_thread_provider != provider
             or conversation.agent_thread_id != thread_id
         ):
@@ -398,8 +404,9 @@ def project_terminal_run(run_id, output):
             conversation.save(update_fields=(
                 "agent_thread_provider", "agent_thread_id", "updated_at",
             ))
-        start = _segment_start(run, run.next_event_sequence)
         tool_calls = _project_tool_calls(run, after_sequence=start)
+        if run.status == Run.Status.CANCELLED and not content and not tool_calls:
+            return
         metadata = {
             "run_id": str(run.id),
             "run_event_sequence": run.next_event_sequence,
@@ -437,7 +444,7 @@ def project_terminal_run(run_id, output):
             defaults={
                 "conversation": conversation,
                 "role": "assistant",
-                "content": str(output.get("result") or ""),
+                "content": content,
                 "metadata": metadata,
             },
         )
@@ -486,7 +493,9 @@ def repair_conversation_messages(conversation):
             ).first() if command_id else None
             if command is not None:
                 project_input_accepted(run.id, event, command)
-        if run.status == Run.Status.SUCCEEDED and run.output_summary:
+        if (run.status == Run.Status.SUCCEEDED and run.output_summary) or (
+            run.status == Run.Status.CANCELLED
+        ):
             terminal_missing = run.next_event_sequence not in projected_sequences
             automated_user_missing = (
                 run.source_type in {"workflow_step", "supervisor_task"}
@@ -498,4 +507,4 @@ def repair_conversation_messages(conversation):
                 ).exists()
             )
             if terminal_missing or automated_user_missing:
-                project_terminal_run(run.id, run.output_summary)
+                project_terminal_run(run.id, run.output_summary or {})
