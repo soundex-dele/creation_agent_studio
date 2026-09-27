@@ -13,9 +13,9 @@
 | MCP 交互 | 接入 `mcpServer/elicitation/request`，支持常用 JSON Schema 表单、手动打开 URL、接受/拒绝/取消。服务端校验字段，禁止外部 schema 引用。表单答案不复制到聊天正文。 |
 | 动态工具协议 | 新 thread 可通过适配器参数注册 `dynamicTools`；`item/tool/call` 调用注入的 `tool_handlers`，按协议返回结果。未注册工具明确失败。产品级工具注册管理界面仍未提供。 |
 | 运行中补充指令 | 输入框增加“补充指令”，经持久化 `steer` 命令调用当前 thread 的 `turn/steer`，包含 `expectedTurnId`；保留停止操作。 |
-| 步骤、工具输出和差异 | 展示 `turn/plan/updated`、命令输出增量、终端交互、MCP 进度、`patchUpdated`、`turn/diff/updated`。 |
-| 告警及结构化错误 | 显示 warning/configWarning/error、模型路由等通知，保存最终错误详情。聊天隐藏 MCP 启动状态及模型元数据回退提示。 |
-| 摘要与状态 | 只接入协议可公开的 reasoning summary，保留 review、上下文压缩、子 Agent 活动。实时 token 用量仍保存，但不在聊天中展示。原始推理内容不进入展示事件。 |
+| 步骤、工具输出和差异 | 接收 `turn/plan/updated`、命令输出增量、终端交互、MCP 进度、`patchUpdated`、`turn/diff/updated`。聊天展示步骤和文件差异，隐藏工具实时输出。 |
+| 告警及结构化错误 | 显示 warning/configWarning/error、模型路由等通知，保存最终错误详情。聊天隐藏 MCP 启动状态、模型元数据回退及使用内置 bubblewrap 的环境提示。 |
+| 摘要与状态 | 只接入协议可公开的 reasoning summary，保留 review、上下文压缩、子 Agent 活动。思考摘要和实时 token 用量仍保存，但不在聊天中展示。原始推理内容不进入展示事件。 |
 | 历史恢复 | `agent.*` 事件纳入 Run 快照及会话消息元数据，刷新与事件回放可以恢复展示信息。 |
 
 ## 实现位置

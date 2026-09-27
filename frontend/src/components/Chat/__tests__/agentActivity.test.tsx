@@ -15,14 +15,17 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
-it('renders progress, live output, diffs, summaries and warnings', () => {
+it('renders progress, diffs and actionable warnings while hiding technical activity', () => {
   const html = renderToStaticMarkup(<AgentActivityPanel activity={{
     plan: { plan: [{ step: '运行测试', status: 'inProgress' }] },
     tools: { shell: { output: '23 passed' } }, diff: { diff: '-old\n+new' },
-    warnings: [{ message: '已切换模型' }],
+    warnings: [{ message: '已切换模型' }, {
+      message: 'Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. Codex will use the bundled bubblewrap in the meantime.',
+    }],
     items: { reasoning: { id: 'reasoning', type: 'reasoning', summary: ['检查测试结果'] } },
   }} />);
-  for (const text of ['运行测试', '进行中', '23 passed', 'agent-diff-add', 'agent-diff-remove', '检查测试结果', '已切换模型']) expect(html).toContain(text);
+  for (const text of ['运行测试', '进行中', 'agent-diff-add', 'agent-diff-remove', '已切换模型']) expect(html).toContain(text);
+  for (const text of ['bubblewrap', '工具实时输出', '23 passed', '思考摘要', '检查测试结果']) expect(html).not.toContain(text);
 });
 
 const question: AgentQuestion = { id: 'request-1', kind: 'question', header: '工具', question: '配置', options: [],

@@ -15,9 +15,10 @@ export default function AgentActivityPanel({ activity }: { activity?: AgentActiv
   const warnings = activity.warnings?.filter(warning => (
     warning.method !== 'mcpServer/startupStatus/updated'
       && !/Model metadata for .+ not found\. Defaulting to fallback metadata/i.test(warningText(warning))
+      && !/Codex could not find bubblewrap on PATH\./i.test(warningText(warning))
   )) ?? [];
-  const tools = Object.entries(activity.tools ?? {});
-  const items = Object.values(activity.items ?? {}).filter(item => !['agentMessage', 'plan'].includes(item.type));
+  const tools = Object.entries(activity.tools ?? {}).filter(([, tool]) => tool.method === 'item/fileChange/patchUpdated');
+  const items = Object.values(activity.items ?? {}).filter(item => !['agentMessage', 'plan', 'reasoning'].includes(item.type));
   if (!activity.plan?.plan?.length && !warnings.length && !tools.length && !activity.diff?.diff && !items.length) return null;
   return <div className="agent-activity-panel">
     {!!activity.plan?.plan?.length && <section aria-label="执行步骤" className="agent-plan-progress">
@@ -33,7 +34,7 @@ export default function AgentActivityPanel({ activity }: { activity?: AgentActiv
       {!!warning.details && <details><summary>查看详情</summary><pre>{text(warning.details)}</pre></details>}
     </div>)}
     {tools.map(([id, tool]) => <details key={id} className="agent-activity-detail">
-      <summary>{tool.method === 'item/fileChange/patchUpdated' ? '文件修改' : '工具实时输出'}</summary>
+      <summary>文件修改</summary>
       <pre>{text(tool.output ?? tool.patch ?? tool.message ?? tool)}</pre>
     </details>)}
     {!!activity.diff?.diff && <details className="agent-activity-detail">
@@ -43,7 +44,7 @@ export default function AgentActivityPanel({ activity }: { activity?: AgentActiv
     </details>}
     {items.map(item =>
       <details key={item.id} className="agent-activity-detail">
-        <summary>{item.type === 'reasoning' ? '思考摘要' : item.type === 'contextCompaction' ? '上下文已压缩'
+        <summary>{item.type === 'contextCompaction' ? '上下文已压缩'
           : item.type === 'subAgentActivity' ? `${item.agentNickname || item.agentRole || item.agentPath || '子任务'} · ${agentStates[item.kind ?? ''] || item.status || '执行中'}` : '审查结果'}</summary>
         <pre>{item.summary?.join('\n\n') || item.review || item.text || agentStates[item.kind ?? ''] || item.status || ''}</pre>
       </details>)}
