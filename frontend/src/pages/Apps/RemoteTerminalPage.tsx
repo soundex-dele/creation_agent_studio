@@ -47,8 +47,10 @@ function TerminalView({ deviceId, sessionId, online, onExit }: {
       const [{ Terminal: XTerminal }, { FitAddon }] = await Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit')]);
       await import('@xterm/xterm/css/xterm.css');
       if (controller.signal.aborted || !host.current) return;
+      // Keep xterm's normal input handling: forcing screenReaderMode disables its
+      // input-event fallback and drops text committed by some IMEs/virtual keyboards.
       const term = new XTerminal({ cursorBlink: true, fontSize: 15, fontFamily: 'Consolas, Menlo, monospace',
-        scrollback: 5000, screenReaderMode: true, allowProposedApi: false, disableStdin: true });
+        scrollback: 5000, allowProposedApi: false, disableStdin: true });
       const fit = new FitAddon();
       term.loadAddon(fit); term.open(host.current); terminal.current = term;
       const sender = new TerminalInput(deviceId, sessionId, failure => {

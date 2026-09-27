@@ -21,6 +21,7 @@ import { useProjectStore, type Project } from '@/stores/useProjectStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import FolderPickerModal from '@/pages/Apps/FolderPickerModal';
+import { workingDirectoryLabel } from '@/lib/workingDirectoryLabel';
 import './MessageInput.css';
 
 export interface ComposerContext {
@@ -465,11 +466,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
             },
           }}
         >
-          <button className="chat-composer-action" disabled={disabled || workspaceLocked} aria-label="选择工作空间"
-            title={workspaceLocked ? '当前对话不支持切换工作空间' : selectedProject?.title || selectedSystemDirectory || '选择工作空间'}>
+          <button className="chat-composer-action chat-composer-workspace" disabled={disabled || workspaceLocked} aria-label="选择工作空间"
+            title={selectedProject?.title || selectedSystemDirectory || (workspaceLocked ? '当前对话不支持切换工作空间' : '选择工作空间')}>
             <FolderOutlined />
             <span>{selectedProject?.title
-              || (selectedSystemDirectory ? selectedSystemDirectory : '选择工作空间')}</span>
+              || (selectedSystemDirectory ? workingDirectoryLabel(selectedSystemDirectory) : '选择工作空间')}</span>
           </button>
         </Dropdown>
         <Dropdown

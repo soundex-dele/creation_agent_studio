@@ -277,3 +277,20 @@
     transition-duration: .01ms !important;
   }
 }
+
+/* Keep long workspace names from pushing the other composer controls away. */
+.chat-composer-workspace {
+  min-width: 0;
+  max-width: min(280px, 100%);
+}
+
+.chat-composer-workspace > .anticon {
+  flex-shrink: 0;
+}
+
+.chat-composer-workspace > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

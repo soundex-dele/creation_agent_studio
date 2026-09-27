@@ -9,6 +9,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import type { WorkspaceFileEntry, WorkspaceFilePreview } from '@/types/workspaceFiles';
+import { workingDirectoryLabel } from '@/lib/workingDirectoryLabel';
 import './WorkspaceFilesPanel.css';
 
 interface Props {
@@ -84,7 +85,7 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
       <div className="workspace-files-header">
         <div>
           <div className="workspace-files-title">工作目录</div>
-          <div className="workspace-files-path" title={workingDirectory}>{workingDirectory}</div>
+          <div className="workspace-files-path" title={workingDirectory}>{workingDirectoryLabel(workingDirectory)}</div>
         </div>
         <div className="workspace-files-actions">
           <button type="button" aria-label="复制工作目录" onClick={copyDirectory} disabled={!workingDirectory}>

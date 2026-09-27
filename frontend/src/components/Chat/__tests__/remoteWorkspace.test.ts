@@ -160,3 +160,20 @@ it('blocks sending and further workspace changes while saving', async () => {
   await act(async () => resolveSave({ ...store.getState().currentConversation, project: 7, working_directory: directory }));
   expect(host.querySelector<HTMLButtonElement>('[aria-label="选择工作空间"]')!.disabled).toBe(false);
 });
+
+it('compacts a long working directory but keeps its full path for display and sending', async () => {
+  const longPath = '/Users/owner/workspace/projects/creation_agent_studio';
+  await render({ workspace: { workingDirectory: longPath } });
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="选择工作空间"]')!;
+  expect(button.textContent).toBe('creation_agent_studio');
+  expect(button.title).toBe(longPath);
+  await click('[aria-label="发送消息"]');
+  expect(post).toHaveBeenCalledWith(`${prefix}/conversations/`, {
+    title: 'hello', working_directory: longPath,
+  }, expect.any(Object));
+});
+
+it('keeps a short working directory visible in full', async () => {
+  await render({ workspace: { workingDirectory: '/tmp/project' } });
+  expect(host.querySelector('[aria-label="选择工作空间"]')?.textContent).toBe('/tmp/project');
+});
