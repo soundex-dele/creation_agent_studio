@@ -32,6 +32,7 @@ const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWith
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
+const KitchenAssistantPage = lazy(() => import('@/pages/Apps/KitchenAssistantPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
@@ -300,6 +301,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ApplicationShell fullBleed>{page(<BrandLibraryPage />)}</ApplicationShell>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/applications/:applicationId/kitchen-assistant',
+    element: (
+      <ProtectedRoute>
+        <ApplicationShell fullBleed>{page(<KitchenAssistantPage />)}</ApplicationShell>
       </ProtectedRoute>
     ),
   },

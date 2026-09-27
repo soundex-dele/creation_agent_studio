@@ -32,6 +32,12 @@ The sync command is idempotent. When a package manifest sets `activate: true`,
 its active deployment follows the latest changed manifest revision. Removing a
 package does not drop its tables or historical catalog records.
 
+## Kitchen assistant
+
+The **厨房助手** (`kitchen-assistant`) workspace ports the Flutter kitchen app
+into a private web application with recipes, meal plans, shopping lists, cooking
+timers, inventory and cooking history. See [`kitchen_assistant/README.md`](kitchen_assistant/README.md).
+
 ## Guided content applications
 
 The **会议与访谈助手** (`meeting-assistant`) workspace turns private recordings

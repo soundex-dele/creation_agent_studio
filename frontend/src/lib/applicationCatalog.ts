@@ -18,6 +18,7 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'brand-library': (app, entry) => withEntry(`/applications/${app.applicationId}/brand-library`, entry),
   'my-drive': (app, entry) => withEntry(`/applications/${app.applicationId}/my-drive`, entry),
   documents: (app, entry) => withEntry(`/applications/${app.applicationId}/documents`, entry),
+  'kitchen-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/kitchen-assistant`, entry),
   'ideas-todos': (app, entry) => withEntry(`/applications/${app.applicationId}/ideas-todos`, entry),
   'my-computer': (_app, entry) => withEntry('/apps/my-computer', entry),
   'case-library': (_app, entry) => withEntry('/apps/case-library', entry),

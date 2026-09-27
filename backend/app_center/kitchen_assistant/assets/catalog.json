@@ -1,0 +1,3476 @@
+[
+  {
+    "id": "kitchen-catalog-01",
+    "catalogId": "kitchen-catalog-01",
+    "name": "燕麦牛奶粥",
+    "category": "早餐",
+    "intro": "适合两人家庭的燕麦牛奶粥，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 10,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-01-i0",
+        "name": "燕麦",
+        "amount": 80.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-01-i1",
+        "name": "牛奶",
+        "amount": 400.0,
+        "unit": "毫升",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-01-i2",
+        "name": "水",
+        "amount": 200.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-01-s0",
+        "title": "准备食材",
+        "description": "量好燕麦、牛奶和水。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-01-i0",
+          "kitchen-catalog-01-i1",
+          "kitchen-catalog-01-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-01-s1",
+        "title": "开始烹饪",
+        "description": "水煮开后加入燕麦，小火煮5分钟并搅拌。",
+        "phase": "cook",
+        "durationMinutes": 1,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-01-i0",
+          "kitchen-catalog-01-i1",
+          "kitchen-catalog-01-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-01-s2",
+        "title": "完成与检查",
+        "description": "倒入牛奶，小火加热至冒小泡后关火。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-01-i0",
+          "kitchen-catalog-01-i1",
+          "kitchen-catalog-01-i2"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-02",
+    "catalogId": "kitchen-catalog-02",
+    "name": "鸡蛋蔬菜饼",
+    "category": "早餐",
+    "intro": "适合两人家庭的鸡蛋蔬菜饼，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-02-i0",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-02-i1",
+        "name": "面粉",
+        "amount": 80.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-02-i2",
+        "name": "胡萝卜",
+        "amount": 50.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-02-i3",
+        "name": "葱",
+        "amount": 1.0,
+        "unit": "根",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-02-i4",
+        "name": "水",
+        "amount": 100.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-02-i5",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-02-i6",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-02-s0",
+        "title": "准备食材",
+        "description": "胡萝卜擦细丝，葱切碎，与面粉、鸡蛋、水和盐拌成糊。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-02-i0",
+          "kitchen-catalog-02-i1",
+          "kitchen-catalog-02-i2",
+          "kitchen-catalog-02-i3",
+          "kitchen-catalog-02-i4",
+          "kitchen-catalog-02-i5",
+          "kitchen-catalog-02-i6"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-02-s1",
+        "title": "开始烹饪",
+        "description": "平底锅刷油，摊薄饼，中小火煎至底部凝固。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-02-i0",
+          "kitchen-catalog-02-i1",
+          "kitchen-catalog-02-i2",
+          "kitchen-catalog-02-i3",
+          "kitchen-catalog-02-i4",
+          "kitchen-catalog-02-i5",
+          "kitchen-catalog-02-i6"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-02-s2",
+        "title": "完成与检查",
+        "description": "翻面继续煎至两面金黄、内部熟透，切块装盘。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-02-i0",
+          "kitchen-catalog-02-i1",
+          "kitchen-catalog-02-i2",
+          "kitchen-catalog-02-i3",
+          "kitchen-catalog-02-i4",
+          "kitchen-catalog-02-i5",
+          "kitchen-catalog-02-i6"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "平底锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-03",
+    "catalogId": "kitchen-catalog-03",
+    "name": "玉米鸡蛋三明治",
+    "category": "早餐",
+    "intro": "适合两人家庭的玉米鸡蛋三明治，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-03-i0",
+        "name": "吐司",
+        "amount": 4.0,
+        "unit": "片",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-03-i1",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-03-i2",
+        "name": "熟玉米粒",
+        "amount": 60.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-03-i3",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-03-i4",
+        "name": "盐",
+        "amount": 1.0,
+        "unit": "克",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-03-s0",
+        "title": "准备食材",
+        "description": "鸡蛋加盐打散，熟玉米粒沥水。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-03-i0",
+          "kitchen-catalog-03-i1",
+          "kitchen-catalog-03-i2",
+          "kitchen-catalog-03-i3",
+          "kitchen-catalog-03-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-03-s1",
+        "title": "开始烹饪",
+        "description": "锅中放油，倒蛋液和玉米，小火煎至蛋液完全凝固。",
+        "phase": "cook",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-03-i0",
+          "kitchen-catalog-03-i1",
+          "kitchen-catalog-03-i2",
+          "kitchen-catalog-03-i3",
+          "kitchen-catalog-03-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-03-s2",
+        "title": "完成与检查",
+        "description": "用吐司夹住蛋饼，轻压后对切。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-03-i0",
+          "kitchen-catalog-03-i1",
+          "kitchen-catalog-03-i2",
+          "kitchen-catalog-03-i3",
+          "kitchen-catalog-03-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "平底锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-04",
+    "catalogId": "kitchen-catalog-04",
+    "name": "南瓜小米粥",
+    "category": "早餐",
+    "intro": "适合两人家庭的南瓜小米粥，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 35,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-04-i0",
+        "name": "南瓜",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-04-i1",
+        "name": "小米",
+        "amount": 80.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-04-i2",
+        "name": "水",
+        "amount": 800.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-04-s0",
+        "title": "准备食材",
+        "description": "南瓜去皮去籽切小块，小米淘洗。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-04-i0",
+          "kitchen-catalog-04-i1",
+          "kitchen-catalog-04-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-04-s1",
+        "title": "开始烹饪",
+        "description": "水烧开后下小米和南瓜，小火煮25分钟，间歇搅拌。",
+        "phase": "cook",
+        "durationMinutes": 25,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-04-i0",
+          "kitchen-catalog-04-i1",
+          "kitchen-catalog-04-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-04-s2",
+        "title": "完成与检查",
+        "description": "煮至小米软烂、南瓜可压碎，按喜好调整稠度。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-04-i0",
+          "kitchen-catalog-04-i1",
+          "kitchen-catalog-04-i2"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-05",
+    "catalogId": "kitchen-catalog-05",
+    "name": "葱花鸡蛋羹",
+    "category": "早餐",
+    "intro": "适合两人家庭的葱花鸡蛋羹，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-05-i0",
+        "name": "鸡蛋",
+        "amount": 3.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-05-i1",
+        "name": "温水",
+        "amount": 225.0,
+        "unit": "毫升",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-05-i2",
+        "name": "葱",
+        "amount": 1.0,
+        "unit": "根",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-05-i3",
+        "name": "盐",
+        "amount": 1.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-05-i4",
+        "name": "生抽",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-05-s0",
+        "title": "准备食材",
+        "description": "鸡蛋打散，加入温水和盐搅匀，过滤入耐热碗。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-05-i0",
+          "kitchen-catalog-05-i1",
+          "kitchen-catalog-05-i2",
+          "kitchen-catalog-05-i3",
+          "kitchen-catalog-05-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-05-s1",
+        "title": "开始烹饪",
+        "description": "盖耐热盘防水滴，放入已上汽蒸锅，中小火蒸12分钟。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-05-i0",
+          "kitchen-catalog-05-i1",
+          "kitchen-catalog-05-i2",
+          "kitchen-catalog-05-i3",
+          "kitchen-catalog-05-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-05-s2",
+        "title": "完成与检查",
+        "description": "确认蛋液完全凝固，撒葱花、淋生抽。未凝固时继续蒸。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-05-i0",
+          "kitchen-catalog-05-i1",
+          "kitchen-catalog-05-i2",
+          "kitchen-catalog-05-i3",
+          "kitchen-catalog-05-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "蒸锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-06",
+    "catalogId": "kitchen-catalog-06",
+    "name": "香蕉煎吐司",
+    "category": "早餐",
+    "intro": "适合两人家庭的香蕉煎吐司，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": [
+      "早"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-06-i0",
+        "name": "吐司",
+        "amount": 4.0,
+        "unit": "片",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-06-i1",
+        "name": "香蕉",
+        "amount": 1.0,
+        "unit": "根",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-06-i2",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-06-i3",
+        "name": "牛奶",
+        "amount": 50.0,
+        "unit": "毫升",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-06-i4",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-06-s0",
+        "title": "准备食材",
+        "description": "香蕉切片；鸡蛋与牛奶打匀。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-06-i0",
+          "kitchen-catalog-06-i1",
+          "kitchen-catalog-06-i2",
+          "kitchen-catalog-06-i3",
+          "kitchen-catalog-06-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-06-s1",
+        "title": "开始烹饪",
+        "description": "吐司两面蘸蛋液，刷油锅中小火煎至两面定型且蛋液熟透。",
+        "phase": "cook",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-06-i0",
+          "kitchen-catalog-06-i1",
+          "kitchen-catalog-06-i2",
+          "kitchen-catalog-06-i3",
+          "kitchen-catalog-06-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-06-s2",
+        "title": "完成与检查",
+        "description": "夹入香蕉片，对切后食用。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-06-i0",
+          "kitchen-catalog-06-i1",
+          "kitchen-catalog-06-i2",
+          "kitchen-catalog-06-i3",
+          "kitchen-catalog-06-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "早餐",
+      "家常"
+    ],
+    "equipment": [
+      "平底锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-07",
+    "catalogId": "kitchen-catalog-07",
+    "name": "土豆炖鸡",
+    "category": "荤菜",
+    "intro": "适合两人家庭的土豆炖鸡，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 45,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-07-i0",
+        "name": "鸡腿肉",
+        "amount": 350.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-07-i1",
+        "name": "土豆",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-07-i2",
+        "name": "姜",
+        "amount": 10.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-07-i3",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-07-i4",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-07-i5",
+        "name": "水",
+        "amount": 500.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-07-i6",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-07-s0",
+        "title": "准备食材",
+        "description": "鸡腿肉切块，土豆去皮切块，姜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-07-i0",
+          "kitchen-catalog-07-i1",
+          "kitchen-catalog-07-i2",
+          "kitchen-catalog-07-i3",
+          "kitchen-catalog-07-i4",
+          "kitchen-catalog-07-i5",
+          "kitchen-catalog-07-i6"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-07-s1",
+        "title": "开始烹饪",
+        "description": "锅中加油炒香姜片，放鸡块炒至变色，加生抽和水煮开。",
+        "phase": "cook",
+        "durationMinutes": 35,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-07-i0",
+          "kitchen-catalog-07-i1",
+          "kitchen-catalog-07-i2",
+          "kitchen-catalog-07-i3",
+          "kitchen-catalog-07-i4",
+          "kitchen-catalog-07-i5",
+          "kitchen-catalog-07-i6"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-07-s2",
+        "title": "完成与检查",
+        "description": "放土豆，小火炖25分钟至鸡肉熟透、土豆软，再加盐收汁。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-07-i0",
+          "kitchen-catalog-07-i1",
+          "kitchen-catalog-07-i2",
+          "kitchen-catalog-07-i3",
+          "kitchen-catalog-07-i4",
+          "kitchen-catalog-07-i5",
+          "kitchen-catalog-07-i6"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-08",
+    "catalogId": "kitchen-catalog-08",
+    "name": "香菇蒸鸡",
+    "category": "荤菜",
+    "intro": "适合两人家庭的香菇蒸鸡，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 35,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-08-i0",
+        "name": "鸡腿肉",
+        "amount": 350.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-08-i1",
+        "name": "鲜香菇",
+        "amount": 150.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-08-i2",
+        "name": "姜",
+        "amount": 10.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-08-i3",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-08-i4",
+        "name": "淀粉",
+        "amount": 5.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-08-i5",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-08-s0",
+        "title": "准备食材",
+        "description": "鸡肉切小块、香菇切片，拌入姜丝、生抽、淀粉和油。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-08-i0",
+          "kitchen-catalog-08-i1",
+          "kitchen-catalog-08-i2",
+          "kitchen-catalog-08-i3",
+          "kitchen-catalog-08-i4",
+          "kitchen-catalog-08-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-08-s1",
+        "title": "开始烹饪",
+        "description": "腌10分钟后铺入浅耐热盘，放上汽蒸锅。",
+        "phase": "cook",
+        "durationMinutes": 25,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-08-i0",
+          "kitchen-catalog-08-i1",
+          "kitchen-catalog-08-i2",
+          "kitchen-catalog-08-i3",
+          "kitchen-catalog-08-i4",
+          "kitchen-catalog-08-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-08-s2",
+        "title": "完成与检查",
+        "description": "中火蒸20分钟，检查最厚肉块熟透后出锅，未熟继续蒸。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-08-i0",
+          "kitchen-catalog-08-i1",
+          "kitchen-catalog-08-i2",
+          "kitchen-catalog-08-i3",
+          "kitchen-catalog-08-i4",
+          "kitchen-catalog-08-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "蒸锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-09",
+    "catalogId": "kitchen-catalog-09",
+    "name": "芹菜炒牛肉",
+    "category": "荤菜",
+    "intro": "适合两人家庭的芹菜炒牛肉，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 25,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-09-i0",
+        "name": "牛肉",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-09-i1",
+        "name": "芹菜",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-09-i2",
+        "name": "姜",
+        "amount": 10.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-09-i3",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-09-i4",
+        "name": "淀粉",
+        "amount": 5.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-09-i5",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-09-s0",
+        "title": "准备食材",
+        "description": "牛肉逆纹切薄片，拌生抽淀粉；芹菜切段，姜切丝。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-09-i0",
+          "kitchen-catalog-09-i1",
+          "kitchen-catalog-09-i2",
+          "kitchen-catalog-09-i3",
+          "kitchen-catalog-09-i4",
+          "kitchen-catalog-09-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-09-s1",
+        "title": "开始烹饪",
+        "description": "热锅下油炒散牛肉至变色后盛出。",
+        "phase": "cook",
+        "durationMinutes": 15,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-09-i0",
+          "kitchen-catalog-09-i1",
+          "kitchen-catalog-09-i2",
+          "kitchen-catalog-09-i3",
+          "kitchen-catalog-09-i4",
+          "kitchen-catalog-09-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-09-s2",
+        "title": "完成与检查",
+        "description": "锅中炒香姜和芹菜，牛肉回锅继续炒至完全熟透。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-09-i0",
+          "kitchen-catalog-09-i1",
+          "kitchen-catalog-09-i2",
+          "kitchen-catalog-09-i3",
+          "kitchen-catalog-09-i4",
+          "kitchen-catalog-09-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-10",
+    "catalogId": "kitchen-catalog-10",
+    "name": "西兰花炒虾仁",
+    "category": "荤菜",
+    "intro": "适合两人家庭的西兰花炒虾仁，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-10-i0",
+        "name": "虾仁",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-10-i1",
+        "name": "西兰花",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-10-i2",
+        "name": "蒜",
+        "amount": 3.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-10-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-10-i4",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-10-s0",
+        "title": "准备食材",
+        "description": "虾仁去虾线，西兰花切小朵洗净，蒜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-10-i0",
+          "kitchen-catalog-10-i1",
+          "kitchen-catalog-10-i2",
+          "kitchen-catalog-10-i3",
+          "kitchen-catalog-10-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-10-s1",
+        "title": "开始烹饪",
+        "description": "西兰花在沸水中焯2分钟捞出；锅中热油炒蒜和虾仁。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-10-i0",
+          "kitchen-catalog-10-i1",
+          "kitchen-catalog-10-i2",
+          "kitchen-catalog-10-i3",
+          "kitchen-catalog-10-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-10-s2",
+        "title": "完成与检查",
+        "description": "虾仁炒至完全变色熟透，加入西兰花和盐翻炒均匀。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-10-i0",
+          "kitchen-catalog-10-i1",
+          "kitchen-catalog-10-i2",
+          "kitchen-catalog-10-i3",
+          "kitchen-catalog-10-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-11",
+    "catalogId": "kitchen-catalog-11",
+    "name": "洋葱炒肉片",
+    "category": "荤菜",
+    "intro": "适合两人家庭的洋葱炒肉片，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 25,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-11-i0",
+        "name": "猪瘦肉",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-11-i1",
+        "name": "洋葱",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-11-i2",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-11-i3",
+        "name": "淀粉",
+        "amount": 5.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-11-i4",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-11-s0",
+        "title": "准备食材",
+        "description": "猪肉切薄片用生抽和淀粉拌匀，洋葱切丝。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-11-i0",
+          "kitchen-catalog-11-i1",
+          "kitchen-catalog-11-i2",
+          "kitchen-catalog-11-i3",
+          "kitchen-catalog-11-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-11-s1",
+        "title": "开始烹饪",
+        "description": "热锅下油，肉片炒散至变色，加入洋葱。",
+        "phase": "cook",
+        "durationMinutes": 15,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-11-i0",
+          "kitchen-catalog-11-i1",
+          "kitchen-catalog-11-i2",
+          "kitchen-catalog-11-i3",
+          "kitchen-catalog-11-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-11-s2",
+        "title": "完成与检查",
+        "description": "继续翻炒至洋葱变软、肉片完全熟透后出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-11-i0",
+          "kitchen-catalog-11-i1",
+          "kitchen-catalog-11-i2",
+          "kitchen-catalog-11-i3",
+          "kitchen-catalog-11-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-12",
+    "catalogId": "kitchen-catalog-12",
+    "name": "冬瓜炖排骨",
+    "category": "荤菜",
+    "intro": "适合两人家庭的冬瓜炖排骨，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 60,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-12-i0",
+        "name": "排骨",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-12-i1",
+        "name": "冬瓜",
+        "amount": 300.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-12-i2",
+        "name": "姜",
+        "amount": 15.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-12-i3",
+        "name": "水",
+        "amount": 1200.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-12-i4",
+        "name": "盐",
+        "amount": 3.0,
+        "unit": "克",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-12-s0",
+        "title": "准备食材",
+        "description": "排骨冷水下锅煮开，撇沫后捞出；冬瓜去皮切块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-12-i0",
+          "kitchen-catalog-12-i1",
+          "kitchen-catalog-12-i2",
+          "kitchen-catalog-12-i3",
+          "kitchen-catalog-12-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-12-s1",
+        "title": "开始烹饪",
+        "description": "排骨、姜和清水煮开后转小火炖40分钟。",
+        "phase": "cook",
+        "durationMinutes": 50,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-12-i0",
+          "kitchen-catalog-12-i1",
+          "kitchen-catalog-12-i2",
+          "kitchen-catalog-12-i3",
+          "kitchen-catalog-12-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-12-s2",
+        "title": "完成与检查",
+        "description": "放冬瓜再炖15分钟至排骨熟透、冬瓜软，加盐。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-12-i0",
+          "kitchen-catalog-12-i1",
+          "kitchen-catalog-12-i2",
+          "kitchen-catalog-12-i3",
+          "kitchen-catalog-12-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-13",
+    "catalogId": "kitchen-catalog-13",
+    "name": "清蒸鲈鱼",
+    "category": "荤菜",
+    "intro": "适合两人家庭的清蒸鲈鱼，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 30,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-13-i0",
+        "name": "鲈鱼",
+        "amount": 500.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-13-i1",
+        "name": "姜",
+        "amount": 15.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-13-i2",
+        "name": "葱",
+        "amount": 2.0,
+        "unit": "根",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-13-i3",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-13-i4",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-13-s0",
+        "title": "准备食材",
+        "description": "鲈鱼去内脏鳃和鳞，洗净；姜葱切丝，铺入蒸盘。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-13-i0",
+          "kitchen-catalog-13-i1",
+          "kitchen-catalog-13-i2",
+          "kitchen-catalog-13-i3",
+          "kitchen-catalog-13-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-13-s1",
+        "title": "开始烹饪",
+        "description": "放入上汽蒸锅蒸15分钟，厚肉处不透明且能轻松剥离鱼骨才算熟，必要时延长。",
+        "phase": "cook",
+        "durationMinutes": 20,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-13-i0",
+          "kitchen-catalog-13-i1",
+          "kitchen-catalog-13-i2",
+          "kitchen-catalog-13-i3",
+          "kitchen-catalog-13-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-13-s2",
+        "title": "完成与检查",
+        "description": "倒去盘中水，淋生抽，铺葱丝，浇热油。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-13-i0",
+          "kitchen-catalog-13-i1",
+          "kitchen-catalog-13-i2",
+          "kitchen-catalog-13-i3",
+          "kitchen-catalog-13-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "蒸锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-14",
+    "catalogId": "kitchen-catalog-14",
+    "name": "彩椒鸡丁",
+    "category": "荤菜",
+    "intro": "适合两人家庭的彩椒鸡丁，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 25,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-14-i0",
+        "name": "鸡胸肉",
+        "amount": 300.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-14-i1",
+        "name": "彩椒",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-14-i2",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-14-i3",
+        "name": "淀粉",
+        "amount": 5.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-14-i4",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-14-s0",
+        "title": "准备食材",
+        "description": "鸡胸肉切丁用生抽淀粉拌匀，彩椒去籽切块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-14-i0",
+          "kitchen-catalog-14-i1",
+          "kitchen-catalog-14-i2",
+          "kitchen-catalog-14-i3",
+          "kitchen-catalog-14-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-14-s1",
+        "title": "开始烹饪",
+        "description": "热锅加油炒鸡丁，翻炒至鸡肉完全熟透。",
+        "phase": "cook",
+        "durationMinutes": 15,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-14-i0",
+          "kitchen-catalog-14-i1",
+          "kitchen-catalog-14-i2",
+          "kitchen-catalog-14-i3",
+          "kitchen-catalog-14-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-14-s2",
+        "title": "完成与检查",
+        "description": "加入彩椒炒至断生，拌匀出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-14-i0",
+          "kitchen-catalog-14-i1",
+          "kitchen-catalog-14-i2",
+          "kitchen-catalog-14-i3",
+          "kitchen-catalog-14-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "荤菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-15",
+    "catalogId": "kitchen-catalog-15",
+    "name": "蒜蓉西兰花",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的蒜蓉西兰花，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-15-i0",
+        "name": "西兰花",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-15-i1",
+        "name": "蒜",
+        "amount": 4.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-15-i2",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-15-i3",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-15-s0",
+        "title": "准备食材",
+        "description": "西兰花切小朵洗净，蒜切末。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-15-i0",
+          "kitchen-catalog-15-i1",
+          "kitchen-catalog-15-i2",
+          "kitchen-catalog-15-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-15-s1",
+        "title": "开始烹饪",
+        "description": "西兰花沸水焯2分钟沥水；锅中热油炒蒜末。",
+        "phase": "cook",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-15-i0",
+          "kitchen-catalog-15-i1",
+          "kitchen-catalog-15-i2",
+          "kitchen-catalog-15-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-15-s2",
+        "title": "完成与检查",
+        "description": "加入西兰花和盐，翻炒至熟后出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-15-i0",
+          "kitchen-catalog-15-i1",
+          "kitchen-catalog-15-i2",
+          "kitchen-catalog-15-i3"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-16",
+    "catalogId": "kitchen-catalog-16",
+    "name": "醋溜土豆丝",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的醋溜土豆丝，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-16-i0",
+        "name": "土豆",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-16-i1",
+        "name": "蒜",
+        "amount": 2.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-16-i2",
+        "name": "醋",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-16-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-16-i4",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-16-s0",
+        "title": "准备食材",
+        "description": "土豆去皮切细丝，清水洗去淀粉并沥干，蒜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-16-i0",
+          "kitchen-catalog-16-i1",
+          "kitchen-catalog-16-i2",
+          "kitchen-catalog-16-i3",
+          "kitchen-catalog-16-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-16-s1",
+        "title": "开始烹饪",
+        "description": "热锅放油炒香蒜片，加入土豆丝翻炒。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-16-i0",
+          "kitchen-catalog-16-i1",
+          "kitchen-catalog-16-i2",
+          "kitchen-catalog-16-i3",
+          "kitchen-catalog-16-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-16-s2",
+        "title": "完成与检查",
+        "description": "加醋和盐，炒至土豆丝熟而有口感。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-16-i0",
+          "kitchen-catalog-16-i1",
+          "kitchen-catalog-16-i2",
+          "kitchen-catalog-16-i3",
+          "kitchen-catalog-16-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-17",
+    "catalogId": "kitchen-catalog-17",
+    "name": "香菇炒油菜",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的香菇炒油菜，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-17-i0",
+        "name": "油菜",
+        "amount": 300.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-17-i1",
+        "name": "鲜香菇",
+        "amount": 150.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-17-i2",
+        "name": "蒜",
+        "amount": 2.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-17-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-17-i4",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-17-s0",
+        "title": "准备食材",
+        "description": "油菜洗净沥水，香菇切片，蒜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-17-i0",
+          "kitchen-catalog-17-i1",
+          "kitchen-catalog-17-i2",
+          "kitchen-catalog-17-i3",
+          "kitchen-catalog-17-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-17-s1",
+        "title": "开始烹饪",
+        "description": "热油炒蒜和香菇，炒至香菇变软。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-17-i0",
+          "kitchen-catalog-17-i1",
+          "kitchen-catalog-17-i2",
+          "kitchen-catalog-17-i3",
+          "kitchen-catalog-17-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-17-s2",
+        "title": "完成与检查",
+        "description": "加入油菜炒熟，撒盐拌匀出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-17-i0",
+          "kitchen-catalog-17-i1",
+          "kitchen-catalog-17-i2",
+          "kitchen-catalog-17-i3",
+          "kitchen-catalog-17-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-18",
+    "catalogId": "kitchen-catalog-18",
+    "name": "西葫芦炒鸡蛋",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的西葫芦炒鸡蛋，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-18-i0",
+        "name": "西葫芦",
+        "amount": 350.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-18-i1",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-18-i2",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-18-i3",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-18-s0",
+        "title": "准备食材",
+        "description": "西葫芦切薄片，鸡蛋打散。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-18-i0",
+          "kitchen-catalog-18-i1",
+          "kitchen-catalog-18-i2",
+          "kitchen-catalog-18-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-18-s1",
+        "title": "开始烹饪",
+        "description": "锅中放一半油炒熟鸡蛋盛出，再加剩余油炒西葫芦。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-18-i0",
+          "kitchen-catalog-18-i1",
+          "kitchen-catalog-18-i2",
+          "kitchen-catalog-18-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-18-s2",
+        "title": "完成与检查",
+        "description": "西葫芦熟后倒回鸡蛋，加入盐翻匀。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-18-i0",
+          "kitchen-catalog-18-i1",
+          "kitchen-catalog-18-i2",
+          "kitchen-catalog-18-i3"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-19",
+    "catalogId": "kitchen-catalog-19",
+    "name": "手撕包菜",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的手撕包菜，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-19-i0",
+        "name": "包菜",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-19-i1",
+        "name": "蒜",
+        "amount": 3.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-19-i2",
+        "name": "生抽",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-19-i3",
+        "name": "醋",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-19-i4",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-19-s0",
+        "title": "准备食材",
+        "description": "包菜撕成小片，洗净充分沥干，蒜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-19-i0",
+          "kitchen-catalog-19-i1",
+          "kitchen-catalog-19-i2",
+          "kitchen-catalog-19-i3",
+          "kitchen-catalog-19-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-19-s1",
+        "title": "开始烹饪",
+        "description": "热油炒香蒜片，放包菜翻炒。",
+        "phase": "cook",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-19-i0",
+          "kitchen-catalog-19-i1",
+          "kitchen-catalog-19-i2",
+          "kitchen-catalog-19-i3",
+          "kitchen-catalog-19-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-19-s2",
+        "title": "完成与检查",
+        "description": "包菜熟后加入生抽和醋，快速拌匀出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-19-i0",
+          "kitchen-catalog-19-i1",
+          "kitchen-catalog-19-i2",
+          "kitchen-catalog-19-i3",
+          "kitchen-catalog-19-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-20",
+    "catalogId": "kitchen-catalog-20",
+    "name": "清炒莴笋",
+    "category": "蔬菜",
+    "intro": "适合两人家庭的清炒莴笋，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-20-i0",
+        "name": "莴笋",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-20-i1",
+        "name": "蒜",
+        "amount": 2.0,
+        "unit": "瓣",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-20-i2",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-20-i3",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-20-s0",
+        "title": "准备食材",
+        "description": "莴笋去皮切薄片，蒜切片。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-20-i0",
+          "kitchen-catalog-20-i1",
+          "kitchen-catalog-20-i2",
+          "kitchen-catalog-20-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-20-s1",
+        "title": "开始烹饪",
+        "description": "锅中加油炒香蒜片，倒入莴笋翻炒。",
+        "phase": "cook",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-20-i0",
+          "kitchen-catalog-20-i1",
+          "kitchen-catalog-20-i2",
+          "kitchen-catalog-20-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-20-s2",
+        "title": "完成与检查",
+        "description": "炒至莴笋熟而脆，加盐拌匀。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-20-i0",
+          "kitchen-catalog-20-i1",
+          "kitchen-catalog-20-i2",
+          "kitchen-catalog-20-i3"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "蔬菜",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-21",
+    "catalogId": "kitchen-catalog-21",
+    "name": "番茄豆腐汤",
+    "category": "汤类",
+    "intro": "适合两人家庭的番茄豆腐汤，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-21-i0",
+        "name": "番茄",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-21-i1",
+        "name": "豆腐",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-21-i2",
+        "name": "水",
+        "amount": 700.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-21-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-21-i4",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-21-s0",
+        "title": "准备食材",
+        "description": "番茄切块，豆腐切小块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-21-i0",
+          "kitchen-catalog-21-i1",
+          "kitchen-catalog-21-i2",
+          "kitchen-catalog-21-i3",
+          "kitchen-catalog-21-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-21-s1",
+        "title": "开始烹饪",
+        "description": "少量油炒番茄出汁，加入水煮开。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-21-i0",
+          "kitchen-catalog-21-i1",
+          "kitchen-catalog-21-i2",
+          "kitchen-catalog-21-i3",
+          "kitchen-catalog-21-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-21-s2",
+        "title": "完成与检查",
+        "description": "放豆腐煮5分钟，加盐调味。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-21-i0",
+          "kitchen-catalog-21-i1",
+          "kitchen-catalog-21-i2",
+          "kitchen-catalog-21-i3",
+          "kitchen-catalog-21-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "汤类",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-22",
+    "catalogId": "kitchen-catalog-22",
+    "name": "玉米胡萝卜汤",
+    "category": "汤类",
+    "intro": "适合两人家庭的玉米胡萝卜汤，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 30,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-22-i0",
+        "name": "玉米",
+        "amount": 1.0,
+        "unit": "根",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-22-i1",
+        "name": "胡萝卜",
+        "amount": 150.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-22-i2",
+        "name": "水",
+        "amount": 1000.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-22-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-22-s0",
+        "title": "准备食材",
+        "description": "玉米切段，胡萝卜去皮切滚刀块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-22-i0",
+          "kitchen-catalog-22-i1",
+          "kitchen-catalog-22-i2",
+          "kitchen-catalog-22-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-22-s1",
+        "title": "开始烹饪",
+        "description": "食材加水煮开，转小火煮25分钟。",
+        "phase": "cook",
+        "durationMinutes": 20,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-22-i0",
+          "kitchen-catalog-22-i1",
+          "kitchen-catalog-22-i2",
+          "kitchen-catalog-22-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-22-s2",
+        "title": "完成与检查",
+        "description": "煮至食材软熟，加盐拌匀。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-22-i0",
+          "kitchen-catalog-22-i1",
+          "kitchen-catalog-22-i2",
+          "kitchen-catalog-22-i3"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "汤类",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-23",
+    "catalogId": "kitchen-catalog-23",
+    "name": "菌菇鸡蛋汤",
+    "category": "汤类",
+    "intro": "适合两人家庭的菌菇鸡蛋汤，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-23-i0",
+        "name": "鲜香菇",
+        "amount": 100.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-23-i1",
+        "name": "白玉菇",
+        "amount": 100.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-23-i2",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-23-i3",
+        "name": "水",
+        "amount": 800.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-23-i4",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-23-i5",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-23-s0",
+        "title": "准备食材",
+        "description": "菌菇清洗切好，鸡蛋打散。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-23-i0",
+          "kitchen-catalog-23-i1",
+          "kitchen-catalog-23-i2",
+          "kitchen-catalog-23-i3",
+          "kitchen-catalog-23-i4",
+          "kitchen-catalog-23-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-23-s1",
+        "title": "开始烹饪",
+        "description": "少量油炒香菌菇，加水煮开后继续煮8分钟。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-23-i0",
+          "kitchen-catalog-23-i1",
+          "kitchen-catalog-23-i2",
+          "kitchen-catalog-23-i3",
+          "kitchen-catalog-23-i4",
+          "kitchen-catalog-23-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-23-s2",
+        "title": "完成与检查",
+        "description": "细流倒入蛋液，煮至完全凝固，加盐。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-23-i0",
+          "kitchen-catalog-23-i1",
+          "kitchen-catalog-23-i2",
+          "kitchen-catalog-23-i3",
+          "kitchen-catalog-23-i4",
+          "kitchen-catalog-23-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "汤类",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-24",
+    "catalogId": "kitchen-catalog-24",
+    "name": "丝瓜豆腐汤",
+    "category": "汤类",
+    "intro": "适合两人家庭的丝瓜豆腐汤，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-24-i0",
+        "name": "丝瓜",
+        "amount": 300.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-24-i1",
+        "name": "豆腐",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-24-i2",
+        "name": "水",
+        "amount": 700.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-24-i3",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-24-i4",
+        "name": "食用油",
+        "amount": 5.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-24-s0",
+        "title": "准备食材",
+        "description": "丝瓜去皮切块，豆腐切块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-24-i0",
+          "kitchen-catalog-24-i1",
+          "kitchen-catalog-24-i2",
+          "kitchen-catalog-24-i3",
+          "kitchen-catalog-24-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-24-s1",
+        "title": "开始烹饪",
+        "description": "油热后略炒丝瓜，加水煮开。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-24-i0",
+          "kitchen-catalog-24-i1",
+          "kitchen-catalog-24-i2",
+          "kitchen-catalog-24-i3",
+          "kitchen-catalog-24-i4"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-24-s2",
+        "title": "完成与检查",
+        "description": "加入豆腐煮5分钟至丝瓜熟软，加盐出锅。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-24-i0",
+          "kitchen-catalog-24-i1",
+          "kitchen-catalog-24-i2",
+          "kitchen-catalog-24-i3",
+          "kitchen-catalog-24-i4"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "汤类",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-25",
+    "catalogId": "kitchen-catalog-25",
+    "name": "香菇鸡肉焖饭",
+    "category": "主食",
+    "intro": "适合两人家庭的香菇鸡肉焖饭，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 50,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-25-i0",
+        "name": "大米",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-25-i1",
+        "name": "鸡腿肉",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-25-i2",
+        "name": "鲜香菇",
+        "amount": 100.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-25-i3",
+        "name": "胡萝卜",
+        "amount": 100.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-25-i4",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-25-i5",
+        "name": "水",
+        "amount": 300.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-25-s0",
+        "title": "准备食材",
+        "description": "鸡肉切小块拌生抽，香菇和胡萝卜切丁，大米淘洗。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-25-i0",
+          "kitchen-catalog-25-i1",
+          "kitchen-catalog-25-i2",
+          "kitchen-catalog-25-i3",
+          "kitchen-catalog-25-i4",
+          "kitchen-catalog-25-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-25-s1",
+        "title": "开始烹饪",
+        "description": "米和水放电饭煲，铺鸡肉和蔬菜，启动正常煮饭程序。",
+        "phase": "cook",
+        "durationMinutes": 40,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-25-i0",
+          "kitchen-catalog-25-i1",
+          "kitchen-catalog-25-i2",
+          "kitchen-catalog-25-i3",
+          "kitchen-catalog-25-i4",
+          "kitchen-catalog-25-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-25-s2",
+        "title": "完成与检查",
+        "description": "程序结束后检查鸡肉熟透，未熟继续加热；拌匀后盛出。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-25-i0",
+          "kitchen-catalog-25-i1",
+          "kitchen-catalog-25-i2",
+          "kitchen-catalog-25-i3",
+          "kitchen-catalog-25-i4",
+          "kitchen-catalog-25-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "电饭煲"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-26",
+    "catalogId": "kitchen-catalog-26",
+    "name": "番茄鸡蛋面",
+    "category": "主食",
+    "intro": "适合两人家庭的番茄鸡蛋面，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-26-i0",
+        "name": "面条",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-26-i1",
+        "name": "番茄",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-26-i2",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-26-i3",
+        "name": "水",
+        "amount": 1000.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-26-i4",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-26-i5",
+        "name": "食用油",
+        "amount": 10.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-26-s0",
+        "title": "准备食材",
+        "description": "番茄切块，鸡蛋打散。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-26-i0",
+          "kitchen-catalog-26-i1",
+          "kitchen-catalog-26-i2",
+          "kitchen-catalog-26-i3",
+          "kitchen-catalog-26-i4",
+          "kitchen-catalog-26-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-26-s1",
+        "title": "开始烹饪",
+        "description": "锅中放油炒熟鸡蛋，加入番茄炒出汁，加水煮开。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-26-i0",
+          "kitchen-catalog-26-i1",
+          "kitchen-catalog-26-i2",
+          "kitchen-catalog-26-i3",
+          "kitchen-catalog-26-i4",
+          "kitchen-catalog-26-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-26-s2",
+        "title": "完成与检查",
+        "description": "放面条按包装时间煮熟，加盐调味。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-26-i0",
+          "kitchen-catalog-26-i1",
+          "kitchen-catalog-26-i2",
+          "kitchen-catalog-26-i3",
+          "kitchen-catalog-26-i4",
+          "kitchen-catalog-26-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "汤锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-27",
+    "catalogId": "kitchen-catalog-27",
+    "name": "蔬菜蛋炒饭",
+    "category": "主食",
+    "intro": "适合两人家庭的蔬菜蛋炒饭，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 20,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-27-i0",
+        "name": "熟米饭",
+        "amount": 400.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-27-i1",
+        "name": "鸡蛋",
+        "amount": 2.0,
+        "unit": "个",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-27-i2",
+        "name": "胡萝卜",
+        "amount": 80.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-27-i3",
+        "name": "豌豆",
+        "amount": 80.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-27-i4",
+        "name": "盐",
+        "amount": 2.0,
+        "unit": "克",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-27-i5",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-27-s0",
+        "title": "准备食材",
+        "description": "胡萝卜切丁，豌豆焯熟，鸡蛋打散，米饭拨松。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-27-i0",
+          "kitchen-catalog-27-i1",
+          "kitchen-catalog-27-i2",
+          "kitchen-catalog-27-i3",
+          "kitchen-catalog-27-i4",
+          "kitchen-catalog-27-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-27-s1",
+        "title": "开始烹饪",
+        "description": "锅中放油炒熟鸡蛋，加入胡萝卜炒熟。",
+        "phase": "cook",
+        "durationMinutes": 10,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-27-i0",
+          "kitchen-catalog-27-i1",
+          "kitchen-catalog-27-i2",
+          "kitchen-catalog-27-i3",
+          "kitchen-catalog-27-i4",
+          "kitchen-catalog-27-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-27-s2",
+        "title": "完成与检查",
+        "description": "加入米饭和豌豆，充分炒热后加盐拌匀。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-27-i0",
+          "kitchen-catalog-27-i1",
+          "kitchen-catalog-27-i2",
+          "kitchen-catalog-27-i3",
+          "kitchen-catalog-27-i4",
+          "kitchen-catalog-27-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-28",
+    "catalogId": "kitchen-catalog-28",
+    "name": "南瓜蒸饭",
+    "category": "主食",
+    "intro": "适合两人家庭的南瓜蒸饭，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 40,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-28-i0",
+        "name": "大米",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-28-i1",
+        "name": "南瓜",
+        "amount": 250.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-28-i2",
+        "name": "水",
+        "amount": 300.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-28-s0",
+        "title": "准备食材",
+        "description": "大米淘洗，南瓜去皮去籽切块。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-28-i0",
+          "kitchen-catalog-28-i1",
+          "kitchen-catalog-28-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-28-s1",
+        "title": "开始烹饪",
+        "description": "大米和水放电饭煲，铺南瓜，启动煮饭程序。",
+        "phase": "cook",
+        "durationMinutes": 30,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-28-i0",
+          "kitchen-catalog-28-i1",
+          "kitchen-catalog-28-i2"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-28-s2",
+        "title": "完成与检查",
+        "description": "程序完成后焖5分钟，拌匀即可。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-28-i0",
+          "kitchen-catalog-28-i1",
+          "kitchen-catalog-28-i2"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "电饭煲"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-29",
+    "catalogId": "kitchen-catalog-29",
+    "name": "肉末豆角拌面",
+    "category": "主食",
+    "intro": "适合两人家庭的肉末豆角拌面，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 30,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-29-i0",
+        "name": "面条",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-29-i1",
+        "name": "猪肉末",
+        "amount": 150.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-29-i2",
+        "name": "豆角",
+        "amount": 200.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-29-i3",
+        "name": "生抽",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-29-i4",
+        "name": "食用油",
+        "amount": 15.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      },
+      {
+        "id": "kitchen-catalog-29-i5",
+        "name": "水",
+        "amount": 200.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-29-s0",
+        "title": "准备食材",
+        "description": "豆角去筋切小段；面条另锅煮熟沥水。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-29-i0",
+          "kitchen-catalog-29-i1",
+          "kitchen-catalog-29-i2",
+          "kitchen-catalog-29-i3",
+          "kitchen-catalog-29-i4",
+          "kitchen-catalog-29-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-29-s1",
+        "title": "开始烹饪",
+        "description": "炒锅热油炒肉末至熟，加豆角、生抽和水煮开。",
+        "phase": "cook",
+        "durationMinutes": 20,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-29-i0",
+          "kitchen-catalog-29-i1",
+          "kitchen-catalog-29-i2",
+          "kitchen-catalog-29-i3",
+          "kitchen-catalog-29-i4",
+          "kitchen-catalog-29-i5"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-29-s2",
+        "title": "完成与检查",
+        "description": "加盖焖至豆角完全软熟且无生味，肉末熟透后连汁拌面。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-29-i0",
+          "kitchen-catalog-29-i1",
+          "kitchen-catalog-29-i2",
+          "kitchen-catalog-29-i3",
+          "kitchen-catalog-29-i4",
+          "kitchen-catalog-29-i5"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "炒锅"
+    ],
+    "spicy": 0
+  },
+  {
+    "id": "kitchen-catalog-30",
+    "catalogId": "kitchen-catalog-30",
+    "name": "玉米杂粮饭",
+    "category": "主食",
+    "intro": "适合两人家庭的玉米杂粮饭，食材和步骤可按口味调整。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 45,
+    "mealTimes": [
+      "中",
+      "晚"
+    ],
+    "source": "厨房助手原创家常参考",
+    "createdAt": "2026-09-27T00:00:00Z",
+    "updatedAt": "2026-09-27T00:00:00Z",
+    "ingredients": [
+      {
+        "id": "kitchen-catalog-30-i0",
+        "name": "大米",
+        "amount": 150.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-30-i1",
+        "name": "小米",
+        "amount": 50.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-30-i2",
+        "name": "玉米粒",
+        "amount": 100.0,
+        "unit": "克",
+        "type": "main"
+      },
+      {
+        "id": "kitchen-catalog-30-i3",
+        "name": "水",
+        "amount": 320.0,
+        "unit": "毫升",
+        "type": "seasoning"
+      }
+    ],
+    "steps": [
+      {
+        "id": "kitchen-catalog-30-s0",
+        "title": "准备食材",
+        "description": "大米和小米淘洗，玉米粒洗净。",
+        "phase": "prep",
+        "durationMinutes": 5,
+        "heatLevel": "无",
+        "ingredientIds": [
+          "kitchen-catalog-30-i0",
+          "kitchen-catalog-30-i1",
+          "kitchen-catalog-30-i2",
+          "kitchen-catalog-30-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-30-s1",
+        "title": "开始烹饪",
+        "description": "所有食材放电饭煲，启动煮饭程序。",
+        "phase": "cook",
+        "durationMinutes": 35,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-30-i0",
+          "kitchen-catalog-30-i1",
+          "kitchen-catalog-30-i2",
+          "kitchen-catalog-30-i3"
+        ],
+        "mediaUrls": []
+      },
+      {
+        "id": "kitchen-catalog-30-s2",
+        "title": "完成与检查",
+        "description": "程序完成后焖5分钟，翻松盛出。",
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "按步骤调整",
+        "ingredientIds": [
+          "kitchen-catalog-30-i0",
+          "kitchen-catalog-30-i1",
+          "kitchen-catalog-30-i2",
+          "kitchen-catalog-30-i3"
+        ],
+        "mediaUrls": []
+      }
+    ],
+    "tips": [
+      "用时仅供参考，请根据食材大小、设备和实际熟度调整。"
+    ],
+    "favorite": false,
+    "tags": [
+      "主食",
+      "家常"
+    ],
+    "equipment": [
+      "电饭煲"
+    ],
+    "spicy": 0
+  }
+]

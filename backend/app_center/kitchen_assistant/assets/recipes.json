@@ -1,0 +1,160 @@
+[
+  {
+    "id": "r1",
+    "name": "番茄炒蛋",
+    "category": "主菜",
+    "intro": "家常快手菜，酸甜开胃，适合午餐或晚餐搭配米饭。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 15,
+    "mealTimes": ["中", "晚", "中/晚通用"],
+    "source": "内置示例",
+    "createdAt": "2026-07-05T00:00:00.000Z",
+    "updatedAt": "2026-07-05T00:00:00.000Z",
+    "ingredients": [
+      {"id": "i1", "name": "番茄", "amount": 2, "unit": "个", "type": "main"},
+      {"id": "i2", "name": "鸡蛋", "amount": 3, "unit": "个", "type": "main"},
+      {"id": "i3", "name": "葱", "amount": 1, "unit": "根", "type": "side"},
+      {"id": "i4", "name": "盐", "amount": 2, "unit": "克", "type": "seasoning"},
+      {"id": "i5", "name": "生抽", "amount": 1, "unit": "勺", "type": "seasoning"}
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "title": "处理食材",
+        "description": "番茄切块，鸡蛋打散，葱切葱花。",
+        "mediaUrls": [],
+        "phase": "prep",
+        "durationMinutes": 4,
+        "heatLevel": "无",
+        "ingredientIds": ["i1", "i2", "i3"]
+      },
+      {
+        "id": "s2",
+        "title": "炒鸡蛋",
+        "description": "热锅加油，倒入蛋液，凝固后快速划散盛出。",
+        "mediaUrls": [],
+        "phase": "cook",
+        "durationMinutes": 3,
+        "heatLevel": "中火",
+        "ingredientIds": ["i2"]
+      },
+      {
+        "id": "s3",
+        "title": "合炒收汁",
+        "description": "番茄炒出汁，加入鸡蛋、盐和生抽，翻匀后撒葱花。",
+        "mediaUrls": [],
+        "phase": "finish",
+        "durationMinutes": 5,
+        "heatLevel": "中小火",
+        "ingredientIds": ["i1", "i2", "i3", "i4", "i5"]
+      }
+    ],
+    "tips": ["鸡蛋先炒再回锅更嫩。", "番茄出汁慢时可加一小勺水。"]
+  },
+  {
+    "id": "r2",
+    "name": "清炒上海青",
+    "category": "青菜",
+    "intro": "清爽脆嫩的绿叶菜，适合搭配荤菜平衡一餐。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 10,
+    "mealTimes": ["中", "晚", "中/晚通用"],
+    "source": "内置示例",
+    "createdAt": "2026-07-05T00:00:00.000Z",
+    "updatedAt": "2026-07-05T00:00:00.000Z",
+    "ingredients": [
+      {"id": "i6", "name": "上海青", "amount": 300, "unit": "克", "type": "main"},
+      {"id": "i7", "name": "蒜", "amount": 3, "unit": "瓣", "type": "side"},
+      {"id": "i8", "name": "盐", "amount": 2, "unit": "克", "type": "seasoning"},
+      {"id": "i9", "name": "生抽", "amount": 1, "unit": "勺", "type": "seasoning"}
+    ],
+    "steps": [
+      {
+        "id": "s4",
+        "title": "清洗沥水",
+        "description": "上海青掰开洗净，充分沥干，蒜切片。",
+        "mediaUrls": [],
+        "phase": "prep",
+        "durationMinutes": 4,
+        "heatLevel": "无",
+        "ingredientIds": ["i6", "i7"]
+      },
+      {
+        "id": "s5",
+        "title": "爆香快炒",
+        "description": "热锅爆香蒜片，放入上海青大火快炒。",
+        "mediaUrls": [],
+        "phase": "cook",
+        "durationMinutes": 3,
+        "heatLevel": "大火",
+        "ingredientIds": ["i6", "i7"]
+      },
+      {
+        "id": "s6",
+        "title": "调味出锅",
+        "description": "加入盐和生抽，翻匀后立即出锅。",
+        "mediaUrls": [],
+        "phase": "finish",
+        "durationMinutes": 1,
+        "heatLevel": "大火",
+        "ingredientIds": ["i8", "i9"]
+      }
+    ],
+    "tips": ["青菜要沥干，避免出水太多。", "全程大火快炒，保持脆嫩。"]
+  },
+  {
+    "id": "r3",
+    "name": "紫菜蛋花汤",
+    "category": "汤类",
+    "intro": "省时的家常汤，适合给一餐补充温热汤水。",
+    "difficulty": "简单",
+    "servings": 2,
+    "durationMinutes": 8,
+    "mealTimes": ["早", "中", "晚", "中/晚通用"],
+    "source": "内置示例",
+    "createdAt": "2026-07-05T00:00:00.000Z",
+    "updatedAt": "2026-07-05T00:00:00.000Z",
+    "ingredients": [
+      {"id": "i10", "name": "紫菜", "amount": 5, "unit": "克", "type": "main"},
+      {"id": "i11", "name": "鸡蛋", "amount": 1, "unit": "个", "type": "main"},
+      {"id": "i12", "name": "葱", "amount": 1, "unit": "根", "type": "side"},
+      {"id": "i13", "name": "盐", "amount": 1, "unit": "克", "type": "seasoning"},
+      {"id": "i14", "name": "香油", "amount": 0.5, "unit": "勺", "type": "seasoning"}
+    ],
+    "steps": [
+      {
+        "id": "s7",
+        "title": "准备汤底",
+        "description": "紫菜撕小片，鸡蛋打散，葱切葱花。",
+        "mediaUrls": [],
+        "phase": "prep",
+        "durationMinutes": 2,
+        "heatLevel": "无",
+        "ingredientIds": ["i10", "i11", "i12"]
+      },
+      {
+        "id": "s8",
+        "title": "煮汤",
+        "description": "锅中加水煮沸，放入紫菜和盐。",
+        "mediaUrls": [],
+        "phase": "cook",
+        "durationMinutes": 3,
+        "heatLevel": "中火",
+        "ingredientIds": ["i10", "i13"]
+      },
+      {
+        "id": "s9",
+        "title": "冲蛋花",
+        "description": "沿锅边淋入蛋液，关火后撒葱花并滴香油。",
+        "mediaUrls": [],
+        "phase": "finish",
+        "durationMinutes": 1,
+        "heatLevel": "小火",
+        "ingredientIds": ["i11", "i12", "i14"]
+      }
+    ],
+    "tips": ["蛋液细流淋入，蛋花更轻盈。", "香油关火后再放，香味更明显。"]
+  }
+]

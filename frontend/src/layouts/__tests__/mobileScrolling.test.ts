@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import postcss, { type Container } from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const readSource = (relativePath: string) => readFileSync(
@@ -6,7 +7,60 @@ const readSource = (relativePath: string) => readFileSync(
   'utf8',
 );
 
+// Inspect the actual CSS declarations at each breakpoint. This guards the
+// shell/page scroll contract; jsdom cannot measure layout or simulate panning.
+function declarationsAt(sources: string[], selectors: string[], width: number) {
+  const declarations: Record<string, string> = {};
+  const visit = (container: Container) => container.nodes?.forEach((node) => {
+    if (node.type === 'atrule' && node.name === 'media') {
+      const condition = node.params.match(/^\((min|max)-width:\s*(\d+)px\)$/);
+      if (condition && (condition[1] === 'min'
+        ? width >= Number(condition[2]) : width <= Number(condition[2]))) visit(node);
+    } else if (node.type === 'rule' && node.selectors.some(selector => selectors.includes(selector))) {
+      node.walkDecls(declaration => { declarations[declaration.prop] = declaration.value; });
+    }
+  });
+  sources.forEach(source => visit(postcss.parse(source)));
+  return declarations;
+}
+
 describe('mobile page scrolling', () => {
+  const globalStyles = readSource('../../styles/global.css');
+
+  it('keeps viewport clipping in the shell and assigns scrolling to padded views', () => {
+    for (const selector of ['body', '#root', '.app-main']) {
+      expect(declarationsAt([globalStyles], [selector], 390).overflow).toBe('hidden');
+    }
+    expect(declarationsAt([globalStyles], ['.app-main', '.app-main--padded'], 390)['overflow-y']).toBe('auto');
+  });
+
+  describe.each([
+    ['KitchenAssistantPage', 'kitchen-page'],
+  ])('%s full-bleed scroll owner', (page, rootClass) => {
+    const pageStyles = readSource(`../../pages/Apps/${page}.css`);
+
+    it('attaches the shared scroll container at the full-bleed route root', () => {
+      const source = readSource(`../../pages/Apps/${page}.tsx`);
+      const routes = readSource('../../router/index.tsx');
+      expect(source).toContain(`className="${rootClass} app-scroll-page"`);
+      expect(routes).toContain(`<ApplicationShell fullBleed>{page(<${page} />)}</ApplicationShell>`);
+    });
+
+    it.each([320, 375, 390, 767, 768, 844, 1440])('retains parent-bounded scrolling at %ipx', (width) => {
+      const declarations = declarationsAt([globalStyles, pageStyles], ['.app-scroll-page', `.${rootClass}`], width);
+      expect(declarations.width).toBe('100%');
+      expect(declarations.height).toBe('100%');
+      expect(declarations['min-height']).toBe('0');
+      expect(declarations['min-width']).toBe('0');
+      expect(declarations['overflow-y']).toBe('auto');
+      expect(declarations.overflow).not.toBe('hidden');
+      expect(declarations['touch-action']).not.toBe('none');
+      // Parent-relative sizing also fits the smaller content height with
+      // navigation visible, in an embed, or on a short landscape viewport.
+      expect(declarations.height).not.toMatch(/vh|dvh/);
+    });
+  });
+
   it('keeps all five primary destinations reachable on narrow screens', () => {
     const styles = readSource('../../components/Navigation/MobileNavigation.css');
     const mobileRule = styles.match(
