@@ -16,7 +16,10 @@ interface MainLayoutProps {
   hideSidebar?: boolean;
   /** Hide the top header (nav + account) for a fullscreen launched-app view. */
   hideHeader?: boolean;
-  /** Let the child own all viewport spacing, e.g. a workflow or embedded app shell. */
+  /** Let the child own viewport spacing AND scrolling. The shell clips overflow:
+   * document-style roots need `app-scroll-page`; pane-based workspaces must
+   * constrain their height and give the content panes their own scroll owners.
+   */
   fullBleed?: boolean;
 }
 

@@ -36,6 +36,7 @@ describe('mobile page scrolling', () => {
 
   describe.each([
     ['KitchenAssistantPage', 'kitchen-page'],
+    ['ResearchAssistantPage', 'research-host'],
   ])('%s full-bleed scroll owner', (page, rootClass) => {
     const pageStyles = readSource(`../../pages/Apps/${page}.css`);
 

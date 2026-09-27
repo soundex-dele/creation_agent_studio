@@ -274,3 +274,20 @@ it('loads workspace files and previews only on explicit sidebar clicks, without 
   expect(button('[aria-label="打开右侧栏"]').getAttribute('aria-expanded')).toBe('false');
   expect(get.mock.calls.some(([path]) => path === '/conversations/c2/workspace-files/')).toBe(false);
 });
+
+it('shows the application Skill error and preserves the generated prompt for retry', async () => {
+  const prompt = '请使用 wechat-viral-article Skill 撰写公众号文章。';
+  const reason = 'codex Skill 目录 /skills 中不存在：wechat-viral-article';
+  vi.spyOn(api, 'post').mockRejectedValue({ response: { data: { skill_names: reason } } });
+  await renderChat({
+    creationContext: { applicationId: 15 },
+    draftRequest: { id: 1, text: prompt },
+  });
+  await click('[aria-label="发送消息"]');
+  expect(host.textContent).toContain(reason);
+  expect(host.querySelector('textarea')!.value).toBe(prompt);
+  expect(host.querySelector('textarea')!.closest('[hidden]')).toBeNull();
+  expect(button('[aria-label="发送消息"]').disabled).toBe(false);
+  expect(useConversationStore.getState().streamingMessageId).toBeNull();
+  expect(useConversationStore.getState().currentConversation?.messages).toEqual([historyMessage]);
+});

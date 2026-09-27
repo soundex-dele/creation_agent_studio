@@ -19,6 +19,24 @@ describe('useConversationStore durable Run integration', () => {
     vi.restoreAllMocks();
   });
 
+  it.each([
+    [{ skill_names: '缺少 wechat-viral-article' }, '缺少 wechat-viral-article'],
+    [{ agent_id: ['该智能体不属于当前聊天应用。'] }, '该智能体不属于当前聊天应用。'],
+    [{ application_id: '当前用户已无权使用该应用。' }, '当前用户已无权使用该应用。'],
+    [{ permission_mode: '组织要求工具审批' }, '组织要求工具审批'],
+    [{ images: ['图片太大', '最多 4 张'] }, '图片太大 最多 4 张'],
+    [{ detail: '执行服务不可用', skill_names: '缺少 Skill' }, '执行服务不可用'],
+    [{ non_field_errors: ['无效请求'] }, '无效请求'],
+    [undefined, '创建 Run 失败'],
+  ])('shows the server validation reason rather than a generic Run error', async (data, expected) => {
+    const failure = { response: { data } };
+    vi.spyOn(api, 'post').mockRejectedValue(failure);
+    const controller = useConversationStore.getState().sendMessageStream('conversation-1', '写作提示词');
+    await expect(controller.submitted).rejects.toBe(failure);
+    expect(useConversationStore.getState().error).toBe(expected);
+    expect(useConversationStore.getState().streamingMessageId).toBeNull();
+  });
+
   it('normalizes conversation ids so URL selections match history items', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({
       results: [{

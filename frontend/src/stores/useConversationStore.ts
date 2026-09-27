@@ -17,6 +17,21 @@ import type { RunResource } from '@/services/applicationRuntime';
 import { streamRunEvents, type RunStreamHandle } from '@/services/runStream';
 import { tenantApiRoot } from '@/services/tenantContext';
 
+function conversationRequestError(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback;
+  const fields = data as Record<string, unknown>;
+  for (const key of ['detail', 'non_field_errors', 'skill_names', 'skill_ids',
+    'agent_id', 'application_id', 'images', 'permission_mode', 'collaboration_mode',
+    'content', 'working_directory', 'project_id', 'title']) {
+    const value = fields[key];
+    const text = Array.isArray(value)
+      ? value.filter(item => typeof item === 'string').join(' ')
+      : typeof value === 'string' ? value : '';
+    if (text.trim()) return text;
+  }
+  return fallback;
+}
+
 export interface MessageAttachment {
   id: string;
   url: string;
@@ -534,7 +549,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             return conversation;
           } catch (error: any) {
             if (version === sessionVersion) {
-              set({ error: error.response?.data?.detail || '创建对话失败', isLoading: false });
+              set({ error: conversationRequestError(error.response?.data, '创建对话失败'), isLoading: false });
             }
             throw error;
           }
@@ -677,14 +692,8 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             });
           }).catch((error: any) => {
             if (!controller.signal.aborted) {
-              const responseData = error.response?.data;
-              const imageError = Array.isArray(responseData?.images)
-                ? responseData.images.join(' ')
-                : responseData?.images;
               set({
-                error: responseData?.detail || imageError
-                  || responseData?.permission_mode?.[0] || responseData?.collaboration_mode?.[0]
-                  || '创建 Run 失败',
+                error: conversationRequestError(error.response?.data, '创建 Run 失败'),
                 streamingMessageId: null,
                 agentActivity: null,
                 currentConversation: current,

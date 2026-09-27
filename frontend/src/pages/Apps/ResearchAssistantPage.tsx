@@ -31,7 +31,7 @@ export function ResearchHome({ base }: { base: string }) {
     }, 200);
     return () => { active = false; controller.abort(); clearTimeout(timer); };
   }, [client, search, page, version]);
-  return <main className="research-host">
+  return <main className="research-host app-scroll-page">
     <header className="research-app-header"><div>
       {resolveApplicationPresentation(params).showApplicationHeader && <Link to="/apps"><ArrowLeft size={14} aria-hidden="true" /> 返回应用</Link>}
       <h1><BookOpen size={25} aria-hidden="true" />资料研究助手</h1><p>汇集资料，让每一个关键结论都有出处。</p></div>
