@@ -187,3 +187,17 @@ it('retries failed policy checks and checks again after the computer reconnects'
   expect(state.api.get).toHaveBeenCalledWith('/conversations/composer-options/');
   expect(await send()).toBe('allow_all');
 });
+
+it('sends running-turn instructions through steer while retaining the stop action', async () => {
+  state.api.get.mockResolvedValue({ skills: [], require_tool_approval: false });
+  const steer = vi.fn().mockResolvedValue(undefined);
+  await act(async () => root.render(React.createElement(MessageInput, {
+    value: '先运行测试', isRunning: true, onSteer: steer, onSendMessage: state.send,
+  })));
+  const button = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes('补充指令'))!;
+  expect(button).toBeTruthy();
+  expect(container.querySelector('[aria-label="结束任务"]')).toBeTruthy();
+  await act(async () => button.click());
+  expect(steer).toHaveBeenCalledWith('先运行测试');
+  expect(state.send).not.toHaveBeenCalled();
+});

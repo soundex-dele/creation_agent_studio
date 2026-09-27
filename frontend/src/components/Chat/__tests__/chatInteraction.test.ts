@@ -291,3 +291,17 @@ it('shows the application Skill error and preserves the generated prompt for ret
   expect(useConversationStore.getState().streamingMessageId).toBeNull();
   expect(useConversationStore.getState().currentConversation?.messages).toEqual([historyMessage]);
 });
+
+it('renders a completed native plan as a distinct document and preserves commentary', async () => {
+  await act(async () => root.render(React.createElement(MessageList, { messages: [{
+    id: 'plan-message', role: 'assistant', content: '准备好了\n\n# 实施计划\n\n1. 检查协议', created_at: '',
+    metadata: { agent: { activity: { items: {
+      intro: { id: 'intro', type: 'agentMessage', phase: 'commentary', text: '准备好了' },
+      plan: { id: 'plan', type: 'plan', completed: true, text: '# 实施计划\n\n1. 检查协议' },
+    } } } },
+  }] })));
+  expect(host.querySelector('.agent-plan-document')?.textContent).toContain('实施计划');
+  expect(host.querySelector('.agent-plan-document')?.textContent).toContain('检查协议');
+  expect(host.textContent).toContain('准备好了');
+  expect(host.querySelectorAll('.agent-plan-document')).toHaveLength(1);
+});

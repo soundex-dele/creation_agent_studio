@@ -184,6 +184,10 @@ def execute_agent_completion(run_payload, sink):
             emitted_output = True
         sink.emit(event_type, payload)
 
+    def wait_for_input(request, *, is_pending):
+        flush_output_delta()
+        return sink.wait_for_input(request, is_pending=is_pending)
+
     logger.info(
         "chat_latency stage=engine_call run_id=%s setup_ms=%.1f messages=%d",
         run_id, (time.perf_counter() - started) * 1000, len(messages),
@@ -200,6 +204,8 @@ def execute_agent_completion(run_payload, sink):
             image_paths=[] if resume_command else image_paths,
             on_event=emit_runtime_event,
             cancelled=lambda: sink.cancelled,
+            on_input_request=wait_for_input,
+            poll_commands=sink.poll_commands,
         )
     except Exception:
         if sink.cancelled:

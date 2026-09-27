@@ -123,6 +123,11 @@ const asQuestion = (payload: Record<string, unknown>): AgentQuestion => {
   const primary = questions[0] ?? normalizeItem(source, 0);
   return {
     ...primary,
+    id: payload.elicitation ? String(payload.input_request_id ?? primary.id) : primary.id,
+    details: payload.details as Record<string, unknown> | undefined,
+    formSchema: payload.form_schema as Record<string, unknown> | undefined,
+    elicitation: Boolean(payload.elicitation),
+    url: typeof payload.url === 'string' ? payload.url : undefined,
     kind: String(payload.input_kind ?? payload.kind ?? source.kind) === 'permission'
       ? 'permission'
       : 'question',
@@ -151,10 +156,12 @@ const answerMessageContent = (
     text?: string;
     selections?: string[];
     answers?: Record<string, { answers: string[] }>;
+    action?: 'accept' | 'decline' | 'cancel';
   },
 ): string => {
+  if (question.elicitation) return { accept: '已提交工具请求', decline: '已拒绝工具请求', cancel: '已取消工具请求' }[answer.action ?? 'accept'];
   if (question.kind === 'permission') {
-    return answer.selections?.[0] === 'deny' ? '拒绝' : '允许';
+    return ['deny', 'decline', 'cancel'].includes(answer.selections?.[0] ?? '') ? '拒绝' : '允许';
   }
   const questions = question.questions?.length ? question.questions : [question];
   if (answer.answers) {
@@ -237,9 +244,12 @@ interface ConversationState {
       text?: string;
       selections?: string[];
       answers?: Record<string, { answers: string[] }>;
+      action?: 'accept' | 'decline' | 'cancel';
+      content?: Record<string, unknown>;
     },
   ) => Promise<void>;
   cancelTurn: (conversationId: string) => Promise<void>;
+  steerTurn: (conversationId: string, text: string) => Promise<void>;
   clearConversation: (conversationId: string) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
   setCurrentConversation: (conversation: ConversationDetail | null) => void;
@@ -286,7 +296,22 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
               : '',
           } : null,
         }));
+        if (event && ['input.accepted', 'input.resolved'].includes(event.type) && !get().streamingMessageId) {
+          const id = `run-live-${projection.runId}-${event.sequence}`;
+          set((state) => ({ streamingMessageId: id, currentConversation: state.currentConversation ? {
+            ...state.currentConversation, messages: [...state.currentConversation.messages,
+              { id, role: 'assistant', content: '', created_at: new Date().toISOString() }],
+          } : null }));
+        }
         get().replaceStreamContent(projection.output || '');
+        if (projection.activity) {
+          set((state) => ({ currentConversation: state.currentConversation ? {
+            ...state.currentConversation, messages: state.currentConversation.messages.map(message =>
+              message.id === state.streamingMessageId ? { ...message, metadata: { ...message.metadata,
+                agent: { ...message.metadata?.agent, activity: projection.activity },
+              } } : message),
+          } : null }));
+        }
         if (!event) {
           set({
             agentActivity: pendingQuestion
@@ -353,7 +378,19 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             }
             break;
           case 'input.accepted':
+          case 'input.resolved':
             set({ agentActivity: 'Run 已继续执行…' });
+            break;
+          case 'input.steered':
+            set((state) => {
+              if (!state.currentConversation) return {};
+              const messages = [...state.currentConversation.messages];
+              const index = messages.findIndex(message => message.id === state.streamingMessageId);
+              messages.splice(index < 0 ? messages.length : index, 0, {
+                id: `steer-${event.sequence}`, role: 'user', content: String(event.payload.text ?? ''), created_at: event.created_at,
+              });
+              return { currentConversation: { ...state.currentConversation, messages }, agentActivity: '已提交补充指令' };
+            });
             break;
           case 'run.succeeded':
             finishRun(conversationId);
@@ -767,7 +804,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
           if (!pendingQuestion) throw new Error('没有待回答的问题');
           const selected = answer.selections?.[0];
           const type = pendingQuestion.kind === 'permission'
-            ? selected === 'deny' ? 'deny_permission' : 'grant_permission'
+            ? ['deny', 'decline', 'cancel'].includes(selected ?? '') ? 'deny_permission' : 'grant_permission'
             : 'answer';
           const stamp = Date.now();
           const nextAssistantId = `run-resume-${activeRun.id}-${stamp}`;
@@ -815,6 +852,14 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             }
             throw error;
           }
+        },
+
+        steerTurn: async (conversationId, text) => {
+          const { activeRun, currentConversation } = get();
+          if (!activeRun || currentConversation?.id !== conversationId) throw new Error('没有运行中的会话');
+          await api.post(`${runTenantRoot(activeRun.organization_id)}/runs/${activeRun.id}/commands`, {
+            type: 'steer', idempotency_key: createIdempotencyKey('chat-steer'), payload: { text },
+          });
         },
 
         cancelTurn: async (conversationId) => {

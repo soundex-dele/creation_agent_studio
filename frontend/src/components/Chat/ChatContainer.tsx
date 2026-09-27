@@ -90,6 +90,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     sendMessageStream,
     answerQuestion,
     cancelTurn,
+    steerTurn,
+    activeRun,
     clearError,
     setCurrentConversation,
     disconnect,
@@ -414,6 +416,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               onValueChange={setInputValue}
               onSendMessage={handleSendMessage}
               isRunning={isRunning}
+              onSteer={activeRun?.status === 'running' && currentConversation?.messages.some(
+                message => message.id === storedStreamingMessageId && message.metadata?.agent?.activity?.session?.can_steer,
+              ) ? (text) => steerTurn(currentConversation!.id, text) : undefined}
               onStop={handleStop}
               stopDisabled={!online || isStopping}
               isStopping={isStopping}

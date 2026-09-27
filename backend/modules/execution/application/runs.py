@@ -46,7 +46,7 @@ ALLOWED_TRANSITIONS = {
         Run.Status.SUCCEEDED,
         Run.Status.FAILED,
     },
-    Run.Status.WAITING_INPUT: {Run.Status.QUEUED, Run.Status.CANCELLED},
+    Run.Status.WAITING_INPUT: {Run.Status.RUNNING, Run.Status.QUEUED, Run.Status.CANCELLING, Run.Status.CANCELLED, Run.Status.FAILED},
     Run.Status.WAITING_CHILDREN: {Run.Status.QUEUED, Run.Status.CANCELLED},
     Run.Status.CANCELLING: {Run.Status.CANCELLED},
     Run.Status.SUCCEEDED: set(),
@@ -642,6 +642,9 @@ def finish_attempt(
 
         run.status = outcome
         run.current_attempt = None
+        run.pending_input_request_id = None
+        run.pending_input_kind = ""
+        run.pending_input_expires_at = None
         run.finished_at = now
         run.output_summary = output_summary or {}
         run.error_code = error_code
@@ -652,6 +655,9 @@ def finish_attempt(
             update_fields=(
                 "status",
                 "current_attempt",
+                "pending_input_request_id",
+                "pending_input_kind",
+                "pending_input_expires_at",
                 "finished_at",
                 "output_summary",
                 "error_code",
@@ -709,7 +715,7 @@ def fail_attempt(
         lease = _validate_lease(run, lease_fence, now)
         if run.current_attempt_id != attempt_id:
             raise LeaseLost("Attempt is no longer current")
-        if run.status not in {Run.Status.RUNNING, Run.Status.CANCELLING}:
+        if run.status not in {Run.Status.RUNNING, Run.Status.CANCELLING, Run.Status.WAITING_INPUT}:
             raise InvalidRunTransition(f"Cannot fail attempt while Run is {run.status}")
 
         attempt = RunAttempt.objects.select_for_update().get(pk=attempt_id, run=run)
@@ -727,7 +733,7 @@ def fail_attempt(
             next_status = Run.Status.CANCELLED
             event_type = "run.cancelled"
             payload = {"reason": "cancelled_during_attempt_failure"}
-        elif run.retry_safe and failed_attempts < run.max_attempts:
+        elif run.status != Run.Status.WAITING_INPUT and run.retry_safe and failed_attempts < run.max_attempts:
             next_status = Run.Status.QUEUED
             event_type = "run.retry_scheduled"
             payload = {
@@ -746,6 +752,9 @@ def fail_attempt(
 
         run.status = next_status
         run.current_attempt = None
+        run.pending_input_request_id = None
+        run.pending_input_kind = ""
+        run.pending_input_expires_at = None
         run.error_code = error_code if next_status == Run.Status.FAILED else ""
         run.error_message = error_message if next_status == Run.Status.FAILED else ""
         run.finished_at = now if next_status in TERMINAL_STATUSES else None
@@ -755,6 +764,9 @@ def fail_attempt(
             update_fields=(
                 "status",
                 "current_attempt",
+                "pending_input_request_id",
+                "pending_input_kind",
+                "pending_input_expires_at",
                 "error_code",
                 "error_message",
                 "finished_at",

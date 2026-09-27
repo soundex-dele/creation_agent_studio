@@ -46,6 +46,7 @@ from modules.tenancy.database import tenant_database_context
 
 
 ADAPTER_EVENT_TYPES = {
+    "agent.session", "agent.item", "agent.plan", "agent.diff", "agent.warning", "agent.usage", "agent.tool",
     "output.delta",
     "output.snapshot",
     "tool.started",
@@ -75,6 +76,7 @@ class ActiveChild:
     messages: object
     cancel_event: object
     next_heartbeat_at: float
+    controls: object = None
     span: object = None
     exited_at: float | None = None
     cancel_requested_at: float | None = None
@@ -182,6 +184,7 @@ class ExecutionCoordinator:
             maxsize=int(getattr(settings, "EXECUTION_EVENT_QUEUE_SIZE", 1000))
         )
         cancel_event = self._context.Event()
+        controls = self._context.Queue()
         # A spawned child must never inherit a live SQLite connection.
         connections.close_all()
         process = self._context.Process(
@@ -191,6 +194,7 @@ class ExecutionCoordinator:
                 messages,
                 cancel_event,
                 self.adapter_entries[claimed.run.executor_key],
+                controls,
             ),
             name=f"run-{self.worker_pool}-{claimed.run.id}",
         )
@@ -205,6 +209,7 @@ class ExecutionCoordinator:
             messages=messages,
             cancel_event=cancel_event,
             next_heartbeat_at=time.monotonic() + self.lease_seconds / 3,
+            controls=controls,
             span=span,
         )
 
@@ -318,6 +323,17 @@ class ExecutionCoordinator:
         )
 
     def _handle_message(self, active, message):
+        if message.get("kind") in {"live_input", "live_input_resolved"}:
+            from modules.execution.application.live import live_input
+            live_input(
+                run_id=active.claimed.run.id, organization_id=active.claimed.run.organization_id,
+                attempt_id=active.claimed.attempt.id, lease_fence=self._fence(active),
+                input_request_id=message["input_request_id"],
+                input_kind=message.get("input_kind", "answer"),
+                request_payload=message.get("request_payload"),
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
+            return False
         if message.get("kind") == "wait_for_children":
             checkpoint_data = message.get("checkpoint") or {}
             encoded = json.dumps(
@@ -552,6 +568,26 @@ class ExecutionCoordinator:
                 consumed_at__isnull=True,
             ).update(consumed_at=timezone.now())
 
+        if (getattr(active, "controls", None) is not None
+                and run_status == Run.Status.RUNNING and not active.cancel_event.is_set()
+                and Run.objects.filter(
+                    pk=active.claimed.run.id, current_attempt_id=active.claimed.attempt.id,
+                    current_attempt__lease__token=active.claimed.lease.token,
+                    current_attempt__lease__released_at__isnull=True,
+                    current_attempt__lease__expires_at__gt=timezone.now(),
+                ).exists()):
+            # API commands are durable; only the worker holding this attempt
+            # receives them. A new attempt must not reuse an old RPC decision.
+            for command in RunCommand.objects.filter(
+                run_id=active.claimed.run.id, consumed_at__isnull=True,
+                type__in=(RunCommand.Type.ANSWER, RunCommand.Type.GRANT_PERMISSION,
+                          RunCommand.Type.DENY_PERMISSION, RunCommand.Type.STEER),
+            ).order_by("created_at"):
+                active.controls.put({"id": str(command.id), "type": command.type,
+                                     "input_request_id": str(command.input_request_id),
+                                     "payload": command.payload})
+                RunCommand.objects.filter(pk=command.pk).update(consumed_at=timezone.now())
+
         terminal = False
         while True:
             try:
@@ -619,6 +655,8 @@ class ExecutionCoordinator:
             active.process.terminate()
             active.process.join(timeout=1)
         active.messages.close()
+        if getattr(active, "controls", None) is not None:
+            active.controls.close()
         self._active.pop(attempt_id, None)
         run_status = Run.objects.filter(pk=active.claimed.run.id).values_list(
             "status", flat=True

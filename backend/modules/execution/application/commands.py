@@ -127,7 +127,18 @@ def _submit_run_command_once(
             )
         now = timezone.now()
         is_cancel = command_type == RunCommand.Type.CANCEL
-        if is_cancel:
+        is_steer = command_type == RunCommand.Type.STEER
+        live = run.current_attempt_id is not None
+        if is_steer:
+            if run.status != Run.Status.RUNNING or not live or not run.events.filter(
+                attempt_id=run.current_attempt_id, type="agent.session", payload__can_steer=True,
+            ).exists():
+                raise CommandNotAllowed("当前任务不支持运行中追加指令")
+            if not isinstance(payload.get("text"), str) or not payload["text"].strip():
+                raise CommandNotAllowed("追加指令不能为空")
+            if len(payload["text"]) > 50000:
+                raise CommandNotAllowed("追加指令过长")
+        elif is_cancel:
             if run.status in {Run.Status.SUCCEEDED, Run.Status.FAILED}:
                 raise CommandNotAllowed(f"Cannot cancel a {run.status} run")
         else:
@@ -160,6 +171,14 @@ def _submit_run_command_once(
                 raise CommandNotAllowed(
                     f"Command {command_type} is invalid for {run.pending_input_kind} input"
                 )
+            if live:
+                required = run.events.filter(type="input.required", payload__input_request_id=str(input_request_id)).last()
+                if required and required.payload.get("codex_request"):
+                    from core.agent_engine.adapters.codex_interactions import response_for_request
+                    try:
+                        response_for_request(required.payload["codex_request"], {"type": command_type, "payload": payload})
+                    except ValueError as exc:
+                        raise CommandNotAllowed(str(exc)) from exc
             if command_type in (
                 RunCommand.Type.APPROVE_PLAN,
                 RunCommand.Type.REVISE_PLAN,
@@ -200,9 +219,18 @@ def _submit_run_command_once(
 
         event = None
         clear_pending_input = False
-        if not is_cancel:
-            new_status = Run.Status.QUEUED
+        if is_steer:
+            new_status = Run.Status.RUNNING
+            event_type = "input.steered"
+            finished_at = None
+        elif not is_cancel:
+            new_status = Run.Status.RUNNING if live else Run.Status.QUEUED
             event_type = "input.accepted"
+            finished_at = None
+            clear_pending_input = True
+        elif live and run.status == Run.Status.WAITING_INPUT:
+            new_status = Run.Status.CANCELLING
+            event_type = "run.cancelling"
             finished_at = None
             clear_pending_input = True
         elif run.status in {
@@ -260,9 +288,11 @@ def _submit_run_command_once(
                         else None
                     ),
                     "requested_by": actor.id,
+                    "live": live,
+                    **({"text": payload["text"]} if is_steer else {}),
                 },
             )
-            if event_type == "input.accepted":
+            if event_type in {"input.accepted", "input.steered"}:
                 from modules.execution.application.projections import (
                     project_input_accepted,
                 )

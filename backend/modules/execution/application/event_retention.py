@@ -43,7 +43,10 @@ def apply_projection_event(projection, event):
         next_projection["status"] = STATUS_BY_EVENT[event.type]
 
     payload = event.payload
-    if event.type == "output.delta":
+    if event.type.startswith("agent."):
+        from .agent_activity import reduce_activity
+        next_projection["activity"] = reduce_activity(next_projection.get("activity"), event.type, payload)
+    elif event.type == "output.delta":
         next_projection["output"] = next_projection.get("output", "") + str(
             payload.get("text", "")
         )
@@ -62,12 +65,15 @@ def apply_projection_event(projection, event):
     elif event.type == "input.required":
         next_projection["status"] = Run.Status.WAITING_INPUT
         next_projection["pendingInput"] = payload
-    elif event.type == "input.accepted":
-        next_projection["status"] = Run.Status.QUEUED
+    elif event.type in {"input.accepted", "input.resolved"}:
+        next_projection["status"] = Run.Status.RUNNING if payload.get("live") or event.type == "input.resolved" else Run.Status.QUEUED
         next_projection["pendingInput"] = None
         next_projection["output"] = ""
+        session = (next_projection.get("activity") or {}).get("session")
+        if "activity" in next_projection:
+            next_projection["activity"] = {"session": session} if session else {}
     elif event.type == "input.expired":
-        next_projection["status"] = Run.Status.CANCELLED
+        next_projection["status"] = payload.get("status") or Run.Status.CANCELLED
         next_projection["pendingInput"] = None
     elif event.type == "artifact.created":
         artifact_id = str(payload.get("artifact_id", ""))

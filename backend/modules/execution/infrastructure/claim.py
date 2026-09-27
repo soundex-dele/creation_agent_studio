@@ -215,7 +215,7 @@ def renew_lease(*, lease_token, lease_epoch, lease_seconds=30):
             lease.released_at is not None
             or lease.expires_at <= now
             or run.current_attempt_id != lease.attempt_id
-            or run.status not in {Run.Status.RUNNING, Run.Status.CANCELLING}
+            or run.status not in {Run.Status.RUNNING, Run.Status.CANCELLING, Run.Status.WAITING_INPUT}
         ):
             return False
         lease.heartbeat_at = now

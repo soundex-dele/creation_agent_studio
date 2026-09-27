@@ -168,3 +168,31 @@ describe('RunEvent reducer', () => {
     expect(state.buffered).toEqual({});
   });
 });
+
+it('restores structured activity and resumes a live request without queueing a new attempt', () => {
+  let state = createRunEventState('run-1');
+  const events = [
+    event(1, 'agent.session', { can_steer: true }),
+    event(2, 'agent.item', { id: 'plan-1', type: 'plan', text: '# Plan' }),
+    event(3, 'agent.plan', { plan: [{ step: 'test', status: 'inProgress' }] }),
+    event(4, 'agent.tool', { id: 'shell', delta: 'first' }),
+    event(5, 'agent.tool', { id: 'shell', delta: ' second' }),
+    event(6, 'agent.diff', { diff: '+added' }),
+    event(7, 'agent.warning', { message: 'warning' }),
+    event(8, 'output.delta', { text: '# Plan' }),
+    event(9, 'input.required', { input_request_id: 'q-1', live: true }),
+  ];
+  for (const item of events) state = ingestRunEvent(state, item).state;
+  const restored = restoreRunEventSnapshot({ schema_version: 1, run_id: 'run-1', through_sequence: 9,
+    projection: state, created_at: '', updated_at: '' });
+  expect(restored.activity?.tools?.shell.output).toBe('first second');
+  expect(restored.activity?.items?.['plan-1'].type).toBe('plan');
+  expect(restored.pendingInput?.input_request_id).toBe('q-1');
+  for (const type of ['input.accepted', 'input.resolved']) {
+    const resumed = ingestRunEvent(restored, event(10, type, { live: true })).state;
+    expect(resumed.status).toBe('running');
+    expect(resumed.output).toBe('');
+    expect(resumed.activity).toEqual({ session: { can_steer: true } });
+    expect(resumed.pendingInput).toBeNull();
+  }
+});

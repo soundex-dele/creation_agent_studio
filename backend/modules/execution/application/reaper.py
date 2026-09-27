@@ -35,7 +35,7 @@ def _reap_one(lease_id, now):
             attempt_status = RunAttempt.Status.CANCELLED
             event_type = "run.cancelled"
             payload = {"reason": "lease_expired_while_cancelling"}
-        elif run.retry_safe and previous_failures + 1 < run.max_attempts:
+        elif run.status != Run.Status.WAITING_INPUT and run.retry_safe and previous_failures + 1 < run.max_attempts:
             next_status = Run.Status.QUEUED
             attempt_status = RunAttempt.Status.INTERRUPTED
             event_type = "run.retry_scheduled"
@@ -57,6 +57,9 @@ def _reap_one(lease_id, now):
 
         run.status = next_status
         run.current_attempt = None
+        run.pending_input_request_id = None
+        run.pending_input_kind = ""
+        run.pending_input_expires_at = None
         run.error_code = "worker_lost" if next_status == Run.Status.FAILED else ""
         run.error_message = "Worker lease expired" if next_status == Run.Status.FAILED else ""
         run.finished_at = now if next_status in {
@@ -69,6 +72,9 @@ def _reap_one(lease_id, now):
             update_fields=(
                 "status",
                 "current_attempt",
+                "pending_input_request_id",
+                "pending_input_kind",
+                "pending_input_expires_at",
                 "error_code",
                 "error_message",
                 "finished_at",
@@ -118,11 +124,11 @@ def _expire_input_request(run_id, now):
             return None
 
         input_request_id = run.pending_input_request_id
-        run.status = Run.Status.CANCELLED
+        run.status = Run.Status.CANCELLING if run.current_attempt_id else Run.Status.CANCELLED
         run.pending_input_request_id = None
         run.pending_input_kind = ""
         run.pending_input_expires_at = None
-        run.finished_at = now
+        run.finished_at = None if run.current_attempt_id else now
         run.version += 1
         run.next_event_sequence += 1
         run.save(
@@ -142,6 +148,7 @@ def _expire_input_request(run_id, now):
             sequence=run.next_event_sequence,
             type="input.expired",
             payload={
+                "status": run.status,
                 "input_request_id": (
                     str(input_request_id) if input_request_id else None
                 )

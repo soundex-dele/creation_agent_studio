@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Input, Radio } from 'antd';
 import type { AgentQuestion } from '@/entities/run';
+import McpRequestForm from './McpRequestForm';
 
 const OTHER_VALUE = '__other__';
 
@@ -10,6 +11,8 @@ interface AgentQuestionCardProps {
     text?: string;
     selections?: string[];
     answers?: Record<string, { answers: string[] }>;
+    action?: 'accept' | 'decline' | 'cancel';
+    content?: Record<string, unknown>;
   }) => Promise<void>;
   onCancel: () => Promise<void>;
 }
@@ -65,7 +68,8 @@ const AgentQuestionCard: React.FC<AgentQuestionCardProps> = ({ question, onAnswe
       <div className="agent-question-eyebrow">
         {question.kind === 'permission' ? '工具权限确认' : 'Agent 提问'}
       </div>
-      {questions.map((item, index) => {
+      {question.details && <pre className="agent-question-details">{JSON.stringify(question.details, null, 2)}</pre>}
+      {question.elicitation ? <><p>{question.question}</p><McpRequestForm key={question.id} question={question} onAnswer={onAnswer} /></> : questions.map((item, index) => {
         const showOther = question.kind === 'question' && (item.isOther ?? true);
         const selection = values[item.id] ?? '';
         return (
@@ -135,7 +139,7 @@ const AgentQuestionCard: React.FC<AgentQuestionCardProps> = ({ question, onAnswe
           </div>
         );
       })}
-      <div className="agent-question-actions">
+      {!question.elicitation && <div className="agent-question-actions">
         <Button danger onClick={() => void onCancel()} disabled={submitting}>取消任务</Button>
         <Button
           type="primary"
@@ -145,7 +149,7 @@ const AgentQuestionCard: React.FC<AgentQuestionCardProps> = ({ question, onAnswe
         >
           提交回答
         </Button>
-      </div>
+      </div>}
     </div>
   );
 };

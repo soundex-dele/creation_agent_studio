@@ -377,6 +377,107 @@ class CodexIntegrationTest(TestCase):
         })
         self.assertEqual(events[-1][1]["result"], "E:/workspace")
 
+    def test_plan_items_stream_and_replace_drafts_without_losing_commentary(self):
+        notifications = [
+            {"method": "item/agentMessage/delta", "payload": {
+                "itemId": "message-1", "delta": "先检查需求。",
+            }},
+            {"method": "item/completed", "payload": {"item": {
+                "id": "message-1", "type": "agentMessage", "text": "先检查需求。",
+            }}},
+            {"method": "turn/plan/updated", "payload": {
+                "plan": [{"step": "分析需求", "status": "completed"}],
+            }},
+            {"method": "item/started", "payload": {"item": {
+                "id": "plan-1", "type": "plan", "text": "",
+            }}},
+            {"method": "item/plan/delta", "payload": {
+                "itemId": "plan-1", "delta": "# 计划草稿\n",
+            }},
+            {"method": "item/plan/delta", "payload": {
+                "itemId": "plan-1", "delta": "\n1. 待确认",
+            }},
+            {"method": "item/completed", "payload": {"item": {
+                "id": "plan-1", "type": "plan", "text": "# 实施计划\n\n1. 实现\n2. 验证",
+            }}},
+            {"method": "item/agentMessage/delta", "payload": {
+                "itemId": "message-2", "delta": "请确认计划。",
+            }},
+            {"method": "turn/completed", "payload": {"turn": {
+                "status": "completed", "error": None,
+            }}},
+        ]
+        thread = MagicMock()
+        thread.turn.return_value.stream.return_value = iter(notifications)
+        events = []
+        result = _consume_codex_turn(
+            thread, "plan", on_event=lambda kind, payload: events.append((kind, payload)),
+        )
+
+        expected_plan = "先检查需求。\n\n# 实施计划\n\n1. 实现\n2. 验证"
+        self.assertEqual([event for event in events if event[0].startswith("output.")], [
+            ("output.delta", {"text": "先检查需求。"}),
+            ("output.delta", {"text": "\n\n# 计划草稿\n"}),
+            ("output.delta", {"text": "\n1. 待确认"}),
+            ("output.snapshot", {"text": expected_plan}),
+            ("output.delta", {"text": "\n\n请确认计划。"}),
+        ])
+        self.assertEqual(result.final_response, expected_plan + "\n\n请确认计划。")
+
+    def test_plan_completion_without_deltas_is_not_dropped_or_duplicated(self):
+        for with_callback in (True, False):
+            with self.subTest(with_callback=with_callback):
+                item = {"id": "plan-1", "type": "plan", "text": "# 计划\n\n- 验证"}
+                thread = MagicMock()
+                thread.turn.return_value.stream.return_value = iter([
+                    {"method": "item/completed", "payload": {"item": item}},
+                    {"method": "item/completed", "payload": {"item": item}},
+                    {"method": "turn/completed", "payload": {"turn": {"status": "completed"}}},
+                ])
+                callback = MagicMock() if with_callback else None
+                result = _consume_codex_turn(thread, "plan", on_event=callback)
+                self.assertEqual(result.final_response, item["text"])
+                if callback:
+                    snapshots = [call.args for call in callback.call_args_list if call.args[0] == "output.snapshot"]
+                    self.assertEqual(snapshots, [("output.snapshot", {"text": item["text"]})])
+
+    def test_plan_completion_can_clear_draft_and_keeps_separate_items(self):
+        thread = MagicMock()
+        thread.turn.return_value.stream.return_value = iter([
+            {"method": "item/completed", "payload": {"item": {
+                "id": "plan-1", "type": "plan", "text": "# 第一版",
+            }}},
+            {"method": "item/plan/delta", "payload": {
+                "itemId": "plan-2", "delta": "# 已撤回草稿",
+            }},
+            {"method": "item/completed", "payload": {"item": {
+                "id": "plan-2", "type": "plan", "text": "",
+            }}},
+            {"method": "item/completed", "payload": {"item": {
+                "id": "plan-3", "type": "plan", "text": "# 修订版",
+            }}},
+            {"method": "turn/completed", "payload": {"turn": {"status": "completed"}}},
+        ])
+        callback = MagicMock()
+        result = _consume_codex_turn(thread, "plan", on_event=callback)
+        self.assertEqual(result.final_response, "# 第一版\n\n# 修订版")
+        callback.assert_any_call("output.snapshot", {"text": "# 第一版"})
+        self.assertEqual(callback.call_args.args, (
+            "output.snapshot", {"text": result.final_response},
+        ))
+
+    def test_interrupted_plan_retains_partial_text(self):
+        thread = MagicMock()
+        thread.turn.return_value.stream.return_value = iter([
+            SimpleNamespace(method="item/plan/delta", payload=SimpleNamespace(
+                item_id="plan-1", delta="# 未完成计划",
+            )),
+            {"method": "turn/completed", "payload": {"turn": {"status": "interrupted"}}},
+        ])
+        result = _consume_codex_turn(thread, "plan")
+        self.assertEqual(result.status, "interrupted")
+        self.assertEqual(result.final_response, "# 未完成计划")
+
     def test_interrupts_active_turn_when_run_is_cancelled(self):
         interrupted = threading.Event()
         transport = MagicMock()

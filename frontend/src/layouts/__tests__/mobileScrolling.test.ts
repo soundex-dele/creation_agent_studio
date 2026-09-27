@@ -113,3 +113,21 @@ describe('mobile page scrolling', () => {
     expect(mobileRule).toMatch(/min-height:\s*44px/);
   });
 });
+
+it.each([320, 375, 390, 767, 768, 844, 1440])('keeps agent plans and interaction forms inside the chat scroll pane at %ipx', width => {
+  const chatStyles = readSource('../../components/Chat/ChatContainer.css');
+  const activityStyles = readSource('../../components/Chat/AgentActivityPanel.css');
+  const source = readSource('../../components/Chat/ChatContainer.tsx');
+  expect(source.indexOf('className="chat-messages"')).toBeLessThan(source.indexOf('<AgentQuestionCard'));
+  const container = declarationsAt([chatStyles], ['.chat-container'], width);
+  const messages = declarationsAt([chatStyles], ['.chat-messages'], width);
+  expect(container.height).toBe('100%');
+  expect(container['min-height']).toBe('0');
+  expect(messages['min-height']).toBe('0');
+  expect(messages['overflow-y']).toBe('auto');
+  const output = declarationsAt([activityStyles], ['.agent-activity-panel pre'], width);
+  expect(output['max-height']).toBe('320px');
+  expect(output.overflow).toBe('auto');
+  const actions = declarationsAt([activityStyles], ['.agent-mcp-form .agent-question-actions'], width);
+  expect(actions['flex-wrap']).toBe('wrap');
+});

@@ -1,6 +1,8 @@
 import importlib
 import logging
 import time
+import queue
+from uuid import uuid4
 from pathlib import Path
 
 
@@ -33,9 +35,42 @@ def _load_entrypoint(dotted_path):
 class ChildEventSink:
     """Small database-free protocol exposed to an execution adapter."""
 
-    def __init__(self, message_queue, cancel_event):
+    def __init__(self, message_queue, cancel_event, controls=None):
         self._queue = message_queue
         self._cancel_event = cancel_event
+        self._controls = controls
+        self._deferred_commands = []
+
+    def poll_commands(self):
+        if self._controls is None:
+            return []
+        commands, self._deferred_commands = self._deferred_commands, []
+        while True:
+            try:
+                commands.append(self._controls.get_nowait())
+            except queue.Empty:
+                return commands
+
+    def wait_for_input(self, request, *, is_pending=lambda: True):
+        if self._controls is None:
+            raise RuntimeError("Live provider input requires a bidirectional worker")
+        request_id = str(uuid4())
+        self._queue.put({"kind": "live_input", "input_request_id": request_id,
+                         "input_kind": request.get("input_kind", "answer"),
+                         "request_payload": request})
+        try:
+            while not self.cancelled and is_pending():
+                try:
+                    command = self._controls.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                if command.get("input_request_id") == request_id:
+                    return command
+                if command.get("type") == "steer":
+                    self._deferred_commands.append(command)
+            return None
+        finally:
+            self._queue.put({"kind": "live_input_resolved", "input_request_id": request_id})
 
     @property
     def cancelled(self):
@@ -100,7 +135,7 @@ class ChildEventSink:
         raise _SuspendExecution()
 
 
-def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint):
+def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint, controls=None):
     """Spawn-safe process entry point; adapters receive data and an IPC sink."""
 
     started = time.perf_counter()
@@ -111,7 +146,7 @@ def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint):
             run_payload.get("run_id", "unknown"), (time.perf_counter() - started) * 1000,
         )
         adapter = _load_entrypoint(adapter_entrypoint)
-        output = adapter(run_payload, ChildEventSink(message_queue, cancel_event))
+        output = adapter(run_payload, ChildEventSink(message_queue, cancel_event, controls))
         outcome = "cancelled" if cancel_event.is_set() else "succeeded"
         message_queue.put(
             {"kind": "terminal", "outcome": outcome, "output": output or {}}

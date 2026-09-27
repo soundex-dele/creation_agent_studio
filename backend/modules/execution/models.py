@@ -300,6 +300,7 @@ class RunEventSnapshot(TenantOwnedModel):
 
 class RunCommand(TenantOwnedModel):
     class Type(models.TextChoices):
+        STEER = "steer", "Steer active turn"
         ANSWER = "answer", "Answer"
         GRANT_PERMISSION = "grant_permission", "Grant permission"
         DENY_PERMISSION = "deny_permission", "Deny permission"

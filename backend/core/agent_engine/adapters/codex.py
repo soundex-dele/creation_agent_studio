@@ -21,6 +21,7 @@ from ..messages import format_messages_for_query
 from ..models import LLMResponse, TokenUsage
 from ..tool_display import tool_display_name
 from .base import AgentAdapter
+from .codex_interactions import INTERACTIVE_METHODS, input_request, response_for_request
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,7 @@ def _codex_tool_payload(item):
 def _consume_codex_turn(
     thread, text, *, model="", skills=None, image_paths=None, on_event=None,
     cancelled=None, collaboration_mode=None, timeout_seconds=None,
+    on_input_request=None, poll_commands=None, tool_handlers=None,
 ):
     """Consume one Codex turn while preserving text and tool notifications."""
 
@@ -162,6 +164,9 @@ def _consume_codex_turn(
         )
         if timeout_seconds is not None:
             turn.deadline = time.monotonic() + float(timeout_seconds)
+        thread._transport.live_interactions = on_input_request is not None
+        turn.poll_commands = poll_commands
+        turn.on_event = on_event
     else:
         if collaboration_mode == "plan":
             raise RuntimeError("Plan 模式需要 CODEX_TRANSPORT=app-server。")
@@ -200,35 +205,86 @@ def _consume_codex_turn(
         )
         watcher.start()
 
-    chunks = []
-    completed_items = {}
+    # Plan mode emits a separate `plan` item, not an agentMessage. Keep text
+    # per item so item/completed can replace its draft without discarding the
+    # surrounding commentary (or duplicating the streamed plan).
+    text_items = {}
+    published_text = ""
+
+    def update_text(item_type, item_id, text, *, append=False):
+        nonlocal published_text
+        key = (item_type, item_id)
+        text_items[key] = text_items.get(key, "") + text if append else text
+        output = "\n\n".join(value for value in text_items.values() if value)
+        if output == published_text:
+            return
+        if on_event is not None:
+            if append and output.startswith(published_text):
+                on_event("output.delta", {"text": output[len(published_text):]})
+            else:
+                # The final plan text is authoritative and can differ from
+                # concatenated item/plan/delta notifications.
+                on_event("output.snapshot", {"text": output})
+        published_text = output
+
     usage = None
     terminal_turn = None
     try:
         for notification in turn.stream():
             method = str(_object_value(notification, "method", ""))
             payload = _object_value(notification, "payload", {}) or {}
-            if method == "item/agentMessage/delta":
+            if method == "agentStudio/serverRequest":
+                message = _plain_value(payload)
+                transport = thread._transport
+                if not transport.is_pending(message):
+                    continue
+                if message["method"] == "item/tool/call":
+                    params = message.get("params") or {}
+                    handler = (tool_handlers or {}).get(params.get("tool"))
+                    try:
+                        if handler is None:
+                            raise ValueError("未注册的客户端工具：" + str(params.get("tool")))
+                        result = handler(params.get("arguments") or {})
+                        response = {"success": True, "contentItems": [{"type": "inputText", "text": str(result)}]}
+                    except Exception as exc:
+                        response = {"success": False, "contentItems": [{"type": "inputText", "text": str(exc)}]}
+                    transport.respond(message, response)
+                    continue
+                command = on_input_request(input_request(message), is_pending=lambda: transport.is_pending(message))
+                if command is not None and transport.is_pending(message):
+                    transport.respond(message, response_for_request(message, command))
+                text_items.clear()
+                published_text = ""
+                continue
+            if method in {"item/agentMessage/delta", "item/plan/delta"}:
                 delta = str(_object_value(payload, "delta", "") or "")
                 if delta:
-                    chunks.append(delta)
-                    if on_event is not None:
-                        on_event("output.delta", {"text": delta})
+                    item_id = str(_object_value(
+                        payload, "itemId", _object_value(payload, "item_id", "")
+                    ))
+                    update_text(method.split("/")[1], item_id, delta, append=True)
             elif method in {"item/started", "item/completed"}:
                 item = _object_value(payload, "item", {}) or {}
                 item_type = str(_object_value(item, "type", ""))
-                if item_type == "agentMessage" and method == "item/completed":
+                if on_event is not None:
+                    raw = _plain_value(item)
+                    if item_type in {"agentMessage", "plan", "reasoning", "subAgentActivity", "enteredReviewMode", "exitedReviewMode", "contextCompaction"}:
+                        # Raw reasoning and binary results never enter user-facing events.
+                        safe = {key: raw[key] for key in ("id", "type", "text", "phase", "summary", "review", "status", "kind", "agentPath", "agentThreadId", "agentNickname", "agentRole") if key in raw}
+                        on_event("agent.item", {**safe, "completed": method == "item/completed"})
+                if item_type in {"agentMessage", "plan"}:
                     item_id = str(_object_value(item, "id", ""))
-                    completed_items[item_id] = str(
-                        _object_value(item, "text", "") or ""
-                    )
+                    if method == "item/completed" or (item_type, item_id) not in text_items:
+                        update_text(item_type, item_id, str(
+                            _object_value(item, "text", "") or ""
+                        ))
                 tool_payload = _codex_tool_payload(item)
                 if tool_payload is not None and on_event is not None:
                     if method == "item/started":
                         on_event("tool.started", tool_payload)
                     else:
                         status = str(_object_value(item, "status", ""))
-                        failed = status in {"failed", "declined"} or bool(
+                        failed = status in {"failed", "declined"} or _object_value(item, "success") is False or bool(
                             tool_payload.get("error_message")
                         )
                         on_event(
@@ -237,22 +293,35 @@ def _consume_codex_turn(
                         )
             elif method == "thread/tokenUsage/updated":
                 usage = _object_value(payload, "token_usage")
+                if on_event is not None:
+                    on_event("agent.usage", _plain_value(payload))
             elif method == "turn/completed":
                 terminal_turn = _object_value(payload, "turn")
+                if on_event is not None and _object_value(terminal_turn, "error"):
+                    on_event("agent.warning", {"method": "error", "error": _plain_value(_object_value(terminal_turn, "error"))})
+            elif on_event is not None:
+                raw = _plain_value(payload)
+                if method == "turn/plan/updated":
+                    on_event("agent.plan", {"plan": raw.get("plan", []), "explanation": raw.get("explanation", "")})
+                elif method == "turn/diff/updated":
+                    on_event("agent.diff", {"diff": raw.get("diff", "")})
+                elif method in {"item/commandExecution/outputDelta", "item/mcpToolCall/progress", "item/commandExecution/terminalInteraction", "item/fileChange/patchUpdated"}:
+                    on_event("agent.tool", {"id": raw.get("itemId", ""), "method": method, **raw})
+                elif method == "item/reasoning/summaryTextDelta":
+                    on_event("agent.item", {"id": raw.get("itemId", ""), "type": "reasoning", "summary_delta": raw.get("delta", ""), "summary_index": raw.get("summaryIndex", 0)})
+                elif method in {"warning", "configWarning", "guardianWarning", "deprecationNotice", "error", "model/rerouted", "model/verification", "model/safetyBuffering/updated", "mcpServer/startupStatus/updated"}:
+                    on_event("agent.warning", {"method": method, **raw})
     finally:
         stop_watcher.set()
         if watcher is not None:
             watcher.join(timeout=0.2)
 
-    final_response = "".join(chunks)
-    if not final_response and completed_items:
-        final_response = list(completed_items.values())[-1]
     terminal_turn = terminal_turn or _ProtocolObject(
         {"status": "failed", "error": {"message": "Missing turn completion"}}
     )
     return _ProtocolObject({
         "status": _object_value(terminal_turn, "status", "failed"),
-        "final_response": final_response,
+        "final_response": published_text,
         "usage": _plain_value(usage),
         "error": _plain_value(_object_value(terminal_turn, "error")),
     })
@@ -284,6 +353,9 @@ class _AppServerTransport:
         self._stderr_lines: list[str] = []
         self._approval_decision = approval_decision
         self.input_request: dict | None = None
+        self.live_interactions = False
+        self._server_requests = {}
+        self._server_request_lock = threading.Lock()
         self._reader = threading.Thread(target=self._read_stdout, daemon=True)
         self._stderr_reader = threading.Thread(target=self._read_stderr, daemon=True)
         self._reader.start()
@@ -327,8 +399,18 @@ class _AppServerTransport:
                     self._handle_server_request(message)
                     continue
                 if message.get("method"):
+                    params = message.get("params") or {}
+                    with self._server_request_lock:
+                        if message["method"] == "serverRequest/resolved":
+                            self._server_requests.pop(params.get("requestId"), None)
+                        elif message["method"] == "turn/completed":
+                            turn_id = (params.get("turn") or {}).get("id")
+                            self._server_requests = {key: req for key, req in self._server_requests.items()
+                                                     if (req.get("params") or {}).get("turnId") != turn_id}
                     self._notifications.put(message)
         finally:
+            with self._server_request_lock:
+                self._server_requests.clear()
             detail = self._stderr_detail()
             failure = RuntimeError(
                 "Codex app-server closed unexpectedly"
@@ -394,6 +476,11 @@ class _AppServerTransport:
     def _handle_server_request(self, message: dict) -> None:
         """Resolve or project interactive requests into the durable Run protocol."""
         method = message.get("method", "")
+        if (getattr(self, "live_interactions", False) and method in INTERACTIVE_METHODS) or method == "item/tool/call":
+            with self._server_request_lock:
+                self._server_requests[message["id"]] = message
+            self._notifications.put({"method": "agentStudio/serverRequest", "params": message})
+            return
         if self.input_request:
             # Preserve the first request while the consumer checkpoints it.
             return
@@ -424,32 +511,10 @@ class _AppServerTransport:
             "item/commandExecution/requestApproval",
             "item/fileChange/requestApproval",
         }:
-            approval_decision = self._approval_decision
-            self._approval_decision = ""
-            if approval_decision == "grant":
-                decision = "accept"
-            else:
-                decision = "decline"
-                if approval_decision != "deny":
-                    params = message.get("params") or {}
-                    self.input_request = {
-                        "input_kind": "permission",
-                        "kind": "permission",
-                        "header": "Codex 权限确认",
-                        "question": str(
-                            params.get("reason")
-                            or params.get("command")
-                            or "Codex 请求执行受保护的操作"
-                        ),
-                        "options": [
-                            {"label": "允许", "value": "grant"},
-                            {"label": "拒绝", "value": "deny"},
-                        ],
-                        "permission": {"method": method, "request": params},
-                    }
-                    self._notifications.put({"method": "agentStudio/inputRequired", "params": {}})
-                    return
-            self._send({"id": message["id"], "result": {"decision": decision}})
+            # Callers without a live-input controller may surface the request,
+            # but no authorization is carried over to a replacement process.
+            self.input_request = input_request(message)
+            self._notifications.put({"method": "agentStudio/inputRequired", "params": {}})
             return
         self._send(
             {
@@ -460,6 +525,18 @@ class _AppServerTransport:
                 },
             }
         )
+
+    def is_pending(self, message):
+        with self._server_request_lock:
+            return self._server_requests.get(message["id"]) == message and self._process.poll() is None
+
+    def respond(self, message, result):
+        with self._server_request_lock:
+            if self._server_requests.get(message["id"]) != message:
+                return False
+            self._send({"id": message["id"], "result": result})
+            self._server_requests.pop(message["id"], None)
+            return True
 
     def next_notification(self, timeout: Optional[float] = None) -> dict:
         message = self._notifications.get(timeout=timeout)
@@ -552,6 +629,8 @@ class _AppServerTurn:
         self._reasoning_effort = reasoning_effort
         self.id = ""
         self.deadline = None
+        self.poll_commands = None
+        self.on_event = None
 
     def _start(self) -> None:
         if self.id:
@@ -580,15 +659,27 @@ class _AppServerTurn:
 
     def stream(self):
         self._start()
+        if self.on_event and self.poll_commands:
+            self.on_event("agent.session", {"thread_id": self._thread_id, "turn_id": self.id, "can_steer": True})
         while True:
+            if self.poll_commands:
+                for command in self.poll_commands():
+                    if command.get("type") == "steer":
+                        try:
+                            self.steer(str((command.get("payload") or {}).get("text") or ""))
+                        except Exception as exc:
+                            if self.on_event:
+                                self.on_event("agent.warning", {"method": "steer.failed", "message": str(exc), "command_id": command.get("id")})
             remaining = None if self.deadline is None else self.deadline - time.monotonic()
             if remaining is not None and remaining <= 0:
                 raise TimeoutError("Codex 图像生成超时，请稍后重试。")
             try:
-                message = (self._transport.next_notification() if remaining is None
-                           else self._transport.next_notification(timeout=remaining))
+                wait = min(remaining, 0.1) if remaining is not None else 0.1
+                message = (self._transport.next_notification(timeout=wait)
+                           if self.poll_commands or remaining is not None
+                           else self._transport.next_notification())
             except queue.Empty:
-                raise TimeoutError("Codex 图像生成超时，请稍后重试。") from None
+                continue
             if message["method"] == "agentStudio/inputRequired":
                 return
             params = message.get("params") or {}
@@ -718,6 +809,7 @@ class _AppServerCodex:
         model: Optional[str],
         sandbox: str,
         config: Optional[dict] = None,
+        dynamic_tools=None,
     ) -> _AppServerThread:
         approval_policy, approvals_reviewer = _approval_settings(approval_mode)
         params = {
@@ -730,6 +822,8 @@ class _AppServerCodex:
         }
         if config:
             params["config"] = config
+        if dynamic_tools:
+            params["dynamicTools"] = dynamic_tools
         params = {
             key: value for key, value in params.items() if value not in (None, "")
         }
@@ -929,6 +1023,8 @@ class CodexAdapter(AgentAdapter):
         return sdk, sdk.Codex(config=config)
 
     def complete(self, messages: list[dict], **options) -> LLMResponse:
+        if options.get("approval_decision"):
+            raise RuntimeError("旧版审批请求已失效，请重新发起任务并确认当前操作。")
         permission_mode = options.get("permission_mode")
         collaboration_mode = options.get("collaboration_mode")
         if permission_mode not in (None, "default", "allow_all"):
@@ -979,6 +1075,10 @@ class CodexAdapter(AgentAdapter):
                 if sdk is not _AppServerSdk or requested_thread_id:
                     raise ValueError("Thread config requires a new app-server thread")
                 thread_options["config"] = options["thread_config"]
+            if options.get("dynamic_tools"):
+                if sdk is not _AppServerSdk or requested_thread_id:
+                    raise ValueError("Dynamic tool registration requires a new app-server thread")
+                thread_options["dynamic_tools"] = options["dynamic_tools"]
             if requested_thread_id:
                 try:
                     thread = client.thread_resume(
@@ -1006,6 +1106,9 @@ class CodexAdapter(AgentAdapter):
                 cancelled=options.get("cancelled"),
                 collaboration_mode=collaboration_mode,
                 timeout_seconds=options.get("timeout_seconds"),
+                on_input_request=options.get("on_input_request"),
+                poll_commands=options.get("poll_commands"),
+                tool_handlers=options.get("tool_handlers"),
             )
             input_request = getattr(client, "input_request", None)
         finally:

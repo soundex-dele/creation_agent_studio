@@ -232,6 +232,50 @@ describe('useConversationStore durable Run integration', () => {
     ]);
   });
 
+  it('replaces a streamed plan draft with its authoritative document and restores history', async () => {
+    let emit: ((event: RunEventEnvelope) => void) | undefined;
+    vi.spyOn(api, 'post').mockResolvedValue({
+      id: 'run-plan', organization_id: 'org-1', status: 'queued',
+    });
+    vi.spyOn(runStream, 'streamRunEvents').mockImplementation((options) => {
+      emit = options.onEvent as (event: RunEventEnvelope) => void;
+      return { abort: vi.fn(), cursor: 0, done: new Promise(() => undefined) };
+    });
+    const conversation = {
+      id: 'conversation-plan', title: 'Plan', created_at: '', updated_at: '', messages: [],
+    };
+    useConversationStore.setState({ currentConversation: conversation });
+    const controller = useConversationStore.getState().sendMessageStream(
+      conversation.id, '设计计划', { collaborationMode: 'plan' },
+    );
+    await controller.submitted;
+    const event = (sequence: number, type: string, payload: Record<string, unknown>) => ({
+      schema_version: 1, run_id: 'run-plan', attempt_id: null,
+      sequence, type, payload, created_at: '',
+    });
+    emit?.(event(1, 'run.started', {}));
+    emit?.(event(2, 'output.delta', { text: '先检查需求。\n\n# 草稿' }));
+    expect(useConversationStore.getState().currentConversation?.messages.slice(-1)[0]?.content)
+      .toContain('# 草稿');
+    const document = '先检查需求。\n\n# 实施计划\n\n1. 实现\n2. 验证';
+    emit?.(event(3, 'output.snapshot', { text: document }));
+    expect(useConversationStore.getState().currentConversation?.messages.slice(-1)[0]?.content)
+      .toBe(document);
+    emit?.(event(4, 'output.snapshot', { result: document, model: 'codex' }));
+    vi.spyOn(api, 'get').mockImplementation(async (url) => url === '/conversations/' ? [] : {
+      ...conversation, active_run: null,
+      messages: [{ id: 'saved-plan', role: 'assistant', content: document, created_at: '' }],
+    });
+    emit?.(event(5, 'run.succeeded', {}));
+    await vi.waitFor(() => {
+      expect(useConversationStore.getState().currentConversation?.messages[0]).toMatchObject({
+        id: 'saved-plan', content: document,
+      });
+    });
+    expect(useConversationStore.getState().streamingMessageId).toBeNull();
+    controller.abort();
+  });
+
   it('submits composer Agent and Skill selections when creating a Run', async () => {
     vi.spyOn(api, 'post').mockResolvedValue({
       id: 'run-2',

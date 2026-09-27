@@ -25,6 +25,7 @@ export interface RunEventGap {
 }
 
 export interface RunEventState {
+  activity?: import('./agentActivity').AgentActivityState;
   runId: string | null;
   nextSequence: number;
   status: RunStatus | null;
@@ -68,6 +69,10 @@ export interface AgentQuestionItem {
 }
 
 export interface AgentQuestion extends AgentQuestionItem {
+  details?: Record<string, unknown>;
+  formSchema?: Record<string, unknown>;
+  elicitation?: boolean;
+  url?: string;
   kind: 'question' | 'permission';
   questions?: AgentQuestionItem[];
 }

@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from modules.execution.models import Run
+from .agent_activity import project_activity
 
 
 def _display_value(value):
@@ -18,7 +19,7 @@ def _display_value(value):
 def _segment_start(run, through_sequence):
     return (
         run.events.filter(
-            type="input.accepted", sequence__lt=through_sequence,
+            type__in=("input.accepted", "input.resolved"), sequence__lt=through_sequence,
         ).order_by("-sequence").values_list("sequence", flat=True).first()
         or 0
     )
@@ -190,6 +191,10 @@ def _question_content(payload, run):
 
 def _answer_content(command_payload, request_payload):
     command_payload = command_payload or {}
+    if request_payload.get("elicitation"):
+        return {"accept": "已提交工具请求", "decline": "已拒绝工具请求", "cancel": "已取消工具请求"}.get(
+            command_payload.get("action", "accept"), "已处理工具请求",
+        )
     answers = command_payload.get("answers")
     if isinstance(answers, dict) and answers:
         questions = {
@@ -277,6 +282,9 @@ def project_input_required(run_id, event):
         }
         if tool_calls:
             metadata["agent"] = {"tool_calls": tool_calls}
+        activity = project_activity(run, after_sequence=start, through_sequence=event.sequence)
+        if activity:
+            metadata.setdefault("agent", {})["activity"] = activity
         message, created = Message.objects.get_or_create(
             run=run,
             run_event_sequence=event.sequence,
@@ -334,7 +342,7 @@ def project_input_accepted(run_id, event, command):
                     "run_id": str(run.id),
                     "run_event_sequence": event.sequence,
                     "interaction": {
-                        "type": "input.accepted",
+                        "type": event.type,
                         "input_request_id": str(command.input_request_id),
                         "command_type": command.type,
                     },
@@ -405,7 +413,8 @@ def project_terminal_run(run_id, output):
                 "agent_thread_provider", "agent_thread_id", "updated_at",
             ))
         tool_calls = _project_tool_calls(run, after_sequence=start)
-        if run.status == Run.Status.CANCELLED and not content and not tool_calls:
+        activity = project_activity(run, after_sequence=start)
+        if run.status == Run.Status.CANCELLED and not content and not tool_calls and not activity:
             return
         metadata = {
             "run_id": str(run.id),
@@ -414,6 +423,8 @@ def project_terminal_run(run_id, output):
             "usage": output.get("usage") or {},
         }
         agent_metadata = {}
+        if activity:
+            agent_metadata["activity"] = activity
         if tool_calls:
             agent_metadata["tool_calls"] = tool_calls
         loaded_skills = output.get("loaded_skills") or []
@@ -479,7 +490,7 @@ def repair_conversation_messages(conversation):
             run_event_sequence__isnull=False,
         ).values_list("run_event_sequence", flat=True))
         for event in run.events.filter(
-            type__in=("input.required", "input.accepted"),
+            type__in=("input.required", "input.accepted", "input.steered"),
         ).order_by("sequence"):
             if event.sequence in projected_sequences:
                 continue

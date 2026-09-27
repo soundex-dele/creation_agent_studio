@@ -2,7 +2,7 @@ from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.db import OperationalError
@@ -750,6 +750,69 @@ class DurableConversationRunTest(TestCase):
         self.assertEqual(response.status_code, 409, response.data)
         self.assertIn("仍在执行", response.data["detail"])
         self.assertTrue(Conversation.objects.filter(pk=self.conversation.id).exists())
+
+    @override_settings(AGENT_ENGINE_ADAPTER="codex")
+    def test_app_server_plan_is_streamed_saved_and_returned_in_history(self):
+        from apps.agents.execution import execute_agent_completion
+        from core.agent_engine.adapters.codex import (
+            CodexAdapter, _AppServerSdk, _AppServerThread,
+        )
+
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "设计实施计划", "collaboration_mode": "plan"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="conversation-plan-document",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 202, response.data)
+        run = Run.objects.get(pk=response.data["id"])
+        final_plan = "# 实施计划\n\n1. 对接协议\n2. 验证历史记录"
+        transport = MagicMock()
+        transport.request.return_value = {"turn": {"id": "turn-1"}}
+        transport.next_notification.side_effect = [
+            {"method": "item/plan/delta", "params": {
+                "threadId": "thread-1", "turnId": "turn-1",
+                "itemId": "plan-1", "delta": "# 计划草稿",
+            }},
+            {"method": "item/completed", "params": {
+                "threadId": "thread-1", "turnId": "turn-1",
+                "item": {"id": "plan-1", "type": "plan", "text": final_plan},
+            }},
+            {"method": "turn/completed", "params": {
+                "threadId": "thread-1",
+                "turn": {"id": "turn-1", "status": "completed"},
+            }},
+        ]
+        client = MagicMock(input_request=None)
+        client.thread_start.return_value = _AppServerThread(
+            transport=transport, thread_id="thread-1", model="test-model",
+        )
+        adapter = CodexAdapter()
+        engine = SimpleNamespace(adapter_name="codex", complete=adapter.complete)
+        sink = MagicMock(cancelled=False)
+        with (
+            patch("apps.agents.execution.build_agent_engine", return_value=engine),
+            patch.object(adapter, "_client", return_value=(_AppServerSdk, client)),
+        ):
+            output = execute_agent_completion({
+                "run_id": str(run.id),
+                "organization_id": str(self.organization.id),
+                "definition_snapshot": run.definition_snapshot,
+                "input": run.input,
+            }, sink)
+
+        self.assertEqual(transport.request.call_args.args[1]["collaborationMode"]["mode"], "plan")
+        sink.emit.assert_any_call("output.delta", {"text": "# 计划草稿"})
+        sink.emit.assert_any_call("output.snapshot", {"text": final_plan})
+        self.assertEqual(output["result"], final_plan)
+        project_terminal_run(run.id, output)
+        self.assertEqual(Message.objects.get(run=run).content, final_plan)
+        history = self.client.get(
+            f"/api/v1/conversations/{self.conversation.id}/", **self.headers,
+        )
+        self.assertEqual(history.status_code, 200, history.data)
+        self.assertEqual(history.data["messages"][-1]["content"], final_plan)
 
     def test_terminal_projection_preserves_tool_history(self):
         response = self.client.post(

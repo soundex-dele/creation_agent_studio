@@ -6,6 +6,7 @@ import type {
   RunEventSnapshotEnvelope,
   RunStatus,
 } from './types';
+import { reduceAgentActivity } from './agentActivity';
 
 const STATUS_BY_EVENT: Record<string, RunStatus> = {
   'run.queued': 'queued',
@@ -83,6 +84,7 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
   };
   const lifecycleStatus = STATUS_BY_EVENT[event.type];
   if (lifecycleStatus) next.status = lifecycleStatus;
+  if (event.type.startsWith('agent.')) next.activity = reduceAgentActivity(state.activity, event);
 
   switch (event.type) {
     case 'output.delta':
@@ -99,12 +101,19 @@ function applyEvent(state: RunEventState, event: RunEventEnvelope): RunEventStat
       next.pendingInput = { ...event.payload };
       break;
     case 'input.accepted':
-      next.status = 'queued';
+      next.status = event.payload.live ? 'running' : 'queued';
       next.pendingInput = null;
       next.output = '';
+      next.activity = state.activity?.session ? { session: state.activity.session } : undefined;
+      break;
+    case 'input.resolved':
+      next.status = 'running';
+      next.pendingInput = null;
+      next.output = '';
+      next.activity = state.activity?.session ? { session: state.activity.session } : undefined;
       break;
     case 'input.expired':
-      next.status = 'cancelled';
+      next.status = event.payload.status === 'cancelling' ? 'cancelling' : 'cancelled';
       next.pendingInput = null;
       break;
     case 'artifact.created': {

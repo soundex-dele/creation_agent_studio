@@ -53,6 +53,7 @@ interface MessageInputProps {
   disabled?: boolean;
   isRunning?: boolean;
   onStop?: () => void | Promise<void>;
+  onSteer?: (text: string) => Promise<void>;
   stopDisabled?: boolean;
   isStopping?: boolean;
   visible?: boolean;
@@ -71,6 +72,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   isRunning = false,
   onStop,
+  onSteer,
   stopDisabled = false,
   isStopping = false,
   visible = true,
@@ -203,6 +205,18 @@ const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(autosizeTextarea, [content, visible]);
 
   const handleSend = async () => {
+    if (isRunning && onSteer && content.trim() && !selectedImages.length && !isSubmitting && !disabled) {
+      setIsSubmitting(true);
+      try {
+        await onSteer(content.trim());
+        setContent('');
+      } catch {
+        message.error('补充指令未提交，请重试');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
     if ((content.trim() || selectedImages.length > 0) && !disabled && !permissionPending && !isSubmitting && !isRunning) {
       setIsSubmitting(true);
       try {
@@ -360,6 +374,13 @@ const MessageInput: React.FC<MessageInputProps> = ({
           rows={1}
           className="chat-input-textarea"
         />
+        {isRunning && onSteer && (
+          <button type="button" className="chat-composer-action" onClick={() => void handleSend()}
+            disabled={!content.trim() || selectedImages.length > 0 || isSubmitting || disabled}
+            aria-label="补充指令" title="向当前任务补充指令">
+            {isSubmitting ? '提交中…' : '补充指令'}
+          </button>
+        )}
         <button
           type="button"
           className={`chat-send-btn ${isRunning ? 'chat-send-btn--stop' : ''}`}

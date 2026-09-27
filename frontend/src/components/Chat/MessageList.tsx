@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { CopySimple } from '@phosphor-icons/react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import type { AgentToolCall } from '@/entities/run';
@@ -15,6 +16,8 @@ import type { MessageAttachment } from '@/stores/useConversationStore';
 import 'katex/dist/katex.min.css';
 import './MessageList.css';
 import { useChatConnection } from './ChatConnectionContext';
+import AgentActivityPanel from './AgentActivityPanel';
+import type { AgentActivityState } from '@/entities/run';
 
 const { Text } = Typography;
 
@@ -33,6 +36,7 @@ export interface ChatMessage {
       loaded_skills?: string[];
     };
     agent?: {
+      activity?: AgentActivityState;
       tool_calls?: AgentToolCall[];
       loaded_skills?: string[];
     };
@@ -144,6 +148,10 @@ const MessageList: React.FC<MessageListProps> = ({
       ?? message.metadata?.composer?.skills
       ?? [];
     const isStreamingMessage = message.id === streamingMessageId;
+    const nativeItems = Object.values(message.metadata?.agent?.activity?.items ?? {}).filter(
+      item => ['agentMessage', 'plan'].includes(item.type) && item.text,
+    );
+    const hasNativeContent = nativeItems.length > 0 && nativeItems.map(item => item.text).join('\n\n') === message.content;
     const customAssistantContent = !isUser && !isSystem && message.content
       ? renderAssistantContent?.({
         message,
@@ -222,9 +230,20 @@ const MessageList: React.FC<MessageListProps> = ({
                   <ThunderboltOutlined /> 已加载技能：{loadedSkills.join('、')}
                 </div>
               )}
+              {!isUser && <AgentActivityPanel activity={message.metadata?.agent?.activity} />}
               {customAssistantContent !== undefined
                 ? customAssistantContent
-                : message.content && (
+                : hasNativeContent ? nativeItems.map(item => (
+                  <section key={item.id} className={item.type === 'plan' ? 'agent-plan-document' : undefined}
+                    aria-label={item.type === 'plan' ? '计划文档' : item.phase === 'commentary' ? '执行说明' : '回复'}>
+                    {item.type === 'plan' && <div className="agent-plan-document-label">计划文档</div>}
+                    {isStreamingMessage ? <span className="message-streaming-content">{item.text}</span>
+                      : <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}
+                        components={remote ? { img: ({ alt }) => <span>{alt || '附件'} · 远程访问暂不支持预览</span>,
+                          a: ({ children }) => <span>{children}（远程访问暂不支持打开文件或链接）</span> } : undefined}
+                      >{normalizeMarkdownMath(item.text || '')}</ReactMarkdown>}
+                  </section>
+                )) : message.content && (
                   isUser || isSystem || isStreamingMessage ? (
                     <span className={isUser ? 'message-user-text' : isStreamingMessage ? 'message-streaming-content' : undefined}>
                       {message.content}
@@ -235,7 +254,7 @@ const MessageList: React.FC<MessageListProps> = ({
                         img: ({ alt }) => <span>{alt || '附件'} · 远程访问暂不支持预览</span>,
                         a: ({ children }) => <span>{children}（远程访问暂不支持打开文件或链接）</span>,
                       } : undefined}
-                      remarkPlugins={[remarkMath]}
+                      remarkPlugins={[remarkGfm, remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                     >
                       {normalizeMarkdownMath(message.content)}
