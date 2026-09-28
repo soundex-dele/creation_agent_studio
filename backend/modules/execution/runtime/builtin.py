@@ -190,16 +190,28 @@ def _render_step_message(step, workflow_input, dependency_results):
         for question in prompt.get("questions", [])
         if question.get("key") in workflow_input
     }
+    mapped_answers = {
+        key: _resolve_automation_value(binding, workflow_input, dependency_results)
+        for key, binding in (step.get('input_mapping') or {}).items()
+    }
+    answers.update(mapped_answers)
     answers.update({
         key: _resolve_automation_value(binding, workflow_input, dependency_results)
         for key, binding in configured_answers.items()
     })
+    explicit = set(effective_config.get('explicit_input_fields', answers)) | set(mapped_answers) | set(configured_answers)
+    preset = effective_config.get('form_preset')
+    brand = effective_config.get('brand_snapshot')
+    inherited_defaults = {**{q['key']: q.get('default_value') for q in prompt.get('questions', [])},
+                          **{k: v for k, v in answers.items() if k not in explicit},
+                          **(preset or {}).get('values', {}), **(brand or {}).get('fields', {})}
     missing_required_text = [
         question
         for question in prompt.get("questions", [])
         if question.get("required")
         and question.get("type") == "text"
-        and answers.get(question["key"], question.get("default_value")) in (None, "")
+        and question['key'] not in explicit
+        and (answers.get(question['key']) if question['key'] in explicit else inherited_defaults.get(question['key'])) in (None, "")
     ]
     if missing_required_text and dependency_results:
         dependency_outputs = {
@@ -226,11 +238,11 @@ def _render_step_message(step, workflow_input, dependency_results):
             if question["key"] == key
         ), missing_required_text[0])
         answers[target["key"]] = dependency_value
-    rendered = compose_guided_prompt(
-        prompt,
-        answers,
-        application_id=int(step.get("application_id") or 0),
-    )
+        explicit.add(target['key'])
+    from apps.applications.form_presets import compose_effective
+    rendered = compose_effective(prompt=prompt, answers=answers,
+        application_id=int(step.get('application_id') or 0), preset=preset, brand=brand,
+        explicit_fields=explicit)
     return rendered["prompt"]
 
 

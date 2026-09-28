@@ -27,6 +27,24 @@ function declarationsAt(sources: string[], selectors: string[], width: number) {
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('bounds form templates and manual workflow setup at %ipx', (width) => {
+    const chat = readSource('../../pages/Apps/ChatApplicationRuntimePage.css');
+    const root = declarationsAt([chat], ['.chat-app-page'], width);
+    const builder = declarationsAt([chat], ['.chat-app-builder'], width);
+    expect(root.height).toBe('100%');
+    expect(root['min-height']).toBe('0');
+    expect(builder.flex).toBe('1');
+    expect(builder['min-height']).toBe('0');
+    expect(builder['min-width']).toBe('0');
+    expect(builder['overflow-y']).toBe('auto');
+    const manual = readSource('../../pages/Workflows/WorkflowManualRunnerPage.tsx');
+    expect(manual).toContain('className="workflow-manual-setup app-scroll-page"');
+    const modal = declarationsAt([readSource('../../components/FormPresetPicker.css')], ['.form-preset-editor'], width);
+    expect(modal['overflow-y']).toBe('auto');
+    expect(modal['max-height']).toBe('65dvh');
+    expect(modal.padding).toContain('safe-area-inset-bottom');
+  });
+
   it('keeps viewport clipping in the shell and assigns scrolling to padded views', () => {
     for (const selector of ['body', '#root', '.app-main']) {
       expect(declarationsAt([globalStyles], [selector], 390).overflow).toBe('hidden');

@@ -74,8 +74,29 @@ spec:
           3. 分别按点击潜力、完读潜力、分享潜力、账号匹配度和合规风险进行 1–10 分评估；
           4. 给出综合排序，选出最值得优先创作的 3 个选题并说明理由；
           5. 对首选选题补充开头钩子、文章大纲、资料核验清单和发布建议。
+        presets:
+        - id: evergreen
+          name: 常青知识选题
+          description: 常青知识选题场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            timeliness: evergreen
+            content_type:
+            - tutorial
+            - insight
+            count: 10
+        - id: hot-opinions
+          name: 热点观点选题
+          description: 热点观点选题场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            timeliness: recent
+            content_type:
+            - opinion
+            count: 10
         questions:
           - key: positioning
+            preset_save: preference
             label: 账号定位
             type: text
             placeholder: 例如：AI 工具实测、职场成长、母婴科普
@@ -86,6 +107,7 @@ spec:
             order: 0
             options: []
           - key: audience
+            preset_save: preference
             label: 目标读者
             type: text
             placeholder: 例如：25–35 岁，希望提升效率的一线城市职场人
@@ -96,6 +118,7 @@ spec:
             order: 1
             options: []
           - key: direction
+            preset_save: preference
             label: 核心领域或选题方向
             type: text
             placeholder: 例如：AI 办公提效、个人知识管理；也可以填写“自动探索”
@@ -106,6 +129,7 @@ spec:
             order: 2
             options: []
           - key: goal
+            preset_save: preference
             label: 选题目标
             type: single_choice
             placeholder: 请选择
@@ -121,6 +145,7 @@ spec:
               - {value: branding, label: 建立专业影响力, description: 优先观点、洞察和可信度, icon: "", order: 3}
               - {value: sales, label: 产品或服务转化, description: 兼顾用户需求与商业合规, icon: "", order: 4}
           - key: content_type
+            preset_save: preference
             label: 内容类型
             type: multi_choice
             placeholder: 可多选
@@ -136,6 +161,7 @@ spec:
               - {value: story, label: 情感故事, description: 场景、冲突和情绪共鸣, icon: "", order: 3}
               - {value: recommendation, label: 产品种草, description: 真实体验和合规利益点, icon: "", order: 4}
           - key: timeliness
+            preset_save: preference
             label: 时效范围
             type: single_choice
             placeholder: 请选择
@@ -149,6 +175,7 @@ spec:
               - {value: evergreen, label: 长效选题, description: 不依赖热点，可持续发布, icon: "", order: 1}
               - {value: recent, label: 近期趋势, description: 围绕近期变化，需要核验时效, icon: "", order: 2}
           - key: count
+            preset_save: preference
             label: 选题数量
             type: number
             placeholder: 请输入 3–20
@@ -159,6 +186,7 @@ spec:
             order: 6
             options: []
           - key: source
+            preset_save: optional
             label: 已有素材、热点或参考信息
             type: text
             placeholder: 可粘贴素材、热点信息、历史数据，或填写工作目录内的文件路径
@@ -169,6 +197,7 @@ spec:
             order: 7
             options: []
           - key: requirements
+            preset_save: preference
             label: 避开方向与补充要求
             type: text
             placeholder: 例如：不做娱乐热点；避免焦虑营销；选题不要与上月文章重复

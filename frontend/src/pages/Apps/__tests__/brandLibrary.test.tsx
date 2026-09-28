@@ -41,8 +41,8 @@ const input = async (selector: string, value: string) => {
   });
 };
 const choose = async (id: string, label: string) => {
-  const field = document.getElementById(id)!;
-  await act(async () => { field.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); });
+  const field = document.getElementById(id) || document.querySelector<HTMLElement>(`[aria-label="${id}"]`) || document.querySelector<HTMLElement>(`[id$="-${id.replace('brand-', '')}"]`)!;
+  await act(async () => { (field.querySelector('input') || field).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); });
   const item = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].find((el) => el.textContent === label)!;
   expect(item, label).toBeDefined(); await click(item); await settle();
 };
@@ -70,7 +70,7 @@ beforeEach(() => {
   mocks.organizationId = 'org-1';
   mocks.loadApp.mockResolvedValue({ id: 'writer', applicationId: 42, name: '文案', kind: 'chat', runtime: {
     default_config: { brand_reference: config }, chat_profile: {}, agent_bindings: [],
-    guided_prompts: [{ id: 'write', key: 'write', title: '创作需求', questions: [
+    guided_prompts: [{ id: 'write', key: 'write', title: '创作需求', presets: [{ id: 'knowledge', name: '知识卡片', values: { audience: '知识读者' } }, { id: 'product', name: '产品介绍', values: { audience: '产品读者' } }], questions: [
       { id: 'source', key: 'source', label: '主题', type: 'text', required: true, default_value: '新品' },
       { id: 'audience', key: 'audience', label: '受众', type: 'text', default_value: '普通读者' },
     ] }],
@@ -186,4 +186,78 @@ it('clears brand selections and generated prompts on organization change', async
   expect(container.textContent).not.toContain('生成的提示词');
   expect(container.textContent).not.toContain('引用品牌资料 · 清风品牌');
   expect(api.get).toHaveBeenCalledWith('/organizations/org-2/brand-library/profiles', { page: 1 }, expect.anything());
+});
+
+
+it('switches only the template layer, keeps manual overrides and restores inheritance', async () => {
+  await mount(true);
+  await choose('预设模板', '知识卡片');
+  const audience = () => [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find((el) => el.closest('label')?.textContent?.includes('受众'))!;
+  expect(audience().value).toBe('知识读者');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(audience(), '本次读者');
+    audience().dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await choose('预设模板', '产品介绍');
+  expect(audience().value).toBe('本次读者');
+  await click(button('生成提示词')); await settle();
+  expect(api.post).toHaveBeenLastCalledWith('/apps/writer/compose-prompt/', expect.objectContaining({
+    preset: { kind: 'builtin', id: 'product' }, explicit_fields: ['audience'], answers: expect.objectContaining({ audience: '本次读者' }),
+  }));
+  await click(button('恢复继承'));
+  expect(audience().value).toBe('产品读者');
+  expect(container.textContent).not.toContain('生成的提示词');
+  await choose('预设模板', '不使用模板');
+  expect(audience().value).toBe('普通读者');
+});
+
+it('saves only selected preferences and retains the template editor after a failure', async () => {
+  await mount(true); await choose('预设模板', '知识卡片');
+  await click(button('另存为模板')); await settle();
+  const editor = document.querySelector('.form-preset-editor')!;
+  const checkboxes = [...editor.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  expect(checkboxes.map((el) => [el.closest('label')?.textContent, el.checked])).toEqual([['主题', false], ['受众', true]]);
+  await input('.form-preset-editor input:not([type="checkbox"])', '知识模板');
+  vi.mocked(api.post).mockRejectedValueOnce({ response: { data: { detail: '无法保存模板' } } });
+  await click(button('保存')); await settle();
+  expect(document.body.textContent).toContain('无法保存模板');
+  expect(document.querySelector<HTMLInputElement>('.form-preset-editor input')?.value).toBe('知识模板');
+  await click(button('保存')); await settle();
+  expect(api.post).toHaveBeenLastCalledWith('/apps/writer/form-presets/', {
+    name: '知识模板', description: '', prompt_key: 'write', values: { audience: '知识读者' },
+  });
+});
+
+it('does not save inherited brand values and invalidates a preview when changing templates', async () => {
+  await mount(true); await choose('预设模板', '知识卡片'); await pickBrand();
+  await click(button('另存为模板')); await settle();
+  const brandField = [...document.querySelectorAll<HTMLInputElement>('.form-preset-editor input[type="checkbox"]')]
+    .find((el) => el.closest('label')?.textContent?.includes('受众'))!;
+  expect(brandField.disabled).toBe(true); expect(brandField.checked).toBe(false);
+  await click(button('取消'));
+  let resolve!: (value: { prompt: string }) => void;
+  vi.mocked(api.post).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+  await click(button('生成提示词')); await choose('预设模板', '产品介绍');
+  await act(async () => resolve({ prompt: '过期模板结果' })); await settle();
+  expect(container.textContent).not.toContain('生成的提示词');
+  expect(container.textContent).toContain('来自品牌');
+});
+
+it('edits and deletes a personal template without retaining stale form values', async () => {
+  let templates = [{ id: 'personal-1', name: '个人模板', prompt_key: 'write', values: { audience: '原读者' } }];
+  vi.mocked(api.get).mockImplementation(async (url) => url.includes('/form-presets/') ? templates : page([]));
+  await mount(true); await choose('预设模板', '个人模板');
+  await click(button('管理我的模板')); await click(button('编辑'));
+  await input('[aria-label="模板参数：受众"]', '新读者');
+  vi.mocked(api.patch).mockImplementation(async () => {
+    templates = [{ ...templates[0], values: { audience: '新读者' } }]; return templates[0];
+  });
+  await click(button('保存')); await settle();
+  expect(api.patch).toHaveBeenCalledWith('/apps/writer/form-presets/personal-1/', expect.objectContaining({ values: { audience: '新读者' } }));
+  expect([...container.querySelectorAll<HTMLTextAreaElement>('textarea')].some((el) => el.value === '新读者')).toBe(true);
+  await click(button('管理我的模板')); await click(button('删除'));
+  vi.mocked(api.delete).mockImplementation(async () => { templates = []; });
+  await click(document.querySelector<HTMLButtonElement>('.ant-popconfirm-buttons .ant-btn-primary')!); await settle();
+  expect(api.delete).toHaveBeenCalledWith('/apps/writer/form-presets/personal-1/');
+  expect([...container.querySelectorAll<HTMLTextAreaElement>('textarea')].some((el) => el.value === '普通读者')).toBe(true);
 });

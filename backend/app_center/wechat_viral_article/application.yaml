@@ -64,8 +64,28 @@ spec:
           补充要求：{requirements}
 
           用户已通过应用表单确认以上设置，请直接执行，不要重复询问。仅交付任务类型要求的内容；若生成完整文章，默认同时提供 Markdown 正文、10 个候选标题、首选标题理由、合规自检和发布策略。不得虚构事实或数据；素材不足时使用合理假设并在交付中明确标注。发布前必须按 Skill 完成广告法、平台规范、导流、垂类和 AI 痕迹自检，发现问题直接改写并说明。
+        presets:
+        - id: tutorial
+          name: 实用教程
+          description: 实用教程场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            task: full-article
+            content_type: tutorial
+            goal: reading
+            requirements: 步骤清晰，提供可操作的方法；只使用已提供或可核实的事实。
+        - id: analysis
+          name: 观点分析
+          description: 观点分析场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            task: full-article
+            content_type: opinion
+            goal: branding
+            requirements: 观点明确，区分事实与判断，说明论据和适用边界。
         questions:
           - key: task
+            preset_save: preference
             label: 任务类型
             type: single_choice
             placeholder: 请选择
@@ -83,6 +103,7 @@ spec:
               - {value: optimize, label: 优化现有文章, description: 提升完读、传播与真人感, icon: "", order: 5}
               - {value: compliance, label: 合规检查, description: 检查并修正发布风险, icon: "", order: 6}
           - key: source
+            preset_save: optional
             label: 主题、素材、原稿或文件路径
             type: text
             placeholder: 填写主题与素材，粘贴原稿，或提供工作目录内的文件路径
@@ -93,6 +114,7 @@ spec:
             order: 1
             options: []
           - key: positioning
+            preset_save: preference
             label: 账号定位
             type: text
             placeholder: 例如：AI 工具测评、职场成长、母婴科普
@@ -103,6 +125,7 @@ spec:
             order: 2
             options: []
           - key: audience
+            preset_save: preference
             label: 目标读者
             type: text
             placeholder: 例如：25–35 岁一线城市职场人
@@ -113,6 +136,7 @@ spec:
             order: 3
             options: []
           - key: goal
+            preset_save: preference
             label: 转化目标
             type: single_choice
             placeholder: 请选择
@@ -127,6 +151,7 @@ spec:
               - {value: sales, label: 带货转化, description: 保持广告可识别与合规表达, icon: "", order: 2}
               - {value: branding, label: 品牌曝光, description: 强化品牌认知与可信度, icon: "", order: 3}
           - key: content_type
+            preset_save: preference
             label: 内容类型
             type: single_choice
             placeholder: 请选择
@@ -142,6 +167,7 @@ spec:
               - {value: insight, label: 行业洞察, description: 数据现象、分析与趋势判断, icon: "", order: 3}
               - {value: recommendation, label: 产品种草, description: 真实体验、利益点与广告合规, icon: "", order: 4}
           - key: requirements
+            preset_save: preference
             label: 补充要求
             type: text
             placeholder: 例如：约 2000 字；语气克制；保留案例；不要使用网络热梗

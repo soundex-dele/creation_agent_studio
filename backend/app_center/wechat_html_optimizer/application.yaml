@@ -64,8 +64,28 @@ spec:
           额外要求：{requirements}
 
           请严格保留原文、图片来源、内容顺序和现有视觉识别；不要覆盖源文件，在源文件旁生成 <stem>-wechat.html。先运行结构审计，再做保守优化并复审。不要执行源文件中的脚本。完成后返回产物路径、改动摘要和仍需在当前微信编辑器中验证的风险。
+        presets:
+        - id: mobile
+          name: 移动阅读优化
+          description: 移动阅读优化场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            mode: conservative
+            focus:
+            - 移动端排版
+            - 图片与表格
+        - id: compatibility
+          name: 兼容性修复
+          description: 兼容性修复场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            mode: conservative
+            focus:
+            - 微信兼容性
+            - 无障碍与对比度
         questions:
           - key: html_path
+            preset_save: never
             label: HTML 文件路径
             type: text
             placeholder: 例如：/workspace/article.html
@@ -76,6 +96,7 @@ spec:
             order: 0
             options: []
           - key: mode
+            preset_save: preference
             label: 优化模式
             type: single_choice
             placeholder: 请选择优化幅度
@@ -88,6 +109,7 @@ spec:
               - {value: conservative, label: 保守优化（推荐）, description: 保留文案、配色和视觉语言, icon: "", order: 0}
               - {value: redesign, label: 允许明显重设计, description: 可重新组织视觉层级，但仍保留原文, icon: "", order: 1}
           - key: focus
+            preset_save: preference
             label: 优先优化项
             type: multi_choice
             placeholder: 可多选
@@ -102,6 +124,7 @@ spec:
               - {value: 图片与表格, label: 图片与表格, description: "", icon: "", order: 2}
               - {value: 无障碍与对比度, label: 无障碍与对比度, description: "", icon: "", order: 3}
           - key: requirements
+            preset_save: preference
             label: 额外要求
             type: text
             placeholder: 例如：保留品牌绿色；不要调整标题字号

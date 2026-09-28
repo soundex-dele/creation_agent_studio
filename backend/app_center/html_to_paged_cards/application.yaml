@@ -69,9 +69,29 @@ spec:
           必须以 DOM 内容块为边界，用 Playwright 和 Chromium 的实际布局高度分页，不按字数估算或固定像素裁切。保留原文顺序、链接、强调和图片，标题与后续内容同页。脚本未渲染图表、iframe、音视频和加载失败的图片不能静默丢弃，应报告并按 Skill 处理。
           检查退出码与 report.json：只有 status 为 complete、正文字符与顺序一致、每块只分配一次、图片加载与所有页面边界检查通过才报告完成。使用普通浏览器或独立 Playwright 检查预览索引中的首页、最密集页、尾页及全部加高页，不得使用 Codex 内置浏览器。失败产物只能作为诊断，修复后用新输出目录重跑。
           交付 index.html、分页 HTML 目录和 report.json 的可访问路径，说明页数、常规尺寸与加高页编号。仅在实际导出成功时附 PNG。页面仍依赖原始资源地址，提醒保留素材，不称为已打包的离线资源包。
+        presets:
+        - id: portrait
+          name: 竖版知识卡片
+          description: 竖版知识卡片场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            aspect: '3:4'
+            size_policy: extend
+            export_format: html-png
+            scale: '2'
+        - id: square
+          name: 方形图文
+          description: 方形图文场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            aspect: '1:1'
+            size_policy: extend
+            export_format: html-png
+            scale: '2'
         questions:
-          - {key: source, label: HTML 文件路径, type: text, placeholder: 填写工作目录内已生成的文章 .html 文件路径, help_text: 可直接使用 Markdown 转 HTML 应用的输出；请保留原图片和样式资源。, required: true, default_value: null, order: 0}
+          - {key: source, preset_save: never, label: HTML 文件路径, type: text, placeholder: 填写工作目录内已生成的文章 .html 文件路径, help_text: 可直接使用 Markdown 转 HTML 应用的输出；请保留原图片和样式资源。, required: true, default_value: null, order: 0}
           - key: aspect
+            preset_save: preference
             label: 页面画幅
             type: single_choice
             required: true
@@ -84,6 +104,7 @@ spec:
               - {value: "4:3", label: "4:3 横版", description: "640×480", order: 3}
               - {value: "16:9", label: "16:9 横版", description: "640×360", order: 4}
           - key: size_policy
+            preset_save: preference
             label: 超大内容处理
             type: single_choice
             required: true
@@ -93,6 +114,7 @@ spec:
               - {value: extend, label: 允许完整加高页, description: 放不下的完整内容块生成加高页，优先保留内容, order: 0}
               - {value: strict, label: 所有页面固定尺寸, description: 超大内容块无法容纳时报告限制，绝不裁剪, order: 1}
           - key: export_format
+            preset_save: preference
             label: 导出格式
             type: single_choice
             required: true
@@ -102,6 +124,7 @@ spec:
               - {value: html, label: 仅分页 HTML, description: 独立页面、预览索引与校验报告, order: 0}
               - {value: html-png, label: 分页 HTML 和 PNG, description: 同时导出每页图片, order: 1}
           - key: scale
+            preset_save: preference
             label: PNG 清晰度倍率
             help_text: 仅导出 PNG 时生效。3 倍时，标准 3:4 页面导出为 1080×1440 图片；加高页另计。
             type: single_choice
@@ -113,9 +136,9 @@ spec:
               - {value: "2", label: "2", order: 1}
               - {value: "3", label: "3", order: 2}
               - {value: "4", label: "4", order: 3}
-          - {key: selector, label: 正文选择器, type: text, placeholder: "留空自动识别，例如 #output、#nice 或 article", help_text: 仅在需要指定正文范围时填写，选择器应唯一匹配文章内容。, required: false, default_value: "", order: 5}
-          - {key: output_directory, label: 输出目录, type: text, placeholder: 留空则在原文旁新建带时间戳的目录, help_text: 指定目录必须为空，不覆盖已有文件。, required: false, default_value: "", order: 6}
-          - {key: requirements, label: 补充要求, type: text, placeholder: 例如：自定义尺寸 400×600；内边距 32；保留原稿字体, required: false, default_value: "", order: 7}
+          - {key: selector, preset_save: preference, label: 正文选择器, type: text, placeholder: "留空自动识别，例如 #output、#nice 或 article", help_text: 仅在需要指定正文范围时填写，选择器应唯一匹配文章内容。, required: false, default_value: "", order: 5}
+          - {key: output_directory, preset_save: never, label: 输出目录, type: text, placeholder: 留空则在原文旁新建带时间戳的目录, help_text: 指定目录必须为空，不覆盖已有文件。, required: false, default_value: "", order: 6}
+          - {key: requirements, preset_save: preference, label: 补充要求, type: text, placeholder: 例如：自定义尺寸 400×600；内边距 32；保留原稿字体, required: false, default_value: "", order: 7}
   backend:
     definition_factory: app_center.html_to_paged_cards.provision.prepare_definition
   database: {mode: none}

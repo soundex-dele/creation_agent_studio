@@ -1,0 +1,16 @@
+.form-preset-picker,
+.form-preset-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.form-preset-editor {
+  max-height: 65dvh;
+  overflow-y: auto;
+  padding: 2px 4px calc(12px + env(safe-area-inset-bottom));
+  overflow-wrap: anywhere;
+}
+.form-preset-picker .ant-space { flex-wrap: wrap; }
+.form-preset-editor label { display: block; }

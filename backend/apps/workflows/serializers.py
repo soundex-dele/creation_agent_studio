@@ -144,6 +144,8 @@ class WorkflowWriteSerializer(serializers.ModelSerializer):
         ).values_list('id', flat=True))
         if requested != allowed:
             raise serializers.ValidationError('包含不可用或未发布的应用版本。')
+        from .form_context import validate_step_presets
+        validate_step_presets(value, self.instance, request)
         return value
 
     def validate(self, attrs):

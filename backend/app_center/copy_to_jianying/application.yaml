@@ -70,9 +70,31 @@ spec:
           配音失败必须报错，不交付缺旁白的草稿；视频短于实测旁白时更换素材，不截断语音。相同外部资源最多重试两次，连续两次修复无效则保留诊断并报告阻塞。不得自动发布、上传或操作客户端导出成片。
           验收检查 builder.py、result.json、build.log、timeline.json 与实际素材，核对旁白与字幕数量和精确时间范围。只有实际生成草稿且 result.json 状态为 complete、文件审计通过，才报告草稿完成；checked 仅表示检查通过。无声模式明确标注无旁白。具备获准的预览能力时检查开头、最密集镜头、结尾并试听；不得使用 Codex 内置浏览器。无法完成客户端检查时明确仅通过文件与素材审计，不宣称播放或效果验收通过。
           交付 builder.py、剪映草稿目录、项目资料目录及审计文件的可访问路径，说明画幅、实际时长、配音与字幕状态以及未完成的检查。仅脚本或检查模式按对应范围交付，不声称已生成草稿；未导出 MP4 不称为成片。提醒保留素材目录与技能运行库。
+        presets:
+        - id: portrait-narration
+          name: 竖版口播
+          description: 竖版口播场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            task: draft
+            aspect: '9:16'
+            duration: 约 60 秒
+            voice: auto
+            requirements: 画面简洁，字幕清晰，按语义组织分镜。
+        - id: landscape-explainer
+          name: 横版讲解
+          description: 横版讲解场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            task: draft
+            aspect: '16:9'
+            duration: 按原稿完整表达
+            voice: auto
+            requirements: 以结构清晰的信息卡与真实素材辅助讲解。
         questions:
-          - {key: source, label: 文案、文章或文件路径, type: text, placeholder: 粘贴口播稿、旁白或文章，也可填写工作目录内的文本文件路径；仅检查时填写 builder.py 路径, required: true, default_value: null, order: 0}
+          - {key: source, preset_save: optional, label: 文案、文章或文件路径, type: text, placeholder: 粘贴口播稿、旁白或文章，也可填写工作目录内的文本文件路径；仅检查时填写 builder.py 路径, required: true, default_value: null, order: 0}
           - key: task
+            preset_save: preference
             label: 交付范围
             type: single_choice
             required: true
@@ -83,6 +105,7 @@ spec:
               - {value: script, label: 仅生成分镜脚本, description: 生成可修改和重复运行的 builder.py, order: 1}
               - {value: check, label: 仅检查已有脚本, description: 校验已有 builder.py，不生成草稿, order: 2}
           - key: aspect
+            preset_save: preference
             label: 画面比例
             type: single_choice
             required: true
@@ -92,8 +115,9 @@ spec:
               - {value: "9:16", label: "9:16 竖版", description: "1080×1920", order: 0}
               - {value: "16:9", label: "16:9 横版", description: "1920×1080", order: 1}
               - {value: "1:1", label: "1:1 方形", description: "1080×1080", order: 2}
-          - {key: duration, label: 时长要求, type: text, placeholder: 留空则保留完整口播稿；文章提炼为约 60 秒口播, help_text: 如需压缩可填写「60 秒以内」；实际片长以配音实测为准。, required: false, default_value: "", order: 3}
+          - {key: duration, preset_save: preference, label: 时长要求, type: text, placeholder: 留空则保留完整口播稿；文章提炼为约 60 秒口播, help_text: 如需压缩可填写「60 秒以内」；实际片长以配音实测为准。, required: false, default_value: "", order: 3}
           - key: voice
+            preset_save: preference
             label: 配音方式
             type: single_choice
             required: true
@@ -103,10 +127,10 @@ spec:
               - {value: auto, label: 自动配音（优先已有录音）, description: 无录音时合成自然普通话配音, order: 0}
               - {value: recording, label: 仅使用已有录音, description: 请在素材中提供录音路径, order: 1}
               - {value: silent, label: 无声字幕, description: 不生成旁白配音, order: 2}
-          - {key: assets, label: 已有图片、视频或录音, type: text, placeholder: 填写工作目录内的素材路径及用途；无素材可留空, help_text: 缺少画面时自动设计信息卡或本地绘图。, required: false, default_value: "", order: 5}
-          - {key: requirements, label: 视觉风格、音色与补充要求, type: text, placeholder: 例如：简洁知识卡片；自然女声；突出三个关键词；保留原稿开头, required: false, default_value: "", order: 6}
-          - {key: output_directory, label: 项目资料目录, type: text, placeholder: 留空则在工作区自动创建唯一项目目录, help_text: 保存分镜脚本、文案、素材和审计文件。, required: false, default_value: "", order: 7}
-          - {key: drafts_root, label: 剪映草稿根目录, type: text, placeholder: 留空使用默认位置, help_text: 自定义位置不保证剪映首页自动发现；请保留草稿引用的素材目录。, required: false, default_value: "", order: 8}
+          - {key: assets, preset_save: never, label: 已有图片、视频或录音, type: text, placeholder: 填写工作目录内的素材路径及用途；无素材可留空, help_text: 缺少画面时自动设计信息卡或本地绘图。, required: false, default_value: "", order: 5}
+          - {key: requirements, preset_save: preference, label: 视觉风格、音色与补充要求, type: text, placeholder: 例如：简洁知识卡片；自然女声；突出三个关键词；保留原稿开头, required: false, default_value: "", order: 6}
+          - {key: output_directory, preset_save: never, label: 项目资料目录, type: text, placeholder: 留空则在工作区自动创建唯一项目目录, help_text: 保存分镜脚本、文案、素材和审计文件。, required: false, default_value: "", order: 7}
+          - {key: drafts_root, preset_save: never, label: 剪映草稿根目录, type: text, placeholder: 留空使用默认位置, help_text: 自定义位置不保证剪映首页自动发现；请保留草稿引用的素材目录。, required: false, default_value: "", order: 8}
   backend:
     definition_factory: app_center.copy_to_jianying.provision.prepare_definition
   database: {mode: none}

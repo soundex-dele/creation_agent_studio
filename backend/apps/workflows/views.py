@@ -30,6 +30,7 @@ from modules.execution.models import Run, RunEvent
 from core.resource_access import accessible_resources, can_access_resource
 
 from .models import Workflow
+from .form_context import freeze_form_context
 from .serializers import (
     WorkflowDetailSerializer,
     WorkflowListSerializer,
@@ -393,6 +394,14 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             steps = list(workflow.steps.select_related("application").order_by("order", "id"))
             if not steps:
                 return Response({"detail": "工作流至少需要一个应用。"}, status=400)
+            from apps.applications.serializers import application_definition
+            manual_snapshots = freeze_form_context(request, [{
+                'id': str(step.id), 'key': step.key,
+                'name': step.name or step.application.name,
+                'application_id': step.application_id,
+                'content': application_definition(step.application),
+                'effective_config': deepcopy(step.config or {}),
+            } for step in steps])
             now = timezone.now()
             with transaction.atomic():
                 # Serialize page mounts so development double-effects and quick
@@ -417,12 +426,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                             "workflow_id": str(workflow.id),
                             "workflow_name": workflow.name,
                             "execution_mode": Workflow.ExecutionMode.MANUAL,
-                            "workflow_steps": [{
-                                "id": str(step.id),
-                                "key": step.key,
-                                "name": step.name or step.application.name,
-                                "application_id": step.application_id,
-                            } for step in steps],
+                            "workflow_steps": manual_snapshots,
                         },
                         input={},
                     )
@@ -454,6 +458,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             _steps, snapshots = build_workflow_step_snapshots(workflow, request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=409)
+        snapshots = freeze_form_context(request, snapshots)
         try:
             input_data = request.data.get("input", {})
             if input_data is None:
@@ -515,6 +520,12 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             _steps, snapshots = build_workflow_step_snapshots(workflow, request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=409)
+        previous_steps = {s['key']: s for s in previous.definition_snapshot.get('workflow_steps', [])}
+        for step in snapshots:
+            frozen = (previous_steps.get(step['key']) or {}).get('effective_config', {})
+            for field in ('brand_snapshot', 'form_preset', 'explicit_input_fields'):
+                if field in frozen:
+                    step['effective_config'][field] = deepcopy(frozen[field])
         by_key = {step["key"]: step for step in snapshots}
         requested_key = str(request.data.get("step_key") or "")
         failed_children = list(previous.child_runs.filter(

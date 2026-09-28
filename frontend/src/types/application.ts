@@ -36,6 +36,20 @@ export interface GuidedQuestion {
   default_value?: unknown;
   order?: number;
   options: GuidedOption[];
+  preset_save?: 'preference' | 'optional' | 'never' | null;
+}
+
+export interface FormPreset {
+  id: string;
+  name: string;
+  description?: string;
+  order?: number;
+  values: Record<string, string | string[] | number>;
+}
+
+export interface FormPresetSnapshot extends FormPreset {
+  kind: 'builtin' | 'personal';
+  prompt_key: string;
 }
 
 export interface GuidedPrompt {
@@ -49,6 +63,7 @@ export interface GuidedPrompt {
   is_featured: boolean;
   order?: number;
   questions: GuidedQuestion[];
+  presets?: FormPreset[];
 }
 
 export interface ChatApplicationProfile {

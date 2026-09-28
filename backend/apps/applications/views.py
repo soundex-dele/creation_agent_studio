@@ -109,17 +109,61 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
         prompt = next((item for item in prompts if str(item.get('id') or item.get('key')) == prompt_id), None)
         if prompt is None:
             return Response({'detail': '引导问题不存在。'}, status=404)
-        if serializer.validated_data.get('brand_reference'):
-            from app_center.brand_library.backend.context import compose_brand_prompt
-            return Response(compose_brand_prompt(
-                request=request, application=application, definition=definition, prompt=prompt,
-                answers=serializer.validated_data['answers'],
-                reference=serializer.validated_data['brand_reference'],
-                explicit_fields=serializer.validated_data['explicit_fields'],
-            ))
-        return Response(compose_guided_prompt(
-            prompt, serializer.validated_data['answers'],
-            application_id=application.id))
+        from .form_presets import compose_effective, resolve_preset
+        from app_center.brand_library.backend.context import resolve_brand_snapshot
+        data = serializer.validated_data
+        preset = brand = None
+        if data.get('workflow_context'):
+            from apps.workflows.form_context import manual_step_context
+            context = manual_step_context(request, application, data['workflow_context'])
+            if str(context['prompt'].get('id') or context['prompt']['key']) == prompt_id:
+                prompt = context['prompt']
+            if data['use_workflow_preset']:
+                preset = context.get('form_preset')
+            if data['use_workflow_brand']:
+                brand = context.get('brand_snapshot')
+        if data.get('preset'):
+            preset = resolve_preset(request, application, prompt, data['preset'])
+        if data.get('brand_reference') and not brand:
+            brand = resolve_brand_snapshot(request=request, application=application, definition=definition, reference=data['brand_reference'])
+        return Response(compose_effective(
+            prompt=prompt, answers=data['answers'], application_id=application.id,
+            preset=preset, brand=brand,
+            explicit_fields=data['explicit_fields'] if 'explicit_fields' in request.data or brand else None,
+        ))
+
+    @action(detail=True, methods=['get', 'post'], url_path='form-presets')
+    def form_presets(self, request, *args, **kwargs):
+        from .form_presets import PersonalPresetSerializer, private_presets
+        application = self.get_object()
+        queryset = private_presets(request, application)
+        if request.method == 'GET':
+            if request.query_params.get('prompt_key'):
+                queryset = queryset.filter(prompt_key=request.query_params['prompt_key'])
+            return Response(PersonalPresetSerializer(queryset, many=True).data)
+        serializer = PersonalPresetSerializer(data=request.data, context={'application': application})
+        serializer.is_valid(raise_exception=True)
+        serializer.save(application=application, organization=resolve_organization(request), owner=request.user)
+        return Response(serializer.data, status=201)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'form-presets/(?P<preset_id>[0-9a-f-]{36})')
+    def form_preset_detail(self, request, preset_id=None, **kwargs):
+        from django.shortcuts import get_object_or_404
+        from .form_presets import PersonalPresetSerializer, private_presets
+        application = self.get_object()
+        preset = get_object_or_404(private_presets(request, application), pk=preset_id)
+        if request.method == 'DELETE':
+            preset.delete()
+            return Response(status=204)
+        serializer = PersonalPresetSerializer(preset, data=request.data, partial=True, context={'application': application})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='workflow-form-context')
+    def workflow_form_context(self, request, **kwargs):
+        from apps.workflows.form_context import manual_step_context
+        return Response(manual_step_context(request, self.get_object(), request.query_params))
 
 
 class SkillViewSet(viewsets.ModelViewSet):

@@ -49,12 +49,22 @@ class GuidedQuestionDefinition(BaseModel):
     validation: dict[str, Any] = Field(default_factory=dict)
     order: int = Field(default=0, ge=0)
     options: list[GuidedOptionDefinition] = Field(default_factory=list)
+    preset_save: Literal["preference", "optional", "never"] | None = None
 
     @model_validator(mode="after")
     def choices_have_options(self):
         if self.type in ("single_choice", "multi_choice") and not self.options:
             raise ValueError("choice questions require at least one option")
         return self
+
+
+class GuidedPresetDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    order: int = Field(default=0, ge=0)
+    values: dict[str, Any] = Field(default_factory=dict)
 
 
 class GuidedPromptDefinition(BaseModel):
@@ -69,6 +79,7 @@ class GuidedPromptDefinition(BaseModel):
     is_featured: bool = False
     order: int = Field(default=0, ge=0)
     questions: list[GuidedQuestionDefinition] = Field(default_factory=list)
+    presets: list[GuidedPresetDefinition] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def prompt_references_known_questions(self):
@@ -81,6 +92,12 @@ class GuidedPromptDefinition(BaseModel):
                 "prompt_template references unknown questions: "
                 + ", ".join(sorted(unknown))
             )
+        from modules.catalog.preset_values import validate_preset_values
+        ids = [preset.id for preset in self.presets]
+        if len(ids) != len(set(ids)):
+            raise ValueError("preset ids must be unique within a guided prompt")
+        for preset in self.presets:
+            validate_preset_values(self.model_dump(), preset.values)
         return self
 
 

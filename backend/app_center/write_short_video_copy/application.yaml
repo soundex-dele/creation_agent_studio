@@ -65,8 +65,28 @@ spec:
 
           用户已通过应用表单确认以上设置，请直接执行，不重复询问已有信息。交付范围优先：完整文案包含推荐标题和 2 个备选、封面短句、连续可读的正文、预计时长与发布配文；只要正文时不强加标题和分镜；拍摄脚本按建议成片时间段对应画面、说话内容、必要上屏文字和声音。纯字幕按屏组织文字与停留时间，不套口播字速。指定平台时读取平台适配参考；需要复杂结构或精确时间轴时读取相应参考。
           中文口播可按每分钟约 180–240 字起稿，只计算需说出的正文，另考虑停顿和演示；无实际录音时标明预计时长，不声称实测。原素材时间码与成片时间段分开。不能读取视频或录音时如实说明。不得编造经历、数据、效果或平台算法；关键事实缺失时只问必要问题，未定稿明确标为草稿。仅交付文案，不自动合成配音、生成视频、剪辑或发布。
+        presets:
+        - id: knowledge-60
+          name: 60 秒知识口播
+          description: 60 秒知识口播场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            task: full
+            format: talking
+            duration: 约 60 秒
+            requirements: 自然口语，开头点明问题，正文给出三个要点。
+        - id: demo-30
+          name: 30 秒产品演示
+          description: 30 秒产品演示场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            task: storyboard
+            format: footage
+            duration: 约 30 秒
+            requirements: 按使用步骤演示，只描述真实功能与已提供的素材。
         questions:
           - key: task
+            preset_save: preference
             label: 交付范围
             type: single_choice
             required: true
@@ -80,8 +100,9 @@ spec:
               - {value: rewrite, label: 优化或压缩旧稿, order: 4}
               - {value: opening-titles, label: 仅开场与标题, order: 5}
               - {value: topics, label: 选题方向, order: 6}
-          - {key: source, label: 主题、素材或原稿, type: text, placeholder: 粘贴主题或原稿，或提供工作目录内的视频、录音和素材路径, required: true, default_value: null, order: 1}
+          - {key: source, preset_save: optional, label: 主题、素材或原稿, type: text, placeholder: 粘贴主题或原稿，或提供工作目录内的视频、录音和素材路径, required: true, default_value: null, order: 1}
           - key: platform
+            preset_save: preference
             label: 发布平台
             type: single_choice
             required: true
@@ -93,6 +114,7 @@ spec:
               - {value: xiaohongshu, label: 小红书, order: 2}
               - {value: channels, label: 视频号, order: 3}
           - key: format
+            preset_save: preference
             label: 视频形式
             type: single_choice
             required: true
@@ -103,9 +125,9 @@ spec:
               - {value: voiceover, label: 配音旁白, order: 1}
               - {value: captions, label: 纯字幕视频, order: 2}
               - {value: footage, label: 匹配已有镜头, order: 3}
-          - {key: duration, label: 目标成片时长, type: text, placeholder: 例如：约 60 秒；30 秒以内；匹配已有素材, required: true, default_value: 约 60 秒, help_text: 无录音时提供估算，实际时长以试读或素材为准。, order: 4}
-          - {key: audience, label: 目标观众, type: text, required: false, default_value: 与主题匹配的普通观众, order: 5}
-          - {key: requirements, label: 语气、素材条件与补充要求, type: text, placeholder: 例如：自然口语；只有录屏；保留原稿开头, required: false, default_value: 自然具体，简体中文, order: 6}
+          - {key: duration, preset_save: preference, label: 目标成片时长, type: text, placeholder: 例如：约 60 秒；30 秒以内；匹配已有素材, required: true, default_value: 约 60 秒, help_text: 无录音时提供估算，实际时长以试读或素材为准。, order: 4}
+          - {key: audience, preset_save: preference, label: 目标观众, type: text, required: false, default_value: 与主题匹配的普通观众, order: 5}
+          - {key: requirements, preset_save: preference, label: 语气、素材条件与补充要求, type: text, placeholder: 例如：自然口语；只有录屏；保留原稿开头, required: false, default_value: 自然具体，简体中文, order: 6}
   backend:
     definition_factory: app_center.write_short_video_copy.provision.prepare_definition
   database: {mode: none}

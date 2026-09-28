@@ -312,3 +312,7 @@ class ComposeGuidedPromptSerializer(serializers.Serializer):
     answers = serializers.DictField(required=False, default=dict)
     brand_reference = BrandReferenceSerializer(required=False, allow_null=True)
     explicit_fields = serializers.ListField(child=serializers.CharField(max_length=100), required=False, default=list, max_length=100)
+    preset = serializers.DictField(required=False, allow_null=True)
+    workflow_context = serializers.DictField(required=False)
+    use_workflow_preset = serializers.BooleanField(required=False, default=True)
+    use_workflow_brand = serializers.BooleanField(required=False, default=True)

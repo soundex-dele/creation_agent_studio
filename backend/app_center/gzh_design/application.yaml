@@ -62,8 +62,24 @@ spec:
           补充要求或自定义主题描述：{requirements}
 
           用户已通过应用表单确认以上设置。若主题为“自动推荐（一键排版）”，请进入全自动模式，自动推断结构并选择最契合的已注册主题，不要再次询问；若已指定主题，直接使用该主题；若选择“自定义主题”，按 Skill 的自定义主题流程执行，仅在缺少必需风格信息时询问。严格从主题组件库装配 HTML，不得凭记忆手写组件或跨主题混用。必须保留原文全部段落和图片，生成纯 section 正文、运行 validate_gzh_html.py 至 0 ERROR 且 0 个半角标点 WARNING，并生成一键复制预览页。交付时给出两个文件的路径、所选主题与校验结论。
+        presets:
+        - id: tools
+          name: 工具教程
+          description: 工具教程场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            theme: moyu-green
+            requirements: 突出步骤和提示，保留原文信息。
+        - id: commentary
+          name: 专业评论
+          description: 专业评论场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            theme: graphite-minimal
+            requirements: 保持清晰层级和克制留白，保留原文信息。
         questions:
           - key: source
+            preset_save: optional
             label: 文章正文或文件路径
             type: text
             placeholder: 粘贴 Markdown/纯文本，或填写工作目录内的 .md、.docx、.pdf、.txt 文件路径
@@ -74,6 +90,7 @@ spec:
             order: 0
             options: []
           - key: theme
+            preset_save: preference
             label: 排版主题
             type: single_choice
             placeholder: 请选择
@@ -93,6 +110,7 @@ spec:
               - {value: olive-journal, label: 橄榄手记, description: 内刊手记、深度评测、案例复盘, icon: "", order: 7}
               - {value: custom, label: 自定义主题, description: 根据补充描述或参考图生成并登记新主题, icon: "", order: 8}
           - key: author
+            preset_save: preference
             label: 作者署名
             type: text
             placeholder: 例如：小林；留空则保留 {{作者名}} 占位
@@ -103,6 +121,7 @@ spec:
             order: 2
             options: []
           - key: bio
+            preset_save: preference
             label: 作者简介
             type: text
             placeholder: 例如：热衷分享 AI 工具与实战经验
@@ -113,6 +132,7 @@ spec:
             order: 3
             options: []
           - key: requirements
+            preset_save: preference
             label: 补充要求或自定义主题描述
             type: text
             placeholder: 例如：品牌色 #007C7E；减少卡片；参考图路径为 assets/style.png

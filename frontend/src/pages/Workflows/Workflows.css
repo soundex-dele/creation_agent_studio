@@ -185,3 +185,6 @@
     display: none !important;
   }
 }
+.workflow-manual-setup {
+  padding: 24px max(16px, calc((100% - 680px) / 2)) calc(24px + env(safe-area-inset-bottom));
+}

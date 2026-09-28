@@ -64,8 +64,28 @@ spec:
 
           用户已通过应用表单确认以上设置，请直接执行，不重复询问已有信息。仅交付所选范围；完整作品默认给推荐标题和 2 个备选、从 P1 封面开始的逐页文案、发布配文。上图文字提供实际换行，并与画面建议分开。页数未指定时按内容组织约 6 页；已有图片和指定页数优先，不为凑页重复内容。指定平台时读取 Skill 的平台适配参考，需要分页或长文拆图时读取分页参考。
           已有图片先读取，再按文件名或原图编号对应；不能读取时说明限制，不声称已看过。不得编造亲测、人物经历、数据或效果承诺。缺少无法合理推断的核心事实时只问必要问题，未定稿明确标为草稿。图片生成、HTML 排版与发布执行不属于本次文案交付。
+        presets:
+        - id: knowledge-cards
+          name: 知识卡片
+          description: 知识卡片场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            task: full
+            platform: xiaohongshu
+            pages: 6 页，每页一个核心信息
+            requirements: 首屏点明问题，正文给出可执行方法，末页总结。
+        - id: product-intro
+          name: 产品介绍
+          description: 产品介绍场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            task: full
+            platform: general
+            pages: 5 页：需求、产品、特点、适用场景、总结
+            requirements: 仅依据提供的产品事实，不虚构体验和效果。
         questions:
           - key: task
+            preset_save: preference
             label: 交付范围
             type: single_choice
             required: true
@@ -78,8 +98,9 @@ spec:
               - {value: rewrite, label: 优化已有文案, order: 3}
               - {value: titles-cover, label: 仅标题与封面短句, order: 4}
               - {value: topics, label: 选题方向, order: 5}
-          - {key: source, label: 主题、素材或原稿, type: text, placeholder: 填写主题、粘贴原稿，或提供工作目录内的图片和文件路径, help_text: 涉及产品体验、价格或数据时，请提供真实资料。, required: true, default_value: null, order: 1}
+          - {key: source, preset_save: optional, label: 主题、素材或原稿, type: text, placeholder: 填写主题、粘贴原稿，或提供工作目录内的图片和文件路径, help_text: 涉及产品体验、价格或数据时，请提供真实资料。, required: true, default_value: null, order: 1}
           - key: platform
+            preset_save: preference
             label: 发布平台
             type: single_choice
             required: true
@@ -90,9 +111,9 @@ spec:
               - {value: xiaohongshu, label: 小红书, order: 1}
               - {value: douyin, label: 抖音图文, order: 2}
               - {value: wechat, label: 公众号图文, order: 3}
-          - {key: audience, label: 目标读者, type: text, default_value: 与主题匹配的普通读者, required: false, order: 3}
-          - {key: pages, label: 页数与图片顺序, type: text, placeholder: 例如：6 页；按原图顺序；只需单图配文, default_value: 按内容决定，完整多图作品约 6 页，已有图片优先, required: false, order: 4}
-          - {key: requirements, label: 语气与补充要求, type: text, placeholder: 例如：自然克制；保留作者口吻；只交付成稿, default_value: 自然具体，简体中文, required: false, order: 5}
+          - {key: audience, preset_save: preference, label: 目标读者, type: text, default_value: 与主题匹配的普通读者, required: false, order: 3}
+          - {key: pages, preset_save: preference, label: 页数与图片顺序, type: text, placeholder: 例如：6 页；按原图顺序；只需单图配文, default_value: 按内容决定，完整多图作品约 6 页，已有图片优先, required: false, order: 4}
+          - {key: requirements, preset_save: preference, label: 语气与补充要求, type: text, placeholder: 例如：自然克制；保留作者口吻；只交付成稿, default_value: 自然具体，简体中文, required: false, order: 5}
   backend:
     definition_factory: app_center.write_image_text_copy.provision.prepare_definition
   database: {mode: none}

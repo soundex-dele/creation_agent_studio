@@ -12,6 +12,9 @@ import { EditOutlined, RocketOutlined } from '@ant-design/icons';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import ChatContainer from '@/components/Chat/ChatContainer';
+import FormPresetPicker from '@/components/FormPresetPicker';
+import { formAnswers, formErrorMessage, presetReference } from '@/lib/formPresets';
+import type { FormPresetSnapshot } from '@/types';
 import BrandReferencePicker from '@/components/BrandReferencePicker';
 import { inheritedBrandFields, type BrandConfig, type BrandSelection } from '@/services/brandLibrary';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -36,14 +39,6 @@ interface ComposePromptResponse {
   normalized_answers: Record<string, unknown>;
 }
 
-const initialAnswers = (prompt: GuidedPrompt | null): Record<string, AnswerValue> => (
-  Object.fromEntries((prompt?.questions ?? []).flatMap((question) => (
-    question.default_value === undefined || question.default_value === null
-      ? []
-      : [[question.key, question.default_value as AnswerValue]]
-  )))
-);
-
 export default function ChatApplicationRuntimePage() {
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const userId = useAuthStore((state) => state.user?.id);
@@ -64,13 +59,18 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
   const [application, setApplication] = useState<AppItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPromptId, setSelectedPromptId] = useState('');
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [overrides, setOverrides] = useState<Record<string, AnswerValue>>({});
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [composing, setComposing] = useState(false);
   const [chatStarted, setChatStarted] = useState(Boolean(restoredConversationId));
   const [conversationId, setConversationId] = useState<string | null>(restoredConversationId);
   const [draftRequestId, setDraftRequestId] = useState(0);
   const [brandSelection, setBrandSelection] = useState<BrandSelection | null>(null);
+  const [preset, setPreset] = useState<FormPresetSnapshot | null>(null);
+  const [useWorkflowPreset, setUseWorkflowPreset] = useState(true);
+  const [useWorkflowBrand, setUseWorkflowBrand] = useState(true);
+  const [contextError, setContextError] = useState('');
+  const [manualContext, setManualContext] = useState<{ prompt: GuidedPrompt; form_preset: FormPresetSnapshot | null; brand_snapshot: { selection: BrandSelection } | null } | null>(null);
   const [explicitFields, setExplicitFields] = useState<string[]>([]);
   const composeVersion = useRef(0);
   const invalidatePreview = () => { composeVersion.current += 1; setGeneratedPrompt(''); };
@@ -95,8 +95,8 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
     ? application.runtime as ChatApplicationRuntime
     : null;
   const prompts = useMemo(() => (
-    [...(runtime?.guided_prompts ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-  ), [runtime]);
+    [...(runtime?.guided_prompts ?? []).map((p) => manualContext?.prompt.key === p.key ? manualContext.prompt : p)].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  ), [runtime, manualContext]);
   const brandConfig = runtime?.default_config.brand_reference as BrandConfig | undefined;
   const inheritedFields = inheritedBrandFields(brandConfig, brandSelection, explicitFields);
   const selectedPrompt = prompts.find(
@@ -104,6 +104,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
   )
     ?? prompts[0]
     ?? null;
+  const answers = formAnswers(selectedPrompt, preset, overrides);
   const defaultAgent = runtime?.agent_bindings.find((binding) => binding.is_default)
     ?? runtime?.agent_bindings[0]
     ?? null;
@@ -111,24 +112,41 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
   useEffect(() => {
     if (!selectedPrompt) return;
     setSelectedPromptId(guidedPromptIdentifier(selectedPrompt));
-    setAnswers(initialAnswers(selectedPrompt));
+    setOverrides({});
+    const context = manualContext?.prompt.key === selectedPrompt.key ? manualContext : null;
+    setPreset(context?.form_preset || null);
+    setUseWorkflowPreset(Boolean(context));
+    setUseWorkflowBrand(Boolean(context));
     setGeneratedPrompt('');
     composeVersion.current += 1;
     setExplicitFields([]);
-    setBrandSelection(null);
-  }, [selectedPrompt]);
+    setBrandSelection(context?.brand_snapshot?.selection || null);
+  }, [selectedPrompt, manualContext]);
+
+  useEffect(() => {
+    if (!manualRunId || !workflowStepKey || !runtime) return;
+    const controller = new AbortController();
+    setContextError('');
+    void api.get<NonNullable<typeof manualContext>>(`/apps/${slug}/workflow-form-context/`, { run_id: manualRunId, step_key: workflowStepKey }, { signal: controller.signal })
+      .then((context) => {
+        if (controller.signal.aborted) return;
+        setManualContext(context);
+        setSelectedPromptId(guidedPromptIdentifier(context.prompt));
+      }).catch(() => { if (!controller.signal.aborted) setContextError('无法读取工作流模板和品牌资料，请重新打开此节点。'); });
+    return () => controller.abort();
+  }, [manualRunId, workflowStepKey, runtime, slug]);
 
   const setAnswer = (question: GuidedQuestion, value: AnswerValue | null) => {
     invalidatePreview();
     setExplicitFields((current) => [...new Set([...current, question.key])]);
-    setAnswers((current) => ({
+    setOverrides((current) => ({
       ...current,
       [question.key]: value === null ? '' : value,
     }));
   };
 
   const composePrompt = async () => {
-    if (!selectedPrompt || !application) return;
+    if (!selectedPrompt || !application || (manualRunId && !manualContext)) return;
     const missing = selectedPrompt.questions.filter((question) => {
       if (inheritedFields.includes(question.key)) return false;
       if (!question.required) return false;
@@ -147,15 +165,17 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
     const version = ++composeVersion.current;
     try {
       const response = await api.post<ComposePromptResponse>(
-        `/apps/${application.id}/compose-prompt/`,
-        { prompt_id: guidedPromptIdentifier(selectedPrompt), answers,
+        `/apps/${slug}/compose-prompt/`,
+        { prompt_id: guidedPromptIdentifier(selectedPrompt), answers, explicit_fields: explicitFields,
+          preset: useWorkflowPreset && manualContext ? null : presetReference(preset),
+          ...(manualRunId && workflowStepKey ? { workflow_context: { run_id: manualRunId, step_key: workflowStepKey },
+            use_workflow_preset: useWorkflowPreset, use_workflow_brand: useWorkflowBrand } : {}),
           ...(brandConfig?.enabled && brandSelection ? { brand_reference: brandSelection.reference, explicit_fields: explicitFields } : {}),
         },
       );
       if (version === composeVersion.current) setGeneratedPrompt(response.prompt);
     } catch (error: any) {
-      const detail = error?.response?.data;
-      message.error(detail?.detail || Object.values(detail || {}).flat()[0] || '生成提示词失败');
+      message.error(formErrorMessage(error, '生成提示词失败'));
     } finally {
       setComposing(false);
     }
@@ -260,7 +280,11 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
             {selectedPrompt ? (
               <>
                 {brandConfig?.enabled && organizationId && <BrandReferencePicker root={tenantApiRoot(organizationId)}
-                  config={brandConfig} value={brandSelection} onChange={(selection) => { invalidatePreview(); setBrandSelection(selection); }} />}
+                  config={brandConfig} value={brandSelection} onChange={(selection) => { invalidatePreview(); setUseWorkflowBrand(false); setBrandSelection(selection); }} />}
+                {contextError && <Alert type="error" message={contextError} />}
+                <FormPresetPicker key={`${organizationId}:${selectedPrompt.key}`} applicationSlug={slug} prompt={selectedPrompt}
+                  value={preset} answers={answers} excludedFields={inheritedFields}
+                  onChange={(next) => { invalidatePreview(); setUseWorkflowPreset(false); setPreset(next); }} />
                 <div className="chat-app-form-title">
                   <span>{selectedPrompt.icon || '📝'}</span>
                   <div>
@@ -270,12 +294,13 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
                 </div>
                 <div className="chat-app-fields">
                   {selectedPrompt.questions.map((question) => (
-                    <label className="chat-app-field" key={question.id}>
+                    <label className="chat-app-field" key={question.key}>
                       <span>{question.label}{question.required && <b>*</b>}</span>
+                      <small>{explicitFields.includes(question.key) ? '本次覆盖' : inheritedFields.includes(question.key) ? '来自品牌' : question.key in (preset?.values || {}) ? '来自模板' : '应用默认值'}</small>
                       {question.help_text && <small>{question.help_text}</small>}
                       {inheritedFields.includes(question.key) ? <div>
                         <Alert type="info" message="使用品牌资料" description="生成提示词时读取档案中的对应资料。" />
-                        <Button type="link" onClick={() => { invalidatePreview(); setExplicitFields((current) => [...current, question.key]); }}>改为本次填写</Button>
+                        <Button type="link" onClick={() => setAnswer(question, answers[question.key] ?? '')}>改为本次填写</Button>
                       </div> : question.type === 'single_choice' || question.type === 'multi_choice' ? (
                         <Select
                           mode={question.type === 'multi_choice' ? 'multiple' : undefined}
@@ -303,13 +328,14 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
                           onChange={(event) => setAnswer(question, event.target.value)}
                         />
                       )}
-                      {brandSelection && explicitFields.includes(question.key) && inheritedBrandFields(brandConfig, brandSelection, []).includes(question.key) && (
-                        <Button type="link" onClick={() => { invalidatePreview(); setExplicitFields((current) => current.filter((key) => key !== question.key)); }}>使用品牌资料</Button>
-                      )}
+                      {explicitFields.includes(question.key) && <Button type="link" onClick={() => {
+                        invalidatePreview(); setExplicitFields((current) => current.filter((key) => key !== question.key));
+                        setOverrides((current) => { const next = { ...current }; delete next[question.key]; return next; });
+                      }}>{brandSelection && inheritedBrandFields(brandConfig, brandSelection, []).includes(question.key) ? '使用品牌资料' : '恢复继承'}</Button>}
                     </label>
                   ))}
                 </div>
-                <Button type="primary" size="large" loading={composing} onClick={composePrompt}>
+                <Button type="primary" size="large" loading={composing} disabled={Boolean(manualRunId && !manualContext)} onClick={composePrompt}>
                   生成提示词
                 </Button>
               </>

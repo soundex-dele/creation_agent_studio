@@ -32,6 +32,10 @@ class _Sink:
     def create_artifact(self, **artifact):
         self.artifacts.append(artifact)
 
+    def poll_commands(self):
+        """Implement the current sink protocol used by agent completion."""
+        return None
+
 
 class _SuspendSink(_Sink):
     def request_input(self, **request):

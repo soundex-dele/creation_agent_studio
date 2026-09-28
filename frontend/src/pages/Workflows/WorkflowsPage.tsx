@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Switch,
+  Alert, Button, Card, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Switch,
   Tag, Typography, message,
 } from 'antd';
 import {
@@ -9,6 +9,10 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
+import WorkflowBrandPicker, { emptyWorkflowBrand, workflowBrandRequest, workflowNodeBrand } from '@/components/WorkflowBrandPicker';
+import { inheritedBrandFields, type BrandConfig } from '@/services/brandLibrary';
+import { formAnswers, formErrorMessage } from '@/lib/formPresets';
+import type { FormPresetSnapshot } from '@/types';
 import { api } from '@/services/api';
 import type {
   GuidedPrompt, Workflow, WorkflowInputValue, WorkflowRunInputField,
@@ -42,7 +46,7 @@ const promptFields = (prompt: GuidedPrompt): WorkflowRunInputField[] => (
       : question.type === 'number' ? 'number' : 'string',
     required: question.required,
     defaultValue: question.default_value as WorkflowInputValue | undefined,
-    options: question.options.map((option) => ({
+    options: (question.options || []).map((option) => ({
       value: option.value,
       label: option.label,
     })),
@@ -64,7 +68,13 @@ const WorkflowsPage = () => {
   const [runAnswers, setRunAnswers] = useState<Record<string, WorkflowInputValue>>({});
   const [runErrors, setRunErrors] = useState<Record<string, string>>({});
   const [preparingRunId, setPreparingRunId] = useState<string | null>(null);
+  const [runBrand, setRunBrand] = useState(emptyWorkflowBrand);
+  const [explicitInputFields, setExplicitInputFields] = useState<string[]>([]);
   const [startingRun, setStartingRun] = useState(false);
+  const entryStep = runWorkflow?.steps?.find((step) => !step.depends_on.length && step.application.kind === 'chat');
+  const runPreset = (entryStep?.config.form_preset || null) as FormPresetSnapshot | null;
+  const inheritedFields = entryStep && runPrompt ? inheritedBrandFields(entryStep.application.default_config.brand_reference as BrandConfig | undefined,
+    workflowNodeBrand(runBrand, entryStep.key), explicitInputFields) : [];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,7 +101,7 @@ const WorkflowsPage = () => {
     try {
       const run = await api.post<{ id: string }>(
         `/workflows/${workflow.id}/start/`,
-        { input },
+        { input, brand_context: workflowBrandRequest(runBrand), explicit_input_fields: explicitInputFields },
         { headers: { 'Idempotency-Key': createIdempotencyKey('workflow') } },
       );
       setRunWorkflow(null);
@@ -100,7 +110,7 @@ const WorkflowsPage = () => {
       setRunErrors({});
       navigate(`/runs/${run.id}`);
     } catch (error: any) {
-      message.error(error?.response?.data?.detail || '工作流启动失败');
+      message.error(formErrorMessage(error, '工作流启动失败'));
     } finally {
       setStartingRun(false);
     }
@@ -112,6 +122,7 @@ const WorkflowsPage = () => {
       return;
     }
     setPreparingRunId(workflow.id);
+    setRunBrand(emptyWorkflowBrand()); setExplicitInputFields([]);
     try {
       const detail = await api.get<Workflow>(`/workflows/${workflow.id}/`);
       const schemaFields = workflowInputFields(detail.input_schema);
@@ -127,24 +138,25 @@ const WorkflowsPage = () => {
         .sort((left, right) => left.order - right.order)
         .find((step) => step.depends_on.length === 0 && step.application.kind === 'chat');
       if (!entryStep || entryStep.application.kind !== 'chat') {
-        await launch(detail, {});
+        setRunWorkflow(detail); setRunPrompt(null); setRunFields([]); setRunAnswers({}); setRunErrors({});
         return;
       }
       const preferredKey = String(
-        entryStep.application.default_config.guided_entry_prompt_key || '',
+        (entryStep.config?.automation as { guided_prompt_key?: string } | undefined)?.guided_prompt_key || entryStep.application.default_config.guided_entry_prompt_key || '',
       );
       const prompt = entryStep.application.guided_prompts.find((item) => (
         String(item.id || item.key) === preferredKey
       )) || entryStep.application.guided_prompts[0];
       if (!prompt) {
-        await launch(detail, {});
+        setRunWorkflow(detail); setRunPrompt(null); setRunFields([]); setRunAnswers({}); setRunErrors({});
         return;
       }
       setRunWorkflow(detail);
       setRunPrompt(prompt);
-      const fields = promptFields(prompt);
+      const bindings = (entryStep.config.automation as { answers?: Record<string, { value?: unknown }> } | undefined)?.answers || {};
+      const fields = promptFields(prompt).filter((field) => !Object.prototype.hasOwnProperty.call(bindings[field.key] || {}, 'value'));
       setRunFields(fields);
-      setRunAnswers(workflowInputDefaults(fields));
+      setRunAnswers(formAnswers(prompt, (entryStep.config?.form_preset || null) as FormPresetSnapshot | null, {}));
       setRunErrors({});
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '读取工作流输入配置失败');
@@ -154,6 +166,7 @@ const WorkflowsPage = () => {
   };
 
   const setRunAnswer = (key: string, value: WorkflowInputValue | null) => {
+    setExplicitInputFields((current) => [...new Set([...current, key])]);
     setRunAnswers((current) => ({
       ...current,
       [key]: value === null ? '' : value,
@@ -168,7 +181,7 @@ const WorkflowsPage = () => {
 
   const submitAutomaticRun = async () => {
     if (!runWorkflow) return;
-    const errors = validateWorkflowInput(runFields, runAnswers);
+    const errors = validateWorkflowInput(runFields.filter((field) => !inheritedFields.includes(field.key)), runAnswers);
     if (Object.keys(errors).length) {
       setRunErrors(errors);
       message.warning('请检查工作流输入');
@@ -363,7 +376,7 @@ const WorkflowsPage = () => {
       )}
       <Modal
         title={runPrompt?.title || `运行 ${runWorkflow?.name || '工作流'}`}
-        open={Boolean(runWorkflow && runFields.length)}
+        open={Boolean(runWorkflow)}
         okText="开始自动运行"
         cancelText="取消"
         width={680}
@@ -380,14 +393,19 @@ const WorkflowsPage = () => {
         <p className="workflow-run-form-description">
           {runPrompt?.description || '填写本次运行输入；映射到该字段的应用会收到相同内容。'}
         </p>
+        {runWorkflow && <WorkflowBrandPicker workflow={runWorkflow} value={runBrand} onChange={setRunBrand} />}
         <div className="workflow-run-form">
           {runFields.map((field) => {
             const errorId = `workflow-input-${field.key}-error`;
             return (
             <label className={`workflow-run-field${runErrors[field.key] ? ' has-error' : ''}`} key={field.key}>
               <span>{field.label}{field.required && <b>*</b>}</span>
+              <small>{explicitInputFields.includes(field.key) ? '本次覆盖' : inheritedFields.includes(field.key) ? '来自品牌' : runPrompt && field.key in (runPreset?.values || {}) ? '来自模板' : '默认值'}</small>
               {field.description && <small>{field.description}</small>}
-              {field.options?.length ? (
+              {inheritedFields.includes(field.key) ? <div>
+                <Alert type="info" message="使用本次品牌资料" />
+                <Button type="link" onClick={() => setRunAnswer(field.key, runAnswers[field.key] ?? '')}>改为本次填写</Button>
+              </div> : field.options?.length ? (
                 <Select
                   id={`workflow-input-${field.key}`}
                   aria-describedby={runErrors[field.key] ? errorId : undefined}
@@ -439,7 +457,13 @@ const WorkflowsPage = () => {
                   onChange={(event) => setRunAnswer(field.key, event.target.value)}
                 />
               )}
-              {runErrors[field.key] && (
+              {explicitInputFields.includes(field.key) && <Button type="link" onClick={() => {
+                setExplicitInputFields((current) => current.filter((key) => key !== field.key));
+                const defaults = runPrompt ? formAnswers(runPrompt, runPreset, {}) : workflowInputDefaults(runFields);
+                setRunAnswers((current) => ({ ...current, [field.key]: defaults[field.key] ?? '' }));
+                setRunErrors((current) => { const next = { ...current }; delete next[field.key]; return next; });
+              }}>恢复继承</Button>}
+              {!inheritedFields.includes(field.key) && runErrors[field.key] && (
                 <small id={errorId} className="workflow-run-field-error" role="alert">
                   {runErrors[field.key]}
                 </small>

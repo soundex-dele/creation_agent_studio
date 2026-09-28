@@ -66,8 +66,32 @@ spec:
           其他要求：{requirements}
 
           用户已通过应用表单确认全部设置。请按 --quick 语义直接生成，不要再次询问；画面比例必须使用上面指定的值。提取的封面标题必须来自原文，不得改写或意译；文章中没有合适的副标题时不要添加。输出完整、自包含、固定尺寸的 cover.html。不要使用内置浏览器，不需要导出 PNG。
+        presets:
+        - id: minimal-landscape
+          name: 横版极简标题
+          description: 横版极简标题场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            cover_type: minimal
+            palette: mono
+            style: flat
+            text_level: title-only
+            font: clean
+            aspect: '16:9'
+        - id: portrait-title
+          name: 竖版大字封面
+          description: 竖版大字封面场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            cover_type: typography
+            palette: vivid
+            style: geometric
+            text_level: title-only
+            font: display
+            aspect: '9:16'
         questions:
           - key: source
+            preset_save: optional
             label: 文章内容
             type: text
             placeholder: 粘贴文章正文、摘要或文件路径
@@ -78,6 +102,7 @@ spec:
             order: 0
             options: []
           - key: cover_type
+            preset_save: preference
             label: 封面类型
             type: single_choice
             placeholder: 请选择
@@ -95,6 +120,7 @@ spec:
               - {value: scene, label: 场景构图, description: "", icon: "", order: 5}
               - {value: minimal, label: 极简留白, description: "", icon: "", order: 6}
           - key: palette
+            preset_save: preference
             label: 配色
             type: single_choice
             placeholder: 请选择
@@ -118,6 +144,7 @@ spec:
               - {value: macaron, label: Macaron, description: "", icon: "", order: 11}
               - {value: neon, label: Neon, description: "", icon: "", order: 12}
           - key: style
+            preset_save: preference
             label: 视觉风格
             type: single_choice
             placeholder: 请选择
@@ -136,6 +163,7 @@ spec:
               - {value: brutalist, label: Brutalist, description: "", icon: "", order: 6}
               - {value: cyber, label: Cyber, description: "", icon: "", order: 7}
           - key: text_level
+            preset_save: preference
             label: 文字层级
             type: single_choice
             placeholder: 请选择
@@ -150,6 +178,7 @@ spec:
               - {value: title-subtitle, label: 标题 + 副标题, description: "", icon: "", order: 2}
               - {value: text-rich, label: 丰富文字, description: "", icon: "", order: 3}
           - key: font
+            preset_save: preference
             label: 字体方向
             type: single_choice
             placeholder: 请选择
@@ -165,6 +194,7 @@ spec:
               - {value: display, label: Display, description: "", icon: "", order: 3}
               - {value: mono, label: Mono, description: "", icon: "", order: 4}
           - key: aspect
+            preset_save: preference
             label: 画面比例
             type: single_choice
             placeholder: 请选择
@@ -181,6 +211,7 @@ spec:
               - {value: "3:2", label: "3:2 横版", description: "1500×1000", icon: "", order: 4}
               - {value: "4:3", label: "4:3 横版", description: "1600×1200", icon: "", order: 5}
           - key: requirements
+            preset_save: preference
             label: 其他要求
             type: text
             placeholder: 例如：品牌紫色；不使用外部字体；右侧留出人物位置

@@ -6,6 +6,9 @@ import {
 import type { InputRef } from 'antd';
 import { ApartmentOutlined, ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import FormPresetPicker from '@/components/FormPresetPicker';
+import { formAnswers } from '@/lib/formPresets';
+import type { FormPresetSnapshot } from '@/types';
 import { api } from '@/services/api';
 import type { ApplicationRuntime, AppItem, Workflow, WorkflowStep, WorkflowRunInputField } from '@/types';
 import {
@@ -641,6 +644,19 @@ const WorkflowEditorPage = () => {
                 ) : <strong>{step.name || step.application.application_name}</strong>}
                 <span className="workflow-step-application">使用应用：{step.application.application_name}</span>
                 <span>{step.application.application_description}</span>
+                {step.application.kind === 'chat' && step.application.guided_prompts.length > 0 && (() => {
+                  const automation = (step.config?.automation || {}) as { guided_prompt_key?: string; answers?: Record<string, { value?: string | string[] | number }> };
+                  const prompt = step.application.guided_prompts.find((p) => String(p.id || p.key) === automation.guided_prompt_key)
+                    || step.application.guided_prompts.find((p) => p.key === step.application.default_config.guided_entry_prompt_key)
+                    || step.application.guided_prompts[0];
+                  const selected = (step.config?.form_preset || null) as FormPresetSnapshot | null;
+                  if (!prompt.questions.length) return null;
+                  return <FormPresetPicker key={`${step.key}:${prompt.key}`} keepSnapshot applicationSlug={step.application.application_slug}
+                    prompt={prompt} value={selected} answers={formAnswers(prompt, selected, Object.fromEntries(
+                      Object.entries(automation.answers || {}).flatMap(([key, binding]) => binding.value === undefined ? [] : [[key, binding.value]])
+                    ))} onChange={(form_preset) => setSteps((current) => current.map((item) => item.key === step.key
+                      ? { ...item, config: { ...item.config, form_preset } } : item))} />;
+                })()}
                 {workflow.execution_mode === 'automatic' && (
                   <label className="workflow-node-dependencies">
                     <span>前置依赖</span>
@@ -686,10 +702,8 @@ const WorkflowEditorPage = () => {
                               options={step.application.guided_prompts.map((item) => ({
                                 value: String(item.id || item.key), label: item.title,
                               }))}
-                              onChange={(guided_prompt_key) => updateStepAutomation(
-                                step.key,
-                                (value) => ({ ...value, guided_prompt_key, answers: {} }),
-                              )}
+                              onChange={(guided_prompt_key) => setSteps((current) => current.map((item) => item.key === step.key
+                                ? { ...item, config: { ...item.config, form_preset: null, automation: { ...automation, guided_prompt_key, answers: {} } } } : item))}
                             />
                             {prompt.questions.map((question) => {
                               const field: WorkflowRunInputField = {
@@ -708,7 +722,7 @@ const WorkflowEditorPage = () => {
                                   <Select
                                     value={selected}
                                     options={[
-                                      { value: 'default', label: '应用默认值' },
+                                      { value: 'default', label: '继承品牌 / 模板 / 默认值' },
                                       ...(workflowInputSourceOptions(workflow.input_schema).length
                                         ? workflowInputSourceOptions(workflow.input_schema) : [{
                                         value: `from:workflow.input.${question.key}`,

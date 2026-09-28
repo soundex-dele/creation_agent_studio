@@ -62,8 +62,26 @@ spec:
           补充视觉要求：{requirements}
 
           用户已通过应用表单确认以上设置，请直接生成，不要再次询问确认。先分析文章和视觉机会，避免按字面描绘比喻；生成 outline.md 与全部自包含 HTML 配图，保持整套作品的配色、字体、圆角、阴影和间距一致。不要使用内置浏览器，不需要导出 PNG。
+        presets:
+        - id: process
+          name: 流程讲解
+          description: 流程讲解场景的创作参数，可按本次需求调整。
+          order: 0
+          values:
+            preset: process-flow
+            density: balanced
+            aspect: '16:9'
+        - id: comparison
+          name: 观点对比
+          description: 观点对比场景的创作参数，可按本次需求调整。
+          order: 1
+          values:
+            preset: versus
+            density: minimal
+            aspect: '16:9'
         questions:
           - key: article
+            preset_save: optional
             label: 文章内容或文件路径
             type: text
             placeholder: 粘贴完整文章，或填写工作目录内的文章文件路径
@@ -74,6 +92,7 @@ spec:
             order: 0
             options: []
           - key: preset
+            preset_save: preference
             label: 配图预设/类型
             type: single_choice
             placeholder: 请选择
@@ -92,6 +111,7 @@ spec:
               - {value: history, label: 时间线, description: 适合历史与演进, icon: "", order: 6}
               - {value: opinion-piece, label: 观点海报, description: 适合评论和观点文章, icon: "", order: 7}
           - key: density
+            preset_save: preference
             label: 配图密度
             type: single_choice
             placeholder: 请选择
@@ -106,6 +126,7 @@ spec:
               - {value: balanced, label: 均衡 3–5 张, description: 控制篇幅与覆盖面, icon: "", order: 2}
               - {value: rich, label: 丰富 6 张以上, description: 高密度视觉解释, icon: "", order: 3}
           - key: aspect
+            preset_save: preference
             label: 画面比例
             type: single_choice
             placeholder: 请选择
@@ -120,6 +141,7 @@ spec:
               - {value: "1:1", label: "1:1 方形", description: "1080×1080", icon: "", order: 2}
               - {value: "3:2", label: "3:2 横版", description: "1500×1000", icon: "", order: 3}
           - key: requirements
+            preset_save: preference
             label: 补充视觉要求
             type: text
             placeholder: 例如：品牌色 #E8655A；避免英文；不使用 Rough.js

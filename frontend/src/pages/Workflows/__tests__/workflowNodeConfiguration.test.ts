@@ -74,6 +74,41 @@ const switchMode = async (label: string) => {
 };
 
 describe('graph node configuration', () => {
+  it('stores a form preset separately from explicit automation answers in manual and automatic nodes', async () => {
+    const application = { id: 8, application_id: 8, kind: 'chat', application_slug: 'writer', application_name: '写作',
+      default_config: { guided_entry_prompt_key: 'write' }, guided_prompts: [{ key: 'write', title: '写作',
+        questions: [{ key: 'audience', label: '受众', type: 'text', options: [], default_value: '默认' }],
+        presets: [{ id: 'knowledge', name: '知识模板', values: { audience: '学习者' } }],
+      }] };
+    const flow = { id: 'workflow-1', name: '模板流程', execution_mode: 'manual', steps: [{
+      id: 'step1', key: 'writer', order: 0, depends_on: [], application_id: 8, application,
+      config: { automation: { answers: { audience: { value: '本次读者' } } } },
+    }] };
+    vi.mocked(api.get).mockImplementation(async (url) => url === '/apps/' || url.includes('/form-presets/') ? [] : flow);
+    vi.mocked(api.put).mockResolvedValue(flow);
+    await act(async () => root.render(createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(WorkflowEditorPage))));
+    const picker = document.querySelector<HTMLElement>('[aria-label="预设模板"]')!;
+    await act(async () => { (picker.querySelector('input') || picker).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); });
+    const option = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].find((el) => el.textContent === '知识模板')!;
+    await click(option);
+    await click(button('保存工作流'));
+    expect(api.put).toHaveBeenLastCalledWith('/workflows/workflow-1/', expect.objectContaining({
+      steps: [expect.objectContaining({ config: {
+        automation: { answers: { audience: { value: '本次读者' } } },
+        form_preset: expect.objectContaining({ kind: 'builtin', id: 'knowledge', prompt_key: 'write', values: { audience: '学习者' } }),
+      } })],
+    }));
+    await switchMode('自动执行');
+    expect(document.body.textContent).toContain('知识模板');
+    await click(button('保存工作流'));
+    expect(api.put).toHaveBeenLastCalledWith('/workflows/workflow-1/', expect.objectContaining({ execution_mode: 'automatic',
+      steps: [expect.objectContaining({ config: expect.objectContaining({
+        automation: { answers: { audience: { value: '本次读者' } } },
+        form_preset: expect.objectContaining({ id: 'knowledge' }),
+      }) })],
+    }));
+  });
+
   it('loads and saves the combined preset with one writer and isolated branch artifacts', async () => {
     route.id = undefined;
     route.preset = CONTENT_SUITE_PRESET;

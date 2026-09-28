@@ -178,3 +178,20 @@ class ChatApplication(models.Model):
 
     def __str__(self):
         return self.application.name
+
+
+class PersonalFormPreset(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey('enterprise.Organization', on_delete=models.CASCADE)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    application = models.ForeignKey(Application, on_delete=models.CASCADE)
+    prompt_key = models.CharField(max_length=200)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    values = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', 'id']
+        indexes = [models.Index(fields=['organization', 'owner', 'application'], name='form_preset_scope')]
