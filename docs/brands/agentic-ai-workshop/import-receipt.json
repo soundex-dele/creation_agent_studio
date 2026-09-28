@@ -1,0 +1,20 @@
+{
+  "imported_at": "2026-09-28T13:39:49.363319+00:00",
+  "environment": "local running application",
+  "username": "admin",
+  "organization": "Enterprise Workspace",
+  "organization_id": "d293a331-c75c-46b2-b667-688a465114c2",
+  "application_id": 7,
+  "profile": {
+    "id": "2b45212b-e7fb-426a-b7f9-0347a91f6e61",
+    "name": "智能体AI工坊",
+    "action": "created"
+  },
+  "product": {
+    "id": "531eec2e-888f-4ed7-88c0-0ca8e09db5df",
+    "name": "Agent Studio（当前项目名称）",
+    "action": "created"
+  },
+  "verification": "Committed data read through user-scoped application views and all imported fields matched source JSON",
+  "examples_imported": 0
+}

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "profile": "brand-profile.json",
+  "products": ["product-agent-studio.json"],
+  "examples": []
+}

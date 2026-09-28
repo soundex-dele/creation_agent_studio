@@ -1,0 +1,17 @@
+{
+  "name": "Agent Studio（当前项目名称）",
+  "description": "智能体AI工坊的工具产品，当前项目名称为 Agent Studio，仓库目录为 creation_agent_studio。项目定位是通用智能体、应用与工作流平台；面向本账号读者，建议重点介绍它如何组织品牌资料、辅助内容创作、处理资料研究并编排任务流程。正式对外名称、公开入口、价格与服务形式待补充。",
+  "facts": [
+    "用户已确认：当前项目是自己的工具产品。",
+    "项目 README 将 Agent Studio 定位为面向组织的通用智能体、应用与工作流平台，包含 Agent、Application、Conversation、Workflow 等产品域。",
+    "品牌资料库应用保存账号定位、品牌语气、视觉规范，以及独立产品和范文条目；应用文档列明十个创作应用可按选择引用品牌资料。",
+    "图文文案应用的配置声明可生成标题、封面短句、逐页文案和发布配文；短视频文案应用的配置声明覆盖口播、旁白、字幕或拍摄脚本。",
+    "公众号写作与公众号排版应用已在仓库配置；排版应用通过所绑定 Skill 将文章材料转换为公众号 HTML。",
+    "HTML 封面生成器的配置声明通过引导表单和 Skill 制作可编辑的 HTML/CSS/SVG 封面。",
+    "资料研究助手文档列明可基于导入资料生成带出处的研究报告、观点对照及写作资料包。",
+    "项目 README 描述工作流支持显式依赖、条件分支、节点级重试和有界并行。"
+  ],
+  "source": "核对日期：2026-09-28。所有权关系来自用户本次补充。项目事实来自 README.md；backend/app_center/brand_library/README.md；backend/app_center/README.md；backend/app_center/write_image_text_copy/application.yaml；backend/app_center/write_short_video_copy/application.yaml；backend/app_center/wechat_viral_article/application.yaml；backend/app_center/gzh_design/application.yaml；backend/app_center/html_cover_generator/application.yaml；backend/app_center/research_assistant/README.md。路径均相对当前仓库根目录。核对范围为本地项目文档和配置，并非完整运行验收；包含未提交工作区的当前状态。",
+  "restrictions": "实际可用能力取决于部署版本、应用同步、权限、模型配置、所需 Skill 和各应用依赖；不能仅凭仓库配置声称某个线上实例全部可用。品牌资料按用户与组织范围隔离，更新资料不会追溯改写历史创作消息。资料研究助手不支持首版范围外的扫描 PDF、加密 PDF、旧 DOC 或网页抓取。文案生成不等于自动发布到各平台；本资料不承诺四平台一键分发。价格、开源授权、试用政策、公开网址、服务支持和客户成果尚未提供，需补充后再用于营销。",
+  "prohibited_claims": "不得宣称永久免费、全部功能开箱即用、支持所有模型或文件、完全自主运营、保证内容准确、保证涨粉变现或已经服务特定数量客户。应用名称中的「爆款」不表示流量承诺。不得把文档与配置核对写成端到端实测通过，也不得把各应用可用描述为已验证的全自动跨应用流程。"
+}
