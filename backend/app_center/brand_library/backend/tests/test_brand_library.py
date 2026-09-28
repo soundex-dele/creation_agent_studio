@@ -123,8 +123,11 @@ def test_compose_inherits_without_mutating_default_or_explicit_answers(ctx):
     url = chat(ctx)
     response = compose(ctx, url, profile)
     assert response.status_code == 200, response.data
-    assert "语气：使用品牌资料：温暖克制" in response.data["prompt"]
-    assert "受众：使用品牌资料：创作者" in response.data["prompt"]
+    assert "语气：参见下方品牌资料「品牌语气 → 风格关键词」" in response.data["prompt"]
+    assert "受众：参见下方品牌资料「账号定位 → 目标受众」" in response.data["prompt"]
+    assert response.data["prompt"].count("温暖克制") == 1
+    assert response.data["prompt"].count("创作者") == 1
+    assert response.data["normalized_answers"]["tone"] == "使用品牌资料：温暖克制"
     assert "不应引用的视觉" not in response.data["prompt"]
     assert set(response.data["brand_reference"]["inherited_fields"]) == {"tone", "audience"}
     explicit = compose(ctx, url, profile, explicit_fields=["tone"], answers={"source": "新品", "tone": "normal"})
@@ -133,6 +136,22 @@ def test_compose_inherits_without_mutating_default_or_explicit_answers(ctx):
     assert plain.data["prompt"] == "主题：新品\n语气：普通\n受众：普通读者"
     assert "brand_reference" not in plain.data
     assert ApplicationDraft.objects.get(application__slug="brand-writer").content["guided_prompts"][0]["questions"][1]["type"] == "single_choice"
+
+
+def test_explicit_text_is_preserved_even_when_it_matches_brand_content(ctx):
+    profile = create(ctx, positioning={"audience": "专注实践的创作者"}, voice={"keywords": "温暖克制"})
+    url = chat(ctx)
+    response = compose(ctx, url, profile, explicit_fields=["audience"],
+                       answers={"source": "新品", "audience": "专注实践的创作者"})
+    assert response.status_code == 200, response.data
+    assert "受众：专注实践的创作者" in response.data["prompt"]
+    assert response.data["prompt"].count("专注实践的创作者") == 2
+    assert response.data["brand_reference"]["inherited_fields"] == ["tone"]
+    cleared = compose(ctx, url, profile, explicit_fields=["audience"],
+                      answers={"source": "新品", "audience": ""})
+    assert cleared.status_code == 200, cleared.data
+    assert cleared.data["normalized_answers"]["audience"] == ""
+    assert "受众：参见" not in cleared.data["prompt"]
 
 
 def test_selected_items_only_and_invalid_references(ctx):
@@ -177,11 +196,22 @@ def test_real_application_composition(ctx, settings, package, modules):
     prompt = definition["guided_prompts"][0]
     assert set(config["fields"]) <= {q["key"] for q in prompt["questions"]}
     answers = {q["key"]: q.get("default_value") or (q["options"][0]["value"] if q.get("options") else "测试素材") for q in prompt["questions"]}
-    profile = create(ctx, positioning={"audience": "创作者"}, voice={"keywords": "自然"}, visual={"primary_color": "#123456", "style": "简洁", "body_font": "宋体"})
+    profile = create(ctx, positioning={"audience": "品牌受众唯一内容", "topics": "品牌领域唯一内容"}, voice={"keywords": "品牌语气唯一内容"}, visual={"primary_color": "#123456", "style": "品牌画面唯一内容", "body_font": "宋体"})
     url = chat(ctx, definition)
     result = compose(ctx, url, profile, modules, prompt_id=prompt["key"], answers=answers)
     assert result.status_code == 200, result.data
     assert "本次品牌资料：测试品牌" in result.data["prompt"]
+    for module, values in {
+        "positioning": ["品牌受众唯一内容", "品牌领域唯一内容"],
+        "voice": ["品牌语气唯一内容"],
+        "visual": ["#123456", "品牌画面唯一内容", "宋体"],
+    }.items():
+        for value in values:
+            assert result.data["prompt"].count(value) == (1 if module in modules else 0)
+    if package == "wechat_viral_topics":
+        assert "账号定位：参见下方品牌资料「账号定位」" in result.data["prompt"]
+        assert "目标读者：参见下方品牌资料「账号定位 → 目标受众」" in result.data["prompt"]
+        assert "核心领域或选题方向：参见下方品牌资料「账号定位 → 内容领域」" in result.data["prompt"]
 
 
 @pytest.mark.django_db
