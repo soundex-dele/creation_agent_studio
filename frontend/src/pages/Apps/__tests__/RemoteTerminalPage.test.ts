@@ -55,6 +55,42 @@ function button(text: string) {
   return Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(item => item.textContent?.replace(/\s/g, '') === text)!;
 }
 
+const existingSession = { id: 'session', shell: 'powershell', exited: true, created_at: '', exit_code: 0 };
+
+it.each([
+  {}, undefined, null, '', '<html>Unexpected response</html>',
+  { sessions: null }, { sessions: {} }, { sessions: [null] }, { sessions: [{}] },
+])('shows a recoverable error for an invalid session response: %j', async response => {
+  vi.mocked(api.get).mockImplementation(async path => path.endsWith('/context/') ? { terminal: capability } : response);
+  await render();
+  expect(container.textContent).toContain('终端会话列表响应无效');
+  expect(button('刷新').disabled).toBe(false);
+
+  vi.mocked(api.get).mockImplementation(async path => path.endsWith('/context/') ? { terminal: capability } : { sessions: [] });
+  await act(async () => button('刷新').click());
+  expect(container.textContent).not.toContain('终端会话列表响应无效');
+  expect(container.textContent).toContain('新建终端或选择已有会话');
+});
+
+it('preserves existing sessions during malformed polling and recovers on the next poll', async () => {
+  let response: unknown = { sessions: [existingSession] };
+  vi.mocked(api.get).mockImplementation(async path => path.endsWith('/context/') ? { terminal: capability } : response);
+  await openSession();
+  expect(container.textContent).toContain('此终端进程已退出');
+
+  response = {};
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(container.textContent).toContain('终端会话列表响应无效');
+  expect(container.textContent).toContain('此终端进程已退出');
+  expect(xterm.dispose).not.toHaveBeenCalled();
+
+  response = { sessions: [{ ...existingSession, exited: false, exit_code: null }] };
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(container.textContent).not.toContain('终端会话列表响应无效');
+  expect(container.textContent).not.toContain('此终端进程已退出');
+  expect(xterm.dispose).not.toHaveBeenCalled();
+});
+
 it('explains local opt-in and refuses to create before permission is enabled', async () => {
   capability = { enabled: false, supported: true };
   await render();

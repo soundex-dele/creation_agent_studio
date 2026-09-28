@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { api } from '@/services/api';
 import { remotePath } from '@/services/chatConnection';
-import { terminalError, terminalKey, terminalPath, terminalPost, terminalStream, TerminalInput,
+import { loadTerminalSessions, terminalError, terminalKey, terminalPost, terminalStream, TerminalInput,
   type TerminalCapability, type TerminalSession } from '@/services/remoteTerminal';
 import type { Terminal } from '@xterm/xterm';
 import './RemoteTerminalPage.css';
@@ -167,6 +167,7 @@ export default function RemoteTerminalPage({ deviceId, online }: { deviceId: str
   const [sessions, setSessions] = useState<TerminalSession[]>([]);
   const [capability, setCapability] = useState<TerminalCapability>();
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -199,10 +200,11 @@ export default function RemoteTerminalPage({ deviceId, online }: { deviceId: str
         if (cancelled) return;
         setCapability(context.terminal); setLoaded(true);
         if (context.terminal?.enabled && context.terminal.supported) {
-          const result = await api.get<{ sessions: TerminalSession[] }>(terminalPath(deviceId));
-          if (!cancelled) setSessions(result.sessions);
+          const sessions = await loadTerminalSessions(deviceId);
+          if (!cancelled) setSessions(sessions);
         }
-      } catch (failure) { if (!cancelled) setError(terminalError(failure)); }
+        if (!cancelled) setLoadError('');
+      } catch (failure) { if (!cancelled) setLoadError(terminalError(failure)); }
       finally { checking = false; }
     };
     void load(); const timer = setInterval(() => void load(), 5000);
@@ -237,6 +239,7 @@ export default function RemoteTerminalPage({ deviceId, online }: { deviceId: str
       }}><Button danger disabled={!ready || !sessionId}>关闭终端</Button></Popconfirm>
       <Button disabled={!online} onClick={() => setRefresh(value => value + 1)}>刷新</Button>
     </div>
+    {loadError && <Alert type="error" showIcon message={loadError} closable onClose={() => setLoadError('')} />}
     {error && <Alert type="error" showIcon message={error} closable onClose={() => setError('')} />}
     {loaded && !capability && <Alert type="info" showIcon message="这台电脑尚不支持远程终端，请升级电脑端。" />}
     {capability && !capability.supported && <Alert type="warning" showIcon message="电脑端的终端组件不可用，请安装终端依赖并重启本机服务。" />}

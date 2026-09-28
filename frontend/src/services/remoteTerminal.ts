@@ -18,6 +18,19 @@ export const terminalRoot = '/remote-access/terminals/';
 export const terminalKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 export const terminalPath = (deviceId: string, suffix = '') => remotePath({ deviceId }, terminalRoot + suffix);
 
+export async function loadTerminalSessions(deviceId: string): Promise<TerminalSession[]> {
+  const result = await api.get<{ sessions?: unknown } | null>(terminalPath(deviceId));
+  const sessions = result?.sessions;
+  if (!Array.isArray(sessions) || !sessions.every(session => session !== null && typeof session === 'object'
+    && typeof session.id === 'string' && session.id.length > 0
+    && typeof session.shell === 'string' && typeof session.exited === 'boolean'
+    && typeof session.created_at === 'string'
+    && (session.exit_code === null || typeof session.exit_code === 'number'))) {
+    throw new Error('终端会话列表响应无效，请刷新重试；若持续出现，请升级并重启电脑端服务。');
+  }
+  return sessions;
+}
+
 export function terminalError(error: unknown): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   return typeof detail === 'string' ? detail : error instanceof Error ? error.message : '终端连接失败。';
