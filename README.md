@@ -161,6 +161,21 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 ### 前端远程部署
 
+两个远程部署脚本可以共用免密登录配置。在 Windows 仓库根目录只需执行一次：
+
+```powershell
+.\backend\venv\Scripts\python.exe deploy_frontend.py --setup-ssh
+# 也可以使用 push_code.py --setup-ssh，二选一即可
+```
+
+首次按提示核对服务器指纹、输入服务器密码。成功后，正常执行任一脚本都会
+自动使用 `%USERPROFILE%\.ssh\creation_agent_studio_ed25519` 私钥，无需再次输入服务器密码。
+配置过程只安装公钥并验证登录，不构建、不上传代码；重复执行不会覆盖私钥或重复添加公钥。
+默认生成无口令的专用私钥，保存在本机用户目录，请妥善保管，不要提交到仓库或分享。
+服务器密码不会被保存。已有密钥可通过 `--setup-ssh -i <私钥路径>` 安装，后续仍需传入
+`-i`；带口令的私钥应先加载到 `ssh-agent`。自定义 SSH 端口在配置和部署时均传入 `--port`。
+`--setup-ssh --dry-run` 只预览，不生成密钥、不连接服务器。
+
 在仓库根目录执行（需要 Python 3.8+、Node.js/npm、OpenSSH，并已安装前端依赖）：
 
 ```bash
@@ -171,7 +186,7 @@ python3 deploy_frontend.py -i ~/.ssh/id_ed25519 --port 22
 python3 deploy_frontend.py --dry-run
 ```
 
-Windows 可将 `python3` 替换为 `python`。脚本先在 `frontend` 中运行
+Windows 将 `python3` 替换为 `.\backend\venv\Scripts\python.exe`。脚本先在 `frontend` 中运行
 `npm run build`，成功后用 Python 将 `dist` 压缩为 `.tar.gz`，通过 SCP 上传，
 再通过 SSH 调用服务器的 `tar` 解压到
 `root@47.120.21.129:/root/creation_agent_studio/frontend/dist`（服务器需要安装 `tar`）。

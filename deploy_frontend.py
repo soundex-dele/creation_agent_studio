@@ -12,6 +12,8 @@ import tarfile
 import tempfile
 from uuid import uuid4
 
+from deploy_ssh import setup_ssh, ssh_options
+
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 REMOTE = "root@47.120.21.129"
@@ -28,10 +30,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=22, help="SSH port (default: 22)")
     parser.add_argument("-i", "--identity", type=Path, help="SSH private key path")
+    parser.add_argument("--setup-ssh", action="store_true", help="Set up shared SSH key login once, without deploying")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without building or uploading")
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
+
+    if args.setup_ssh:
+        ssh = shutil.which("ssh")
+        if not ssh:
+            raise RuntimeError("找不到 ssh，请先安装 OpenSSH 并加入 PATH。")
+        setup_ssh(ssh, REMOTE, args.port, args.identity, dry_run=args.dry_run)
+        return
 
     programs = {}
     for name in ("npm", "ssh", "scp"):
@@ -41,12 +51,7 @@ def main(argv=None):
     if not (FRONTEND / "package.json").is_file():
         raise RuntimeError(f"找不到前端配置：{FRONTEND / 'package.json'}")
 
-    options = ["-o", "ConnectTimeout=15"]
-    if args.identity:
-        identity = args.identity.expanduser().resolve()
-        if not identity.is_file():
-            raise RuntimeError(f"找不到 SSH 私钥：{identity}")
-        options += ["-i", str(identity)]
+    options = ssh_options(args.identity)
 
     print(f"构建目录：{FRONTEND}", flush=True)
     run([programs["npm"], "run", "build"], cwd=FRONTEND, dry_run=args.dry_run)

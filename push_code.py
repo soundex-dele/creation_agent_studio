@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import sys
 
+from deploy_ssh import setup_ssh, ssh_options
+
 
 ROOT = Path(__file__).resolve().parent
 REMOTE = "root@47.120.21.129"
@@ -50,10 +52,18 @@ def main(argv=None):
     parser.add_argument("--branch", default="main", help="Server checkout branch (default: main)")
     parser.add_argument("--port", type=int, default=22, help="SSH port (default: 22)")
     parser.add_argument("-i", "--identity", type=Path, help="SSH private key path")
+    parser.add_argument("--setup-ssh", action="store_true", help="Set up shared SSH key login once, without pushing")
     parser.add_argument("--dry-run", action="store_true", help="Preview without connecting or pushing")
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
+
+    if args.setup_ssh:
+        ssh = shutil.which("ssh")
+        if not ssh:
+            raise RuntimeError("找不到 ssh，请先安装 OpenSSH 并加入 PATH。")
+        setup_ssh(ssh, REMOTE, args.port, args.identity, dry_run=args.dry_run)
+        return
 
     git = shutil.which("git")
     ssh = shutil.which("ssh")
@@ -72,12 +82,7 @@ def main(argv=None):
     if subprocess.check_output([git, "status", "--porcelain"], cwd=ROOT):
         print("提示：存在未提交修改，本次仅推送已提交代码，请先提交需要部署的修改。", flush=True)
 
-    ssh_command = [ssh, "-o", "ConnectTimeout=15", "-p", str(args.port)]
-    if args.identity:
-        identity = args.identity.expanduser().resolve()
-        if not identity.is_file():
-            raise RuntimeError(f"找不到 SSH 私钥：{identity}")
-        ssh_command += ["-i", str(identity)]
+    ssh_command = [ssh, *ssh_options(args.identity), "-p", str(args.port)]
     environment = os.environ.copy()
     # Git parses GIT_SSH_COMMAND using a shell, including on Git for Windows.
     environment["GIT_SSH_COMMAND"] = shlex.join(ssh_command)

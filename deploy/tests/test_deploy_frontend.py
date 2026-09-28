@@ -41,7 +41,12 @@ class DeployFrontendTests(unittest.TestCase):
 
         def execute(command, **kwargs):
             if command[0] == "ssh":
-                return REAL_RUN(["sh", "-c", command[-1]], check=True)
+                script = command[-1]
+                if self.frontend.drive:
+                    # Git Bash's tar treats a Windows drive colon as a remote host.
+                    posix_root = "/" + self.frontend.drive[0].lower() + self.frontend.as_posix()[2:]
+                    script = script.replace(str(self.frontend), posix_root).replace("\\", "/")
+                return REAL_RUN(["sh", "-c", script], check=True)
             if command[0] == "scp":
                 archive = Path(command[-2])
                 self.assertEqual(archive.read_bytes()[:2], b"\x1f\x8b")
