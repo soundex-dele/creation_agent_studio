@@ -1,12 +1,15 @@
+import { createUuid } from "@/lib/uuid";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Button,
   Checkbox,
+  ConfigProvider,
   Empty,
   Input,
   InputNumber,
   Modal,
+  message,
   Popconfirm,
   Select,
   Spin,
@@ -15,11 +18,13 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined,
-  BookOutlined,
-  ClockCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
+import {
+  ArrowRight, Basket, BookOpen, ChefHat, Check, Heart,
+  Leaf, MoonStars, Sparkle, Sun, SunHorizon, Timer, Users,
+} from "@phosphor-icons/react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useOrganizationStore } from "@/stores/useOrganizationStore";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -63,6 +68,7 @@ const expiryLabels = {
   soon: "即将到期",
   expired: "已过期",
 };
+const mealIcons = { breakfast: SunHorizon, lunch: Sun, dinner: MoonStars };
 type Editor =
   | { kind: "recipe"; item?: Recipe; missing?: string[] }
   | { kind: "inventory"; item?: Inventory };
@@ -88,6 +94,8 @@ export function KitchenWorkspace({
     refresh,
   } = useKitchenState(base);
   const [tab, setTab] = useState("home");
+  const [messageApi, messageHolder] = message.useMessage();
+  const [selectingRecipeId, setSelectingRecipeId] = useState<string>();
   const [myTab, setMyTab] = useState("inventory");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("全部");
@@ -139,8 +147,11 @@ export function KitchenWorkspace({
         ["soon", "expired"].includes(expiryStatus(i.expireDate)),
     ) ?? [];
   const prefs = state?.preferences ?? defaultPreferences;
-  const toggleRecipe = (id: string) =>
-    void commit((s) =>
+  const toggleRecipe = async (id: string) => {
+    if (busy || cooking) return;
+    const removing = state?.selectedRecipeIds.includes(id);
+    setSelectingRecipeId(id);
+    const saved = await commit((s) =>
       s.cooking
         ? s
         : {
@@ -151,6 +162,15 @@ export function KitchenWorkspace({
             checkedShoppingItems: [],
           },
     );
+    setSelectingRecipeId(undefined);
+    void messageApi.open({
+      key: "kitchen-recipe-selection",
+      type: saved ? "success" : "error",
+      content: saved
+        ? removing ? "已移出待制作清单" : "已加入待制作，可在底部「菜单」查看"
+        : "保存未成功，请查看页面顶部提示并重试。",
+    });
+  };
   const begin = async () => {
     if (state?.cooking || (await commit((s) => startCooking(s))))
       setCookingOpen(true);
@@ -159,13 +179,16 @@ export function KitchenWorkspace({
     recipes.length ? (
       <div className="kitchen-recipes">
         {recipes.map((recipe) => (
-          <article className="kitchen-card" key={recipe.id}>
+          <article className="kitchen-card kitchen-recipe-card" key={recipe.id}>
             <div className="kitchen-card-top">
               <span className="kitchen-recipe-icon">
-                <BookOutlined />
+                <BookOpen size={26} aria-hidden="true" />
               </span>
               <Tag>{recipe.category}</Tag>
               <Button
+                className="kitchen-favorite"
+                type="text"
+                icon={<Heart size={20} weight={recipe.favorite ? "fill" : "regular"} aria-hidden="true" />}
                 aria-label={`${recipe.name}${recipe.favorite ? "取消收藏" : "收藏"}`}
                 aria-pressed={!!recipe.favorite}
                 disabled={busy}
@@ -177,9 +200,7 @@ export function KitchenWorkspace({
                     ),
                   }))
                 }
-              >
-                {recipe.favorite ? "已收藏" : "收藏"}
-              </Button>
+              />
             </div>
             <button
               className="kitchen-recipe-title"
@@ -202,10 +223,10 @@ export function KitchenWorkspace({
             </div>
             <div className="kitchen-meta">
               <span>
-                <ClockCircleOutlined /> {recipe.durationMinutes} 分钟
+                <Timer size={16} aria-hidden="true" /> {recipe.durationMinutes} 分钟
               </span>
               <span>{recipe.difficulty}</span>
-              <span>{recipe.servings} 人份</span>
+              <span><Users size={16} aria-hidden="true" />{recipe.servings} 人份</span>
             </div>
             {!!conflicts(recipe, prefs).length && (
               <p className="kitchen-muted">
@@ -214,6 +235,8 @@ export function KitchenWorkspace({
             )}
             <Button
               block
+              loading={selectingRecipeId === recipe.id}
+              icon={state?.selectedRecipeIds.includes(recipe.id) ? <Check size={18} aria-hidden="true" /> : <PlusOutlined />}
               disabled={busy || !!cooking}
               type={
                 state?.selectedRecipeIds.includes(recipe.id)
@@ -234,21 +257,27 @@ export function KitchenWorkspace({
     );
   const draftKey = `kitchen-draft:${userId ?? "current"}:${base}:${editor?.item?.id ?? "new"}`;
   return (
+    <ConfigProvider theme={{ token: { colorPrimary: "#32694e", borderRadius: 12, controlHeight: 44 } }}>
+    <div className="kitchen-workspace">
+    {messageHolder}
     <main className="kitchen-page app-scroll-page" ref={pageRoot}>
       {showHeader && (
         <header className="kitchen-header">
-          <div>
+          <div className="kitchen-brand">
+            <span className="kitchen-brand-icon"><ChefHat size={26} aria-hidden="true" /></span>
+            <div>
+              <h1>厨房助手</h1>
+              <p>把每一顿家常饭，安排得刚刚好。</p>
+            </div>
+          </div>
             <Button
               type="text"
+              aria-label="返回应用中心"
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate("/apps")}
             >
-              应用中心
+              <span className="kitchen-back-label">应用中心</span>
             </Button>
-            <h1>厨房助手</h1>
-            <p>把每一顿家常饭，安排得刚刚好。</p>
-          </div>
-          <span className="kitchen-eyebrow">YOUR EVERYDAY KITCHEN</span>
         </header>
       )}
       {error && (
@@ -257,7 +286,7 @@ export function KitchenWorkspace({
           showIcon
           message={error}
           description={
-            pending ? "操作已保留，可重试或放弃后刷新。" : "加载失败，请重试。"
+            pending ? "操作已保留，可重试或放弃后刷新。" : state ? "本次操作未保存，请重试。" : "加载失败，请重试。"
           }
           action={
             <div className="kitchen-actions">
@@ -284,7 +313,8 @@ export function KitchenWorkspace({
       ) : (
         <>
           <div className="kitchen-status">
-            <span>
+            <span role="status">
+              <Leaf size={14} aria-hidden="true" />
               {error ? "操作待处理" : busy ? "正在同步…" : "数据私有 · 已保存"}{" "}
               · {state.recipes.length} 道菜谱
             </span>
@@ -364,53 +394,52 @@ export function KitchenWorkspace({
                       commit={commit}
                     />
                   )}
-                  <Tabs
-                    activeKey={tab}
-                    onChange={setTab}
-                    items={[
-                      { key: "home", label: "今日" },
-                      { key: "recipes", label: "菜谱" },
-                      {
-                        key: "plan",
-                        label: `菜单${selected.length ? ` · ${selected.length}` : ""}`,
-                      },
-                      { key: "shopping", label: "采购" },
-                      { key: "kitchen", label: "我的厨房" },
-                    ]}
-                  />
+
                   {tab === "home" && (
                     <>
                       <section className="kitchen-hero">
-                        <div>
+                        <div className="kitchen-hero-copy">
                           <span className="kitchen-eyebrow">
-                            A LITTLE PLANNING, A LOVELY MEAL
+                            <Leaf size={15} aria-hidden="true" /> 好好吃饭 · 好好生活
                           </span>
                           <h2>今天，吃点什么？</h2>
-                          <p>安排三餐，买好食材，慢慢做，好好吃。</p>
+                          <p>从一餐一饭，找回生活的小确幸。</p>
+                          <div className="kitchen-hero-summary">
+                            <span><ChefHat size={16} aria-hidden="true" />已选 {selected.length} 道菜</span>
+                            <span><Users size={16} aria-hidden="true" />{state.servings} 人用餐</span>
+                          </div>
                           <div className="kitchen-actions">
                             <Button
                               type="primary"
                               size="large"
+                              icon={<ArrowRight size={18} aria-hidden="true" />}
                               onClick={() => setTab("plan")}
                             >
                               安排今天的饭
                             </Button>
-                            <Button onClick={() => setAI({ kind: "menu" })}>
+                            <Button icon={<Sparkle size={18} aria-hidden="true" />} onClick={() => setAI({ kind: "menu" })}>
                               让 AI 帮忙安排
                             </Button>
                           </div>
                         </div>
-                        <div className="kitchen-hero-note">
-                          <span>这一餐</span>
-                          <strong>
-                            {String(selected.length).padStart(2, "0")}
-                          </strong>
-                          <span>道菜 · {state.servings} 人</span>
-                        </div>
+                        <svg className="kitchen-hero-art" viewBox="0 0 240 240" fill="none" aria-hidden="true">
+                          <circle cx="120" cy="120" r="112" fill="#e1e8d7" />
+                          <circle cx="120" cy="116" r="91" fill="#fffdf5" />
+                          <circle cx="120" cy="116" r="73" stroke="#e5e7d6" strokeWidth="2" />
+                          <path d="M69 102c-19-29 11-54 31-29 10-33 44-21 34 7 35-14 45 19 17 33 30 11 12 40-12 29-1 29-35 31-39 3-26 15-48-13-24-29" fill="#66894d" />
+                          <path d="m83 89 41 48m-13-59 5 49m26-33-26 33" stroke="#d4dfad" strokeWidth="3" strokeLinecap="round" />
+                          <path d="M120 134c-9-17 9-38 30-27 19-4 34 20 19 34-2 20-35 26-49-7Z" fill="#f4d992" />
+                          <circle cx="145" cy="128" r="14" fill="#dc9738" />
+                          <path d="M74 144a18 18 0 0 1 33 14Z" fill="#c76a49" />
+                          <path d="M75 145a18 18 0 0 0 32 13" stroke="#e89570" strokeWidth="5" />
+                          <path d="m170 64 8-15m-4 20 17-7M58 170l-8 14m13-9-1 15" stroke="#66894d" strokeWidth="4" strokeLinecap="round" />
+                          <circle cx="173" cy="174" r="5" fill="#c76a49" />
+                          <circle cx="65" cy="67" r="4" fill="#dc9738" />
+                        </svg>
                       </section>
                       <div className="kitchen-section-heading">
-                        <h2>今日三餐</h2>
-                        <Button onClick={() => setTab("shopping")}>
+                        <div><span className="kitchen-section-kicker">DAILY MENU</span><h2>今日三餐</h2></div>
+                        <Button type="text" icon={<Basket size={18} aria-hidden="true" />} onClick={() => setTab("shopping")}>
                           本餐采购缺口 ·{" "}
                           {
                             purchaseList(
@@ -422,7 +451,7 @@ export function KitchenWorkspace({
                           项
                         </Button>
                       </div>
-                      <div className="kitchen-recipes">
+                      <div className="kitchen-daily-meals">
                         {meals.map((meal) => {
                           const day = state.weeklyMenu.find(
                             (d) => d.date === localDate(),
@@ -431,8 +460,11 @@ export function KitchenWorkspace({
                             ? mealSettings(day, meal, state.servings)
                             : undefined;
                           const ids = day?.[meal] ?? [];
+                          const MealIcon = mealIcons[meal];
                           return (
-                            <section className="kitchen-card" key={meal}>
+                            <section className={`kitchen-card kitchen-daily-meal kitchen-daily-meal--${meal}`} key={meal}>
+                              <span className="kitchen-meal-icon"><MealIcon size={23} aria-hidden="true" /></span>
+                              <div className="kitchen-meal-copy">
                               <h3>{mealLabels[meal]}</h3>
                               <p>
                                 {cfg?.skipped
@@ -446,23 +478,26 @@ export function KitchenWorkspace({
                                       .join("、") || "还没有安排"}
                               </p>
                               {cfg && <p>{cfg.servings} 人</p>}
+                              </div>
                               <Button
+                                type="text"
+                                aria-label={ids.length ? `选用${mealLabels[meal]}` : `安排${mealLabels[meal]}`}
                                 disabled={
                                   busy ||
                                   !!cooking ||
-                                  !ids.length ||
                                   cfg?.skipped
                                 }
-                                onClick={() =>
+                                onClick={() => {
+                                  if (!ids.length) { setTab("plan"); return; }
                                   void commit((s) => ({
                                     ...s,
                                     selectedRecipeIds: ids,
                                     servings: cfg!.servings,
                                     checkedShoppingItems: [],
-                                  })).then((ok) => ok && setTab("plan"))
-                                }
+                                  })).then((ok) => ok && setTab("plan"));
+                                }}
                               >
-                                选用{mealLabels[meal]}
+                                {ids.length ? "选用" : "去安排"}<ArrowRight size={16} aria-hidden="true" />
                               </Button>
                             </section>
                           );
@@ -488,6 +523,7 @@ export function KitchenWorkspace({
                       )}
                       <div className="kitchen-section-heading">
                         <div>
+                          <span className="kitchen-section-kicker">COOK SOMETHING GOOD</span>
                           <h2>为这一餐找点灵感</h2>
                           <p>根据饮食偏好、可用库存和近期下厨记录推荐。</p>
                         </div>
@@ -495,7 +531,7 @@ export function KitchenWorkspace({
                           添加精选菜谱
                         </Button>
                       </div>
-                      <Select
+                      <div className="kitchen-recommend-filter"><Select
                         aria-label="推荐用时"
                         value={maxMinutes}
                         onChange={setMaxMinutes}
@@ -504,7 +540,7 @@ export function KitchenWorkspace({
                           { value: 15, label: "单道菜 15 分钟内" },
                           { value: 30, label: "单道菜 30 分钟内" },
                         ]}
-                      />
+                      /></div>
                       {recipeCards(
                         recommend(
                           state.recipes,
@@ -542,7 +578,10 @@ export function KitchenWorkspace({
                   )}
                   {tab === "recipes" && (
                     <>
-                      <div className="kitchen-toolbar">
+                      <div className="kitchen-section-heading">
+                        <div><span className="kitchen-section-kicker">MY RECIPE BOOK</span><h2>把喜欢的味道，留下来</h2><p>{state.recipes.length} 道家常菜，下一顿的灵感都在这里。</p></div>
+                      </div>
+                      <div className="kitchen-toolbar kitchen-recipe-search">
                         <Input.Search
                           aria-label="搜索菜谱"
                           placeholder="菜名、食材、标签"
@@ -559,7 +598,10 @@ export function KitchenWorkspace({
                             ...new Set(state.recipes.map((r) => r.category)),
                           ].map((value) => ({ value, label: value }))}
                         />
+                      </div>
+                      <div className="kitchen-actions kitchen-recipe-actions">
                         <Button
+                          type="primary"
                           icon={<PlusOutlined />}
                           disabled={busy || !!cooking}
                           onClick={() => setEditor({ kind: "recipe" })}
@@ -579,6 +621,8 @@ export function KitchenWorkspace({
                           文字导入
                         </Button>
                       </div>
+                      <details className="kitchen-filters">
+                        <summary>筛选菜谱 · 收藏、餐次与用时</summary>
                       <div className="kitchen-toolbar">
                         <Checkbox
                           checked={favorites}
@@ -632,6 +676,7 @@ export function KitchenWorkspace({
                           ]}
                         />
                       </div>
+                      </details>
                       {recipeCards(
                         state.recipes.filter(
                           (r) =>
@@ -906,6 +951,7 @@ export function KitchenWorkspace({
                               ]}
                             />
                             <Select
+                              aria-label="库存分类"
                               value={stockCategory}
                               onChange={setStockCategory}
                               options={[
@@ -919,6 +965,7 @@ export function KitchenWorkspace({
                               }))}
                             />
                             <Select
+                              aria-label="存放位置"
                               value={location}
                               onChange={setLocation}
                               options={["全部", "冷藏", "冷冻", "常温"].map(
@@ -1043,6 +1090,7 @@ export function KitchenWorkspace({
       )}
       {recipeDetail && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title={recipeDetail.name}
           width={720}
@@ -1091,7 +1139,7 @@ export function KitchenWorkspace({
                 disabled={busy || !!cooking}
                 onClick={() => {
                   const copy = structuredClone(recipeDetail);
-                  copy.id = crypto.randomUUID();
+                  copy.id = createUuid();
                   delete copy.catalogId;
                   copy.name += "（副本）";
                   setEditor({ kind: "recipe", item: copy });
@@ -1109,6 +1157,7 @@ export function KitchenWorkspace({
                 问 AI
               </Button>
               <Button
+                loading={selectingRecipeId === recipeDetail.id}
                 disabled={busy || !!cooking}
                 onClick={() => toggleRecipe(recipeDetail.id)}
               >
@@ -1180,6 +1229,7 @@ export function KitchenWorkspace({
       )}
       {finishOpen && cooking && state && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title="一顿饭做好了"
           onCancel={() => setFinishOpen(false)}
@@ -1231,6 +1281,27 @@ export function KitchenWorkspace({
         </Modal>
       )}
     </main>
+    {state && editor?.kind !== "recipe" && !(cookingOpen && cooking) && (
+      <nav className="kitchen-bottom-navigation" aria-label="厨房助手导航">
+        <Tabs
+          className="kitchen-primary-tabs"
+          activeKey={tab}
+          onChange={setTab}
+          items={[
+            { key: "home", label: <span><Sun size={21} aria-hidden="true" />今日</span> },
+            { key: "recipes", label: <span><BookOpen size={21} aria-hidden="true" />菜谱</span> },
+            {
+              key: "plan",
+              label: <span><ChefHat size={21} aria-hidden="true" />菜单{selected.length > 0 && <small>{selected.length}</small>}</span>,
+            },
+            { key: "shopping", label: <span><Basket size={21} aria-hidden="true" />采购</span> },
+            { key: "kitchen", label: <span><Leaf size={21} aria-hidden="true" />我的厨房</span> },
+          ]}
+        />
+      </nav>
+    )}
+    </div>
+    </ConfigProvider>
   );
 }
 export default function KitchenAssistantPage() {

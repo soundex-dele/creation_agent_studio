@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import { useState } from "react";
 import {
   Alert,
@@ -232,7 +233,7 @@ export function ShoppingPanel({
                         ...extra,
                         name: extra.name.trim(),
                         unit: extra.unit.trim(),
-                        id: crypto.randomUUID(),
+                        id: createUuid(),
                       },
                     ],
                   },
@@ -252,7 +253,7 @@ export function ShoppingPanel({
             setError("");
             setPurchases(
               selected.map((i) => ({
-                id: crypto.randomUUID(),
+                id: createUuid(),
                 name: i.name,
                 unit: i.unit,
                 amount: i.missing,
@@ -266,6 +267,7 @@ export function ShoppingPanel({
       )}
       {purchases && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title="确认采购入库"
           okText="确认入库"

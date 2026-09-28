@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import { useState } from "react";
 import { Button, Checkbox, Popconfirm, Progress, Select, Tag } from "antd";
 import type { KitchenState } from "@/services/kitchenAssistant";
@@ -129,7 +130,7 @@ export function CookingView({
       <Button
         disabled={busy || !step.durationMinutes || timerExists}
         onClick={() => {
-          const id = crypto.randomUUID();
+          const id = createUuid();
           const deadline = Date.now() + step.durationMinutes * 60000;
           void commit((s) => ({
             ...s,

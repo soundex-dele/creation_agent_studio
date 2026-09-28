@@ -35,6 +35,7 @@ export function CatalogPicker({
     state.recipes.some((v) => v.catalogId === r.catalogId || v.id === r.id);
   return (
     <Modal
+      rootClassName="kitchen-modal"
       open
       title="添加精选家常菜 · 30 道"
       width={800}

@@ -300,6 +300,7 @@ export function WeekPlanner({
       )}
       {preview && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title="确认菜单安排"
           width={1000}

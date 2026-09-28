@@ -188,6 +188,7 @@ export function RecordHistory({
       )}
       {detail && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title="当时的菜谱"
           footer={null}

@@ -90,6 +90,43 @@ describe('mobile page scrolling', () => {
     expect(mobileRule).toMatch(/overflow-x:\s*auto/);
   });
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('reserves kitchen bottom navigation outside the scroll pane at %ipx', (width) => {
+    const styles = readSource('../../pages/Apps/KitchenAssistantPage.css');
+    const workspace = declarationsAt([styles], ['.kitchen-workspace'], width);
+    const page = declarationsAt([globalStyles, styles], ['.app-scroll-page', '.kitchen-page'], width);
+    const navigation = declarationsAt([styles], ['.kitchen-bottom-navigation'], width);
+    // Include the nav ancestor so this outranks Ant Design's three-class
+    // selector, even when its runtime stylesheet is injected after page CSS.
+    const tabs = declarationsAt([styles], ['.kitchen-bottom-navigation .kitchen-primary-tabs > .ant-tabs-nav .ant-tabs-nav-list'], width);
+
+    expect(workspace.display).toBe('flex');
+    expect(workspace['flex-direction']).toBe('column');
+    expect(workspace.height).toBe('100%');
+    expect(workspace['min-height']).toBe('0');
+    expect(workspace.overflow).toBe('hidden');
+    expect(page.flex).toBe('1');
+    expect(page['min-height']).toBe('0');
+    expect(page['overflow-y']).toBe('auto');
+    expect(navigation['flex-shrink']).toBe('0');
+    expect(navigation.position).toBeUndefined();
+    expect(navigation.padding).toContain('env(safe-area-inset-bottom)');
+    expect(tabs['grid-template-columns']).toBe('repeat(5, minmax(0, 1fr))');
+    expect(tabs.display).toBe('grid');
+    expect(tabs.gap).toBe('8px');
+  });
+
+  it.each([320, 375, 390, 767])('separates mobile kitchen actions from search and gives them room at %ipx', width => {
+    const styles = readSource('../../pages/Apps/KitchenAssistantPage.css');
+    const actions = declarationsAt([styles], ['.kitchen-actions', '.kitchen-recipe-actions'], width);
+    const primary = declarationsAt([styles], ['.kitchen-recipe-actions > .ant-btn-primary'], width);
+    const hero = declarationsAt([styles], ['.kitchen-hero .kitchen-actions'], width);
+    expect(actions.display).toBe('grid');
+    expect(actions.gap).toBe('12px');
+    expect(actions['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');
+    expect(primary['grid-column']).toBe('1 / -1');
+    expect(hero['grid-template-columns']).toBe('minmax(0, 1fr)');
+  });
+
   it('keeps full-bleed capability hubs vertically scrollable', () => {
     const styles = readSource('../../pages/Hubs/CapabilityHubPage.css');
     const rootRule = styles.match(/\.capability-hub\s*\{([^}]*)\}/)?.[1] ?? '';

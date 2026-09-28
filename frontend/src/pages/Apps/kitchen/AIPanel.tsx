@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import { useEffect, useState } from "react";
 import { Alert, Button, Input, Modal, Select, Tag } from "antd";
 import type {
@@ -105,7 +106,7 @@ export function AIPanel({
             kind,
             instruction,
             revision,
-            requestKey: crypto.randomUUID(),
+            requestKey: createUuid(),
             recipeId,
             parentId: parent,
             startDate: kind === "menu" ? start : undefined,
@@ -127,6 +128,7 @@ export function AIPanel({
   };
   return (
     <Modal
+      rootClassName="kitchen-modal"
       open
       title="AI 厨房助手"
       width={900}
@@ -294,6 +296,7 @@ export function AIPanel({
       ))}
       {preview && (
         <Modal
+          rootClassName="kitchen-modal"
           open
           title="AI 菜单预览"
           width={800}

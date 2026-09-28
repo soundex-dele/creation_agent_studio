@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import type {
   CookingRecord,
   Inventory,
@@ -440,7 +441,7 @@ export function finishCooking(
       : state.inventory,
     records: [
       {
-        id: crypto.randomUUID(),
+        id: createUuid(),
         recipeNames: recipes.map((r) => r.name),
         recipeSnapshots: structuredClone(recipes),
         startedAt: state.cooking.startedAt,

@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import { useEffect, useState } from "react";
 import { Alert, Button, Form, Input, InputNumber, Modal, Select } from "antd";
 import type {
@@ -9,14 +10,14 @@ import type {
 } from "@/services/kitchenAssistant";
 
 const newIngredient = (): Ingredient => ({
-  id: crypto.randomUUID(),
+  id: createUuid(),
   name: "",
   amount: 1,
   unit: "个",
   type: "main",
 });
 const newStep = (): CookingStep => ({
-  id: crypto.randomUUID(),
+  id: createUuid(),
   title: "",
   description: "",
   phase: "cook",
@@ -53,7 +54,7 @@ export function RecipeEditor({
   });
   const [dirty, setDirty] = useState(false);
   const [form] = Form.useForm();
-  const [id] = useState(() => recipe?.id ?? crypto.randomUUID());
+  const [id] = useState(() => recipe?.id ?? createUuid());
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     () =>
       (draft?.ingredients ?? recipe?.ingredients)?.map((i) => ({ ...i })) ?? [
@@ -557,7 +558,7 @@ export function InventoryEditor({
       if (
         await onSave({
           ...values,
-          id: item?.id ?? crypto.randomUUID(),
+          id: item?.id ?? createUuid(),
           expireDate: values.expireDate || null,
         })
       )
@@ -569,6 +570,7 @@ export function InventoryEditor({
   };
   return (
     <Modal
+      rootClassName="kitchen-modal"
       open
       title={item ? "编辑库存" : "添加食材"}
       onCancel={onClose}
@@ -638,6 +640,7 @@ export function RecordEditor({
   const [error, setError] = useState("");
   return (
     <Modal
+      rootClassName="kitchen-modal"
       open
       title="这顿饭怎么样？"
       onCancel={onClose}

@@ -58,6 +58,10 @@ const render = async () => {
 };
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // Exercise the whole kitchen workflow under phone/LAN HTTP capabilities.
+  vi.stubGlobal('crypto', {
+    getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto),
+  });
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({
@@ -169,6 +173,23 @@ it("completes a two-dish meal and saves its history", async () => {
   expect(snapshot.data.cooking).toBeNull();
   expect(container.textContent).toContain("下厨记录 · 1");
 });
+
+it("keeps primary navigation below the scroll pane and opens meal planning from an empty meal", async () => {
+  await render();
+  const workspace = container.querySelector('.kitchen-workspace')!;
+  const page = workspace.querySelector('.kitchen-page')!;
+  const navigation = workspace.querySelector('nav[aria-label="厨房助手导航"]')!;
+  expect(page.nextElementSibling).toBe(navigation);
+  expect(navigation.parentElement).toBe(workspace);
+  expect(navigation.querySelectorAll('[role="tab"]')).toHaveLength(5);
+  expect(page.contains(navigation)).toBe(false);
+  await click(container.querySelector<HTMLButtonElement>('[aria-label="安排早餐"]')!);
+  expect(navigation.querySelector('[aria-selected="true"]')?.textContent).toBe('菜单');
+  expect(page.textContent).toContain('这一餐的安排');
+  await tab('菜谱');
+  await click(button('添加菜谱'));
+  expect(container.querySelector('.kitchen-bottom-navigation')).toBeNull();
+});
 it("keeps the saved state when a write conflicts and offers reload", async () => {
   await render();
   vi.mocked(api.patch).mockRejectedValueOnce({
@@ -183,6 +204,45 @@ it("keeps the saved state when a write conflicts and offers reload", async () =>
   await click(button("在最新数据上重试"));
   expect(snapshot.data.selectedRecipeIds).toHaveLength(1);
   expect(api.get).toHaveBeenCalledTimes(2);
+});
+it("adds a recipe from a phone HTTP context without crypto.randomUUID", async () => {
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  vi.stubGlobal('crypto', { getRandomValues });
+  await render();
+  await click(button('加入待制作'));
+  expect(api.patch).toHaveBeenCalledOnce();
+  const patch = vi.mocked(api.patch).mock.calls[0][1] as KitchenPatch;
+  expect(patch.operationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(snapshot.data.selectedRecipeIds).toHaveLength(1);
+  expect(button('已加入·移出清单')).toBeDefined();
+  await tab('菜单');
+  expect(container.textContent).toContain('待制作 · 1 道');
+});
+it('shows progress until adding a recipe is actually saved', async () => {
+  await render();
+  let finishSave!: (snapshot: KitchenSnapshot) => void;
+  vi.mocked(api.patch).mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve; }));
+  const add = button('加入待制作');
+  await click(add);
+  expect(add.classList.contains('ant-btn-loading')).toBe(true);
+  expect(snapshot.data.selectedRecipeIds).toEqual([]);
+  const patch = vi.mocked(api.patch).mock.calls[0][1] as KitchenPatch;
+  await act(async () => finishSave({
+    revision: 1,
+    data: { ...snapshot.data, ...patch.changes },
+  }));
+  await settle();
+  expect(button('已加入·移出清单').classList.contains('ant-btn-loading')).toBe(false);
+  expect(document.body.textContent).toContain('已加入待制作，可在底部「菜单」查看');
+});
+it('reports request preparation failures instead of silently dropping a click', async () => {
+  vi.stubGlobal('crypto', undefined);
+  await render();
+  await click(button('加入待制作'));
+  expect(api.patch).not.toHaveBeenCalled();
+  expect(snapshot.data.selectedRecipeIds).toEqual([]);
+  expect(container.textContent).toContain('当前浏览器无法生成操作标识');
+  expect(document.body.textContent).toContain('保存未成功');
 });
 it("restores saved cooking progress and elapsed timers on mount", async () => {
   snapshot.data.selectedRecipeIds = ["r1"];

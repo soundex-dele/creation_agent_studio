@@ -1,3 +1,4 @@
+import { createUuid } from "@/lib/uuid";
 import { api } from "./api";
 
 export interface Ingredient {
@@ -192,7 +193,7 @@ export const kitchenApi = (base: string) => ({
 export function statePatch(
   before: KitchenSnapshot,
   after: KitchenState,
-  operationId = crypto.randomUUID(),
+  operationId = createUuid(),
 ): KitchenPatch {
   const changes: Partial<Omit<KitchenState, "records">> = {};
   for (const key of Object.keys(after) as (keyof KitchenState)[]) {

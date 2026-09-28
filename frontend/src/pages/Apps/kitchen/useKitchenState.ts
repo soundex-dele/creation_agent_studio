@@ -90,14 +90,22 @@ export function useKitchenState(base: string) {
   }
   async function commit(change: Change, aiTaskId?: string): Promise<boolean> {
     if (lock.current || pendingRef.current || !current.current) return false;
-    return send({
-      change,
-      conflict: false,
-      patch: {
-        ...statePatch(current.current, change(current.current.data)),
-        ...(aiTaskId ? { aiTaskId } : {}),
-      },
-    });
+    let operation: Pending;
+    try {
+      operation = {
+        change,
+        conflict: false,
+        patch: {
+          ...statePatch(current.current, change(current.current.data)),
+          ...(aiTaskId ? { aiTaskId } : {}),
+        },
+      };
+    } catch (err) {
+      // Preparation errors occur before send's network error handling.
+      if (alive.current) setError(err instanceof Error ? err.message : entryError(err));
+      return false;
+    }
+    return send(operation);
   }
   async function retry() {
     const operation = pendingRef.current;
