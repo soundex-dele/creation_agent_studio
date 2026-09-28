@@ -1,0 +1,44 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: pocket-salvager
+  version: 1.0.0
+  name: 口袋打捞队
+  description: 驾驶小船探索青绿海域，在三分钟内打捞物资、升级船只，赶在暴风雨前点亮灯塔。支持键盘与触屏。
+  category:
+    slug: games
+    name: 休闲游戏
+    description: 放松片刻，享受经典游戏与益智挑战
+    icon: gamepad
+    order: 60
+  icon: pocket-salvager
+  color: "#246f78"
+  tags: [游戏, 探索, 打捞, 单机, Phaser]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: pocket-salvager
+    executor_protocol_version: 1
+    renderer_key: pocket-salvager
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+    dependencies:
+      agents: []
+      skills: []
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    activate: true

@@ -18,6 +18,7 @@ const TemplatesPage = lazy(() => import('@/pages/Templates/TemplatesPage'));
 const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPage'));
 const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
 const SokobanPage = lazy(() => import('@/pages/Apps/SokobanPage'));
+const PocketSalvagerPage = lazy(() => import('@/pages/Apps/PocketSalvagerPage'));
 const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
 const MyComputerPage = lazy(() => import('@/pages/Apps/MyComputerPage'));
 const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
@@ -225,6 +226,10 @@ const router = createBrowserRouter([
     path: '/applications/:applicationId/sokoban',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<SokobanPage />)}</ApplicationShell></ProtectedRoute>,
   },
+  ...['/apps/pocket-salvager', '/applications/:applicationId/pocket-salvager'].map(path => ({
+    path,
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<PocketSalvagerPage />)}</ApplicationShell></ProtectedRoute>,
+  })),
   {
     path: '/applications/:applicationId/run',
     element: (

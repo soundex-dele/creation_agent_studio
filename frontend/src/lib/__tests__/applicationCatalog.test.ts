@@ -5,6 +5,11 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens Pocket Salvager from the home and applications catalog', () => {
+    const app = { id: 'pocket-salvager', applicationId: 43, kind: 'custom' as const, rendererKey: 'pocket-salvager' };
+    expect(applicationPath(app)).toBe('/applications/43/pocket-salvager?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/applications/43/pocket-salvager?entry=home');
+  });
   it('opens Sokoban with a dedicated renderer from either catalog entry', () => {
     const app = { id: 'sokoban', applicationId: 42, kind: 'custom' as const, rendererKey: 'sokoban' };
     expect(applicationPath(app)).toBe('/applications/42/sokoban?entry=apps');
