@@ -120,10 +120,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const streamingMessageId = ownsConversation ? storedStreamingMessageId : null;
   const pendingQuestion = ownsConversation ? storedPendingQuestion : null;
   const agentActivity = ownsConversation ? storedAgentActivity : null;
-  const workspace = useMemo(() => currentConversation ? {
-    projectId: currentConversation.project ?? undefined,
-    workingDirectory: currentConversation.working_directory,
-  } : undefined, [currentConversation]);
+  const workspaceConversationId = currentConversation?.id;
+  const workspaceProject = currentConversation?.project;
+  const workspaceDirectory = currentConversation?.working_directory;
+  const workspace = useMemo(() => workspaceConversationId ? {
+    projectId: workspaceProject ?? undefined,
+    workingDirectory: workspaceDirectory,
+  } : undefined, [workspaceConversationId, workspaceProject, workspaceDirectory]);
 
   const handleWorkspaceChange = async (selection: Pick<ComposerContext, 'projectId' | 'workingDirectory'>) => {
     if (!conversationId || !online || workspaceChangingRef.current) throw new Error('工作空间暂不可修改');

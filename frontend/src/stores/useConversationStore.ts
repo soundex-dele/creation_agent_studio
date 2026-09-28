@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createStreamUpdates } from '@/lib/streamUpdates';
 
 import {
   createRunEventState,
@@ -266,6 +267,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
   return create<ConversationState>()(
   persist(
     (set, get) => {
+      const streamUpdates = createStreamUpdates();
       const finishRun = (conversationId: string) => {
         set({ streamingMessageId: null, pendingQuestion: null, agentActivity: null });
         void get().fetchConversationDetail(conversationId).catch(() => undefined);
@@ -295,21 +297,29 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
               ? String(projection.pendingInput.input_kind ?? '')
               : '',
           } : null,
+          currentConversation: state.currentConversation && state.streamingMessageId ? {
+            ...state.currentConversation,
+            messages: state.currentConversation.messages.map(message => {
+              if (message.id !== state.streamingMessageId) return message;
+              if (message.content === projection.output
+                && message.metadata?.agent?.activity === projection.activity) return message;
+              return {
+                ...message,
+                content: projection.output || '',
+                metadata: { ...message.metadata, agent: {
+                  ...message.metadata?.agent, activity: projection.activity,
+                } },
+              };
+            }),
+          } : state.currentConversation,
+          ...(event?.type === 'output.delta' ? { agentActivity: '正在生成…' } : {}),
         }));
         if (event && ['input.accepted', 'input.resolved'].includes(event.type) && !get().streamingMessageId) {
           const id = `run-live-${projection.runId}-${event.sequence}`;
           set((state) => ({ streamingMessageId: id, currentConversation: state.currentConversation ? {
             ...state.currentConversation, messages: [...state.currentConversation.messages,
-              { id, role: 'assistant', content: '', created_at: new Date().toISOString() }],
-          } : null }));
-        }
-        get().replaceStreamContent(projection.output || '');
-        if (projection.activity) {
-          set((state) => ({ currentConversation: state.currentConversation ? {
-            ...state.currentConversation, messages: state.currentConversation.messages.map(message =>
-              message.id === state.streamingMessageId ? { ...message, metadata: { ...message.metadata,
-                agent: { ...message.metadata?.agent, activity: projection.activity },
-              } } : message),
+              { id, role: 'assistant', content: projection.output || '', created_at: new Date().toISOString(),
+                metadata: { agent: { activity: projection.activity } } }],
           } : null }));
         }
         if (!event) {
@@ -331,7 +341,6 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             set({ agentActivity: 'Agent 正在运行…' });
             break;
           case 'output.delta':
-            set({ agentActivity: '正在生成…' });
             break;
           case 'output.snapshot':
             break;
@@ -410,6 +419,21 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         }
       };
 
+      const publishRunProjection = (
+        conversationId: string, projection: RunEventState, event?: RunEventEnvelope,
+      ) => {
+        // Reduce every event, but avoid notifying React and serializing storage
+        // for every token/tool-output fragment. Lifecycle events stay immediate.
+        if (event && (event.type === 'output.delta'
+          || ((event.type === 'agent.item' || event.type === 'agent.tool')
+            && (typeof event.payload.delta === 'string' || typeof event.payload.summary_delta === 'string')))) {
+          streamUpdates.schedule(() => applyRunProjection(conversationId, projection, event));
+        } else {
+          streamUpdates.flush();
+          applyRunProjection(conversationId, projection, event);
+        }
+      };
+
       const restoreConversationRun = (
         conversationId: string,
         run: RunResource | null | undefined,
@@ -459,17 +483,18 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             if (requestVersion !== latestConversationDetailRequest
               || get().currentConversation?.id !== conversationId) return;
             projection = ingestRunEvent(projection, event).state;
-            applyRunProjection(conversationId, projection, event);
+            publishRunProjection(conversationId, projection, event);
           },
           onSnapshot: (snapshot) => {
             if (requestVersion !== latestConversationDetailRequest
               || get().currentConversation?.id !== conversationId) return;
             projection = restoreRunEventSnapshot(snapshot);
-            applyRunProjection(conversationId, projection);
+            publishRunProjection(conversationId, projection);
           },
           onError: (error) => {
             if (requestVersion === latestConversationDetailRequest
               && get().currentConversation?.id === conversationId) {
+              streamUpdates.flush();
               set({ error: `Run 恢复失败: ${error.message}` });
             }
           },
@@ -478,6 +503,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
 
       return {
         disconnect: () => {
+          streamUpdates.flush();
           latestConversationDetailRequest += 1;
           restoredConversationRunStream?.abort();
           restoredConversationRunStream = null;
@@ -713,16 +739,17 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
                   }
                 }
                 projection = ingestRunEvent(projection, event).state;
-                applyRunProjection(conversationId, projection, event);
+                publishRunProjection(conversationId, projection, event);
               },
               onSnapshot: (snapshot) => {
                 if (controller.signal.aborted) return;
                 projection = restoreRunEventSnapshot(snapshot);
-                applyRunProjection(conversationId, projection);
+                publishRunProjection(conversationId, projection);
               },
               onError: (error) => {
                 logTiming('stream_error', { runId: run.id, errorType: error.name });
                 if (!controller.signal.aborted && get().streamingMessageId) {
+                  streamUpdates.flush();
                   set({ error: `Run 事件流错误: ${error.message}` });
                 }
               },
@@ -740,7 +767,10 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
             throw error;
           });
           void controller.submitted.catch(() => undefined);
-          controller.signal.addEventListener('abort', () => stream?.abort(), { once: true });
+          controller.signal.addEventListener('abort', () => {
+            if (activeController === controller) streamUpdates.flush();
+            stream?.abort();
+          }, { once: true });
           return controller;
         },
 

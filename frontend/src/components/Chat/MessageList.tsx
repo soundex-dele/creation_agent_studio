@@ -60,14 +60,6 @@ interface MessageListProps {
   ) => ReactNode | undefined;
 }
 
-const MessageList: React.FC<MessageListProps> = ({
-  messages,
-  isLoading = false,
-  isStreaming = false,
-  streamingMessageId = null,
-  renderAssistantContent,
-}) => {
-  const { remote } = useChatConnection();
   const copyMessageContent = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -135,7 +127,17 @@ const MessageList: React.FC<MessageListProps> = ({
     );
   };
 
-  const renderMessage = (message: ChatMessage) => {
+interface MessageRowProps {
+  message: ChatMessage;
+  isStreamingMessage: boolean;
+  remote: boolean;
+  renderAssistantContent?: MessageListProps['renderAssistantContent'];
+}
+
+// Historical Markdown, math and tool details must not rerender on each token.
+const MessageRow = React.memo(function MessageRow({
+  message, isStreamingMessage, remote, renderAssistantContent,
+}: MessageRowProps) {
     const isUser = message.role === 'user';
     const isSystem = message.role === 'system';
     const toolCalls = message.metadata?.agent?.tool_calls
@@ -147,7 +149,6 @@ const MessageList: React.FC<MessageListProps> = ({
     const selectedSkills = message.metadata?.composer?.skill_names
       ?? message.metadata?.composer?.skills
       ?? [];
-    const isStreamingMessage = message.id === streamingMessageId;
     const nativeItems = Object.values(message.metadata?.agent?.activity?.items ?? {}).filter(
       item => ['agentMessage', 'plan'].includes(item.type) && item.text,
     );
@@ -286,7 +287,16 @@ const MessageList: React.FC<MessageListProps> = ({
         </div>
       </div>
     );
-  };
+});
+
+const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  isLoading = false,
+  isStreaming = false,
+  streamingMessageId = null,
+  renderAssistantContent,
+}) => {
+  const { remote } = useChatConnection();
 
   return (
     <div className="message-list-content">
@@ -295,7 +305,11 @@ const MessageList: React.FC<MessageListProps> = ({
           <Text className="text-text-dim">开始新的对话吧...</Text>
         </div>
       )}
-      {messages.map(renderMessage)}
+      {messages.map(message => (
+        <MessageRow key={message.id} message={message}
+          isStreamingMessage={message.id === streamingMessageId}
+          remote={remote} renderAssistantContent={renderAssistantContent} />
+      ))}
 
       {(isLoading || isStreaming) && (
         <div className="animate-fade-in mb-4 flex gap-3">
@@ -319,4 +333,4 @@ const MessageList: React.FC<MessageListProps> = ({
   );
 };
 
-export default MessageList;
+export default React.memo(MessageList);
