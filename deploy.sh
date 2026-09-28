@@ -184,13 +184,7 @@ log "Applying database migrations."
 # a clean installation even though it is part of the initial bootstrap.
 create_superuser
 
-log "Synchronizing the Study With Method App Center package."
-"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center \
-  --package study-with-method
-"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center --package my-computer
-
-"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center --package wechat-assistant
-
+"${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center
 start_service "frontend" \
   bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0 --port "$3" --strictPort' \
   _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}"
