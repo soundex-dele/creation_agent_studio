@@ -17,6 +17,7 @@ const AgentDetailPage = lazy(() => import('@/pages/Agents/AgentDetailPage'));
 const TemplatesPage = lazy(() => import('@/pages/Templates/TemplatesPage'));
 const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPage'));
 const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
+const SokobanPage = lazy(() => import('@/pages/Apps/SokobanPage'));
 const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
 const MyComputerPage = lazy(() => import('@/pages/Apps/MyComputerPage'));
 const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
@@ -219,6 +220,10 @@ const router = createBrowserRouter([
         </ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/sokoban',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<SokobanPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/run',

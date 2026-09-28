@@ -1,0 +1,44 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: sokoban
+  version: 1.0.0
+  name: 推箱子
+  description: 回到经典仓库，动动脑筋把木箱推到目标点。20 个递进关卡，支持撤销、选关和本机自动存档。
+  category:
+    slug: games
+    name: 休闲游戏
+    description: 放松片刻，享受经典游戏与益智挑战
+    icon: gamepad
+    order: 60
+  icon: sokoban
+  color: "#b86b31"
+  tags: [游戏, 益智, 推箱子, 单机, Sokoban]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: sokoban
+    executor_protocol_version: 1
+    renderer_key: sokoban
+    renderer_schema_version: 1
+    retry_policy:
+      max_attempts: 1
+      retry_safe: false
+    input_schema:
+      type: object
+    output_schema:
+      type: object
+    default_config:
+      launch_mode: dedicated
+    dependencies:
+      agents: []
+      skills: []
+  database:
+    mode: none
+  install:
+    scope: per-organization
+    activate: true

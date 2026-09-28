@@ -5,6 +5,11 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens Sokoban with a dedicated renderer from either catalog entry', () => {
+    const app = { id: 'sokoban', applicationId: 42, kind: 'custom' as const, rendererKey: 'sokoban' };
+    expect(applicationPath(app)).toBe('/applications/42/sokoban?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/applications/42/sokoban?entry=home');
+  });
   it('opens My Drive from either catalog entry', () => {
     const app = { id: 'my-drive', applicationId: 26, kind: 'custom' as const, rendererKey: 'my-drive' };
     expect(applicationPath(app)).toBe('/applications/26/my-drive?entry=apps');
