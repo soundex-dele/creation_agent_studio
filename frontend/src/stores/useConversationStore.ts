@@ -73,6 +73,33 @@ export interface ConversationDetail extends Conversation {
   active_run?: RunResource | null;
 }
 
+class InvalidConversationDetailError extends Error {
+  constructor() {
+    super('对话接口返回的数据格式异常，请稍后重试。');
+    this.name = 'InvalidConversationDetailError';
+  }
+}
+
+function parseConversationDetail(response: unknown, expectedId: string): ConversationDetail {
+  if (!response || typeof response !== 'object' || Array.isArray(response)) {
+    throw new InvalidConversationDetailError();
+  }
+  const detail = response as Record<string, unknown>;
+  const validId = (value: unknown) => (typeof value === 'string' && value.length > 0)
+    || (typeof value === 'number' && Number.isFinite(value));
+  if (!validId(detail.id) || String(detail.id) !== expectedId
+    || !Array.isArray(detail.messages)
+    || !detail.messages.every((item: unknown) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+      const message = item as Record<string, unknown>;
+      return validId(message.id) && ['user', 'assistant', 'system'].includes(String(message.role))
+        && typeof message.content === 'string';
+    })) {
+    throw new InvalidConversationDetailError();
+  }
+  return { ...detail, id: String(detail.id) } as unknown as ConversationDetail;
+}
+
 export interface ChatRunOptions {
   permissionMode?: 'default' | 'allow_all';
   collaborationMode?: 'default' | 'plan';
@@ -262,6 +289,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
   const runTenantRoot = (id: string) => connection ? `/organizations/${id}` : tenantApiRoot(id);
   let latestConversationDetailRequest = 0;
   let sessionVersion = 0;
+  let idleRefreshRequest: object | null = null;
   let restoredConversationRunStream: RunStreamHandle | null = null;
   let activeController: AbortController | null = null;
   return create<ConversationState>()(
@@ -505,6 +533,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         disconnect: () => {
           streamUpdates.flush();
           latestConversationDetailRequest += 1;
+          idleRefreshRequest = null;
           restoredConversationRunStream?.abort();
           restoredConversationRunStream = null;
           activeController?.abort();
@@ -521,12 +550,24 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
           set({ conversations: [], currentConversation: null, error: null });
         },
         refreshIfIdle: async (id) => {
-          if (get().isLoading || get().streamingMessageId || get().activeRun || get().error) return;
+          const current = get();
+          if (current.currentConversation?.id !== id || idleRefreshRequest
+            || current.isLoading || current.streamingMessageId || current.activeRun || current.error) return;
           const version = latestConversationDetailRequest;
-          const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
-          if (version !== latestConversationDetailRequest || get().currentConversation?.id !== id || get().activeRun) return;
-          set({ currentConversation: { ...response, id: String(response.id) } });
-          if (response.active_run) restoreConversationRun(id, response.active_run);
+          const request = {};
+          idleRefreshRequest = request;
+          try {
+            const response = await api.get<unknown>(`/conversations/${id}/`);
+            const latest = get();
+            if (version !== latestConversationDetailRequest
+              || latest.currentConversation !== current.currentConversation
+              || latest.isLoading || latest.streamingMessageId || latest.activeRun) return;
+            const detail = parseConversationDetail(response, id);
+            set({ currentConversation: detail });
+            if (detail.active_run) restoreConversationRun(id, detail.active_run);
+          } finally {
+            if (idleRefreshRequest === request) idleRefreshRequest = null;
+          }
         },
         conversations: [],
         currentConversation: null,
@@ -561,18 +602,23 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
           }
           set({ isLoading: true, error: null });
           try {
-            const response = await api.get<ConversationDetail>(`/conversations/${id}/`);
+            const response = await api.get<unknown>(`/conversations/${id}/`);
             if (requestId === latestConversationDetailRequest) {
+              const detail = parseConversationDetail(response, id);
               revokeOptimisticImageUrls(get().currentConversation?.messages);
               set({
-                currentConversation: { ...response, id: String(response.id) },
+                currentConversation: detail,
                 isLoading: false,
               });
-              restoreConversationRun(String(response.id), response.active_run);
+              restoreConversationRun(detail.id, detail.active_run);
             }
           } catch (error: any) {
             if (requestId === latestConversationDetailRequest) {
-              set({ error: error.response?.data?.detail || '获取对话详情失败', isLoading: false });
+              set({
+                error: error instanceof InvalidConversationDetailError
+                  ? error.message : error.response?.data?.detail || '获取对话详情失败',
+                isLoading: false,
+              });
             }
             throw error;
           }

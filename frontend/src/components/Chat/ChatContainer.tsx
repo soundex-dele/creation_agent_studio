@@ -104,6 +104,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const creatingConversationRef = useRef(false);
   const skipNextFetchRef = useRef<string | null>(null);
   const appliedDraftRequestIdRef = useRef<number | null>(null);
+  const wasOnlineRef = useRef(online);
   const [inputValue, setInputValue] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
@@ -157,7 +158,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       if (skipNextFetchRef.current === conversationId) {
         skipNextFetchRef.current = null;
       } else if (autoFetch) {
-        fetchConversationDetail(conversationId);
+        void fetchConversationDetail(conversationId).catch(() => undefined);
       }
     } else {
       setCurrentConversation(null);
@@ -178,11 +179,24 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }, [disconnect]);
 
   useEffect(() => {
+    const reconnected = !wasOnlineRef.current && online;
+    wasOnlineRef.current = online;
     if (!conversationId || !online) return;
-    const timer = setInterval(() => {
+    // Runs already stream their updates. Refresh idle history only when the
+    // user returns or reconnects, rather than downloading it every five seconds.
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
       void refreshIfIdle(conversationId).catch(() => undefined);
-    }, 5000);
-    return () => clearInterval(timer);
+    };
+    if (reconnected) refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [conversationId, online, refreshIfIdle]);
 
   useEffect(() => {

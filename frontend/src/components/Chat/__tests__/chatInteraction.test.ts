@@ -79,6 +79,72 @@ async function enterDraft(text: string) {
   });
 }
 
+it('loads conversation history once without polling while idle', async () => {
+  vi.useFakeTimers();
+  const fetchDetail = vi.fn(async () => {});
+  useConversationStore.setState({ fetchConversationDetail: fetchDetail });
+  await renderChat({ autoFetch: true });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(fetchDetail).toHaveBeenCalledExactlyOnceWith('c1');
+  expect(useConversationStore.getState().refreshIfIdle).not.toHaveBeenCalled();
+});
+
+it('keeps messages visible after an HTML response and displays the next valid refresh', async () => {
+  useConversationStore.setState({ refreshIfIdle: initialState.refreshIfIdle });
+  await renderChat();
+  expect(host.textContent).toContain('已有消息');
+  vi.mocked(api.get).mockResolvedValueOnce('<!doctype html><html><div id="root"></div></html>');
+  await act(async () => {
+    await expect(useConversationStore.getState().refreshIfIdle('c1')).rejects.toThrow('对话接口返回的数据格式异常');
+  });
+  expect(host.textContent).toContain('已有消息');
+  expect(host.querySelector('.chat-empty')).toBeNull();
+  vi.mocked(api.get).mockResolvedValueOnce({
+    id: 'c1', messages: [historyMessage, { ...historyMessage, id: 'm2', content: '恢复后的新消息' }],
+  });
+  await act(async () => { await useConversationStore.getState().refreshIfIdle('c1'); });
+  expect(host.textContent).toContain('已有消息');
+  expect(host.textContent).toContain('恢复后的新消息');
+});
+
+it('refreshes on return and reconnect, skipping hidden/offline views and cleaning up listeners', async () => {
+  const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  const refresh = vi.mocked(useConversationStore.getState().refreshIfIdle);
+  await renderChat();
+  expect(refresh).not.toHaveBeenCalled();
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(refresh).toHaveBeenLastCalledWith('c1');
+  visibility.mockReturnValue('hidden');
+  refresh.mockClear();
+  await act(async () => {
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('online'));
+  });
+  expect(refresh).not.toHaveBeenCalled();
+  visibility.mockReturnValue('visible');
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+  expect(refresh).toHaveBeenCalledOnce();
+  await renderChat({}, false);
+  refresh.mockClear();
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(refresh).not.toHaveBeenCalled();
+  await renderChat({}, true);
+  expect(refresh).toHaveBeenCalledExactlyOnceWith('c1');
+  refresh.mockClear();
+  await renderChat({ conversationId: 'c2' });
+  await act(async () => { window.dispatchEvent(new Event('online')); });
+  expect(refresh).toHaveBeenCalledExactlyOnceWith('c2');
+  await act(async () => root.render(null));
+  refresh.mockClear();
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('online'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(refresh).not.toHaveBeenCalled();
+});
+
 it('shows send instead of stop when leaving a running conversation for a new chat', async () => {
   useConversationStore.setState({
     disconnect: initialState.disconnect,

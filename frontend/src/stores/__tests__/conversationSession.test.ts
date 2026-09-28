@@ -45,6 +45,120 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('idle conversation refresh', () => {
+  const invalidDetails = [
+    ['HTML fallback', '<!doctype html><html><body><div id="root"></div></body></html>'],
+    ['null body', null],
+    ['missing id', { messages: [] }],
+    ['wrong conversation', { ...conversation('other') }],
+    ['missing messages', { id: 'old', title: 'summary' }],
+    ['invalid messages', { ...conversation('old'), messages: null }],
+    ['invalid message entry', { ...conversation('old'), messages: [null] }],
+  ] as const;
+
+  it.each(invalidDetails)('preserves history after %s and accepts the next valid refresh', async (_label, invalid) => {
+    const store = createConversationStore(undefined, api);
+    const history = { ...conversation('old'), messages: [
+      { id: 'm1', role: 'user' as const, content: 'Existing history', created_at: '' },
+    ] };
+    const recovered = { ...history, title: 'Recovered' };
+    vi.spyOn(api, 'get').mockResolvedValueOnce(invalid).mockResolvedValueOnce(recovered);
+    store.getState().setCurrentConversation(history);
+    await expect(store.getState().refreshIfIdle('old')).rejects.toThrow('对话接口返回的数据格式异常');
+    expect(store.getState().currentConversation).toBe(history);
+    expect(store.getState().error).toBeNull();
+    await store.getState().refreshIfIdle('old');
+    expect(store.getState().currentConversation).toEqual(recovered);
+  });
+
+  it.each(invalidDetails)('rejects %s during detail loading without corrupting existing history', async (_label, invalid) => {
+    const store = createConversationStore(undefined, api);
+    const history = conversation('old');
+    vi.spyOn(api, 'get').mockResolvedValueOnce(invalid).mockResolvedValueOnce(history);
+    store.getState().setCurrentConversation(history);
+    await expect(store.getState().fetchConversationDetail('old')).rejects.toThrow('对话接口返回的数据格式异常');
+    expect(store.getState().currentConversation).toBe(history);
+    expect(store.getState().isLoading).toBe(false);
+    expect(store.getState().error).toContain('对话接口返回的数据格式异常');
+    await store.getState().fetchConversationDetail('old');
+    expect(store.getState().currentConversation).toEqual(history);
+    expect(store.getState().error).toBeNull();
+  });
+
+  it('accepts a valid empty conversation instead of treating response size as validity', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ ...conversation('29'), id: 29 });
+    await useConversationStore.getState().fetchConversationDetail('29');
+    expect(useConversationStore.getState().currentConversation).toEqual(conversation('29'));
+  });
+
+  it('deduplicates concurrent refreshes and allows a later refresh', async () => {
+    const pending = deferred<unknown>();
+    const get = vi.spyOn(api, 'get').mockReturnValue(pending.promise as never);
+    useConversationStore.getState().setCurrentConversation(conversation('old'));
+    const first = useConversationStore.getState().refreshIfIdle('old');
+    await useConversationStore.getState().refreshIfIdle('old');
+    expect(get).toHaveBeenCalledOnce();
+    pending.resolve({ ...conversation('old'), title: 'updated' });
+    await first;
+    expect(useConversationStore.getState().currentConversation?.title).toBe('updated');
+    await useConversationStore.getState().refreshIfIdle('old');
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows retry after a refresh fails', async () => {
+    const get = vi.spyOn(api, 'get').mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(conversation('old'));
+    useConversationStore.getState().setCurrentConversation(conversation('old'));
+    await expect(useConversationStore.getState().refreshIfIdle('old')).rejects.toThrow('offline');
+    await useConversationStore.getState().refreshIfIdle('old');
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not refresh another conversation or one with a pending outgoing message', async () => {
+    const get = vi.spyOn(api, 'get');
+    useConversationStore.getState().setCurrentConversation(conversation('old'));
+    await useConversationStore.getState().refreshIfIdle('other');
+    useConversationStore.setState({ streamingMessageId: 'pending' });
+    await useConversationStore.getState().refreshIfIdle('old');
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite a message submitted while the refresh was in flight', async () => {
+    const pending = deferred<unknown>();
+    vi.spyOn(api, 'get').mockReturnValue(pending.promise as never);
+    const stream = vi.spyOn(runStream, 'streamRunEvents');
+    useConversationStore.getState().setCurrentConversation(conversation('old'));
+    const refreshing = useConversationStore.getState().refreshIfIdle('old');
+    const sending = { ...conversation('old'), messages: [
+      { id: 'pending', role: 'user' as const, content: 'hello', created_at: '' },
+    ] };
+    useConversationStore.setState({ currentConversation: sending, streamingMessageId: 'pending' });
+    pending.resolve({ ...conversation('old'), active_run: run });
+    await refreshing;
+    expect(useConversationStore.getState().currentConversation).toBe(sending);
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it('isolates pending refreshes across conversation changes', async () => {
+    const old = deferred<unknown>();
+    const next = deferred<unknown>();
+    const get = vi.spyOn(api, 'get').mockReturnValueOnce(old.promise as never)
+      .mockReturnValueOnce(next.promise as never);
+    useConversationStore.getState().setCurrentConversation(conversation('old'));
+    const first = useConversationStore.getState().refreshIfIdle('old');
+    useConversationStore.getState().setCurrentConversation(conversation('new'));
+    const second = useConversationStore.getState().refreshIfIdle('new');
+    old.resolve({ ...conversation('old'), active_run: run });
+    await first;
+    await useConversationStore.getState().refreshIfIdle('new');
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(useConversationStore.getState().currentConversation?.id).toBe('new');
+    next.resolve({ ...conversation('new'), title: 'new update' });
+    await second;
+    expect(useConversationStore.getState().currentConversation?.title).toBe('new update');
+  });
+});
+
 describe('conversation session isolation', () => {
   it('does not cancel a different conversation run from a stale view', async () => {
     markRunning();
