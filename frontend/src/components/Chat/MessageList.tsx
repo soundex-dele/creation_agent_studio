@@ -12,6 +12,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import type { AgentToolCall } from '@/entities/run';
 import { normalizeMarkdownMath } from '@/lib/markdownMath';
+import { copyText } from '@/lib/clipboard';
 import type { MessageAttachment } from '@/stores/useConversationStore';
 import 'katex/dist/katex.min.css';
 import './MessageList.css';
@@ -62,10 +63,10 @@ interface MessageListProps {
 
   const copyMessageContent = async (content: string) => {
     try {
-      await navigator.clipboard.writeText(content);
+      await copyText(content);
       toast.success('消息已复制');
     } catch {
-      toast.error('复制失败，请稍后重试');
+      toast.error('复制失败，请选中消息文字手动复制');
     }
   };
 

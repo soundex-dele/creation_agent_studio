@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import type { WorkspaceFileEntry, WorkspaceFilePreview } from '@/types/workspaceFiles';
 import { workingDirectoryLabel } from '@/lib/workingDirectoryLabel';
+import { copyText } from '@/lib/clipboard';
 import './WorkspaceFilesPanel.css';
 
 interface Props {
@@ -73,7 +74,7 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
 
   const copyDirectory = async () => {
     try {
-      await navigator.clipboard.writeText(workingDirectory);
+      await copyText(workingDirectory);
       message.success('工作目录已复制');
     } catch {
       message.error('复制失败');

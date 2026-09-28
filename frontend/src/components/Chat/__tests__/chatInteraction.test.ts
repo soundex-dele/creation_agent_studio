@@ -21,6 +21,8 @@ let mobile: boolean;
 const initialState = useConversationStore.getState();
 const historyMessage = { id: 'm1', role: 'user' as const, content: '已有消息', created_at: '2026-09-23T03:20:00Z' };
 const cancelTurn = vi.fn(async () => {});
+const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand');
 
 beforeEach(() => {
   mobile = true;
@@ -50,6 +52,10 @@ afterEach(async () => {
   host.remove();
   useConversationStore.setState(initialState, true);
   vi.restoreAllMocks();
+  if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+  else Reflect.deleteProperty(navigator, 'clipboard');
+  if (execCommandDescriptor) Object.defineProperty(document, 'execCommand', execCommandDescriptor);
+  else Reflect.deleteProperty(document, 'execCommand');
   vi.useRealTimers();
 });
 
@@ -291,6 +297,27 @@ it('groups time and copy below the bubble and copies only the message content', 
   expect(host.textContent).not.toContain('你');
   await click('.message-copy-button');
   expect(writeText).toHaveBeenCalledWith('已有消息');
+});
+
+it.each([true, false])('reports the actual copy result without the Clipboard API (success: %s)', async copied => {
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+  const execCommand = vi.fn(() => {
+    expect((document.activeElement as HTMLTextAreaElement).value).toBe(historyMessage.content);
+    return copied;
+  });
+  Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+  const success = vi.spyOn(message, 'success').mockImplementation(() => (() => {}) as ReturnType<typeof message.success>);
+  const error = vi.spyOn(message, 'error').mockImplementation(() => (() => {}) as ReturnType<typeof message.error>);
+  await act(async () => root.render(React.createElement(MessageList, { messages: [historyMessage] })));
+  await click('.message-copy-button');
+  expect(execCommand).toHaveBeenCalledExactlyOnceWith('copy');
+  if (copied) {
+    expect(success).toHaveBeenCalledWith('消息已复制');
+    expect(error).not.toHaveBeenCalled();
+  } else {
+    expect(error).toHaveBeenCalledWith('复制失败，请选中消息文字手动复制');
+    expect(success).not.toHaveBeenCalled();
+  }
 });
 
 it('loads workspace files and previews only on explicit sidebar clicks, without polling', async () => {
