@@ -40,7 +40,7 @@ def storyboard(run, app, payload, sink, doc, workspace):
     if doc.get("conversion_source"):
         from .backend.access import generation_for
         from .runtime import read_archive
-        old = generation_for(run.owner, app, doc["conversion_source"], ready=True)
+        old = generation_for(run.owner, app, doc["conversion_source"], ready=True, include_deleted=True)
         folder = workspace / "original"; folder.mkdir(exist_ok=True)
         read_archive(old.artifacts.get(kind="animation-source"), folder)
         previous = {"source": (folder / "Animation.tsx").read_text("utf-8"), "storyboard": (folder / "storyboard.md").read_text("utf-8") if (folder / "storyboard.md").exists() else ""}

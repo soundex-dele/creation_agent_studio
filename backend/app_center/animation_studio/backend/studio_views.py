@@ -3,12 +3,14 @@ import uuid
 from django.db import transaction
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from apps.enterprise.models import Membership
 from modules.execution.models import Run
 from modules.execution.infrastructure.artifacts import get_artifact_storage
 from .views import BaseView
+from .access import runs_for
 from .models import AnimationProject, AnimationVersion, AnimationPreset, AnimationSpeechConfig, AnimationAsset
 from .projects import project_for, project_data, import_history, save_draft, document_assets
 from .documents import empty_document, validate_document, validate_style, builtins, FONTS
@@ -23,7 +25,8 @@ def revision(data):
 
 def version_for(project, identifier):
     version = get_object_or_404(AnimationVersion.objects.select_related("run"), pk=identifier,
-        organization_id=project.organization_id, project__application=project.application, project__owner=project.owner)
+        organization_id=project.organization_id, project__application=project.application, project__owner=project.owner,
+        deleted_at__isnull=True)
     if version.project_id != project.id and project.draft.get("source_run_id") != str(version.run_id):
         from rest_framework.exceptions import NotFound
         raise NotFound("版本不存在。")
@@ -54,12 +57,13 @@ class ProjectView(BaseView):
     def get(self, request, project_id, **kwargs):
         app = self.application(); project = project_for(request.user, app, project_id)
         data = project_data(project)
-        versions = list(project.versions.select_related("run"))
-        if not versions and project.draft.get("schema_version") == 1:
+        versions = list(project.versions.filter(deleted_at__isnull=True).select_related("run"))
+        if not versions and not project.versions.exists() and project.draft.get("schema_version") == 1:
             versions = list(AnimationVersion.objects.filter(run_id=project.draft.get("source_run_id"), organization_id=app.organization_id,
-                project__application=app, project__owner=request.user).select_related("run"))
+                project__application=app, project__owner=request.user, deleted_at__isnull=True).select_related("run"))
         data["versions"] = [{"id": str(v.id), "note": v.note, "document": v.document,
-            "created_at": v.created_at.isoformat(), "run": self.serialize(v.run, app)} for v in versions]
+            "created_at": v.created_at.isoformat(), "can_delete": v.project_id == project.id,
+            "run": self.serialize(v.run, app)} for v in versions]
         data["tasks"] = [self.serialize_run(r) for r in Run.objects.for_organization(app.organization_id).filter(
             owner=request.user, source_id=str(app.id), executor_key="animation-studio", input__project_id=str(project.id)).exclude(input__action="generate").order_by("-created_at")[:20]]
         return Response(data)
@@ -74,6 +78,28 @@ class ProjectView(BaseView):
             p.archived = request.data["archived"]
         p.save(update_fields=["title", "archived", "updated_at"])
         return Response(project_data(p))
+
+
+class VersionView(BaseView):
+    @transaction.atomic
+    def delete(self, request, project_id, version_id, **kwargs):
+        app = self.application()
+        project = project_for(request.user, app, project_id)
+        # Unlike restore, deletion must never follow a copied project's source link.
+        version = get_object_or_404(AnimationVersion, pk=version_id, project=project,
+            organization_id=app.organization_id)
+        run = get_object_or_404(runs_for(request.user, app).select_for_update(), pk=version.run_id)
+        version.refresh_from_db()
+        if version.deleted_at:
+            return Response(status=204)
+        terminal = (Run.Status.SUCCEEDED, Run.Status.FAILED, Run.Status.CANCELLED)
+        if run.status not in terminal:
+            return Response({"detail": "该版本正在生成，请等待完成或取消任务后再删除。"}, status=409)
+        if runs_for(request.user, app).filter(input__action="export", input__source_run_id=str(run.id)).exclude(status__in=terminal).exists():
+            return Response({"detail": "该版本正在导出，请等待完成或取消导出后再删除。"}, status=409)
+        version.deleted_at = timezone.now()
+        version.save(update_fields=["deleted_at"])
+        return Response(status=204)
 
 
 class DraftView(BaseView):

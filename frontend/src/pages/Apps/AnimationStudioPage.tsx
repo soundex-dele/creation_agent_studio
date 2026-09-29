@@ -265,7 +265,7 @@ export default function AnimationStudioPage() {
   const userId = useAuthStore(state => state.user?.id);
   const [params, setParams] = useSearchParams();
   const initial = useRef(params.get('animation') || undefined);
-  const onSelect = useCallback((id: string) => setParams(current => { const next = new URLSearchParams(current); next.set('animation', id); return next; }, { replace: true }), [setParams]);
+  const onSelect = useCallback((id: string) => setParams(current => { const next = new URLSearchParams(current); if (id) next.set('animation', id); else next.delete('animation'); return next; }, { replace: true }), [setParams]);
   if (!applicationId || !organizationId || !userId) return <Empty description="请选择组织并登录后使用。" />;
   if (params.get('legacy') !== '1') return <AnimationStudioEditor key={`${organizationId}:${userId}:${applicationId}`} organizationId={organizationId} applicationId={applicationId} userId={String(userId)} initialRunId={initial.current} onSelect={onSelect} showHeader={resolveApplicationPresentation(params).showApplicationHeader} />;
   return <AnimationStudioWorkspace key={`${organizationId}:${userId}:${applicationId}`} organizationId={organizationId} applicationId={applicationId} initialRunId={initial.current} onSelect={onSelect} showHeader={resolveApplicationPresentation(params).showApplicationHeader} />;

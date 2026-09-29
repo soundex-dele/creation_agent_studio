@@ -13,17 +13,32 @@ const engine = fileURLToPath(new URL('..', import.meta.url));
 const execute = promisify(execFile);
 const config = {schema_version:2,width:1280,height:720,fps:30,durationInFrames:150};
 
-async function preview(source) {
+async function preview(source, {shadowDependencies = false, cover = false} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'animation-preview-test-'));
   const dir = path.join(root, 'project');
   try {
     await fs.mkdir(dir);
+    if (shadowDependencies) {
+      for (const name of ['react', 'react-dom', 'remotion', '@remotion/player']) {
+        const pkg = path.join(root, 'node_modules', name);
+        await fs.mkdir(pkg, {recursive:true});
+        await fs.writeFile(path.join(pkg, 'package.json'), JSON.stringify({name, version:'0.0.0', main:'index.js'}));
+        for (const file of ['index.js', 'client.js', 'jsx-runtime.js', 'jsx-dev-runtime.js']) {
+          await fs.writeFile(path.join(pkg, file), `throw new Error('Unexpected ancestor dependency: ${name}');module.exports={};`);
+        }
+      }
+    }
     await fs.writeFile(path.join(dir, 'composition.json'), JSON.stringify(config));
     await fs.writeFile(path.join(dir, 'assets.json'), '[]');
     await fs.writeFile(path.join(dir, 'project.json'), JSON.stringify({schema_version:2,
       scenes:[{id:'one',title:'动画',frames:150,source}], audio:[],subtitles:[],subtitle_style:{enabled:false},brand:{}}));
     try {
       const result = await execute(process.execPath, [path.join(engine, 'runner.mjs'), 'preview', dir], {cwd:engine,timeout:90000});
+      if (cover) {
+        await execute(process.execPath, [path.join(engine, 'runner.mjs'), 'cover', dir], {cwd:engine,timeout:90000});
+        const png = await fs.readFile(path.join(dir, 'out/cover.png'));
+        assert.deepEqual([...png.subarray(0, 8)], [137,80,78,71,13,10,26,10]);
+      }
       return {success:true,stdout:result.stdout,html:await fs.readFile(path.join(dir,'out/preview.html'),'utf8')};
     } catch (error) {
       const line = error.stderr?.split('\n').find(item => item.startsWith('ANIMATION_BUILD_ERROR '));
@@ -39,6 +54,12 @@ test('real isolated preview plays and keeps CSP with diagnostic bootstrap', {tim
   assert.match(result.stdout, /preview_ready/);
   assert.match(result.html, /script-src 'sha256-/);
   assert.doesNotMatch(result.html, /script-src[^;]*unsafe-inline/);
+});
+
+test('preview and cover use engine dependencies even when task ancestors contain conflicting packages', {timeout:180000}, async()=>{
+  const result = await preview(`import React from 'react';import {useCurrentFrame} from 'remotion';export default ({scene})=>{const title=React.useMemo(()=>scene.title,[scene.title]);return <div>{title} {useCurrentFrame()}</div>}`, {shadowDependencies:true,cover:true});
+  assert.equal(result.success, true, JSON.stringify(result));
+  assert.doesNotMatch(result.html, /Unexpected ancestor dependency/);
 });
 
 for (const [name, source, message] of [

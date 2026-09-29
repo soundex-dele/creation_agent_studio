@@ -19557,6 +19557,1456 @@
                     }
                 }
             ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccountPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_douyin-benchmark_accounts_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "同键同参重放；同键异参返回409。",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinAccountInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccountCreated"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccount"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "patch": {
+                "operationId": "applications_douyin-benchmark_accounts_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinAccount"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccount"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_douyin-benchmark_accounts_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTaskPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "同键同参重放；同键异参返回409。",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinTaskInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTask"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTask"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/cancel": {
+            "post": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_cancel_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/frames/{frame_id}": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_frames_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "frame_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_versions_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/DouyinScriptVersion"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_versions_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinScriptEdit"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinScriptVersion"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions/{version_id}/download": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_tasks_versions_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "version_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_accounts_works_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinWorks"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works/{work_id}/upload": {
+            "post": {
+                "operationId": "applications_douyin-benchmark_accounts_works_upload_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/applications_douyin-benchmark_accounts_works_upload_create"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinUpload"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "work_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/brands": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_brands_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/connection": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_connection_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinConnection"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccountPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "同键同参重放；同键异参返回409。",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinAccountInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccountCreated"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccount"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "patch": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_partial_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinAccount"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinAccount"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTaskPage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "同键同参重放；同键异参返回409。",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinTaskInput"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTask"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinTask"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/cancel": {
+            "post": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_cancel_create",
+                "description": "",
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/frames/{frame_id}": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_frames_read",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "frame_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_versions_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/DouyinScriptVersion"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_versions_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinScriptEdit"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinScriptVersion"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions/{version_id}/download": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_tasks_versions_download_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "version_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_works_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinWorks"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works/{work_id}/upload": {
+            "post": {
+                "operationId": "organizations_applications_douyin-benchmark_accounts_works_upload_create",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/applications_douyin-benchmark_accounts_works_upload_create"
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinUpload"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "account_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "work_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/brands": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_brands_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/connection": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_connection_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinConnection"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/applications/{application_id}/douyin-benchmark/collector-config": {
+            "get": {
+                "operationId": "applications_douyin-benchmark_collector-config_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinCollectorConfig"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "put": {
+                "operationId": "applications_douyin-benchmark_collector-config_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinCollectorConfigInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinCollectorConfig"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "operationId": "applications_douyin-benchmark_collector-config_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": "已清除个人采集配置"
+                    }
+                },
+                "tags": [
+                    "applications"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/collector-config": {
+            "get": {
+                "operationId": "organizations_applications_douyin-benchmark_collector-config_list",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinCollectorConfig"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "put": {
+                "operationId": "organizations_applications_douyin-benchmark_collector-config_update",
+                "description": "",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/DouyinCollectorConfigInput"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DouyinCollectorConfig"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "operationId": "organizations_applications_douyin-benchmark_collector-config_delete",
+                "description": "",
+                "responses": {
+                    "204": {
+                        "description": "已清除个人采集配置"
+                    }
+                },
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "organization_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "name": "application_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ]
         }
     },
     "servers": [
@@ -19979,6 +21429,75 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ResearchGenerateInput"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "DouyinAccountInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/DouyinAccountInput"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "DouyinAccount": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/DouyinAccount"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "DouyinTaskInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/DouyinTaskInput"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "DouyinScriptEdit": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/DouyinScriptEdit"
+                        }
+                    }
+                },
+                "required": true
+            },
+            "applications_douyin-benchmark_accounts_works_upload_create": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "video": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "required": [
+                                "video"
+                            ]
+                        }
+                    }
+                },
+                "required": true
+            },
+            "DouyinCollectorConfigInput": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/DouyinCollectorConfigInput"
                         }
                     }
                 },
@@ -25796,6 +27315,559 @@
                         "title": "Output",
                         "description": "schema_version=1; title, sections[{heading, items[{type,text,evidence_ids,source_id?,source_title?}]}], citations and coverage",
                         "type": "object",
+                        "nullable": true
+                    }
+                }
+            },
+            "DouyinAccountPage": {
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "title": "Count",
+                        "type": "integer"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DouyinAccount"
+                        }
+                    }
+                }
+            },
+            "DouyinAccount": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "source_url": {
+                        "title": "Source url",
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "platform_id": {
+                        "title": "Platform id",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "group": {
+                        "title": "Group",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "notes": {
+                        "title": "Notes",
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "profile": {
+                        "title": "Profile",
+                        "type": "object",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "DouyinAccountInput": {
+                "required": [
+                    "source"
+                ],
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "title": "Source",
+                        "type": "string",
+                        "maxLength": 4000,
+                        "minLength": 1
+                    },
+                    "count": {
+                        "title": "Count",
+                        "type": "integer",
+                        "enum": [
+                            20,
+                            50,
+                            100
+                        ],
+                        "default": 50
+                    },
+                    "group": {
+                        "title": "Group",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 100
+                    },
+                    "notes": {
+                        "title": "Notes",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 5000
+                    }
+                }
+            },
+            "DouyinAccountCreated": {
+                "required": [
+                    "task",
+                    "reused"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "source_url": {
+                        "title": "Source url",
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "platform_id": {
+                        "title": "Platform id",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "group": {
+                        "title": "Group",
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "notes": {
+                        "title": "Notes",
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "profile": {
+                        "title": "Profile",
+                        "type": "object",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "task": {
+                        "$ref": "#/components/schemas/DouyinTask"
+                    },
+                    "reused": {
+                        "title": "Reused",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "DouyinTask": {
+                "required": [
+                    "kind"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "maxLength": 20,
+                        "minLength": 1
+                    },
+                    "work_id": {
+                        "title": "Work id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "run_id": {
+                        "title": "Run id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "stage": {
+                        "title": "Stage",
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1
+                    },
+                    "error": {
+                        "title": "Error",
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "progress": {
+                        "title": "Progress",
+                        "type": "object"
+                    },
+                    "output": {
+                        "title": "Output",
+                        "type": "object",
+                        "readOnly": true
+                    },
+                    "sources": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        },
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "DouyinTaskPage": {
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "title": "Count",
+                        "type": "integer"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DouyinTask"
+                        }
+                    }
+                }
+            },
+            "DouyinTaskInput": {
+                "required": [
+                    "kind"
+                ],
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "title": "Kind",
+                        "type": "string",
+                        "enum": [
+                            "collect",
+                            "account",
+                            "breakdown",
+                            "topics",
+                            "script"
+                        ]
+                    },
+                    "count": {
+                        "title": "Count",
+                        "type": "integer",
+                        "enum": [
+                            20,
+                            50,
+                            100
+                        ],
+                        "default": 50
+                    },
+                    "work_id": {
+                        "title": "Work id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "batch_id": {
+                        "title": "Batch id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "source_task_id": {
+                        "title": "Source task id",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "topic_index": {
+                        "title": "Topic index",
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 2,
+                        "minimum": 0
+                    },
+                    "positioning": {
+                        "title": "Positioning",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 2000
+                    },
+                    "audience": {
+                        "title": "Audience",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 2000
+                    },
+                    "theme": {
+                        "title": "Theme",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 2000
+                    },
+                    "duration": {
+                        "title": "Duration",
+                        "type": "integer",
+                        "default": 60,
+                        "maximum": 600,
+                        "minimum": 15
+                    },
+                    "conditions": {
+                        "title": "Conditions",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 3000
+                    },
+                    "brand_profile_id": {
+                        "title": "Brand profile id",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                }
+            },
+            "DouyinScriptVersion": {
+                "required": [
+                    "revision"
+                ],
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "revision": {
+                        "title": "Revision",
+                        "type": "integer",
+                        "maximum": 9223372036854776000,
+                        "minimum": 0
+                    },
+                    "content": {
+                        "title": "Content",
+                        "type": "object"
+                    },
+                    "created_at": {
+                        "title": "Created at",
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "DouyinScriptEdit": {
+                "required": [
+                    "revision",
+                    "content"
+                ],
+                "type": "object",
+                "properties": {
+                    "revision": {
+                        "title": "Revision",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "content": {
+                        "title": "Content",
+                        "type": "object"
+                    }
+                }
+            },
+            "DouyinWorks": {
+                "required": [
+                    "items",
+                    "sample_size",
+                    "median_likes",
+                    "explanation",
+                    "batch"
+                ],
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "sample_size": {
+                        "title": "Sample size",
+                        "type": "integer"
+                    },
+                    "median_likes": {
+                        "title": "Median likes",
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "explanation": {
+                        "title": "Explanation",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "batch": {
+                        "$ref": "#/components/schemas/DouyinTask"
+                    }
+                }
+            },
+            "DouyinUpload": {
+                "type": "object",
+                "properties": {
+                    "video": {
+                        "title": "Video",
+                        "type": "string",
+                        "readOnly": true,
+                        "format": "uri"
+                    }
+                }
+            },
+            "DouyinConnection": {
+                "required": [
+                    "connected",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "connected": {
+                        "title": "Connected",
+                        "type": "boolean"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "code": {
+                        "title": "Code",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            },
+            "DouyinCollectorConfigInput": {
+                "required": [
+                    "user_agent"
+                ],
+                "type": "object",
+                "properties": {
+                    "user_agent": {
+                        "title": "User agent",
+                        "type": "string",
+                        "maxLength": 2000,
+                        "minLength": 1
+                    },
+                    "cookies": {
+                        "title": "Cookies",
+                        "type": "string",
+                        "maxLength": 64000
+                    },
+                    "screen": {
+                        "title": "Screen",
+                        "type": "string",
+                        "pattern": "^[1-9]\\d{1,4}x[1-9]\\d{1,4}$",
+                        "default": "1920x1080",
+                        "maxLength": 20,
+                        "minLength": 1
+                    },
+                    "language": {
+                        "title": "Language",
+                        "type": "string",
+                        "pattern": "^[a-zA-Z-]{2,50}$",
+                        "default": "zh-CN",
+                        "maxLength": 50,
+                        "minLength": 1
+                    },
+                    "timezone": {
+                        "title": "Timezone",
+                        "type": "string",
+                        "default": "Asia/Shanghai",
+                        "maxLength": 100,
+                        "minLength": 1
+                    }
+                }
+            },
+            "DouyinCollectorConfig": {
+                "required": [
+                    "configured",
+                    "user_agent",
+                    "has_cookies",
+                    "screen",
+                    "language",
+                    "timezone",
+                    "updated_at"
+                ],
+                "type": "object",
+                "properties": {
+                    "configured": {
+                        "title": "Configured",
+                        "type": "boolean"
+                    },
+                    "user_agent": {
+                        "title": "User agent",
+                        "type": "string"
+                    },
+                    "has_cookies": {
+                        "title": "Has cookies",
+                        "type": "boolean"
+                    },
+                    "screen": {
+                        "title": "Screen",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "language": {
+                        "title": "Language",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "timezone": {
+                        "title": "Timezone",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "updated_at": {
+                        "title": "Updated at",
+                        "type": "string",
+                        "format": "date-time",
                         "nullable": true
                     }
                 }

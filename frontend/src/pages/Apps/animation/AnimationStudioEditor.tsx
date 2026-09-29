@@ -1,7 +1,7 @@
 import { StudioSelect } from './StudioControls';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, Button, Drawer, Empty, Spin } from 'antd';
+import { Alert, Button, Drawer, Empty, Modal, Spin } from 'antd';
 import { ArrowLeft, Clapperboard, Plus, FolderOpen, Film, AudioLines, Captions, Images, Palette, Layers, Play, Settings, Menu, Sparkles, Clock3, Copy, Save, LockKeyhole } from 'lucide-react';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { tenantApiRoot } from '@/services/tenantContext';
@@ -52,6 +52,9 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
   const [projects, setProjects] = useState<StudioProject[]>([]); const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [query, setQuery] = useState(''); const [archived, setArchived] = useState(false);
   const [assets, setAssets] = useState<LibraryAsset[]>([]); const [presets, setPresets] = useState<StudioPreset[]>([]); const [fonts, setFonts] = useState(['Noto Sans SC']); const [speech, setSpeech] = useState<SpeechConfig>();
   const [mode, setMode] = useState<StudioPage>(initialRunId ? 'preview' : 'scenes'); const [sceneId, setSceneId] = useState(''); const [selectedId, setSelectedId] = useState(initialRunId || ''); const [compareId, setCompareId] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<{ projectId: string; versionId: string; label: string }>();
+  const [versionNotice, setVersionNotice] = useState('');
+  const versionEpoch = useRef(0);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailedRun, setDetailedRun] = useState<AnimationRun>();
@@ -96,11 +99,14 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
     if (!projectId) return;
     let alive = true; let fetching = false;
     const id = projectId;
-    const timer = setInterval(() => { if (fetching) return; fetching = true; void client.get(id).then(p => { if (alive) refreshProject(p); }).catch(report).finally(() => { fetching = false; }); }, 3000);
+    const timer = setInterval(() => { if (fetching || busyRef.current) return; fetching = true; const epoch = versionEpoch.current; void client.get(id).then(p => { if (alive && epoch === versionEpoch.current) refreshProject(p); }).catch(report).finally(() => { fetching = false; }); }, 3000);
     return () => { alive = false; clearInterval(timer); };
   }, [projectId, client, refreshProject, report]);
   const versions = project?.versions || [];
-  const selected = versions.find(v => v.run.id === selectedId) || versions[0]; const compare = versions.find(v => v.run.id === compareId);
+  const selected = versions.find(v => v.run.id === selectedId) || versions[0]; const compare = versions.find(v => v.run.id === compareId && v.run.id !== selected?.run.id);
+  const deleteBlockedReason = selected?.can_delete === false ? '这是其他作品引用的版本，请在原作品中删除。'
+    : selected && !animationTerminal(selected.run.status) ? '请等待生成完成或取消任务后再删除。'
+    : selected?.run.exports.some(run => !animationTerminal(run.status)) ? '请等待导出完成或取消导出后再删除。' : '';
   const scene = doc?.scenes?.find(s => s.id === sceneId) || doc?.scenes?.[0];
   const tasks = [...(project?.tasks || []), ...versions.flatMap(v => [v.run, ...v.run.exports])]; const active = tasks.filter(t => !animationTerminal(t.status));
   const change = draft.change;
@@ -132,11 +138,36 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
     const url = URL.createObjectURL(await response.blob()); const a = document.createElement('a'); a.href = url; a.download = String(item.metadata.filename || item.kind); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const pickVersion = (id: string) => { setSelectedId(id); if (id) onSelect(id); };
+  const deleteVersion = () => void runSafe(async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    versionEpoch.current += 1;
+    await client.deleteVersion(target.projectId, target.versionId);
+    versionEpoch.current += 1;
+    if (!mounted.current) return;
+    setDeleteTarget(undefined);
+    const current = draft.current.current?.project;
+    if (current?.id !== target.projectId) return;
+    const remaining = (current.versions || []).filter(v => v.id !== target.versionId);
+    refreshProject({ ...current, versions: remaining });
+    const next = remaining.find(v => v.run.id === selectedId) || remaining[0];
+    setSelectedId(next?.run.id || '');
+    setCompareId(id => remaining.some(v => v.run.id === id) && id !== next?.run.id ? id : '');
+    onSelect(next?.run.id || '');
+    setVersionNotice(`${target.label}已删除`);
+  });
   const refresh = async () => { if (project) refreshProject(await client.get(project.id)); await refreshList(); };
   const menu = <StudioNavigation current={mode} onSelect={navigate} />;
   const editing = mode !== 'history' && mode !== 'preview';
   const title = navigation.find(item => item.id === mode)!.title;
   return <section className="animation-workspace studio-workspace" data-page={mode} aria-label="动画制作工作台">
+    <Modal title={`删除${deleteTarget?.label || '版本'}？`} open={!!deleteTarget} onOk={deleteVersion}
+      onCancel={() => { if (!busy) setDeleteTarget(undefined); }} okText="确认删除" cancelText="取消"
+      okButtonProps={{ danger: true }} cancelButtonProps={{ disabled: busy, autoFocus: true }} confirmLoading={busy}
+      closable={!busy} maskClosable={!busy} keyboard={!busy}>
+      <p>删除后，该版本将从版本列表移除，无法在这里恢复。当前草稿、素材和关联文件会保留。</p>
+      {deleteTarget && error && <Alert type="error" showIcon message={error} />}
+    </Modal>
     <header className="animation-header"><div className="animation-brand">{isMobile && <Button ref={menuButton} type="text" icon={<Menu size={20} aria-hidden="true" />} aria-label="打开动画制作菜单" aria-expanded={menuOpen} aria-haspopup="dialog" onClick={() => setMenuOpen(true)} />}{showHeader && <Link to="/apps" aria-label="返回应用"><ArrowLeft size={20} aria-hidden="true" /></Link>}<span className="animation-logo"><Clapperboard size={23} aria-hidden="true" /></span><div><h1>动画制作</h1><p>分镜创作 · 有声动画 · 批量出片</p></div></div><span className="studio-save-status" role="status"><Save size={14} aria-hidden="true" />{draft.status}</span></header>
     {isMobile && <Drawer title="动画制作菜单" placement="left" width="min(88vw, 320px)" open={menuOpen}
       onClose={() => setMenuOpen(false)} rootClassName="studio-menu-drawer"
@@ -184,11 +215,12 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
           <RetainedPanel active={mode === 'batch'} name="batch"><BatchPanel client={client} presets={presets} report={report} download={(run, artifact) => void download(run, artifact).catch(report)} /></RetainedPanel>
           <RetainedPanel active={mode === 'settings'} name="settings"><SpeechSettings client={client} report={report} /></RetainedPanel>
       </>}</section>
-      <section className="studio-preview-pane" hidden={mode !== 'preview'} aria-label="预览与版本"><div className="animation-section-title animation-preview-heading"><span>预览、比较与导出</span>{selected && <Button type="primary" onClick={() => { navigate('scenes'); }}>继续修改</Button>}</div>
+      <section className="studio-preview-pane" hidden={mode !== 'preview'} aria-label="预览与版本"><div className="animation-section-title animation-preview-heading"><span>预览、比较与导出</span>{selected && <div className="studio-buttons"><Button danger disabled={busy || !!deleteBlockedReason} title={deleteBlockedReason || undefined} onClick={() => { if (project) { setError(''); setVersionNotice(''); setDeleteTarget({ projectId: project.id, versionId: selected.id, label: `版本 ${versions.length - versions.indexOf(selected)}` }); } }}>删除当前版本</Button><Button type="primary" onClick={() => { navigate('scenes'); }}>继续修改</Button></div>}</div>
+        {versionNotice && <p role="status">{versionNotice}</p>}
         <div className="studio-version-strip" aria-label="版本缩略图">{versions.map((v, i) => <button key={v.id} aria-pressed={selected?.id === v.id} className={selected?.id === v.id ? 'is-selected' : ''} onClick={() => pickVersion(v.run.id)}><VersionThumbnail run={v.run} runtime={runtime} /><span>版本 {versions.length - i}</span></button>)}</div>
         <label>查看版本<StudioSelect value={selected?.run.id || ''} onChange={e => pickVersion(e.target.value)}><option value="">选择版本</option>{versions.map((v, i) => <option key={v.id} value={v.run.id}>版本 {versions.length - i} · {animationStatus(v.run.status)} · {new Date(v.created_at).toLocaleString('zh-CN')}</option>)}</StudioSelect></label>
         {selected ? <><div className={compare ? "studio-comparison-grid" : undefined}><div className="animation-canvas" style={{ aspectRatio: (selected.run.input.aspect || '16:9').replace(':', '/') }}>{mode === 'preview' && <AnimationPreview generation={selected.run} runtime={runtime} />}</div>{compare && <div className="animation-canvas" style={{ aspectRatio: (compare.run.input.aspect || '16:9').replace(':', '/') }}>{mode === 'preview' && <AnimationPreview generation={compare.run} runtime={runtime} />}</div>}</div>{selected.run.error_message && <Alert type="error" message="此版本生成失败" description={taskError(selected.run.error_message)} />}<p>{selected.note || '首次生成'}</p><Button disabled={busy} onClick={() => void runSafe(async () => { if (!project || !await draft.flush()) return; const c = draft.current.current!; const p = await client.action(project.id, 'restore', { version_id: selected.id, revision: c.project.revision }); adopt({ ...p, versions: project.versions }); navigate('scenes'); })}>复制此版本为草稿</Button>
-          <label>对比版本<StudioSelect value={compareId} onChange={e => setCompareId(e.target.value)}><option value="">不对比</option>{versions.filter(v => v.id !== selected.id).map(v => <option key={v.id} value={v.run.id}>{v.note || v.created_at}</option>)}</StudioSelect></label>{compare && <><div className="studio-diff"><h4>内容差异</h4>{(selected.document.scenes || []).map(s => { const old = compare.document.scenes?.find(o => o.id === s.id); return <p key={s.id}><strong>{s.title}</strong>：{!old ? '新增场景' : JSON.stringify(old) === JSON.stringify(s) ? '未变化' : `${old.body} → ${s.body}；${old.frames / 30}s → ${s.frames / 30}s`}</p>; })}{(compare.document.scenes || []).filter(s => !selected.document.scenes?.some(n => n.id === s.id)).map(s => <p key={s.id}>已移除：{s.title}</p>)}{selected.document.schema_version === 1 && <p>{String(compare.run.input.prompt)} → {String(selected.run.input.prompt)}</p>}</div></>}
+          <label>对比版本<StudioSelect value={compare?.run.id || ''} onChange={e => setCompareId(e.target.value)}><option value="">不对比</option>{versions.filter(v => v.id !== selected.id).map(v => <option key={v.id} value={v.run.id}>{v.note || v.created_at}</option>)}</StudioSelect></label>{compare && <><div className="studio-diff"><h4>内容差异</h4>{(selected.document.scenes || []).map(s => { const old = compare.document.scenes?.find(o => o.id === s.id); return <p key={s.id}><strong>{s.title}</strong>：{!old ? '新增场景' : JSON.stringify(old) === JSON.stringify(s) ? '未变化' : `${old.body} → ${s.body}；${old.frames / 30}s → ${s.frames / 30}s`}</p>; })}{(compare.document.scenes || []).filter(s => !selected.document.scenes?.some(n => n.id === s.id)).map(s => <p key={s.id}>已移除：{s.title}</p>)}{selected.document.schema_version === 1 && <p>{String(compare.run.input.prompt)} → {String(selected.run.input.prompt)}</p>}</div></>}
           <h3>导出当前版本</h3><ExportFields value={options} onChange={setOptions} doc={selected.document} /><Button type="primary" disabled={busy || selected.run.status !== 'succeeded'} onClick={() => void runSafe(async () => { const fingerprint = JSON.stringify({ run: selected.run.id, options }); if (requestKey.current?.fingerprint !== fingerprint) requestKey.current = { fingerprint, key: crypto.randomUUID() }; await client.export(selected.run.id, options, requestKey.current.key); requestKey.current = undefined; await refresh(); })}>导出 {options.format.toUpperCase()}</Button>
           {selected.run.artifacts.filter(a => a.kind === 'animation-source').map(a => <Button key={a.id} onClick={() => void download(selected.run, a).catch(report)}>下载源码</Button>)}
           {selected.run.exports.map(e => <article className="studio-card" key={e.id}><small>{animationStatus(e.status)} · {String((e.input.export_options as { format?: string } | undefined)?.format || 'mp4').toUpperCase()}</small>{e.error_message && <p>{e.error_message}</p>}{!animationTerminal(e.status) && <Button onClick={() => void runtime.sendCommand(e.id, { type: 'cancel', idempotency_key: crypto.randomUUID() }).then(refresh).catch(report)}>取消导出</Button>}{e.artifacts.map(a => <Button key={a.id} onClick={() => void download(e, a).catch(report)}>下载 {String(a.metadata.filename || a.kind)}</Button>)}</article>)}

@@ -4,7 +4,7 @@ from apps.applications.models import Application
 from apps.enterprise.models import Membership
 from core.resource_access import accessible_resources
 from modules.execution.models import Run
-from .models import AnimationAsset
+from .models import AnimationAsset, AnimationVersion
 
 
 def application_for(user, organization_id, application_id):
@@ -21,8 +21,14 @@ def runs_for(user, application):
         owner=user, source_type="application", source_id=str(application.id), executor_key="animation-studio")
 
 
-def generation_for(user, application, run_id, *, ready=False):
-    run = get_object_or_404(runs_for(user, application).filter(input__action="generate"), pk=run_id)
+def generation_for(user, application, run_id, *, ready=False, include_deleted=False, lock=False):
+    runs = runs_for(user, application).filter(input__action="generate")
+    if lock:
+        runs = runs.select_for_update()
+    run = get_object_or_404(runs, pk=run_id)
+    if not include_deleted and AnimationVersion.objects.filter(run=run, deleted_at__isnull=False).exists():
+        from rest_framework.exceptions import NotFound
+        raise NotFound("版本已删除。")
     if ready and (run.status != "succeeded" or not run.artifacts.filter(kind="animation-source").exists()):
         raise ValidationError("请先完成该版本的 HTML 预览生成。")
     return run

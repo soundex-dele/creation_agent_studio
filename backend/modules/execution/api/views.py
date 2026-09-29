@@ -192,6 +192,9 @@ def _can_access_run(request, run):
             return False
         from app_center.research_assistant.backend.access import can_access_run as research_access
         return research_access(request.user, root)
+    if root.executor_key == "douyin-benchmark":
+        from app_center.douyin_benchmark.backend.access import can_access_run as douyin_access
+        return douyin_access(request.user, root)
     if root.executor_key == "meeting-assistant":
         if root.owner_id != request.user.id:
             return False

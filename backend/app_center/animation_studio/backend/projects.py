@@ -41,6 +41,7 @@ def import_history(user, app):
     """Idempotently group only chains from this owner/application/tenant."""
     runs = list(runs_for(user, app).filter(input__action="generate").order_by("created_at", "id"))
     owned = {str(run.id): run for run in runs}
+    # Include deleted versions: their run links prevent resurrection and retain chain ownership.
     linked = {str(v.run_id): v.project for v in AnimationVersion.objects.for_organization(app.organization_id).filter(project__owner=user, project__application=app).select_related("project")}
     visiting = set()
 

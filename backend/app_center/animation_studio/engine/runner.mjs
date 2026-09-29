@@ -9,6 +9,7 @@ import {validateSource} from './validate.mjs';
 import {fontCss} from './fonts.mjs';
 import {buildStructured} from './structured.mjs';
 import {previewBootstrap, previewEntry, verifyPreview, PreviewError} from './preview.mjs';
+import {engineDependencies, engineWebpackOverride} from './dependencies.mjs';
 
 const engine = path.dirname(fileURLToPath(import.meta.url));
 let browserExecutable = process.env.ANIMATION_BROWSER_EXECUTABLE || undefined;
@@ -20,6 +21,7 @@ if (!browserExecutable && process.platform === 'win32') {
 try {
 const [mode, directory] = process.argv.slice(2);
 if (!['preview', 'render', 'stills', 'cover'].includes(mode) || !directory) throw new Error('Usage: node runner.mjs preview|render|stills|cover <project>');
+const dependencies = await engineDependencies(engine);
 const project = path.resolve(directory);
 const output = path.join(project, 'out');
 await fs.mkdir(output, {recursive: true});
@@ -51,7 +53,7 @@ const frameList = [0, Math.floor(config.durationInFrames / 2), config.durationIn
 if (mode === 'preview') {
   const entry = path.join(project, 'Preview.tsx');
   await fs.writeFile(entry, previewEntry(config));
-  const result = await build({entryPoints:[entry],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',minify:true,banner:{js:previewBootstrap},nodePaths:[path.join(engine,'node_modules')],define:{'process.env.NODE_ENV':'"production"'}});
+  const result = await build({entryPoints:[entry],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',minify:true,banner:{js:previewBootstrap},alias:dependencies.aliases,nodePaths:[dependencies.modules],define:{'process.env.NODE_ENV':'"production"'}});
   const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const hash = createHash('sha256').update(js).digest('base64');
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'`;
@@ -70,7 +72,7 @@ if (mode === 'preview') {
 } else {
   const entry = path.join(project, 'Root.tsx');
   await fs.writeFile(entry, `import React from 'react';import {registerRoot,Composition} from 'remotion';import Scene from './Scene';registerRoot(()=> <Composition id="Animation" component={Scene} {...${meta}}/>);`);
-  const serveUrl = await bundle({entryPoint:entry,outDir:path.join(output,'bundle'),webpackOverride:(configuration)=>({...configuration,resolve:{...configuration.resolve,modules:[path.join(engine,'node_modules'),'node_modules']}})});
+  const serveUrl = await bundle({entryPoint:entry,outDir:path.join(output,'bundle'),webpackOverride:configuration=>engineWebpackOverride(configuration, dependencies)});
   const indexPath = path.join(serveUrl, 'index.html');
   const index = (await fs.readFile(indexPath, 'utf8')).replace(/<link[^>]*id="__remotion_favicon"[^>]*>/,'');
   await fs.writeFile(indexPath,index.replace('<head>',`<head><link rel="icon" href="data:,"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">`));

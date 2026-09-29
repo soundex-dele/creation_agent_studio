@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/Evil0ctal/Douyin_TikTok_Download_API",
+  "version": "5.1.2",
+  "commit": "d8f874cd5b647b0ca087a57b15a458c3864439fa",
+  "mode": "source",
+  "source_path": "backend/third_party/Douyin_TikTok_Download_API",
+  "python": "3.12 or 3.13",
+  "live_verification": "pending: personal browser credentials have not been supplied"
+}

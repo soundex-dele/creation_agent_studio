@@ -218,6 +218,16 @@
       "notes": [
         "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
       ]
+    },
+    "douyin-benchmark": {
+      "name": "抖音对标助手",
+      "runtimes": [
+        "ffmpeg"
+      ],
+      "notes": [
+        "Whisper 模型首次转写时下载；需提供固定版本 DTK 源码及独立 Python 3.12/3.13 环境，在应用采集设置保存本人 User-Agent 与 Cookie。",
+        "视觉拆解需配置支持图片输入的组织模型。"
+      ]
     }
   }
 }

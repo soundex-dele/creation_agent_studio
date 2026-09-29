@@ -10,6 +10,7 @@ urlpatterns = [
     path(prefix + "projects/<uuid:project_id>", studio_views.ProjectView.as_view()),
     path(prefix + "projects/<uuid:project_id>/draft", studio_views.DraftView.as_view()),
     path(prefix + "projects/<uuid:project_id>/tasks", studio_views.ProjectTasksView.as_view()),
+    path(prefix + "projects/<uuid:project_id>/versions/<uuid:version_id>", studio_views.VersionView.as_view()),
     path(prefix + "projects/<uuid:project_id>/<str:operation>", studio_views.ProjectActionView.as_view()),
     path(prefix + "presets", studio_views.PresetsView.as_view()),
     path(prefix + "speech-config", studio_views.SpeechConfigView.as_view()),

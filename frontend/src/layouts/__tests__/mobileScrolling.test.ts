@@ -101,6 +101,7 @@ describe('mobile page scrolling', () => {
   });
 
   describe.each([
+    ['DouyinBenchmarkPage', 'douyin-host'],
     ['KitchenAssistantPage', 'kitchen-page'],
     ['ResearchAssistantPage', 'research-host'],
     ['BrandLibraryPage', 'brand-library-page'],

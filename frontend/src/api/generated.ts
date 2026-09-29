@@ -7895,6 +7895,522 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/applications/{application_id}/douyin-benchmark/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_list"];
+        put?: never;
+        post: operations["applications_douyin-benchmark_accounts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_read"];
+        put?: never;
+        post?: never;
+        delete: operations["applications_douyin-benchmark_accounts_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["applications_douyin-benchmark_accounts_partial_update"];
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_tasks_list"];
+        put?: never;
+        post: operations["applications_douyin-benchmark_accounts_tasks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_tasks_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_douyin-benchmark_accounts_tasks_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/frames/{frame_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                frame_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_tasks_frames_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_tasks_versions_list"];
+        put?: never;
+        post: operations["applications_douyin-benchmark_accounts_tasks_versions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions/{version_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_tasks_versions_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_accounts_works_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works/{work_id}/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applications_douyin-benchmark_accounts_works_upload_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_brands_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_connection_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_list"];
+        put?: never;
+        post: operations["organizations_applications_douyin-benchmark_accounts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_read"];
+        put?: never;
+        post?: never;
+        delete: operations["organizations_applications_douyin-benchmark_accounts_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["organizations_applications_douyin-benchmark_accounts_partial_update"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_tasks_list"];
+        put?: never;
+        post: operations["organizations_applications_douyin-benchmark_accounts_tasks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_tasks_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_douyin-benchmark_accounts_tasks_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/frames/{frame_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                frame_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_tasks_frames_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_tasks_versions_list"];
+        put?: never;
+        post: operations["organizations_applications_douyin-benchmark_accounts_tasks_versions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/tasks/{task_id}/versions/{version_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_tasks_versions_download_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_accounts_works_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/accounts/{account_id}/works/{work_id}/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizations_applications_douyin-benchmark_accounts_works_upload_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_brands_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_connection_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{application_id}/douyin-benchmark/collector-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["applications_douyin-benchmark_collector-config_list"];
+        put: operations["applications_douyin-benchmark_collector-config_update"];
+        post?: never;
+        delete: operations["applications_douyin-benchmark_collector-config_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/applications/{application_id}/douyin-benchmark/collector-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["organizations_applications_douyin-benchmark_collector-config_list"];
+        put: operations["organizations_applications_douyin-benchmark_collector-config_update"];
+        post?: never;
+        delete: operations["organizations_applications_douyin-benchmark_collector-config_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10631,6 +11147,279 @@ export interface components {
              */
             output?: Record<string, never> | null;
         };
+        DouyinAccountPage: {
+            /** Count */
+            count: number;
+            results: components["schemas"]["DouyinAccount"][];
+        };
+        DouyinAccount: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /**
+             * Source url
+             * Format: uri
+             */
+            readonly source_url?: string;
+            /** Platform id */
+            readonly platform_id?: string;
+            /** Name */
+            readonly name?: string;
+            /** Group */
+            group?: string;
+            /** Notes */
+            notes?: string;
+            /** Profile */
+            readonly profile?: Record<string, never>;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+        };
+        DouyinAccountInput: {
+            /** Source */
+            source: string;
+            /**
+             * Count
+             * @default 50
+             * @enum {integer}
+             */
+            count: 20 | 50 | 100;
+            /**
+             * Group
+             * @default
+             */
+            group: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        DouyinAccountCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /**
+             * Source url
+             * Format: uri
+             */
+            readonly source_url?: string;
+            /** Platform id */
+            readonly platform_id?: string;
+            /** Name */
+            readonly name?: string;
+            /** Group */
+            group?: string;
+            /** Notes */
+            notes?: string;
+            /** Profile */
+            readonly profile?: Record<string, never>;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            readonly updated_at?: string;
+            task: components["schemas"]["DouyinTask"];
+            /** Reused */
+            reused: boolean;
+        };
+        DouyinTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Work id
+             * Format: uuid
+             */
+            readonly work_id?: string | null;
+            /**
+             * Run id
+             * Format: uuid
+             */
+            readonly run_id?: string | null;
+            /** Status */
+            readonly status?: string;
+            /** Stage */
+            stage?: string;
+            /** Error */
+            error?: string;
+            /** Progress */
+            progress?: Record<string, never>;
+            /** Output */
+            readonly output?: Record<string, never>;
+            readonly sources?: Record<string, never>[];
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+        };
+        DouyinTaskPage: {
+            /** Count */
+            count: number;
+            results: components["schemas"]["DouyinTask"][];
+        };
+        DouyinTaskInput: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "collect" | "account" | "breakdown" | "topics" | "script";
+            /**
+             * Count
+             * @default 50
+             * @enum {integer}
+             */
+            count: 20 | 50 | 100;
+            /**
+             * Work id
+             * Format: uuid
+             */
+            work_id?: string;
+            /**
+             * Batch id
+             * Format: uuid
+             */
+            batch_id?: string;
+            /**
+             * Source task id
+             * Format: uuid
+             */
+            source_task_id?: string;
+            /**
+             * Topic index
+             * @default 0
+             */
+            topic_index: number;
+            /**
+             * Positioning
+             * @default
+             */
+            positioning: string;
+            /**
+             * Audience
+             * @default
+             */
+            audience: string;
+            /**
+             * Theme
+             * @default
+             */
+            theme: string;
+            /**
+             * Duration
+             * @default 60
+             */
+            duration: number;
+            /**
+             * Conditions
+             * @default
+             */
+            conditions: string;
+            /**
+             * Brand profile id
+             * Format: uuid
+             */
+            brand_profile_id?: string | null;
+        };
+        DouyinScriptVersion: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            readonly id?: string;
+            /** Revision */
+            revision: number;
+            /** Content */
+            content?: Record<string, never>;
+            /**
+             * Created at
+             * Format: date-time
+             */
+            readonly created_at?: string;
+        };
+        DouyinScriptEdit: {
+            /** Revision */
+            revision: number;
+            /** Content */
+            content: Record<string, never>;
+        };
+        DouyinWorks: {
+            items: Record<string, never>[];
+            /** Sample size */
+            sample_size: number;
+            /** Median likes */
+            median_likes: number | null;
+            /** Explanation */
+            explanation: string;
+            batch: components["schemas"]["DouyinTask"];
+        };
+        DouyinUpload: {
+            /**
+             * Video
+             * Format: uri
+             */
+            readonly video?: string;
+        };
+        DouyinConnection: {
+            /** Connected */
+            connected: boolean;
+            /** Message */
+            message: string;
+            /** Code */
+            code?: string;
+        };
+        DouyinCollectorConfigInput: {
+            /** User agent */
+            user_agent: string;
+            /** Cookies */
+            cookies?: string;
+            /**
+             * Screen
+             * @default 1920x1080
+             */
+            screen: string;
+            /**
+             * Language
+             * @default zh-CN
+             */
+            language: string;
+            /**
+             * Timezone
+             * @default Asia/Shanghai
+             */
+            timezone: string;
+        };
+        DouyinCollectorConfig: {
+            /** Configured */
+            configured: boolean;
+            /** User agent */
+            user_agent: string;
+            /** Has cookies */
+            has_cookies: boolean;
+            /** Screen */
+            screen: string;
+            /** Language */
+            language: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Updated at
+             * Format: date-time
+             */
+            updated_at: string | null;
+        };
+
     };
     responses: never;
     parameters: never;
@@ -10840,6 +11629,40 @@ export interface components {
                 "application/json": components["schemas"]["ResearchGenerateInput"];
             };
         };
+        DouyinAccountInput: {
+            content: {
+                "application/json": components["schemas"]["DouyinAccountInput"];
+            };
+        };
+        DouyinAccount: {
+            content: {
+                "application/json": components["schemas"]["DouyinAccount"];
+            };
+        };
+        DouyinTaskInput: {
+            content: {
+                "application/json": components["schemas"]["DouyinTaskInput"];
+            };
+        };
+        DouyinScriptEdit: {
+            content: {
+                "application/json": components["schemas"]["DouyinScriptEdit"];
+            };
+        };
+        "applications_douyin-benchmark_accounts_works_upload_create": {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    video: string;
+                };
+            };
+        };
+        DouyinCollectorConfigInput: {
+            content: {
+                "application/json": components["schemas"]["DouyinCollectorConfigInput"];
+            };
+        };
+
     };
     headers: never;
     pathItems: never;
@@ -24794,4 +25617,899 @@ export interface operations {
             };
         };
     };
+    "applications_douyin-benchmark_accounts_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccountPage"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_create": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 同键同参重放；同键异参返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinAccountInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccountCreated"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccount"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinAccount"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccount"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTaskPage"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_create": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 同键同参重放；同键异参返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinTaskInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTask"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTask"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_cancel_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_frames_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                frame_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_versions_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinScriptVersion"][];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_versions_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinScriptEdit"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinScriptVersion"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_tasks_versions_download_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_works_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinWorks"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_accounts_works_upload_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                account_id: string;
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["applications_douyin-benchmark_accounts_works_upload_create"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinUpload"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_brands_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "applications_douyin-benchmark_connection_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinConnection"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccountPage"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_create": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 同键同参重放；同键异参返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinAccountInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccountCreated"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccount"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_partial_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinAccount"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinAccount"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTaskPage"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_create": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 同键同参重放；同键异参返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinTaskInput"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTask"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinTask"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_cancel_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_frames_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                frame_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_versions_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinScriptVersion"][];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_versions_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinScriptEdit"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinScriptVersion"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_tasks_versions_download_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                task_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_works_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinWorks"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_accounts_works_upload_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+                account_id: string;
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["applications_douyin-benchmark_accounts_works_upload_create"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinUpload"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_brands_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_connection_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinConnection"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_collector-config_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinCollectorConfig"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_collector-config_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinCollectorConfigInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinCollectorConfig"];
+                };
+            };
+        };
+    };
+    "applications_douyin-benchmark_collector-config_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清除个人采集配置 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_collector-config_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinCollectorConfig"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_collector-config_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DouyinCollectorConfigInput"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DouyinCollectorConfig"];
+                };
+            };
+        };
+    };
+    "organizations_applications_douyin-benchmark_collector-config_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清除个人采集配置 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+
 }

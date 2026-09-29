@@ -14,6 +14,7 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
   'pocket-salvager': (app, entry) => withEntry(`/applications/${app.applicationId}/pocket-salvager`, entry),
   sokoban: (app, entry) => withEntry(`/applications/${app.applicationId}/sokoban`, entry),
+  'douyin-benchmark': (app, entry) => withEntry(`/applications/${app.applicationId}/douyin-benchmark`, entry),
   'research-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/research-assistant`, entry),
   'meeting-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/meeting-assistant`, entry),
   'ai-drawing': (app, entry) => withEntry(`/applications/${app.applicationId}/ai-drawing`, entry),

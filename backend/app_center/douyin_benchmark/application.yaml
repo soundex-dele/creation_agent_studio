@@ -1,0 +1,38 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: douyin-benchmark
+  version: 1.0.0
+  name: 抖音对标助手
+  description: 采集对标账号，拆解突出作品，创作有依据的口播与拍摄脚本。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "标"
+  color: "#2563EB"
+  tags: [抖音, 对标分析, 视频拆解, 口播脚本]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: douyin-benchmark
+    executor_protocol_version: 1
+    renderer_key: douyin-benchmark
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      required: [task_id]
+      additionalProperties: false
+      properties:
+        task_id: {type: string, format: uuid}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.douyin_benchmark.backend.apps.DouyinBenchmarkConfig
+    urlconf: app_center.douyin_benchmark.backend.urls
+    executor_entrypoint: app_center.douyin_benchmark.runtime.execute
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

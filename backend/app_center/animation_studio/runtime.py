@@ -171,7 +171,7 @@ def archive_source(workspace):
         for target in sorted((Path(workspace) / "assets").glob("*")):
             if target.is_file():
                 archive.write(target, "assets/" + target.name)
-        for name in ("runner.mjs", "validate.mjs", "structured.mjs", "fonts.mjs", "preview.mjs", "package.json", "package-lock.json"):
+        for name in ("runner.mjs", "validate.mjs", "structured.mjs", "fonts.mjs", "preview.mjs", "dependencies.mjs", "package.json", "package-lock.json"):
             archive.write(ENGINE / name, name)
         archive.writestr("README.md", "# 动画源码\n\n需要 Node.js 20+、中文字体及 Chrome Headless Shell。\n\n"
             "1. npm ci\n2. npm run browser\n3. npm run preview（生成 out/preview.html，直接在浏览器打开）\n"
@@ -209,7 +209,7 @@ def _execute(payload, sink):
         if "document" in values or values["action"] == "batch":
             from .studio_runtime import execute_studio
             return execute_studio(payload, sink, run, application, values)
-        source = generation_for(run.owner, application, values["source_run_id"], ready=True) if values.get("source_run_id") else None
+        source = generation_for(run.owner, application, values["source_run_id"], ready=True, include_deleted=True) if values.get("source_run_id") else None
         source_artifact = source.artifacts.filter(kind="animation-source").first() if source else None
         asset_records = assets_for(run.owner, application, values.get("asset_ids", []))
         if values["action"] == "generate":

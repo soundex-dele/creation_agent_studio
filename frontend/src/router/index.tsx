@@ -38,6 +38,7 @@ const KitchenAssistantPage = lazy(() => import('@/pages/Apps/KitchenAssistantPag
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
+const DouyinBenchmarkPage = lazy(() => import('@/pages/Apps/DouyinBenchmarkPage'));
 const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
 const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
 const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
@@ -278,6 +279,10 @@ const router = createBrowserRouter([
   {
     path: '/applications/:applicationId/meeting-assistant',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<MeetingAssistantPage />)}</ApplicationShell></ProtectedRoute>,
+  },
+  {
+    path: '/applications/:applicationId/douyin-benchmark',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<DouyinBenchmarkPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/research-assistant',

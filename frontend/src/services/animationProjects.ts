@@ -7,7 +7,7 @@ export interface AudioTrack { asset_id: string; role: 'narration' | 'music' | 'e
 export interface Subtitle { start: number; end: number; text: string }
 export interface Brand extends Partial<SceneStyle> { logo?: string; ending?: string }
 export interface StudioDocument { note?: string; schema_version: number; prompt: string; aspect: AnimationAspect; style: string; scenes: StudioScene[]; audio: AudioTrack[]; subtitles: Subtitle[]; subtitle_style: { enabled: boolean; font: string; size: number; color: string; position: 'top' | 'center' | 'bottom' }; brand: Brand; source_run_id?: string }
-export interface StudioVersion { id: string; note: string; document: StudioDocument; created_at: string; run: AnimationGeneration }
+export interface StudioVersion { id: string; note: string; document: StudioDocument; created_at: string; run: AnimationGeneration; can_delete?: boolean }
 export interface StudioProject { id: string; title: string; archived: boolean; revision: number; updated_at: string; draft: StudioDocument; versions?: StudioVersion[]; tasks?: AnimationRun[] }
 export interface TemplateField { name: string; scene_id: string; property: 'title' | 'body' | 'narration' | 'assets'; type: 'text' | 'number' | 'image' }
 export interface StudioPreset { id: string; name: string; kind: 'template' | 'brand'; builtin: boolean; data: { document?: StudioDocument; fields?: TemplateField[] } & Brand }
@@ -36,6 +36,7 @@ export function withScenes(document: StudioDocument, scenes: StudioScene[]): Stu
 export const projectApi = (base: string) => ({
   list: (q = '', archived = false, page = 1) => api.get<{ count: number; results: StudioProject[] }>(`${base}/projects`, { q, archived: archived ? '1' : '0', page }),
   get: (id: string) => api.get<StudioProject>(`${base}/projects/${id}`),
+  deleteVersion: (id: string, versionId: string) => api.delete<void>(`${base}/projects/${id}/versions/${versionId}`),
   create: (draft = newDocument(), title = '未命名作品') => api.post<StudioProject>(`${base}/projects`, { draft, title }),
   update: (id: string, data: { title?: string; archived?: boolean }) => api.patch<StudioProject>(`${base}/projects/${id}`, data),
   save: (id: string, revision: number, document: StudioDocument) => api.put<StudioProject>(`${base}/projects/${id}/draft`, { revision, document }),

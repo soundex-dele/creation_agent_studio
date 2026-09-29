@@ -45,6 +45,8 @@ class AnimationVersion(TenantOwnedModel):
     document = models.JSONField(default=dict)
     note = models.CharField(max_length=1000, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Keep the run link so history import cannot recreate a removed version.
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "animation_studio_versions"

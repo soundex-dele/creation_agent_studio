@@ -10,7 +10,7 @@ import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import type { AnimationGeneration } from '@/services/animationStudio';
 
 const runtime = vi.hoisted(() => ({ getArtifactAccess: vi.fn(), sendCommand: vi.fn(), subscribeRun: vi.fn(), abort: vi.fn() }));
-vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 vi.mock('@/services/applicationRuntime', () => ({ createApplicationRuntimeClient: () => runtime }));
 let host: HTMLDivElement; let root: Root; let project: StudioProject;
 let mobile: boolean;
@@ -27,6 +27,93 @@ function addVersion() {
   project.versions = [{ id: 'version-1', document: project.draft, created_at: '', note: '', run }];
   return run;
 }
+function addTwoVersions() {
+  addVersion();
+  const first = project.versions![0];
+  project.versions!.push({ ...first, id: 'version-2', run: { ...generation(), id: 'generation-2', artifacts: [] } });
+  vi.mocked(api.delete).mockImplementation(async url => {
+    project = { ...project, versions: project.versions!.filter(v => !url.endsWith(`/versions/${v.id}`)) };
+  });
+}
+describe('version deletion', () => {
+  it('requires confirmation, supports cancellation, then selects the remaining version', async () => {
+    addTwoVersions(); await render(); await panel('preview');
+    await write(field('对比版本', 'select'), 'generation-2');
+    await click('删除当前版本');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('删除版本 2');
+    expect(api.delete).not.toHaveBeenCalled();
+    await click('取消'); expect(api.delete).not.toHaveBeenCalled();
+    await click('删除当前版本'); await click('确认删除');
+    expect(api.delete).toHaveBeenCalledWith(expect.stringContaining('/projects/project-1/versions/version-1'));
+    expect(selectedValue('查看版本')).toBe('generation-2');
+    expect(selectedValue('对比版本')).toBe('');
+    expect(host.querySelector('.studio-comparison-grid')).toBeNull();
+    expect(onSelect).toHaveBeenLastCalledWith('generation-2');
+    expect(host.textContent).toContain('版本 2已删除');
+  });
+
+  it('clears the last version and URL selection while keeping the current draft', async () => {
+    addVersion(); await render();
+    await write(field('动画内容', 'textarea'), '保留我的草稿');
+    await panel('preview'); await click('删除当前版本'); await click('确认删除');
+    expect(onSelect).toHaveBeenLastCalledWith('');
+    expect(host.querySelectorAll('.studio-version-strip button')).toHaveLength(0);
+    expect(button('删除当前版本')).toBeUndefined();
+    await panel('scenes');
+    expect(field('动画内容', 'textarea').value).toBe('保留我的草稿');
+  });
+
+  it('keeps the version and confirmation open on failure and allows retry', async () => {
+    addTwoVersions();
+    vi.mocked(api.delete).mockRejectedValueOnce(new Error('删除失败，请重试'));
+    await render(); await panel('preview'); await click('删除当前版本'); await click('确认删除');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('删除失败，请重试');
+    expect(selectedValue('查看版本')).toBe('generation-1');
+    expect(onSelect).not.toHaveBeenCalled();
+    await click('确认删除');
+    expect(api.delete).toHaveBeenCalledTimes(2);
+    expect(selectedValue('查看版本')).toBe('generation-2');
+  });
+
+  it.each(['generating', 'exporting', 'referenced'])('disables deletion when %s', async kind => {
+    const run = addVersion();
+    if (kind === 'generating') run.status = 'running';
+    if (kind === 'exporting') run.exports = [{ ...generation(), id: 'export-1', status: 'queued' }];
+    if (kind === 'referenced') project.versions![0].can_delete = false;
+    await render(); await panel('preview');
+    expect(button('删除当前版本').disabled).toBe(true);
+    expect(button('删除当前版本').title).toBeTruthy();
+    await click('删除当前版本');
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  it('submits once during a pending deletion', async () => {
+    addTwoVersions();
+    let finish!: () => void;
+    vi.mocked(api.delete).mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+    await render(); await panel('preview'); await click('删除当前版本');
+    await click('确认删除'); await click('确认删除');
+    expect(api.delete).toHaveBeenCalledTimes(1);
+    expect(button('取消').disabled).toBe(true);
+    await act(async () => finish());
+    expect(selectedValue('查看版本')).toBe('generation-2');
+  });
+
+  it('ignores a poll started before deletion instead of restoring the removed version', async () => {
+    vi.useFakeTimers(); addTwoVersions(); await render(); await panel('preview');
+    const stale = structuredClone(project);
+    let finish!: (value: StudioProject) => void;
+    const normalGet = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/projects/project-1')
+      ? new Promise<StudioProject>(resolve => { finish = resolve; }) : normalGet(url, ...args));
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    await click('删除当前版本'); await click('确认删除');
+    await act(async () => finish(stale));
+    expect(host.querySelectorAll('.studio-version-strip button')).toHaveLength(1);
+    expect(selectedValue('查看版本')).toBe('generation-2');
+  });
+});
+
 beforeEach(() => {
   vi.resetAllMocks(); localStorage.clear(); mobile = false; mediaChange = undefined;
   Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true });

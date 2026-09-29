@@ -196,7 +196,7 @@ def test_generation_builds_preview_without_rendering_and_survives_workspace_clea
     with zipfile.ZipFile(io.BytesIO(sink.artifacts[0]["content"])) as archive:
         assert "Animation.tsx" in archive.namelist()
         assert "package-lock.json" in archive.namelist()
-        assert "preview.mjs" in archive.namelist()
+        assert {"preview.mjs", "dependencies.mjs"}.issubset(archive.namelist())
         assert json.loads(archive.read("composition.json"))["durationInFrames"] == 900
 
 

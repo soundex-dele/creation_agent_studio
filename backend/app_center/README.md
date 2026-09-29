@@ -38,6 +38,10 @@ The **厨房助手** (`kitchen-assistant`) workspace ports the Flutter kitchen a
 into a private web application with recipes, meal plans, shopping lists, cooking
 timers, inventory and cooking history. See [`kitchen_assistant/README.md`](kitchen_assistant/README.md).
 
+## Douyin benchmark
+
+The **抖音对标助手** (`douyin-benchmark`) workspace collects public author posts through isolated DTK source calls with encrypted personal browser settings, keeps metric snapshots, analyzes transcripts and sampled frames, and creates editable shooting scripts. See [`douyin_benchmark/README.md`](douyin_benchmark/README.md) for configuration and live-verification requirements.
+
 ## Guided content applications
 
 The **动画制作** (`animation-studio`) dedicated workspace generates editable Remotion animations,

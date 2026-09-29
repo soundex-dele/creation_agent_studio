@@ -1,5 +1,6 @@
 import uuid
 from pathlib import Path
+from django.db import transaction
 
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -80,7 +81,7 @@ class AssetsView(BaseView):
 class GenerationsView(BaseView):
     def get(self, request, **kwargs):
         application = self.application()
-        runs = runs_for(request.user, application).filter(input__action="generate").order_by("-created_at", "-id")
+        runs = runs_for(request.user, application).filter(input__action="generate", animation_version__deleted_at__isnull=True).order_by("-created_at", "-id")
         pagination = PageNumberPagination()
         pagination.page_size = 20
         page = pagination.paginate_queryset(runs, request)
@@ -109,9 +110,10 @@ class GenerationView(BaseView):
 
 
 class ExportsView(BaseView):
+    @transaction.atomic
     def post(self, request, run_id, **kwargs):
         application = self.application()
-        source = generation_for(request.user, application, run_id, ready=True)
+        source = generation_for(request.user, application, run_id, ready=True, lock=True)
         from .studio_validation import export_options
         values = {"action": "export", "source_run_id": str(source.id)}
         if request.data:
