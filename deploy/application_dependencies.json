@@ -1,0 +1,223 @@
+{
+  "applications": {
+    "ai-drawing": {
+      "name": "AI 绘图",
+      "runtimes": [],
+      "notes": [
+        "执行账号的 Codex 登录及图像生成能力需单独验证。"
+      ]
+    },
+    "animation-studio": {
+      "name": "动画制作",
+      "runtimes": [
+        "animation",
+        "ffmpeg"
+      ],
+      "notes": [
+        "配置执行账号的 Codex 登录；配音功能另需语音服务凭据。"
+      ]
+    },
+    "article-html-illustrator": {
+      "name": "文章 HTML 配图",
+      "runtimes": [],
+      "skills": [
+        "baoyu-article-html-illustrator"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "brand-library": {
+      "name": "品牌资料库",
+      "runtimes": []
+    },
+    "case-library": {
+      "name": "案例库",
+      "runtimes": []
+    },
+    "copy-to-jianying": {
+      "name": "文案转剪映",
+      "runtimes": [
+        "ffmpeg"
+      ],
+      "skills": [
+        "copy-to-jianying"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "creation-master": {
+      "name": "创作大师",
+      "runtimes": [
+        "ffmpeg"
+      ],
+      "notes": [
+        "Windows Qt/剪映桌面依赖需额外指定 --with-creation-master；Web 版使用共享依赖。"
+      ]
+    },
+    "creation-toolbox": {
+      "name": "创作工具箱",
+      "runtimes": [
+        "ffmpeg"
+      ],
+      "notes": [
+        "Whisper 模型在首次转录时下载，离线部署需预先缓存模型。"
+      ]
+    },
+    "documents": {
+      "name": "在线文档",
+      "runtimes": []
+    },
+    "gzh-design": {
+      "name": "公众号排版引擎",
+      "runtimes": [],
+      "skills": [
+        "gzh-design"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "html-cover-generator": {
+      "name": "HTML 封面生成器",
+      "runtimes": [],
+      "skills": [
+        "baoyu-html-cover"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "html-to-paged-cards": {
+      "name": "HTML 分页图文",
+      "runtimes": [],
+      "skills": [
+        "html-to-paged-cards"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "html-to-png": {
+      "name": "HTML 批量转 PNG",
+      "runtimes": [
+        "png"
+      ]
+    },
+    "ideas-todos": {
+      "name": "想法&待办",
+      "runtimes": []
+    },
+    "kitchen-assistant": {
+      "name": "厨房助手",
+      "runtimes": []
+    },
+    "markdown-to-html": {
+      "name": "Markdown 转 HTML",
+      "runtimes": [],
+      "skills": [
+        "baoyu-markdown-to-html"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "meeting-assistant": {
+      "name": "会议与访谈助手",
+      "runtimes": [
+        "ffmpeg"
+      ],
+      "notes": [
+        "Whisper 模型在首次转录时下载，离线部署需预先缓存模型。"
+      ]
+    },
+    "my-computer": {
+      "name": "我的电脑",
+      "runtimes": [],
+      "notes": [
+        "远程设备代理与执行主机连接需单独配置。"
+      ]
+    },
+    "my-drive": {
+      "name": "我的网盘",
+      "runtimes": []
+    },
+    "pocket-salvager": {
+      "name": "口袋打捞队",
+      "runtimes": []
+    },
+    "research-assistant": {
+      "name": "资料研究助手",
+      "runtimes": []
+    },
+    "sokoban": {
+      "name": "推箱子",
+      "runtimes": []
+    },
+    "study-with-method": {
+      "name": "学之有道",
+      "runtimes": [],
+      "notes": [
+        "依赖 teaching_data 子模块；安装后另行运行 validate_teaching_data。"
+      ]
+    },
+    "wechat-assistant": {
+      "name": "微信助手",
+      "runtimes": [],
+      "notes": [
+        "微信连接凭据及连接器服务需单独配置。"
+      ]
+    },
+    "wechat-html-optimizer": {
+      "name": "公众号 HTML 优化器",
+      "runtimes": [],
+      "skills": [
+        "optimize-wechat-html"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "wechat-viral-article": {
+      "name": "公众号爆款写作",
+      "runtimes": [],
+      "skills": [
+        "wechat-viral-article"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "wechat-viral-topics": {
+      "name": "公众号爆款选题",
+      "runtimes": [],
+      "skills": [
+        "wechat-viral-article"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "write-image-text-copy": {
+      "name": "图文文案",
+      "runtimes": [],
+      "skills": [
+        "write-image-text-copy"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    },
+    "write-short-video-copy": {
+      "name": "短视频文案",
+      "runtimes": [],
+      "skills": [
+        "write-short-video-copy"
+      ],
+      "notes": [
+        "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
+      ]
+    }
+  }
+}

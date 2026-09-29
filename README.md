@@ -59,8 +59,10 @@ bash install-dependencies.sh --system-deps --with-codex
 ```
 
 脚本创建或复用项目虚拟环境，初始化锁定版本的 Git 子模块，安装后端
-`requirements/production.txt`、前端 npm 依赖、HTML 转 PNG 的 Playwright 和
-Chromium，并执行 `pip check` 与浏览器截图自检。Windows 使用 `backend/venv`；
+`requirements/production.txt`、前端 npm 依赖、HTML 转 PNG 的 Playwright/Chromium，
+以及动画制作的 Remotion 引擎/Chrome Headless Shell，并执行 `pip check`、浏览器截图
+与 Remotion 浏览器启动自检。Python 依赖已包含 openpyxl、faster-whisper、Pillow 等应用组件。
+Windows 使用 `backend/venv`；
 Linux/macOS 优先复用 `backend/.venv`，其次 `backend/venv`，新环境使用 `.venv`。
 所有 pip 操作均在该虚拟环境内执行。前端构建所需的开发依赖也会安装。
 
@@ -80,7 +82,29 @@ Linux/macOS 的 `PYTHON_BOOTSTRAP=python3.12`。
 | `-WithMobile` | `--with-mobile` | 安装移动端 npm 包，Android/iOS SDK 仍需单独配置 |
 | `-WithCodex` | `--with-codex` | 安装与后端 Dockerfile 对齐的 Codex CLI；已有可用执行器时可省略 |
 | `-SkipSubmodules` | `--skip-submodules` | 使用已初始化的子模块或包含完整子模块的源码包 |
+| `-App animation-studio` | `--app animation-studio` | 只安装指定应用的额外运行组件；共享后端与前端依赖仍会安装 |
+| `-ListApps` | `--list-apps` | 只列出支持的应用、运行组件和外部前置条件，不安装或创建虚拟环境 |
 | `-DryRun` | `--dry-run` | 只显示安装计划；虚拟环境不存在时只显示创建提示 |
+
+不指定应用时，默认覆盖所有仓库内应用。支持一次选择多个应用：
+
+```bash
+bash install-dependencies.sh --list-apps
+bash install-dependencies.sh --app animation-studio --app html-to-png --dry-run
+bash install-dependencies.sh --app animation-studio --skip-submodules
+```
+
+```powershell
+.\install-dependencies.ps1 -ListApps
+.\install-dependencies.ps1 -App animation-studio,html-to-png -DryRun
+.\install-dependencies.ps1 -App animation-studio -SkipSubmodules
+```
+
+应用与额外组件的映射维护在 [deploy/application_dependencies.json](deploy/application_dependencies.json)。
+普通表单、文档、游戏等应用复用共享依赖；转录与媒体应用检查 FFmpeg；外部 Skill 应用会列出
+所需 Skill 名称及待配置事项，不会将这些外部组件误报为已经安装。
+Linux 仅选择动画制作并指定 `--system-deps` 时，也会安装 Playwright 的系统库安装器，
+为 Chrome Headless Shell 补齐系统库。Whisper 模型仍在首次转录时下载，离线部署需提前缓存。
 
 `WithCodex` 使用 npm 的全局安装目录，该目录需对当前用户可写（例如使用 nvm 管理的 Node.js）；
 若组织已统一安装 Codex CLI，可省略此参数并确保 `codex` 在 worker 的 PATH 中。

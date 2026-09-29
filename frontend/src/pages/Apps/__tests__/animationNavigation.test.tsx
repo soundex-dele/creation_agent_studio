@@ -9,7 +9,7 @@ import { newDocument, newScene, type StudioProject } from '@/services/animationP
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import type { AnimationGeneration } from '@/services/animationStudio';
 
-const runtime = vi.hoisted(() => ({ getArtifactAccess: vi.fn(), sendCommand: vi.fn() }));
+const runtime = vi.hoisted(() => ({ getArtifactAccess: vi.fn(), sendCommand: vi.fn(), subscribeRun: vi.fn(), abort: vi.fn() }));
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() } }));
 vi.mock('@/services/applicationRuntime', () => ({ createApplicationRuntimeClient: () => runtime }));
 let host: HTMLDivElement; let root: Root; let project: StudioProject;
@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '<h1>动画</h1>' }));
   runtime.getArtifactAccess.mockResolvedValue({ url: 'https://test.invalid/preview' });
+  runtime.subscribeRun.mockReturnValue({ abort: runtime.abort });
   project = { id: 'project-1', title: '我的作品', archived: false, revision: 1, updated_at: '', draft: { ...newDocument(), scenes: [newScene()] }, versions: [], tasks: [] };
   vi.mocked(api.get).mockImplementation(async url => {
     if (url.includes('/projects/project-1')) return project;
@@ -69,9 +70,16 @@ async function panel(name: string) {
 }
 async function click(name: string) { await act(async () => button(name).click()); }
 function field(label: string, selector = 'input') {
-  return Array.from(host.querySelectorAll('label')).find(node => node.textContent?.startsWith(label) && !node.closest('[hidden]'))!.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector)!;
+  return Array.from(host.querySelectorAll('label')).find(node => node.textContent?.startsWith(label) && !node.closest('[hidden]'))!.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector === 'select' ? 'input[role="combobox"]' : selector)!;
 }
+function selectedValue(label: string) { return (field(label, 'select').closest('.studio-select-field') as HTMLElement).dataset.value; }
 async function write(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
+  if (element.getAttribute('role') === 'combobox') {
+    await act(async () => element.closest('.ant-select')!.querySelector('.ant-select-selector')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    const option = Array.from(document.querySelectorAll<HTMLElement>('.studio-select-popup:not(.ant-select-dropdown-hidden) [data-option-value]')).find(item => item.dataset.optionValue === value)!;
+    await act(async () => option.click());
+    return;
+  }
   await act(async () => {
     Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value')!.set!.call(element, value);
     element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
@@ -87,6 +95,21 @@ async function openMenu() {
 }
 
 describe('unified animation navigation', () => {
+  it('opens details for an active export and retains the dialog after the task completes', async () => {
+    vi.useFakeTimers();
+    const version = addVersion();
+    version.exports = [{ ...generation(), id: 'export-1', status: 'running', input: { ...generation().input, action: 'export' } }];
+    await render(); await click('详情');
+    expect(runtime.subscribeRun).toHaveBeenCalledWith('export-1', expect.any(Object));
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    version.exports[0].status = 'succeeded';
+    await act(async () => vi.advanceTimersByTimeAsync(3100));
+    expect(host.querySelector('.studio-task')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.querySelector('.animation-task-current')?.textContent).toContain('已完成');
+    expect(runtime.sendCommand).not.toHaveBeenCalled();
+  });
+
   it('exposes nine destinations with one active menu item, title and content pane', async () => {
     await render(); expect(api.post).not.toHaveBeenCalled();
     expect(currentPage()).toBe('scenes');
@@ -114,7 +137,7 @@ describe('unified animation navigation', () => {
     await panel('audio'); await write(field('音色', 'select'), 'two');
     await panel('history'); await write(field('搜索作品'), '作品过滤');
     await panel('preview'); await panel('history'); expect(field('搜索作品').value).toBe('作品过滤');
-    await panel('audio'); expect(field('音色', 'select').value).toBe('two');
+    await panel('audio'); expect(selectedValue('音色')).toBe('two');
     await panel('settings'); expect(field('密钥引用名称').value).toBe('my-secret-ref');
     await panel('batch'); expect(host.querySelectorAll('[data-panel="batch"] tbody tr')).toHaveLength(2);
     await panel('presets'); expect(field('预设名称').value).toBe('测试模板');
@@ -132,7 +155,7 @@ describe('unified animation navigation', () => {
     await write(field('格式', 'select'), 'gif');
     await click('继续修改');
     expect(currentPage()).toBe('scenes'); expect(host.querySelector('iframe')).toBeNull();
-    await panel('preview'); expect(field('格式', 'select').value).toBe('gif');
+    await panel('preview'); expect(selectedValue('格式')).toBe('gif');
     expect(host.querySelector('iframe')).not.toBeNull();
   });
 

@@ -11,6 +11,7 @@ import { activeExport, animationApi, animationArtifact, animationError, animatio
   type AnimationAspect, type AnimationAsset, type AnimationGeneration, type AnimationInput, type AnimationRun } from '@/services/animationStudio';
 import './AnimationStudioPage.css';
 import AnimationStudioEditor from './animation/AnimationStudioEditor';
+import AnimationTaskDetails from './animation/AnimationTaskDetails';
 
 const EXAMPLES = [
   { title: '知识讲解', text: '用 30 秒讲清楚番茄工作法：专注 25 分钟、休息 5 分钟，用简洁的时钟和进度动画辅助说明。' },
@@ -80,6 +81,7 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
   const [listError, setListError] = useState('');
   const [connectionError, setConnectionError] = useState('');
   const [stage, setStage] = useState('');
+  const [detailedRun, setDetailedRun] = useState<AnimationRun>();
   const [tab, setTab] = useState(initialRunId ? 'preview' : 'create');
   const initialized = useRef(false);
   const selection = useRef(0);
@@ -232,7 +234,7 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
       <main className="animation-results">
         <div className="animation-section-title animation-preview-heading"><div><span className="animation-eyebrow">YOUR ANIMATION</span><h2>{String(selected?.output_summary.title || '创作预览')}</h2></div><div className="animation-preview-tools"><span className={`animation-format ${video ? 'is-video' : ''}`}>{video ? 'MP4' : 'HTML'}</span>{ready && <Button type="primary" disabled={busy} onClick={edit}>继续修改</Button>}</div></div>
         {connectionError && <Alert type="warning" message={connectionError} />}
-        {active && <div className="animation-progress" role="status"><Spin size="small" /><span>{animationStatus(active.status, stage || (exporting ? 'rendering' : ''))}</span><Button size="small" disabled={busy || active.status === 'cancelling'} onClick={() => void cancel()}>取消任务</Button></div>}
+        {active && <div className="animation-progress" role="status"><Spin size="small" /><span>{animationStatus(active.status, stage || (exporting ? 'rendering' : ''))}</span><Button size="small" onClick={() => setDetailedRun(active)}>详情</Button><Button size="small" disabled={busy || active.status === 'cancelling'} onClick={() => void cancel()}>取消任务</Button></div>}
         <div className="animation-canvas" style={{ aspectRatio: dimensions ? `${dimensions.width} / ${dimensions.height}` : aspect.replace(':', ' / ') }}>
           {selected ? <AnimationPreview generation={selected} runtime={runtime} /> : <div className="animation-placeholder"><div className="animation-placeholder-mark"><Film size={40} strokeWidth={1.3} /></div><h3>从一句话，到一段动画</h3><p>知识、流程、数据，都可以有更生动的表达。</p><span>HTML 实时预览 · 自由修改 · 高清导出</span></div>}
         </div>
@@ -253,6 +255,7 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
         <Pagination simple current={page} total={total} pageSize={20} showSizeChanger={false} hideOnSinglePage onChange={setPage} />
       </aside>
     </div>
+    {detailedRun && <AnimationTaskDetails key={detailedRun.id} run={[selected, ...(selected?.exports || [])].find(run => run?.id === detailedRun.id) || detailedRun} runtime={runtime} onClose={() => setDetailedRun(undefined)} />}
   </section>;
 }
 

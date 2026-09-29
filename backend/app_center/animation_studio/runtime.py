@@ -32,9 +32,76 @@ class Cancelled(Exception):
     pass
 
 
+class AnimationBuildError(RuntimeError):
+    def __init__(self, message, *, code="scene_build_error", retryable=True):
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
+
+
+def build_error(log, workspace):
+    sanitized = log.replace(str(workspace), "<project>").replace(str(ENGINE), "<engine>")
+    for line in reversed(sanitized.splitlines()):
+        if line.startswith("ANIMATION_BUILD_ERROR "):
+            try:
+                data = json.loads(line.removeprefix("ANIMATION_BUILD_ERROR "))
+                if isinstance(data, dict) and isinstance(data.get("message"), str):
+                    message = data["message"].replace(str(workspace), "<project>").replace(str(ENGINE), "<engine>")
+                    return AnimationBuildError(message, code=data.get("code", "scene_build_error"),
+                                               retryable=data.get("retryable") is not False)
+            except ValueError:
+                pass
+    return AnimationBuildError(sanitized)
+
+
 def check_cancel(sink):
     if sink.cancelled:
         raise Cancelled()
+
+
+def report_build_failure(sink, error, attempt, context=None):
+    check_cancel(sink)
+    sink.emit("progress.updated", {
+        **(context or {}), "stage": "build_failed", "attempt": attempt,
+        "error_message": str(error)[-4000:],
+        "error_code": getattr(error, "code", "scene_build_error"),
+        "will_retry": attempt < 3 and getattr(error, "retryable", True),
+    })
+
+
+def require_engine():
+    node = shutil.which("node")
+    if not node:
+        raise RuntimeError("动画引擎无法启动：未找到 Node.js，请安装 Node.js 20+ 并确保任务进程的 PATH 可访问 node。")
+    if not (ENGINE / "node_modules" / "remotion" / "package.json").is_file():
+        raise RuntimeError(
+            "动画引擎依赖未安装，请在仓库根目录执行 "
+            "npm ci --prefix backend/app_center/animation_studio/engine，随后执行 "
+            "npm run browser --prefix backend/app_center/animation_studio/engine，再重新生成。"
+        )
+    return node
+
+
+def ai_progress(sink, context):
+    """Report output activity without publishing generated source or reasoning."""
+    characters = 0
+    last_emit = None
+
+    def on_event(event_type, payload):
+        nonlocal characters, last_emit
+        if event_type not in ("output.delta", "output.snapshot"):
+            return
+        text = payload.get("text")
+        if not isinstance(text, str) or not text:
+            return
+        characters = len(text) if event_type == "output.snapshot" else characters + len(text)
+        now = time.monotonic()
+        if last_emit is None or now - last_emit >= 2:
+            check_cancel(sink)
+            sink.emit("progress.updated", {**context, "activity": "responding", "characters": characters})
+            last_emit = now
+
+    return on_event
 
 
 def stop_process(process):
@@ -62,10 +129,11 @@ def run_process(arguments, workspace, sink, timeout=300):
                 if time.monotonic() > deadline:
                     raise TimeoutError("动画任务超时，可稍后重试或缩短动画。")
                 time.sleep(0.15)
-            output.seek(0)
-            tail = output.read()[-6000:].decode("utf-8", errors="replace")
+            output.seek(0, 2)
+            output.seek(max(0, output.tell() - 16000))
+            tail = output.read().decode("utf-8", errors="replace")
             if process.returncode:
-                raise RuntimeError(tail.replace(str(workspace), "<project>").replace(str(ENGINE), "<engine>"))
+                raise build_error(tail, workspace)
         finally:
             stop_process(process)
     check_cancel(sink)
@@ -103,7 +171,7 @@ def archive_source(workspace):
         for target in sorted((Path(workspace) / "assets").glob("*")):
             if target.is_file():
                 archive.write(target, "assets/" + target.name)
-        for name in ("runner.mjs", "validate.mjs", "structured.mjs", "fonts.mjs", "package.json", "package-lock.json"):
+        for name in ("runner.mjs", "validate.mjs", "structured.mjs", "fonts.mjs", "preview.mjs", "package.json", "package-lock.json"):
             archive.write(ENGINE / name, name)
         archive.writestr("README.md", "# 动画源码\n\n需要 Node.js 20+、中文字体及 Chrome Headless Shell。\n\n"
             "1. npm ci\n2. npm run browser\n3. npm run preview（生成 out/preview.html，直接在浏览器打开）\n"
@@ -146,9 +214,7 @@ def _execute(payload, sink):
         asset_records = assets_for(run.owner, application, values.get("asset_ids", []))
         if values["action"] == "generate":
             enforce_member_token_quota(run.organization, run.owner)
-    node = shutil.which("node")
-    if not node or not (ENGINE / "node_modules" / "remotion").exists():
-        raise RuntimeError("动画引擎未安装，请在 animation_studio/engine 执行 npm ci 和 npm run browser。")
+    node = require_engine()
     root = Path(settings.AGENT_WORKSPACE_ROOT) / "animation-studio" / str(run.organization_id)
     root.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=f"{run.id}-", dir=root, ignore_cleanup_errors=True) as directory:
@@ -201,7 +267,8 @@ def _execute(payload, sink):
             check_cancel(sink)
             sink.emit("progress.updated", {"stage": "generating" if attempt == 0 else "repairing", "attempt": attempt + 1})
             response = CodexAdapter(model=(payload.get("effective_config") or {}).get("model")).complete(
-                messages, working_directory=str(workspace), cancelled=lambda: sink.cancelled, timeout_seconds=600)
+                messages, working_directory=str(workspace), cancelled=lambda: sink.cancelled, timeout_seconds=600,
+                on_event=ai_progress(sink, {"stage": "generating" if attempt == 0 else "repairing", "attempt": attempt + 1}))
             check_cancel(sink)
             with tenant_database_context(run.organization_id):
                 record_usage(organization=run.organization, user=run.owner, resource_type="application", resource_id=str(application.id),
@@ -216,6 +283,10 @@ def _execute(payload, sink):
                 run_process([node, str(ENGINE / "runner.mjs"), "preview", str(workspace)], workspace, sink)
                 break
             except (ValueError, RuntimeError) as exc:
+                report_build_failure(sink, exc, attempt + 1)
+                if isinstance(exc, AnimationBuildError) and not exc.retryable:
+                    sink.create_artifact(kind="animation-diagnostic", filename="build-error.txt", content=str(exc), mime_type="text/plain")
+                    raise
                 last_error = str(exc)[-4000:]
                 messages.extend([{"role": "assistant", "content": response.content},
                                  {"role": "user", "content": f"修复以下构建错误，返回完整 JSON：\n{last_error}"}])

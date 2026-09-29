@@ -1,7 +1,6 @@
 import copy
 import json
 import math
-import shutil
 import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,15 +17,16 @@ from .json_output import decode_json_object
 from .backend.projects import project_for, document_assets
 from .backend.models import AnimationProject, AnimationVersion, AnimationAsset
 from .backend.media import probe
-from .runtime import ENGINE, PACKAGE, check_cancel, run_process, archive_source, export_video
+from .runtime import ENGINE, PACKAGE, AnimationBuildError, ai_progress, check_cancel, require_engine, report_build_failure, run_process, archive_source, export_video
 
 
-def ask(run, application, payload, sink, system, content, workspace):
+def ask(run, application, payload, sink, system, content, workspace, *, progress=None):
     check_cancel(sink)
     enforce_member_token_quota(run.organization, run.owner)
     response = CodexAdapter(model=(payload.get("effective_config") or {}).get("model")).complete(
         [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(content, ensure_ascii=False)}],
-        working_directory=str(workspace), cancelled=lambda: sink.cancelled, timeout_seconds=600)
+        working_directory=str(workspace), cancelled=lambda: sink.cancelled, timeout_seconds=600,
+        on_event=ai_progress(sink, progress or {"stage": "generating"}))
     check_cancel(sink)
     record_usage(organization=run.organization, user=run.owner, resource_type="application", resource_id=str(application.id),
                  usage=response.usage.model_dump(), provider="codex", model=response.model)
@@ -46,7 +46,8 @@ def storyboard(run, app, payload, sink, doc, workspace):
         previous = {"source": (folder / "Animation.tsx").read_text("utf-8"), "storyboard": (folder / "storyboard.md").read_text("utf-8") if (folder / "storyboard.md").exists() else ""}
     result = ask(run, app, payload, sink,
         '你是动画分镜导演。只返回 JSON {"scenes":[{"title":"标题","body":"画面文案","narration":"旁白","description":"画面描述","frames":300}]}。字符串内的换行、制表符和引号必须按 JSON 标准转义。总时长 150–3600 帧，30fps，最多30幕。保留用户事实、数字与限定，不编造数据。',
-        {"prompt": doc["prompt"], "style": doc["style"], "aspect": doc["aspect"], "original_work": previous}, workspace)
+        {"prompt": doc["prompt"], "style": doc["style"], "aspect": doc["aspect"], "original_work": previous}, workspace,
+        progress={"stage": "storyboard"})
     items = result.get("scenes", [])
     if not isinstance(items, list): raise RuntimeError("AI 分镜结果无效。")
     doc["scenes"] = [{**scene(), **{key: item[key] for key in ("title", "body", "narration", "description", "frames") if key in item}} for item in items]
@@ -56,6 +57,7 @@ def storyboard(run, app, payload, sink, doc, workspace):
 
 def persist_result(run, project, values, doc, sink):
     check_cancel(sink)
+    sink.emit("progress.updated", {"stage": "saving"})
     doc = validate_document(doc, complete=True)
     sink.create_artifact(kind="animation-document", filename="project.json", content=json.dumps(doc, ensure_ascii=False), mime_type="application/json", metadata={"schema_version": 2})
     changed = AnimationProject.objects.filter(pk=project.id, revision=values["draft_revision"]).update(
@@ -70,11 +72,13 @@ def execute_studio(payload, sink, run, app, values):
     project = project_for(run.owner, app, values["project_id"])
     doc = copy.deepcopy(values["document"])
     document_assets(run.owner, app, doc)
+    action = values["action"]
+    # Check before paid storyboard generation, so a missing engine cannot waste AI work.
+    node = require_engine() if action in ("generate", "scene") else None
     root = Path(settings.AGENT_WORKSPACE_ROOT) / "animation-studio" / str(run.organization_id)
     root.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=f"{run.id}-", dir=root, ignore_cleanup_errors=True) as directory:
         workspace = Path(directory)
-        action = values["action"]
         if action == "storyboard" or (action == "generate" and not doc["scenes"]):
             doc = storyboard(run, app, payload, sink, doc, workspace)
         if action == "speech":
@@ -106,6 +110,7 @@ def execute_studio(payload, sink, run, app, values):
             offset = sum(s["frames"] for s in doc["scenes"][:doc["scenes"].index(item)])
             delta = item["frames"] - old_frames
             doc["subtitles"] = [{**s, "start": s["start"] + (delta if s["start"] >= offset + old_frames else 0), "end": s["end"] + (delta if s["start"] >= offset + old_frames else 0)} for s in doc["subtitles"] if not offset <= s["start"] < offset + old_frames]
+            sink.emit("progress.updated", {"stage": "transcribing", "scene_id": item["id"], "scene_title": item["title"]})
             transcription = transcribe_segments(path, cancelled=lambda: sink.cancelled)
             doc["subtitles"].extend({"start": offset + math.floor(s["start"] * 30), "end": min(offset + frames, offset + math.ceil(s["end"] * 30)), "text": s["text"]} for s in transcription["segments"] if s["end"] > s["start"])
         elif action == "transcribe":
@@ -124,27 +129,40 @@ def execute_studio(payload, sink, run, app, values):
             trim = track.get("trim_start", 0); total = sum(s["frames"] for s in doc["scenes"])
             doc["subtitles"] = [{"start": max(offset, offset + math.floor(s["start"] * 30) - trim), "end": min(total, offset + math.ceil(s["end"] * 30) - trim), "text": s["text"]} for s in result["segments"] if offset + math.ceil(s["end"]*30)-trim > offset and offset + math.floor(s["start"]*30)-trim < total]
         if action in ("generate", "scene"):
-            node = shutil.which("node")
-            if not node or not (ENGINE / "node_modules" / "remotion").exists(): raise RuntimeError("动画引擎未安装。")
             targets = [s for s in doc["scenes"] if (s["id"] == values.get("scene_id") if action == "scene" else not s.get("source") and not s.get("locked"))]
             for item in targets:
-                sink.emit("progress.updated", {"stage": "generating", "scene_id": item["id"]})
+                progress = {"scene_id": item["id"], "scene_title": item["title"],
+                            "scene_index": doc["scenes"].index(item) + 1, "scene_total": len(doc["scenes"])}
                 system = (PACKAGE / "authoring.md").read_text("utf-8") + '\n现在只生成一个独立场景。默认组件接收 {scene} props，标题、正文、素材及颜色必须读取 scene.title/body/assets/style；不要把这些可编辑内容写死。场景长度使用 scene.frames。不要生成旁白、字幕或场景排序。'
                 content = {"scene": item, "requirements": values.get("instruction", doc["prompt"]), "aspect": doc["aspect"], "style": doc["style"]}
                 last_error = ""
                 for attempt in range(3):
-                    result = ask(run, app, payload, sink, system, {**content, "build_error": last_error}, workspace)
+                    step = {**progress, "stage": "generating" if attempt == 0 else "repairing", "attempt": attempt + 1}
+                    sink.emit("progress.updated", step)
+                    result = ask(run, app, payload, sink, system,
+                                 {**content, "build_error": last_error, "previous_source": item.get("source", "")},
+                                 workspace, progress=step)
                     source = result.get("source")
                     if not isinstance(source, str) or not source.strip(): raise RuntimeError("AI 没有返回场景源码。")
                     item["source"] = source
                     prepare(workspace, doc, run.owner, app)
                     try:
+                        sink.emit("progress.updated", {**progress, "stage": "building_preview", "attempt": attempt + 1})
                         run_process([node, str(ENGINE / "runner.mjs"), "preview", str(workspace)], workspace, sink)
                         break
                     except RuntimeError as exc:
+                        report_build_failure(sink, exc, attempt + 1, progress)
+                        if isinstance(exc, AnimationBuildError) and not exc.retryable:
+                            sink.create_artifact(kind="animation-diagnostic", filename="build-error.txt", content=str(exc), mime_type="text/plain")
+                            raise
                         last_error = str(exc)[-4000:]
-                else: raise RuntimeError("场景构建失败，已尝试修复两次。" + last_error)
+                else:
+                    sink.create_artifact(kind="animation-diagnostic-source", filename="scene-incomplete.tsx",
+                                         content=item["source"], mime_type="text/plain", metadata={"scene_id": item["id"], "incomplete": True})
+                    sink.create_artifact(kind="animation-diagnostic", filename="build-error.txt", content=last_error, mime_type="text/plain")
+                    raise RuntimeError("场景构建失败，已尝试修复两次。" + last_error)
             if action == "scene": doc["note"] = f"修改 {targets[0]['title']}：{values['instruction']}"[:1000]
+            sink.emit("progress.updated", {"stage": "building_preview"})
             prepare(workspace, doc, run.owner, app)
             run_process([node, str(ENGINE / "runner.mjs"), "preview", str(workspace)], workspace, sink)
             if action == "generate":
@@ -153,6 +171,7 @@ def execute_studio(payload, sink, run, app, values):
                 check_cancel(sink)
                 sink.create_artifact(kind="animation-source", filename="animation-source.zip", content=archive_source(workspace), mime_type="application/zip", metadata=metadata)
                 sink.create_artifact(kind="animation-preview", filename="preview.html", content=(workspace / "out/preview.html").read_bytes(), mime_type="text/html", metadata=metadata)
+                sink.emit("progress.updated", {"stage": "building_cover"})
                 run_process([node, str(ENGINE / "runner.mjs"), "cover", str(workspace)], workspace, sink)
                 sink.create_artifact(kind="animation-cover", filename="cover.png", content=(workspace / "out/cover.png").read_bytes(), mime_type="image/png", metadata=metadata)
                 # The version is published only when its Run succeeds; never rewrite completed versions.
@@ -219,6 +238,7 @@ def export_format(workspace, node, sink, source_id, options):
         config_path.write_text(json.dumps(config), "utf-8")
         if format == "mp4": return export_video(workspace, node, sink, source_id)
         if format == "png":
+            sink.emit("progress.updated", {"stage": "building_cover"})
             run_process([node, str(ENGINE / "runner.mjs"), "cover", str(workspace)], workspace, sink, timeout=300)
             file = workspace / "out/cover.png"; kind = "animation-cover"; mime = "image/png"
         else:
@@ -230,6 +250,7 @@ def export_format(workspace, node, sink, source_id, options):
                     if s is selected: break
                     start += s["frames"]
                 frames = selected["frames"]
+            sink.emit("progress.updated", {"stage": "rendering"})
             run_process([node, str(ENGINE / "runner.mjs"), "render", str(workspace)], workspace, sink, timeout=1200)
             file = workspace / "out/animation.gif"; kind = "animation-gif"; mime = "image/gif"
             filters = "fps=15,scale='if(gte(iw,ih),720,-2)':'if(gte(iw,ih),-2,720)':flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse"

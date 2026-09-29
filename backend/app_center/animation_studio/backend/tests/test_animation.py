@@ -196,17 +196,34 @@ def test_generation_builds_preview_without_rendering_and_survives_workspace_clea
     with zipfile.ZipFile(io.BytesIO(sink.artifacts[0]["content"])) as archive:
         assert "Animation.tsx" in archive.namelist()
         assert "package-lock.json" in archive.namelist()
+        assert "preview.mjs" in archive.namelist()
         assert json.loads(archive.read("composition.json"))["durationInFrames"] == 900
 
 
 def test_two_repairs_then_diagnostic_without_false_success(ctx):
     run = Run.objects.get(pk=generate(ctx).data["id"])
     sink = Sink()
-    with patch.object(runtime.CodexAdapter, "complete", return_value=response()) as model, patch.object(runtime, "run_process", side_effect=RuntimeError("bad component")):
+    with patch.object(runtime.CodexAdapter, "complete", return_value=response()) as model, patch.object(runtime, "run_process", side_effect=RuntimeError("bad component")), patch.object(sink, "emit") as emit:
         with pytest.raises(RuntimeError, match="修复两次"):
             runtime.execute(payload(ctx, run), sink)
     assert model.call_count == 3
+    failures = [call.args[1] for call in emit.call_args_list if call.args[1].get("stage") == "build_failed"]
+    assert [item["attempt"] for item in failures] == [1, 2, 3]
+    assert [item["will_retry"] for item in failures] == [True, True, False]
+    assert all(item["error_message"] == "bad component" for item in failures)
     assert [a["kind"] for a in sink.artifacts] == ["animation-diagnostic-source", "animation-diagnostic"]
+
+
+def test_preview_environment_failure_does_not_retry_ai(ctx):
+    run = Run.objects.get(pk=generate(ctx).data["id"])
+    sink = Sink()
+    with patch.object(runtime.CodexAdapter, "complete", return_value=response()) as model, patch.object(
+        runtime, "run_process", side_effect=runtime.AnimationBuildError("预览浏览器启动失败", code="preview_browser_error", retryable=False)
+    ):
+        with pytest.raises(runtime.AnimationBuildError, match="预览浏览器启动失败"):
+            runtime.execute(payload(ctx, run), sink)
+    assert model.call_count == 1
+    assert [a["kind"] for a in sink.artifacts] == ["animation-diagnostic"]
 
 
 def test_cancel_before_generation_never_calls_model(ctx):

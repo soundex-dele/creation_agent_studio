@@ -1,0 +1,36 @@
+.animation-task-modal .ant-modal { top: 24px; max-width: calc(100vw - 24px); padding-bottom: 24px; }
+.animation-task-modal .ant-modal-content { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); overflow: hidden; background: var(--color-bg-card); color: var(--color-text); }
+.animation-task-modal .ant-modal-header, .animation-task-modal .ant-modal-footer { flex-shrink: 0; }
+.animation-task-modal .ant-modal-body { min-height: 0; overflow-y: auto; padding: 4px; }
+.animation-task-modal .ant-modal-header { background: var(--color-bg-card); padding-right: 32px; }
+.animation-task-modal .ant-modal-close { min-width: 44px; min-height: 44px; }
+.animation-task-modal .ant-btn { min-height: 44px; white-space: normal; height: auto; }
+.animation-task-modal :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.animation-task-details { display: flex; flex-direction: column; gap: 20px; min-width: 0; padding-bottom: env(safe-area-inset-bottom); }
+.animation-task-current { display: flex; align-items: flex-start; gap: 16px; padding: 20px; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 12px; }
+.animation-task-current > svg, .animation-task-current > .ant-spin { flex-shrink: 0; margin-top: 3px; }
+.animation-task-current > div { min-width: 0; }
+.animation-task-current strong { font-size: 16px; }
+.animation-task-current p, .animation-task-log p { margin: 6px 0 0; line-height: 1.7; overflow-wrap: anywhere; }
+.animation-task-log-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.animation-task-log-heading h3 { margin: 0; font-size: 15px; }
+.animation-task-log-heading span, .animation-task-note, .animation-task-log time { color: var(--color-text-sec); font-size: 12px; }
+.animation-task-log { list-style: none; margin: 0; padding: 0; }
+.animation-task-log li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
+.animation-task-log li > svg { margin-top: 6px; }
+.animation-task-log strong { font-size: 14px; }
+.animation-task-log p { font-size: 13px; color: var(--color-text-sec); }
+.animation-task-error { margin-top: 10px; min-width: 0; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-surface); }
+.animation-task-error summary { min-height: 44px; padding: 12px; cursor: pointer; font-size: 13px; }
+.animation-task-error pre { margin: 0; padding: 0 12px 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.7; font-family: ui-monospace, monospace; }
+.animation-task-log time { font-variant-numeric: tabular-nums; padding-top: 2px; }
+.animation-task-note { margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
+.animation-task-note svg { vertical-align: middle; margin-right: 4px; }
+@media (max-width: 390px) {
+  .animation-task-modal .ant-modal-content { padding: 16px; }
+  .animation-task-current { padding: 14px; gap: 12px; }
+  .animation-task-log li { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animation-task-modal *, .animation-task-modal *::before, .animation-task-modal *::after { animation: none !important; transition: none !important; }
+}

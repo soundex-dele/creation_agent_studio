@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +12,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 PNG = ROOT / "backend/app_center/html_to_png"
+ANIMATION = ROOT / "backend/app_center/animation_studio/engine"
+CATALOG = ROOT / "deploy/application_dependencies.json"
 CODEX_VERSION = "0.155.0"  # Keep aligned with backend/Dockerfile.
 
 
@@ -54,6 +57,42 @@ def system_commands(platform):
     raise RuntimeError("Unsupported OS for --system-deps; install FFmpeg manually.")
 
 
+def application_selection(requested, catalog):
+    selected = list(dict.fromkeys(name for value in requested for name in value.split(","))) if requested else list(catalog)
+    unknown = set(selected) - catalog.keys()
+    if unknown:
+        raise RuntimeError("Unknown application(s): " + ", ".join(sorted(unknown)) + ". Use --list-apps to see supported IDs.")
+    return selected
+
+
+def install_png(execute, node, *, system_deps=False):
+    browser_args = ["install", "chromium"]
+    if system_deps and sys.platform.startswith("linux"):
+        browser_args.append("--with-deps")
+    # Install into Playwright's normal per-user cache. Run as the service account.
+    execute([node, PNG / "node_modules/playwright/cli.js", *browser_args], cwd=PNG)
+    smoke = (
+        "const {chromium}=require('playwright'); "
+        "(async()=>{const b=await chromium.launch({headless:true}); "
+        "try {const p=await b.newPage(); await p.setContent('<h1>Ready</h1>'); "
+        "await p.screenshot(); console.log('Chromium PNG check passed');} "
+        "finally {await b.close();}})().catch(e=>{console.error(e);process.exit(1)});"
+    )
+    execute([node, "-e", smoke], cwd=PNG)
+
+
+def install_animation(execute, node, npm):
+    execute(npm + ["run", "browser"], cwd=ANIMATION)
+    smoke = (
+        "const {openBrowser}=require('@remotion/renderer'); "
+        "(async()=>{const b=await openBrowser('chrome', "
+        "{browserExecutable:process.env.ANIMATION_BROWSER_EXECUTABLE||undefined}); "
+        "try {console.log('Remotion '+require('remotion/package.json').version+' browser check passed');} "
+        "finally {await b.close({silent:true});}})().catch(e=>{console.error(e);process.exit(1)});"
+    )
+    execute([node, "-e", smoke], cwd=ANIMATION)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--development", action="store_true", help="Include test/development Python packages")
@@ -63,7 +102,28 @@ def main(argv=None):
     parser.add_argument("--with-codex", action="store_true", help="Install the pinned Codex CLI globally")
     parser.add_argument("--skip-submodules", action="store_true", help="Use already initialized submodules or a source archive")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without changing files or installing packages")
+    parser.add_argument("--app", action="append", default=[], help="Application ID (repeat or comma-separate); default: all. Shared backend/frontend dependencies are always included.")
+    parser.add_argument("--list-apps", action="store_true", help="List applications, extra runtimes and external prerequisites without installing anything")
     args = parser.parse_args(argv)
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))["applications"]
+    selected = application_selection(args.app, catalog)
+    if args.list_apps:
+        for name in selected:
+            app = catalog[name]
+            print(f"{name}: {app['name']} | shared backend/frontend" +
+                  (" + " + ", ".join(app["runtimes"]) if app["runtimes"] else ""))
+            for note in app.get("notes", []):
+                print("  " + note)
+            if app.get("skills"):
+                print("  Skills: " + ", ".join(app["skills"]))
+        return
+    runtimes = {runtime for name in selected for runtime in catalog[name]["runtimes"]}
+    if args.with_creation_master:
+        runtimes.add("ffmpeg")
+    # Playwright's supported distro installer also supplies Chrome Headless Shell's libraries.
+    if "animation" in runtimes and args.system_deps and sys.platform.startswith("linux"):
+        runtimes.add("png")
+    print("Applications: " + ", ".join(selected), flush=True)
 
     allowed_venvs = {(ROOT / "backend/venv").resolve(), (ROOT / "backend/.venv").resolve()}
     if sys.prefix == sys.base_prefix or Path(sys.prefix).resolve() not in allowed_venvs:
@@ -80,7 +140,7 @@ def main(argv=None):
     npm = npm_command(node)
     git = require_program("git") if not args.skip_submodules else None
     execute = lambda command, **kwargs: run(command, dry_run=args.dry_run, **kwargs)
-    ffmpeg_missing = not shutil.which("ffmpeg") or not shutil.which("ffprobe")
+    ffmpeg_missing = "ffmpeg" in runtimes and (not shutil.which("ffmpeg") or not shutil.which("ffprobe"))
     if ffmpeg_missing and not args.system_deps:
         raise RuntimeError("FFmpeg/ffprobe is missing. Re-run with --system-deps (-SystemDeps on Windows), or install FFmpeg and add it to PATH.")
     if args.system_deps:
@@ -103,33 +163,35 @@ def main(argv=None):
     execute(pip + ["check"])
     # App Center React sources share the root frontend's dependencies and aliases.
     # Include dev dependencies even under NODE_ENV=production: Vite/tsc need them.
-    for folder in ([ROOT / "frontend", PNG] + ([ROOT / "mobile"] if args.with_mobile else [])):
+    folders = [ROOT / "frontend"]
+    if "png" in runtimes:
+        folders.append(PNG)
+    if "animation" in runtimes:
+        folders.append(ANIMATION)
+    if args.with_mobile:
+        folders.append(ROOT / "mobile")
+    for folder in folders:
         execute(npm + ["ci", "--include=dev"], cwd=folder)
     if args.with_codex:
         execute(npm + ["install", "--global", f"@openai/codex@{CODEX_VERSION}"])
 
-    playwright_cli = PNG / "node_modules/playwright/cli.js"
-    browser_args = ["install", "chromium"]
-    if args.system_deps and sys.platform.startswith("linux"):
-        browser_args.append("--with-deps")
-    # Install into Playwright's normal per-user cache. Run as the service account.
-    execute([node, playwright_cli, *browser_args], cwd=PNG)
+    if "png" in runtimes:
+        install_png(execute, node, system_deps=args.system_deps)
+    if "animation" in runtimes:
+        install_animation(execute, node, npm)
     if args.with_creation_master:
         execute([sys.executable, "-m", "playwright", "install", "chromium"])
-    smoke = (
-        "const {chromium}=require('playwright'); "
-        "(async()=>{const b=await chromium.launch({headless:true}); "
-        "try {const p=await b.newPage(); await p.setContent('<h1>Ready</h1>'); "
-        "await p.screenshot(); console.log('Chromium PNG check passed');} "
-        "finally {await b.close();}})().catch(e=>{console.error(e);process.exit(1)});"
-    )
-    execute([node, "-e", smoke], cwd=PNG)
-    print("\nDependency installation plan complete." if args.dry_run else "\nDependencies installed and Chromium verified.")
+    print("\nDependency installation plan complete." if args.dry_run else "\nRepository dependencies installed; selected browsers verified.")
     if ffmpeg_missing and args.system_deps and sys.platform == "win32":
         print("Open a new terminal so the FFmpeg PATH update takes effect before starting workers.")
     print("Configure backend/.env and service credentials, then run migrations/start services separately.")
-    print("External Skill directories and their own dependencies must be provisioned on the execution host.")
-    print("If backend/.env sets PLAYWRIGHT_NODE_MODULES, remove stale host paths or point it at " + str(PNG / "node_modules"))
+    for name in selected:
+        for note in catalog[name].get("notes", []):
+            print(f"[{name}] {note}")
+        if catalog[name].get("skills"):
+            print(f"[{name}] External Skills: " + ", ".join(catalog[name]["skills"]))
+    if "png" in runtimes:
+        print("If backend/.env sets PLAYWRIGHT_NODE_MODULES, remove stale host paths or point it at " + str(PNG / "node_modules"))
 
 
 if __name__ == "__main__":

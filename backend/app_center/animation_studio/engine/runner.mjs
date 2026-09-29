@@ -8,6 +8,7 @@ import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotio
 import {validateSource} from './validate.mjs';
 import {fontCss} from './fonts.mjs';
 import {buildStructured} from './structured.mjs';
+import {previewBootstrap, previewEntry, verifyPreview, PreviewError} from './preview.mjs';
 
 const engine = path.dirname(fileURLToPath(import.meta.url));
 let browserExecutable = process.env.ANIMATION_BROWSER_EXECUTABLE || undefined;
@@ -16,6 +17,7 @@ if (!browserExecutable && process.platform === 'win32') {
     try { await fs.access(candidate); browserExecutable = candidate; break; } catch { /* next installed browser */ }
   }
 }
+try {
 const [mode, directory] = process.argv.slice(2);
 if (!['preview', 'render', 'stills', 'cover'].includes(mode) || !directory) throw new Error('Usage: node runner.mjs preview|render|stills|cover <project>');
 const project = path.resolve(directory);
@@ -48,54 +50,22 @@ const frameList = [0, Math.floor(config.durationInFrames / 2), config.durationIn
 
 if (mode === 'preview') {
   const entry = path.join(project, 'Preview.tsx');
-  await fs.writeFile(entry, `import React from 'react'; import {createRoot} from 'react-dom/client'; import {Player} from '@remotion/player'; import Scene from './Scene';
-class Boundary extends React.Component {state={error:false}; static getDerivedStateFromError(){return {error:true}}; render(){return this.state.error ? <p role="alert">动画运行失败，请修改后重新生成。</p>:this.props.children}}
-window.__animationPlayer = React.createRef();
-createRoot(document.getElementById('root')).render(<Boundary><Player ref={window.__animationPlayer} component={Scene} {...${meta}} compositionWidth={${config.width}} compositionHeight={${config.height}} controls showVolumeControls style={{width:'100%',height:'100%'}}/></Boundary>);`);
-  const result = await build({entryPoints:[entry],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',minify:true,nodePaths:[path.join(engine,'node_modules')],define:{'process.env.NODE_ENV':'"production"'}});
+  await fs.writeFile(entry, previewEntry(config));
+  const result = await build({entryPoints:[entry],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',minify:true,banner:{js:previewBootstrap},nodePaths:[path.join(engine,'node_modules')],define:{'process.env.NODE_ENV':'"production"'}});
   const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const hash = createHash('sha256').update(js).digest('base64');
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'`;
   await fs.writeFile(path.join(output,'preview.html'), `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"><title>动画预览</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden;background:#10121b;color:white}*{box-sizing:border-box}</style></head><body><div id="root"></div><script>${js}</script></body></html>`);
   // Validate real playback before publishing; no MP4 or render bundle is created here.
-  const browser = await openBrowser('chrome', {browserExecutable});
+  let browser;
   try {
-    const page = await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:0,onBrowserLog:null,onLog:()=>{}});
-    await page.setViewport({width:config.width,height:config.height,deviceScaleFactor:1});
+    browser = await openBrowser('chrome', {browserExecutable});
     const html = await fs.readFile(path.join(output,'preview.html'),'utf8');
-    await page.goto({url:'about:blank',timeout:30000});
-    await page.evaluate((markup)=>{document.body.style.margin='0';const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0';frame.srcdoc=markup;document.body.append(frame);},html);
-    let playerFrame;
-    for (let tries=0; tries<100; tries++) {
-      playerFrame = page.mainFrame().childFrames()[0];
-      if (playerFrame) break;
-      await new Promise(resolve=>setTimeout(resolve,100));
-    }
-    if (!playerFrame) throw new Error('隔离预览框架未初始化。');
-    for (let tries=0; tries<100; tries++) {
-      if (await playerFrame.evaluate(()=>Boolean(window.__animationPlayer?.current))) break;
-      await new Promise(resolve=>setTimeout(resolve,100));
-    }
-    const isolated = await playerFrame.evaluate(()=>{try{return !parent.document;}catch{return true;}});
-    if (!isolated) throw new Error('HTML 预览未隔离。');
-    for (const frame of frameList) {
-      await playerFrame.evaluate((value)=>{if(!window.__animationPlayer?.current)throw new Error('HTML Player failed to initialize');window.__animationPlayer.current.seekTo(value);},frame);
-      await playerFrame.evaluate(()=>document.fonts.ready.then(()=>true));
-      await new Promise(resolve=>setTimeout(resolve,150));
-      const valid = await playerFrame.evaluate(()=>Boolean(document.querySelector('[data-animation-scene]')) && !document.querySelector('[role="alert"]'));
-      if (!valid) throw new Error(`HTML 动画在第 ${frame} 帧运行失败。`);
-      if (process.env.ANIMATION_CAPTURE_FRAMES === '1') {
-        const result = await page._client().send('Page.captureScreenshot', {format:'png'});
-        await fs.writeFile(path.join(output,`preview-${frame}.png`),Buffer.from(result.value.data,'base64'));
-      }
-    }
-    await playerFrame.evaluate(()=>window.__animationPlayer.current.seekTo(0));
-    await playerFrame.evaluate(()=>window.__animationPlayer.current.play());
-    await new Promise(resolve=>setTimeout(resolve,300));
-    const advanced = await playerFrame.evaluate(()=>window.__animationPlayer.current.getCurrentFrame()>0);
-    if (!advanced) throw new Error('HTML 动画播放未推进。');
-    await playerFrame.evaluate(()=>window.__animationPlayer.current.pause());
-  } finally { await browser.close({silent:true}); }
+    await verifyPreview(browser, html, config, output, {captureFrames:process.env.ANIMATION_CAPTURE_FRAMES === '1'});
+  } catch (error) {
+    if (error instanceof PreviewError) throw error;
+    throw new PreviewError('预览浏览器执行失败：' + error.message, 'preview_browser_error', false);
+  } finally { if (browser) await browser.close({silent:true}); }
   console.log(JSON.stringify({stage:'preview_ready'}));
 } else {
   const entry = path.join(project, 'Root.tsx');
@@ -116,4 +86,9 @@ createRoot(document.getElementById('root')).render(<Boundary><Player ref={window
       onProgress:({progress})=>{const percent=Math.floor(progress*100);if(percent!==previous){previous=percent;console.log(JSON.stringify({stage:'rendering',percent}))}}});
     await renderStill({...options,composition,frame:Math.min(config.coverFrame??30,config.durationInFrames-1),output:path.join(output,'cover.png')});
   }
+}
+
+} catch (error) {
+  console.error('ANIMATION_BUILD_ERROR ' + JSON.stringify({code:error.code || 'scene_build_error', retryable:error.retryable !== false, message:String(error.message || error).slice(0, 3000)}));
+  process.exitCode = 1;
 }

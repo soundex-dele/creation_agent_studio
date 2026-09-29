@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -33,7 +34,7 @@ class InstallerTests(unittest.TestCase):
     def commands(self):
         return [[str(value) for value in call.args[0]] for call in self.run.call_args_list]
 
-    def test_default_installs_locked_web_and_png_packages_and_probes_chromium(self):
+    def test_default_installs_locked_web_png_animation_and_probes_browsers(self):
         installer.main(["--dry-run"])
         commands = self.commands()
         self.assertTrue(any(command[1:] == ["submodule", "update", "--init", "--recursive"] for command in commands))
@@ -42,10 +43,12 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(all(command[0] == sys.executable for command in pip))
         self.assertTrue(pip[1][-1].endswith("production.txt"))
         npm_calls = [call for call in self.run.call_args_list if "ci" in call.args[0]]
-        self.assertEqual([call.kwargs["cwd"] for call in npm_calls], [installer.ROOT / "frontend", installer.PNG])
+        self.assertEqual([call.kwargs["cwd"] for call in npm_calls], [installer.ROOT / "frontend", installer.PNG, installer.ANIMATION])
         self.assertTrue(all("--include=dev" in call.args[0] for call in npm_calls))
-        self.assertEqual(commands[-2][-2:], ["install", "chromium"])
-        self.assertIn("p.screenshot()", commands[-1][-1])
+        self.assertTrue(any(command[-2:] == ["install", "chromium"] for command in commands))
+        self.assertTrue(any("p.screenshot()" in command[-1] for command in commands))
+        self.assertEqual(commands[-2][-2:], ["run", "browser"])
+        self.assertIn("openBrowser('chrome'", commands[-1][-1])
         self.assertTrue(all(call.kwargs["dry_run"] for call in self.run.call_args_list))
 
     def test_optional_packages_are_explicit_and_use_project_python(self):
@@ -96,6 +99,52 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer.subprocess, "run") as child:
             RUN_COMMAND(["npm", "ci"], dry_run=True)
             child.assert_not_called()
+
+    def test_selecting_animation_installs_only_its_extra_runtime(self):
+        installer.main(["--dry-run", "--app", "animation-studio"])
+        npm_calls = [call for call in self.run.call_args_list if "ci" in call.args[0]]
+        self.assertEqual([call.kwargs["cwd"] for call in npm_calls], [installer.ROOT / "frontend", installer.ANIMATION])
+        self.assertFalse(any(call.kwargs.get("cwd") == installer.PNG for call in self.run.call_args_list))
+
+    def test_shared_only_app_does_not_require_media_tools_or_browsers(self):
+        with patch.object(installer.shutil, "which", return_value=None):
+            installer.main(["--dry-run", "--app", "kitchen-assistant"])
+        self.assertFalse(any(call.kwargs.get("cwd") in (installer.PNG, installer.ANIMATION) for call in self.run.call_args_list))
+
+    def test_repeated_comma_selections_deduplicate_runtime_installations(self):
+        installer.main(["--dry-run", "--app", "animation-studio,html-to-png", "--app", "animation-studio"])
+        npm_calls = [call for call in self.run.call_args_list if "ci" in call.args[0]]
+        self.assertEqual([call.kwargs["cwd"] for call in npm_calls].count(installer.ANIMATION), 1)
+
+    def test_unknown_app_fails_before_mutating_anything(self):
+        with self.assertRaisesRegex(RuntimeError, "Unknown application"):
+            installer.main(["--app", "animation-studo"])
+        self.run.assert_not_called()
+
+    def test_list_does_not_require_venv_node_git_or_system_packages(self):
+        with patch.object(installer.sys, "prefix", "/host-python"), patch.object(
+            installer, "require_program", side_effect=AssertionError("must not probe tools"),
+        ), patch.object(installer.subprocess, "check_output", side_effect=AssertionError("must not launch tools")):
+            installer.main(["--list-apps"])
+        self.run.assert_not_called()
+
+    def test_animation_linux_system_install_includes_chromium_libraries(self):
+        with patch.object(installer.sys, "platform", "linux"), patch.object(installer, "system_commands", return_value=[]):
+            installer.main(["--dry-run", "--app", "animation-studio", "--system-deps"])
+        self.assertTrue(any(command[-3:] == ["install", "chromium", "--with-deps"] for command in self.commands()))
+
+    def test_catalog_covers_every_bundled_application_and_known_runtimes(self):
+        catalog = json.loads(installer.CATALOG.read_text(encoding="utf-8"))["applications"]
+        # Manifest package IDs follow the same slug convention as their directories.
+        manifests = (installer.ROOT / "backend/app_center").glob("*/application.yaml")
+        self.assertEqual(set(catalog), {path.parent.name.replace("_", "-") for path in manifests})
+        for app in catalog.values():
+            self.assertTrue(set(app["runtimes"]) <= {"ffmpeg", "png", "animation"})
+
+    def test_full_dry_run_does_not_start_package_managers_or_browsers(self):
+        with patch.object(installer, "run", RUN_COMMAND), patch.object(installer.subprocess, "run") as child:
+            installer.main(["--dry-run", "--skip-submodules"])
+        child.assert_not_called()
 
 
 if __name__ == "__main__":

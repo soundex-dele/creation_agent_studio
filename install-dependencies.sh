@@ -8,6 +8,12 @@ if [[ -x "${PROJECT_ROOT}/backend/.venv/bin/python" ]]; then
 elif [[ -x "${PROJECT_ROOT}/backend/venv/bin/python" ]]; then
   VENV_PYTHON="${PROJECT_ROOT}/backend/venv/bin/python"
 else
+  # Listing/help use only the standard library and do not create an environment.
+  for argument in "$@"; do
+    if [[ "$argument" == "--list-apps" || "$argument" == "--help" || "$argument" == "-h" ]]; then
+      exec "${PYTHON_BOOTSTRAP:-python3}" "${PROJECT_ROOT}/deploy/install_dependencies.py" "$@"
+    fi
+  done
   for argument in "$@"; do
     if [[ "$argument" == "--dry-run" ]]; then
       printf 'Would create backend/.venv using %s. Run without --dry-run to bootstrap it.\n' "${PYTHON_BOOTSTRAP:-python3}"
