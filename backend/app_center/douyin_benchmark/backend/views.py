@@ -14,7 +14,7 @@ from .models import Account, Task, Snapshot, ScriptVersion
 from .serializers import AccountInput, AccountSerializer, TaskInput, TaskSerializer, ScriptEdit, VersionSerializer
 from .serializers import AccountPage, TaskPage, ConnectionSerializer, WorkResultSerializer, UploadInput, AccountCreated
 from .services import start, cancel, Conflict
-from .provider import CollectionError
+from .provider import CollectionError, work_web_url, ordered_media_urls
 from .collector_config import LocalDTKClient, config_for, public_config, private_config, cipher, invoke
 from .models import CollectorConfig
 from .serializers import CollectorConfigInput, CollectorConfigOutput
@@ -147,7 +147,8 @@ class WorksView(BaseView):
         if not batch:
             return Response({"items": [], "sample_size": 0, "median_likes": None, "explanation": "请先采集作品。", "batch": None})
         snapshots = list(Snapshot.objects.filter(batch=batch).select_related("work"))
-        result = rank([{**s.data, "id": str(s.work_id), "has_upload": bool(s.work.media_key)} for s in snapshots], snapshots[0].captured_at)
+        result = rank([{**s.data, "url": work_web_url(s.data), "id": str(s.work_id), "has_upload": bool(s.work.media_key),
+            "video_url": next(iter(ordered_media_urls(s.work.media_urls)), "")} for s in snapshots], snapshots[0].captured_at)
         search = request.query_params.get("search", "").lower()[:200]
         result["items"] = [i for i in result["items"] if search in i["title"].lower() and
             (request.query_params.get("outstanding") != "true" or i["outstanding"])]
@@ -156,7 +157,9 @@ class WorksView(BaseView):
             raise ValidationError("排序字段无效。")
         result["items"].sort(key=lambda i: (i.get(sort) is not None, i.get(sort) or ("" if sort == "published_at" else 0)), reverse=True)
         result["batch"] = TaskSerializer(batch).data
-        return Response(result)
+        response = Response(result)
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class UploadView(BaseView):

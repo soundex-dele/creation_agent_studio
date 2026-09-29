@@ -15,7 +15,9 @@ from urllib.parse import urlsplit
 SOURCE = Path(__file__).resolve().parents[1] / "third_party/Douyin_TikTok_Download_API/src"
 if sys.version_info < (3, 12) or sys.version_info >= (3, 14):
     raise SystemExit("DTK v5 需要 Python 3.12/3.13，请使用 backend/.venv-dtk/bin/python")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(SOURCE))
+from core.douyin_media_urls import prioritize_video_urls
 try:
     import httpx
     from dtk.core.errors import DtkError
@@ -172,6 +174,7 @@ def video_urls(content):
             if (isinstance(url, str) and urlsplit(url).scheme in {"http", "https"}
                     and urlsplit(url).hostname and url not in urls):
                 urls.append(url)
+    urls = prioritize_video_urls(urls)
     if not urls:
         raise VideoUrlError("作品没有可用的无水印地址，可能已删除、私密或受限")
     return {"content_id": content.get("content_id"), "title": content.get("title"),

@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import os
+import re
 import socket
 import subprocess
 import uuid
@@ -8,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urljoin
 import requests
 from django.conf import settings
+from .provider import CollectionError, platform_media_url, video_urls, ordered_media_urls
 
 MAX_BYTES = 500 * 1024 * 1024
 MAX_SECONDS = 600
@@ -45,14 +47,28 @@ def store_upload(upload):
     return key
 
 
-def checked_media_url(url):
-    p = urlsplit(url)
-    allowed = ("douyinvod.com", "douyin.com", "douyincdn.com", "bytecdn.cn", "ibytedtos.com", "byteimg.com")
-    host = p.hostname or ""
-    if p.scheme != "https" or p.username or p.password or p.port not in (None, 443) or not any(host == d or host.endswith("." + d) for d in allowed):
-        raise ValueError("视频下载地址不在允许的平台域名中，请补传原视频。")
-    if any(not ipaddress.ip_address(info[4][0]).is_global for info in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)):
-        raise ValueError("视频下载地址无效。")
+class MediaAddressError(ValueError):
+    """A refused candidate may be skipped; its target must never be requested."""
+
+
+def checked_media_url(url, *, redirected=False):
+    label = "视频重定向地址" if redirected else "视频下载地址"
+    try:
+        p = urlsplit(url)
+        host = p.hostname or ""
+    except (TypeError, ValueError):
+        raise MediaAddressError(f"{label}格式无效。") from None
+    # Only expose a bounded hostname, never credentials, paths or signed queries.
+    visible_host = host if re.fullmatch(r"[a-zA-Z0-9.:-]{1,253}", host) else "无法识别主机"
+    if not platform_media_url(url):
+        raise MediaAddressError(f"{label}被拦截（主机：{visible_host}；域名、协议、端口或凭据格式不受支持）。")
+    port = 443 if p.scheme == "https" else 80
+    try:
+        addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        raise requests.ConnectionError("视频域名解析失败。") from None
+    if not addresses or any(not ipaddress.ip_address(info[4][0]).is_global for info in addresses):
+        raise MediaAddressError(f"{label}被拦截（主机：{visible_host}；解析结果包含非公共地址）。")
     return url
 
 
@@ -62,12 +78,15 @@ def download(url, key, check, *, headers=None):
     session = requests.Session()
     session.trust_env = False
     try:
-        for _ in range(5):
+        for hop in range(5):
             check()
-            checked_media_url(url)
+            checked_media_url(url, redirected=hop > 0)
             with session.get(url, headers=headers or {"Referer": "https://www.douyin.com/"}, stream=True, timeout=(10, 30), allow_redirects=False) as response:
                 if response.is_redirect:
-                    url = urljoin(url, response.headers.get("Location", ""))
+                    try:
+                        url = urljoin(url, response.headers.get("Location", ""))
+                    except ValueError:
+                        raise MediaAddressError("视频重定向地址格式无效。") from None
                     continue
                 response.raise_for_status()
                 if int(response.headers.get("Content-Length", "0")) > MAX_BYTES:
@@ -81,12 +100,52 @@ def download(url, key, check, *, headers=None):
                             raise ValueError("视频超过500 MB。")
                         dest.write(chunk)
                 return path
-        raise ValueError("视频重定向次数过多，请补传原视频。")
+        raise MediaAddressError("视频重定向次数过多，请补传原视频。")
     except Exception:
         path.unlink(missing_ok=True)
         raise
     finally:
         session.close()
+
+
+def download_video(cached_urls, client, platform_id, key, check):
+    """Use the post-list media first; renew details only when missing or expired."""
+    headers = client.media_headers()
+    blocked = []
+    def attempt(urls):
+        for url in ordered_media_urls(urls)[:3]:
+            check()
+            if not platform_media_url(url):
+                continue
+            try:
+                return download(url, key, check, headers=headers)
+            except MediaAddressError as exc:
+                blocked.append(exc)
+                continue
+            except requests.RequestException:
+                # Never propagate signed URLs in requests' exception messages.
+                continue
+        return None
+    path = attempt(cached_urls)
+    if path is not None:
+        return path
+    try:
+        detail = client.detail(platform_id)
+    except CollectionError:
+        if blocked:
+            raise blocked[-1] from None
+        raise
+    if str(detail.get("content_id") or "") != str(platform_id):
+        raise ValueError("详情接口返回的作品 ID 不匹配，请刷新作品后重试。")
+    urls = video_urls(detail)
+    if not urls:
+        raise ValueError("DTK 未返回可用的视频文件地址；作品可能为图文、私密或已删除，可补传原视频。")
+    path = attempt(urls)
+    if path is None:
+        if blocked:
+            raise blocked[-1]
+        raise ValueError("视频文件地址不可用，请刷新作品或补传原视频。")
+    return path
 
 
 def command(args, timeout=90):

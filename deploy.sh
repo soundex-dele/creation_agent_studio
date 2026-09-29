@@ -201,17 +201,17 @@ case "${EXECUTION_WORKERS_ENABLED}" in
     ;;
 esac
 
-case "${REMOTE_ACCESS_HOST_ENABLED}" in
-  True|true|1|yes)
-    start_service "remote-connector" \
-      bash -c 'cd "$1" && exec "$2" manage.py run_remote_connector' \
-      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
-    ;;
-esac
+#case "${REMOTE_ACCESS_HOST_ENABLED}" in
+#  True|true|1|yes)
+#    start_service "remote-connector" \
+#      bash -c 'cd "$1" && exec "$2" manage.py run_remote_connector' \
+#      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+#    ;;
+#esac
 
-start_service "wechat-connector" \
-  bash -c 'cd "$1" && exec "$2" manage.py run_wechat_connector' \
-  _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+#start_service "wechat-connector" \
+#  bash -c 'cd "$1" && exec "$2" manage.py run_wechat_connector' \
+#  _ "${BACKEND_DIR}" "${PYTHON_BIN}"
 
 log "Agent Studio is running. Frontend: http://localhost:${FRONTEND_PORT}"
 wait_for_services

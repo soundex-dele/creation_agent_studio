@@ -74,7 +74,8 @@ def invoke(operation, config, params=None, check=lambda: None):
             raise CollectionError("invalid")
         if result.get("error"):
             raise CollectionError(result["error"] if result["error"] in {
-                "credentials", "auth", "limited", "timeout", "invalid", "unavailable"} else "unavailable")
+                "credentials", "auth", "limited", "timeout", "invalid", "unavailable",
+                "content_unavailable", "signature", "challenge", "empty_response", "risk_control"} else "unavailable", diagnostic=result.get("diagnostic"))
         return result.get("data")
     finally:
         if process.poll() is None:

@@ -15,7 +15,7 @@ from dtk.urls import resolve, identify, ResourceKind
 
 
 class BridgeError(Exception):
-    pass
+    diagnostic = None
 
 
 async def author_id(url, identity):
@@ -48,11 +48,20 @@ async def request(endpoint, params, identity, transport=None):
             headers={**spec["headers"], **signed.headers}, endpoint=endpoint), timeout=30)
         if response.status == 429:
             raise BridgeError("limited")
-        if response.status in (401, 403):
-            raise BridgeError("auth")
-        outcome = transport.classify(response).outcome
+        classification = transport.classify(response)
+        outcome = classification.outcome
         if outcome is not Outcome.OK:
-            raise BridgeError("auth" if outcome is Outcome.RISK_CONTROL else "unavailable")
+            if outcome is Outcome.BUSINESS_ERROR:
+                raise BridgeError("content_unavailable")
+            if classification.rule.startswith("signature."):
+                raise BridgeError("signature")
+            if classification.rule == "body.challenge_marker":
+                raise BridgeError("challenge")
+            if classification.rule in ("body.empty", "payload.withheld", "payload.bare_envelope"):
+                raise BridgeError("empty_response")
+            if response.status == 401:
+                raise BridgeError("auth")
+            raise BridgeError("risk_control" if outcome is Outcome.RISK_CONTROL else "unavailable")
         payload = response.json_or_none()
         if not isinstance(payload, dict):
             raise BridgeError("invalid")
@@ -64,6 +73,9 @@ async def request(endpoint, params, identity, transport=None):
         else:
             result = ADAPTER.parse_content(payload, fetched_at=now)
         return result.model_dump(mode="json")
+    except BridgeError as exc:
+        exc.diagnostic = {"endpoint": endpoint, "http_status": response.status}
+        raise
     finally:
         if own:
             await transport.close()
@@ -100,13 +112,14 @@ def main():
                 return await run(data)
         result = {"data": asyncio.run(bounded())}
     except BridgeError as exc:
-        result = {"error": str(exc)}
+        result = {"error": str(exc), "diagnostic": exc.diagnostic}
     except VideoUrlError:
         result = {"error": "credentials"}
     except DtkError as exc:
         code = exc.code.value
-        result = {"error": "limited" if code == "RATE_LIMITED" else "auth" if code in
-            ("UNAUTHENTICATED", "UPSTREAM_RISK_CONTROL", "SIGNING_FAILED") else "invalid"}
+        result = {"error": {"RATE_LIMITED": "limited", "UNAUTHENTICATED": "auth",
+            "UPSTREAM_RISK_CONTROL": "risk_control", "SIGNING_FAILED": "signature",
+            "CONTENT_PRIVATE": "content_unavailable", "NOT_FOUND": "content_unavailable"}.get(code, "invalid")}
     except TimeoutError:
         result = {"error": "timeout"}
     except Exception:

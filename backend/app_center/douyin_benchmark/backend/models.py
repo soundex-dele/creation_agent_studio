@@ -28,6 +28,7 @@ class Work(models.Model):
     platform_id = models.CharField(max_length=100)
     metadata = models.JSONField(default=dict)
     media_key = models.CharField(max_length=300, blank=True)
+    media_urls = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

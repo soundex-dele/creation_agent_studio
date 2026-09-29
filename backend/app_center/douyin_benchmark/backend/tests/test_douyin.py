@@ -214,7 +214,7 @@ def test_breakdown_topics_script_pipeline(ctx, monkeypatch):
     work = add_work(ctx)
     task = Task.objects.get(pk=post(ctx, {"kind": "breakdown", "work_id": str(work.pk)}).data["id"])
     from app_center.douyin_benchmark import runtime
-    monkeypatch.setattr(runtime, "DTKClient", lambda **kw: SimpleNamespace(detail=lambda pid: {"media": {"video": {"url": "https://v.douyinvod.com/media"}}}, media_headers=lambda: {"User-Agent": "personal-UA", "Referer": "https://www.douyin.com/"}))
+    monkeypatch.setattr(runtime, "DTKClient", lambda **kw: SimpleNamespace(detail=lambda pid: {"content_id": pid, "kind": "video", "media": {"video": {"url": "https://v.douyinvod.com/media", "watermark": False}}}, media_headers=lambda: {"User-Agent": "personal-UA", "Referer": "https://www.douyin.com/"}))
     download = Mock(return_value=Path("/test/video.mp4"))
     monkeypatch.setattr(runtime.media, "download", download)
     monkeypatch.setattr(runtime.media, "extract", lambda *args: (Path("/test/audio.wav"), [{"id": "f0", "time": 0, "key": "tasks/test/f0.jpg"}], 60))
@@ -249,7 +249,7 @@ def test_visual_failure_retains_transcript(ctx, monkeypatch):
     work = add_work(ctx)
     task = Task.objects.get(pk=post(ctx, {"kind": "breakdown", "work_id": str(work.pk)}).data["id"])
     from app_center.douyin_benchmark import runtime
-    monkeypatch.setattr(runtime, "DTKClient", lambda **kw: SimpleNamespace(detail=lambda pid: {"media": {"video": {"url": "https://v.douyinvod.com/media"}}}, media_headers=lambda: {"User-Agent": "personal-UA", "Referer": "https://www.douyin.com/"}))
+    monkeypatch.setattr(runtime, "DTKClient", lambda **kw: SimpleNamespace(detail=lambda pid: {"content_id": pid, "kind": "video", "media": {"video": {"url": "https://v.douyinvod.com/media", "watermark": False}}}, media_headers=lambda: {"User-Agent": "personal-UA", "Referer": "https://www.douyin.com/"}))
     download = Mock(return_value=Path("/test/video.mp4"))
     monkeypatch.setattr(runtime.media, "download", download)
     monkeypatch.setattr(runtime.media, "extract", lambda *args: (Path("/test/audio.wav"), [{"id": "f0", "time": 0, "key": "frame.jpg"}], 60))

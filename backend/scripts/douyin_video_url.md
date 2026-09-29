@@ -86,3 +86,7 @@ backend/.venv-dtk/bin/python backend/scripts/douyin_video_url.py \
 ```bash
 backend/.venv-dtk/bin/python -m unittest discover -s backend/scripts -p 'test_douyin_video_url.py' -v
 ```
+
+## 媒体候选顺序
+
+默认 `url` 和 `urls` 中优先选择 DTK 返回的 `v11*.douyinvod.com` 地址（当前部署实测可播放），同组保持原顺序；无 v11 时保留原来的首选地址。其他 CDN 仍作为备用。只重排完整候选，不替换域名、不重编码签名参数。该规则与抖音对标助手页面和下载共用。

@@ -36,7 +36,7 @@ def frozen_input(account, values):
         if not values.get("work_id"):
             raise ValidationError("请选择作品。")
         work = get_object_or_404(account.works, pk=values["work_id"])
-        data.update({"metadata": work.metadata, "media_key": work.media_key})
+        data.update({"metadata": work.metadata, "media_key": work.media_key, "media_urls": list(work.media_urls)})
     if kind in ("topics", "script"):
         if not values.get("source_task_id"):
             raise ValidationError("请选择已完成的拆解或选题任务。")

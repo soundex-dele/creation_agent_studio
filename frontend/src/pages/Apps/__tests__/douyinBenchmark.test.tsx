@@ -12,7 +12,7 @@ import { AnalysisResult } from '../douyin/AnalysisResult';
 import { ScriptEditor } from '../douyin/ScriptEditor';
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const account = { id: 'a1', source_url: 'https://www.douyin.com/user/test', name: '知识账号', group: '', notes: '', profile: {}, updated_at: '2026-09-29' };
-const work = { id: 'w1', title: '如何读书', likes: 0, comments: null, collects: null, shares: null, ratio: null, published_at: null, duration: 60, url: 'https://www.douyin.com/video/123', cover: '', kind: 'video' };
+const work = { id: 'w1', title: '如何读书', likes: 0, comments: null, collects: null, shares: null, ratio: null, published_at: null, duration: 60, url: 'https://www.douyin.com/video/7536599534051626299', video_url: 'https://v3.douyinvod.com/real-file.mp4', cover: '', kind: 'video' };
 const script = { title: '读书的新角度', cover: '从问题开始', narration: '今天讨论一个问题。', scenes: [{ time: '0–5秒', visual: '固定机位', spoken: '今天讨论一个问题。' }], checklist: ['准备提词器'] };
 const task: DouyinTask = { id: 't1', kind: 'breakdown', work_id: 'w1', run_id: 'r1', status: 'succeeded', stage: 'completed', error: '', created_at: '2026-09-29', progress: {}, sources: [], output: { visual_status: 'pending', visual_note: '未配置视觉模型，已保留转写和关键帧', segments: [{ id: 's1', start: 0, end: 5, text: '你有没有遇到过这种情况？' }], claims: [{ type: 'observation', text: '以提问开场', refs: ['s1'] }] } };
 let container: HTMLDivElement; let root: Root;
@@ -124,4 +124,13 @@ describe('personal collector settings', () => {
     expect(document.body.textContent).toContain('Cookie 格式错误');
     expect(document.querySelector('[aria-label="采集 Cookie"]')).not.toBeNull();
   });
+});
+
+
+it('opens DTK media for playback and keeps the Douyin source page separate', async () => {
+  await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={() => {}} />);
+  await click('作品库');
+  const links = [...container.querySelectorAll('a')];
+  expect(links.find((link) => link.textContent === '播放视频')?.getAttribute('href')).toBe('https://v3.douyinvod.com/real-file.mp4');
+  expect(links.find((link) => link.textContent === '抖音来源页')?.getAttribute('href')).toBe('https://www.douyin.com/video/7536599534051626299');
 });

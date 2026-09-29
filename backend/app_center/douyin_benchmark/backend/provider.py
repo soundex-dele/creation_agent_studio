@@ -8,15 +8,27 @@ import time
 from urllib.parse import urlsplit, urlunsplit
 import requests
 from django.conf import settings
+from core.douyin_media_urls import prioritize_video_urls, DOUYIN_MEDIA_DOMAINS
 
 
 class CollectionError(Exception):
-    def __init__(self, code="unavailable"):
+    def __init__(self, code="unavailable", diagnostic=None):
         self.code = code
-        super().__init__({"not_configured": "请先在采集设置中保存 User-Agent 和 Cookie。", "runtime": "DTK 独立运行环境未就绪，请按部署说明安装。", "credentials": "请检查同一桌面 Chrome 的 User-Agent 和 Cookie，Cookie 需包含有效 UIFID / UIFID_TEMP。", "auth": "Cookie 已失效或请求受到平台限制，请更新采集设置后重试。",
+        message = {"not_configured": "请先在采集设置中保存 User-Agent 和 Cookie。", "runtime": "DTK 独立运行环境未就绪，请按部署说明安装。", "credentials": "请检查同一桌面 Chrome 的 User-Agent 和 Cookie，Cookie 需包含有效 UIFID / UIFID_TEMP。", "auth": "抖音接口要求有效登录状态，请更新采集设置后重试。",
+            "content_unavailable": "抖音返回作品或账号不可访问，可能已删除、私密或受限；不代表 Cookie 失效。",
+            "signature": "DTK 请求签名生成失败或被抖音拒绝，请检查采集源码版本与浏览器指纹配置。",
+            "challenge": "抖音返回了验证页面，请在原浏览器完成验证后重试，或补传原视频。",
+            "empty_response": "抖音接口未返回作品数据；尚不能判断 Cookie 是否失效，可稍后重试或补传原视频。",
+            "risk_control": "抖音拒绝了本次请求，请检查采集网络与浏览器配置，或补传原视频。",
             "limited": "采集服务限流，请稍后重试。", "pagination": "分页未继续推进，已保留获取到的作品。",
             "invalid": "采集接口返回的数据结构不兼容。", "timeout": "采集超时，请稍后重试。",
-            "unavailable": "采集服务不可用，请检查服务和登录状态。"}.get(code, "采集失败，请检查服务状态。"))
+            "unavailable": "采集服务不可用，请检查服务和登录状态。"}.get(code, "采集失败，请检查服务状态。")
+        diagnostic = diagnostic if isinstance(diagnostic, dict) else {}
+        endpoint = {"douyin.content_detail": "视频详情", "douyin.author_profile": "账号资料", "douyin.author_posts": "作品列表"}.get(diagnostic.get("endpoint"))
+        status = diagnostic.get("http_status")
+        if endpoint and type(status) is int and 100 <= status <= 599:
+            message += f"（{endpoint}，HTTP {status}）"
+        super().__init__(message)
 
 
 def source_url(text):
@@ -49,6 +61,58 @@ def public_image(url):
     return ""
 
 
+def platform_media_url(url):
+    if not isinstance(url, str):
+        return ""
+    try:
+        parsed = urlsplit(url or "")
+        host = (parsed.hostname or "").rstrip(".")
+        if (parsed.scheme in ("http", "https") and parsed.username is None and parsed.password is None
+                and parsed.port in (None, 443 if parsed.scheme == "https" else 80)
+                and any(host == domain or host.endswith("." + domain) for domain in DOUYIN_MEDIA_DOMAINS)):
+            return url
+    except (ValueError, TypeError):
+        pass
+    return ""
+
+
+def ordered_media_urls(urls):
+    return prioritize_video_urls(url for url in urls if platform_media_url(url))
+
+
+def video_urls(content):
+    """DTK's media streams are file URLs; web_url is never a download source."""
+    if content.get("kind") != "video":
+        return []
+    media = content.get("media") or {}
+    result = []
+    for stream in [media.get("video"), *(media.get("streams") or [])]:
+        if not isinstance(stream, dict) or stream.get("watermark") is not False:
+            continue
+        for url in [stream.get("url"), *(stream.get("urls") or [])]:
+            if platform_media_url(url) and url not in result:
+                result.append(url)
+    return ordered_media_urls(result)[:8]
+
+
+def work_web_url(item):
+    content_id = str(item.get("content_id") or item.get("platform_id") or "")
+    if not content_id.isascii() or not content_id.isdigit():
+        return ""
+    slug = "note" if item.get("kind") == "image_album" else "video"
+    canonical = f"https://www.douyin.com/{slug}/{content_id}"
+    # Only accept a returned source link that matches this work, never a media URL.
+    supplied = item.get("web_url") or item.get("url") or ""
+    try:
+        parsed = urlsplit(supplied)
+        if (parsed.scheme == "https" and parsed.netloc == "www.douyin.com"
+                and parsed.path.rstrip("/") == f"/{slug}/{content_id}"):
+            return supplied
+    except ValueError:
+        pass
+    return canonical
+
+
 def normalize_work(item):
     if not isinstance(item, dict) or item.get("platform") != "douyin" or not str(item.get("content_id") or "").isdigit():
         raise CollectionError("invalid")
@@ -59,7 +123,7 @@ def normalize_work(item):
     return {"platform_id": str(item["content_id"]), "title": str(item.get("title") or "")[:2000],
         "description": str(item.get("description") or "")[:10000], "published_at": item.get("created_at"),
         "duration": item["duration_ms"] / 1000 if isinstance(item.get("duration_ms"), (int, float)) else None,
-        "kind": item.get("kind"), "url": f'https://www.douyin.com/video/{item["content_id"]}',
+        "kind": item.get("kind"), "url": work_web_url(item), "_media_urls": video_urls(item),
         "cover": public_image(covers[0].get("url")) if covers else "", **counts}
 
 

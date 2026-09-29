@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from drf_yasg.utils import swagger_serializer_method
 from .models import Account, Task, ScriptVersion
-from .provider import source_url
+from .provider import source_url, work_web_url
 
 
 class AccountInput(serializers.Serializer):
@@ -71,7 +71,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     @swagger_serializer_method(serializer_or_field=serializers.ListField(child=serializers.JSONField()))
     def get_sources(self, obj):
-        return obj.input.get("evidence", [])
+        return [{**item, "url": work_web_url(item)} for item in obj.input.get("evidence", [])]
 
 
 class VersionSerializer(serializers.ModelSerializer):

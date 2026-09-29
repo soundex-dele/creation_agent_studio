@@ -2,12 +2,16 @@
 import sys
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
+from types import SimpleNamespace
+import json
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import test_douyin_video_url as fixtures
 import collector
+from dtk.transport.base import RawResponse
+from dtk.transport.classify import DEFAULT_CLASSIFIER
 
 
 class CollectorSourceTests(unittest.IsolatedAsyncioTestCase):
@@ -70,6 +74,29 @@ class CollectorSourceTests(unittest.IsolatedAsyncioTestCase):
         import json
         with self.assertRaises(collector.BridgeError):
             await collector.run({'operation': 'validate', 'config': {'cookies': json.dumps({'UIFID_TEMP': 'test', 'ttwid': 'bad\r\nvalue'}), 'user_agent': fixtures.UA}})
+
+    async def test_response_failures_are_not_all_cookie_expiry(self):
+        identity = collector.make_identity(fixtures.COOKIES, fixtures.UA)
+        cases = [
+            (403, b'Signature Not Found', 'signature'),
+            (403, b'Forbidden', 'risk_control'),
+            (401, b'Unauthorized', 'auth'),
+            (200, b'<html>captcha</html>', 'challenge'),
+            (200, b'', 'empty_response'),
+            (200, b'{"status_code":2053}', 'content_unavailable'),
+            (403, b'{"status_code":2053}', 'content_unavailable'),
+        ]
+        for status, body, expected in cases:
+            with self.subTest(status=status, expected=expected):
+                transport = SimpleNamespace(request=AsyncMock(return_value=RawResponse(status=status, body=body)), classify=DEFAULT_CLASSIFIER.classify)
+                with self.assertRaises(collector.BridgeError) as error:
+                    await collector.request(collector.CONTENT_DETAIL, {'aweme_id': fixtures.POST_ID}, identity, transport)
+                self.assertEqual(str(error.exception), expected)
+
+    def test_app_allowlist_covers_pinned_dtk_douyin_media_domains(self):
+        from dtk.media.domains import DOUYIN_MEDIA_DOMAINS as source_domains
+        from core.douyin_media_urls import DOUYIN_MEDIA_DOMAINS as app_domains
+        self.assertTrue(source_domains <= app_domains, source_domains - app_domains)
 
 
 if __name__ == '__main__':

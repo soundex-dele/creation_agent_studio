@@ -63,7 +63,7 @@ def execute(payload, sink):
                 for items, complete in client.pages(profile["platform_id"], data["count"]):
                     with current(payload, sink) as active:
                         for item in items:
-                            work, _ = Work.objects.update_or_create(account=active.account, platform_id=item["platform_id"], defaults={"metadata": item})
+                            work, _ = Work.objects.update_or_create(account=active.account, platform_id=item["platform_id"], defaults={"media_urls": item.pop("_media_urls", []), "metadata": item})
                             Snapshot.objects.update_or_create(batch=active, work=work, defaults={"data": item, "captured_at": captured})
                         size = active.snapshots.count()
                     save("采集作品", progress={"current": size, "total": data["count"]})
@@ -92,11 +92,8 @@ def execute(payload, sink):
                 path = media.path_for(data["media_key"])
             else:
                 client = DTKClient(account=task.account, check=check)
-                detail = client.detail(data["metadata"]["platform_id"])
-                video = (detail.get("media") or {}).get("video") or {}
-                if not video.get("url"):
-                    raise ValueError("未取得视频文件，请在作品中补传原视频。")
-                path = media.download(video["url"], f"{prefix}/source.mp4", check, headers=client.media_headers())
+                path = media.download_video(data.get("media_urls", []), client,
+                    data["metadata"]["platform_id"], f"{prefix}/source.mp4", check)
             save("提取关键帧")
             audio, frames, duration = media.extract(path, prefix, check)
             save("转写口播")

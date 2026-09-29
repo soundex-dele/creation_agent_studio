@@ -5,7 +5,7 @@ export type CollectorConfigInput = Pick<CollectorConfig, 'user_agent' | 'screen'
 
 export interface DouyinAccount { id: string; source_url: string; name: string; group: string; notes: string; profile: { signature?: string }; updated_at: string }
 export interface DouyinWork {
-  id: string; platform_id: string; title: string; description: string; url: string; cover: string; kind: string;
+  id: string; platform_id: string; title: string; description: string; url: string; video_url?: string; cover: string; kind: string;
   published_at: string | null; duration: number | null; likes: number | null; comments: number | null;
   collects: number | null; shares: number | null; ratio: number | null; outstanding: boolean; has_upload: boolean;
 }

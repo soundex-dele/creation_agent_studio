@@ -151,6 +151,21 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(script.VideoUrlError, "未解析到 Cookie"):
             script.load_cookies("not-a-cookie")
 
+    def test_v11_candidate_is_selected_without_rewriting_signed_urls(self):
+        first = "https://v26-web.douyinvod.com/a?sign=original%2Btoken&x=1"
+        preferred = "https://v11-weba.douyinvod.com/b?sign=other%2Btoken&x=2"
+        result = script.video_urls({"kind": "video", "media": {"video": {
+            "url": first, "urls": [first, preferred], "watermark": False}}})
+        self.assertEqual(result["url"], preferred)
+        self.assertEqual(result["urls"], [preferred, first])
+
+    def test_preference_matches_actual_v11_host_and_retains_fallback(self):
+        candidates = ["https://v26-web.douyinvod.com/a", "https://v110-web.douyinvod.com/b",
+            "https://v11-weba.douyinvod.com.evil.example/c", "https://v11-weba.douyinvod.com/d",
+            "https://v11-web.douyinvod.com/e"]
+        self.assertEqual(script.prioritize_video_urls(candidates), candidates[3:] + candidates[:3])
+        self.assertEqual(script.prioritize_video_urls(candidates[:3]), candidates[:3])
+
 
 if __name__ == "__main__":
     unittest.main()
