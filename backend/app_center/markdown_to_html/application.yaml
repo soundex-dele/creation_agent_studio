@@ -2,13 +2,13 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: markdown-to-html
-  version: 1.0.1
+  version: 1.0.2
   name: Markdown 转 HTML
-  description: 将 Markdown 转为带内联样式的 HTML，支持四种主题、代码高亮、数学公式和可选文末引用。
+  description: 将 Markdown 转为带内联样式的 HTML，支持四种经典主题、六种小红书图文主题、代码高亮、数学公式和可选文末引用。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
   icon: "📄"
   color: "#0f4c81"
-  tags: [Markdown, HTML, 公众号排版, 文末引用]
+  tags: [Markdown, HTML, 公众号排版, 小红书图文, 文末引用]
   developer: Agent Studio
 spec:
   application_kind: chat
@@ -30,7 +30,7 @@ spec:
         default_modules: [visual]
         fields: {color: visual.primary_color, font: visual.body_font, requirements: visual}
     chat_profile:
-      welcome_message: 提供 Markdown 正文或文件路径，选择主题后生成可用于公众号的 HTML 文件。
+      welcome_message: 提供 Markdown 正文或文件路径，选择经典排版或小红书图文主题，生成带样式的 HTML 文件。
       input_placeholder: 继续调整主题、主色、字号或引用方式…
       empty_state_title: 将 Markdown 转成带样式的 HTML
       allow_agent_selection: false
@@ -45,7 +45,7 @@ spec:
     guided_prompts:
       - key: convert-markdown
         title: 填写 Markdown 转换设置
-        description: 选择排版主题、字体、字号和外链处理方式，生成 HTML 文件。
+        description: 选择经典或小红书图文主题，设置字体、字号和外链处理方式，生成 HTML 文件。
         icon: "📄"
         action: preview
         is_featured: true
@@ -66,7 +66,9 @@ spec:
           补充要求：{requirements}
 
           用户已通过表单确认以上设置，不要再次询问主题。保持原文内容，仅转换排版；不额外调用格式化 Skill。粘贴的正文先保存为工作目录内的 Markdown 文件，已有文件则读取后转换。使用 Skill 的 scripts/main.ts，优先 bun，否则 npx -y bun。
-          将表单中的中文名称映射为脚本参数：主题「经典」→ --theme default，「优雅」→ --theme grace，「简约」→ --theme simple，「现代」→ --theme modern；字体「无衬线」→ --font-family sans，「衬线」→ --font-family serif，「中文衬线」→ --font-family serif-cjk，「等宽」→ --font-family mono。字号传给 --font-size。主色为空或 theme 时不传 --color，其他值按 --color 处理。外链处理选择「转为文末引用」才启用 --cite；正文首标题选择「保留首标题」才启用 --keep-title。Mermaid 选择「转为 PNG 图片」时按 Skill 使用无头浏览器渲染，选择「保留 Mermaid 源码」时传 --no-mermaid；不可用时保留回退内容并说明，不声称图表已渲染。
+          将表单中的中文名称映射为脚本参数：主题「经典」→ --theme default，「优雅」→ --theme grace，「简约」→ --theme simple，「现代」→ --theme modern，「奶油手账」→ --theme xhs-cream，「极简杂志」→ --theme xhs-editorial，「醒目干货」→ --theme xhs-bold，「薄荷清单」→ --theme xhs-mint，「复古笔记」→ --theme xhs-journal，「莓紫灵感」→ --theme xhs-lilac。若收到的是主题参数值，直接传给 --theme。字体「无衬线」→ --font-family sans，「衬线」→ --font-family serif，「中文衬线」→ --font-family serif-cjk，「等宽」→ --font-family mono。字号传给 --font-size。主色为空或 theme 时不传 --color，其他值按 --color 处理。外链处理选择「转为文末引用」才启用 --cite；正文首标题选择「保留首标题」才启用 --keep-title。Mermaid 选择「转为 PNG 图片」时按 Skill 使用无头浏览器渲染，选择「保留 Mermaid 源码」时传 --no-mermaid；不可用时保留回退内容并说明，不声称图表已渲染。
+          小红书图文主题只改变标题、引用、列表、图片等元素的视觉样式，逐字保留原文，不添加点赞收藏文案、不自动拆页、不固定高度裁断内容。首标题按用户选项处理，不因选择小红书主题而覆盖明确设置。本应用交付 HTML；只有用户另行要求多页或图片时，再使用相应分页或导出工具，不能将 HTML 排版尺寸称为 PNG 分辨率。
+          使用 xhs-* 主题前，检查当前 Skill 的 scripts/main.ts --help 是否包含所选主题。主题依赖同仓库包含新增样式的 baoyu-md 构建版；若缺少主题，按 Skill 文档处理本地构建或明确报告依赖未更新，不静默退回经典主题或用旧版 npm 包覆盖本地主题。
           输出文件与输入文件同目录，已有 HTML 按 Skill 备份。检查实际执行结果，交付可访问的 HTML 文件路径；有备份时说明备份路径，图片等依赖资源一并说明。转换失败或缺少运行依赖时如实报告，不把代码块或虚构路径当成已生成文件。不得打开 Codex 内置浏览器。
         presets:
         - id: reading
@@ -90,11 +92,42 @@ spec:
             citations: bottom
             mermaid: png
             requirements: 保留代码块、公式和图表，确保长代码可阅读。
+        - id: xhs-cream
+          name: 小红书 · 奶油手账
+          description: 米白纸底、焦糖标题、圆角便签，适合生活分享与好物清单。
+          order: 2
+          values: {theme: xhs-cream, color: theme, font: sans, font_size: 16px, citations: inline, keep_title: keep, mermaid: png}
+        - id: xhs-editorial
+          name: 小红书 · 极简杂志
+          description: 衬线大标题、朱红点缀、细线分隔，适合审美、穿搭与旅行。
+          order: 3
+          values: {theme: xhs-editorial, color: theme, font: sans, font_size: 16px, citations: inline, keep_title: keep, mermaid: png}
+        - id: xhs-bold
+          name: 小红书 · 醒目干货
+          description: 柠檬黄标签、黑色粗框、重点高亮，适合教程与避坑总结。
+          order: 4
+          values: {theme: xhs-bold, color: theme, font: sans, font_size: 18px, citations: inline, keep_title: keep, mermaid: png}
+        - id: xhs-mint
+          name: 小红书 · 薄荷清单
+          description: 清浅绿底、步骤条、叶片圆角，适合习惯养成与整理计划。
+          order: 5
+          values: {theme: xhs-mint, color: theme, font: sans, font_size: 16px, citations: inline, keep_title: keep, mermaid: png}
+        - id: xhs-journal
+          name: 小红书 · 复古笔记
+          description: 牛皮纸色、虚线标签、笔记横线，适合学习笔记与书摘。
+          order: 6
+          values: {theme: xhs-journal, color: theme, font: sans, font_size: 16px, citations: inline, keep_title: keep, mermaid: png}
+        - id: xhs-lilac
+          name: 小红书 · 莓紫灵感
+          description: 淡紫画布、胶囊标题、细边卡片，适合成长记录与灵感收集。
+          order: 7
+          values: {theme: xhs-lilac, color: theme, font: sans, font_size: 16px, citations: inline, keep_title: keep, mermaid: png}
         questions:
           - {key: source, preset_save: optional, label: Markdown 正文或文件路径, type: text, placeholder: 粘贴 Markdown，或填写工作目录内的 .md 文件路径, help_text: 正文含本地图片时请提供可访问的图片路径。, required: true, default_value: null, order: 0}
           - key: theme
             preset_save: preference
             label: 排版主题
+            help_text: 4 种经典主题与 6 种小红书图文主题。制作图文建议保留首标题；本应用生成 HTML，多页图片需后续分页导出。
             type: single_choice
             required: true
             default_value: default
@@ -104,7 +137,13 @@ spec:
               - {value: grace, label: 优雅, description: 圆角卡片与精致引用, order: 1}
               - {value: simple, label: 简约, description: 清爽留白与极简布局, order: 2}
               - {value: modern, label: 现代, description: 胶囊标题与宽松行距, order: 3}
-          - {key: color, preset_save: preference, label: 主色, type: text, placeholder: theme、blue、red 或十六进制色值, help_text: theme 表示使用主题默认颜色。, required: false, default_value: theme, order: 2}
+              - {value: xhs-cream, label: 奶油手账, description: 小红书风格 · 米白纸底、焦糖标题、圆角便签, order: 4}
+              - {value: xhs-editorial, label: 极简杂志, description: 小红书风格 · 衬线大标题、朱红点缀、细线分隔, order: 5}
+              - {value: xhs-bold, label: 醒目干货, description: 小红书风格 · 柠檬黄标签、黑色粗框、重点高亮, order: 6}
+              - {value: xhs-mint, label: 薄荷清单, description: 小红书风格 · 清浅绿底、步骤条、叶片圆角, order: 7}
+              - {value: xhs-journal, label: 复古笔记, description: 小红书风格 · 牛皮纸色、虚线标签、笔记横线, order: 8}
+              - {value: xhs-lilac, label: 莓紫灵感, description: 小红书风格 · 淡紫画布、胶囊标题、细边卡片, order: 9}
+          - {key: color, preset_save: preference, label: 主色, type: text, placeholder: theme、blue、red 或十六进制色值, help_text: theme 表示使用主题默认主色；自定义主色不会替换所有背景与装饰颜色。, required: false, default_value: theme, order: 2}
           - key: font
             preset_save: preference
             label: 字体
@@ -143,6 +182,7 @@ spec:
           - key: keep_title
             preset_save: preference
             label: 正文首标题
+            help_text: 小红书图文建议保留首标题，便于呈现大标题；公众号正文可按需移除。
             type: single_choice
             required: true
             default_value: remove
@@ -160,7 +200,7 @@ spec:
             options:
               - {value: png, label: 转为 PNG 图片, description: 需要可用的 Chrome、Chromium 或 Edge, order: 0}
               - {value: source, label: 保留 Mermaid 源码, description: 不生成图表图片, order: 1}
-          - {key: requirements, preset_save: preference, label: 补充要求, type: text, placeholder: 例如：覆盖文章标题；指定 Mermaid 配色, required: false, default_value: "", order: 8}
+          - {key: requirements, preset_save: preference, label: 补充要求, type: text, placeholder: 例如：保留图片和清单；覆盖文章标题；指定 Mermaid 配色, required: false, default_value: "", order: 8}
   backend:
     definition_factory: app_center.markdown_to_html.provision.prepare_definition
   database: {mode: none}

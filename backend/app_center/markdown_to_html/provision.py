@@ -6,5 +6,5 @@ def prepare_definition(*, organization, application, definition):
         organization=organization,
         definition=definition,
         skill_slug="baoyu-markdown-to-html",
-        skill_description="将 Markdown 转为带主题和内联样式的 HTML，支持公众号排版和文末引用。",
+        skill_description="将 Markdown 转为带主题和内联样式的 HTML，支持公众号排版、六种小红书图文主题和文末引用。",
     )
