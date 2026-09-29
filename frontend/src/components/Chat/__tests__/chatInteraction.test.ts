@@ -320,6 +320,30 @@ it.each([true, false])('reports the actual copy result without the Clipboard API
   }
 });
 
+it.each([true, false])('shows the form application sidebar before and after creating its conversation (mobile: %s)', async isMobile => {
+  mobile = isMobile;
+  const applicationProps = { createOnFirstSend: true, creationContext: { applicationId: 15 } };
+  const post = vi.spyOn(api, 'post').mockResolvedValue({});
+  await renderChat({ ...applicationProps, conversationId: null });
+  await click('[aria-label="打开右侧栏"]');
+  expect(button('[aria-label="打开右侧栏"]').getAttribute('aria-expanded')).toBe('true');
+  expect(document.querySelector('.chat-workspace-drawer')?.textContent).toContain('发送第一条消息后即可使用会话工作空间');
+  const workspaceAction = (label: string) => Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.chat-workspace-sidebar-actions button'),
+  ).find(element => element.textContent === label)!;
+  expect(workspaceAction('打开目录').disabled).toBe(true);
+  expect(workspaceAction('查看工作空间文件').disabled).toBe(true);
+  expect(post).not.toHaveBeenCalled();
+  expect(vi.mocked(api.get).mock.calls.some(([path]) => path.includes('workspace-files'))).toBe(false);
+
+  await renderChat({ ...applicationProps, conversationId: 'created-app-chat' });
+  await click('[aria-label="打开右侧栏"]');
+  expect(workspaceAction('打开目录').disabled).toBe(false);
+  expect(workspaceAction('查看工作空间文件').disabled).toBe(false);
+  await act(async () => workspaceAction('打开目录').click());
+  expect(post).toHaveBeenCalledWith('/conversations/created-app-chat/open-workspace/', {});
+});
+
 it('loads workspace files and previews only on explicit sidebar clicks, without polling', async () => {
   vi.useFakeTimers();
   const workspaceEndpoint = '/conversations/c1/workspace-files/';

@@ -41,6 +41,7 @@ const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
 const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
 const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
 const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
+const AnimationStudioPage = lazy(() => import('@/pages/Apps/AnimationStudioPage'));
 const MyDrivePage = lazy(() => import('@/pages/Apps/MyDrivePage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
@@ -291,6 +292,10 @@ const router = createBrowserRouter([
         </ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/animation-studio',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<AnimationStudioPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/ai-drawing',

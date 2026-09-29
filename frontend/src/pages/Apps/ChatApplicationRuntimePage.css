@@ -22,7 +22,8 @@
   position: absolute;
   z-index: 5;
   top: 14px;
-  right: 18px;
+  /* Keep the chat's 44px sidebar button and a gap clear on the right. */
+  right: 72px;
 }
 
 .chat-app-header > button {

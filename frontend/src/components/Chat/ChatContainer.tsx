@@ -325,7 +325,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const canCollapseComposer = isMobile && !isEmpty;
   const composerVisible = !canCollapseComposer || composerExpanded;
   const agent = currentConversation?.agent;
-  const showWorkspaceSidebar = Boolean(conversationId && !remote && composerMode !== 'document');
+  const showWorkspaceSidebar = Boolean(
+    (conversationId || (createOnFirstSend && creationContext?.applicationId))
+    && !remote && composerMode !== 'document',
+  );
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -337,7 +340,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   return (
     <div className={`chat-container${showWorkspaceSidebar ? ' chat-container--with-toolbar' : ''}${!composerVisible ? ' chat-container--composer-collapsed' : ''}`}>
       {error && <Alert message={error} type="error" showIcon closable onClose={clearError} />}
-      {showWorkspaceSidebar && conversationId && (
+      {showWorkspaceSidebar && (
         <ChatWorkspaceSidebar key={conversationId} conversationId={conversationId} />
       )}
       {isEmpty && !isLoading ? (

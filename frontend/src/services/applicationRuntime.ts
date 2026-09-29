@@ -3,6 +3,7 @@ import { streamRunEvents } from './runStream';
 import { api } from './api';
 import type { ApplicationDefinition } from '@/types/application';
 import { tenantApiRoot } from './tenantContext';
+import { getRunArtifactAccess } from './runArtifacts';
 
 
 export interface RunResource {
@@ -122,9 +123,7 @@ export function createApplicationRuntimeClient({
       runId: string,
       artifactId: string,
     ): Promise<{ artifact_id: string; url: string; expires_at: string }> =>
-      api.get<{ artifact_id: string; url: string; expires_at: string }>(
-        `${root}/runs/${runId}/artifacts/${artifactId}/access`,
-      ),
+      getRunArtifactAccess(organizationId, { run_id: runId, id: artifactId }),
   };
 }
 

@@ -1,0 +1,91 @@
+.animation-workspace { --animation-accent: #4f46e5; --animation-success: #087f5b; color-scheme: light; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; min-width: 0; overflow: hidden; color: var(--color-text); background: var(--color-bg-surface); }
+.dark .animation-workspace { --animation-accent: #a5b4fc; --animation-success: #6ee7b7; color-scheme: dark; }
+.animation-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 24px; padding: 18px 24px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-card); }
+.animation-brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.animation-brand > a { display: grid; place-items: center; width: 36px; height: 40px; color: var(--color-text-sec); }
+.animation-logo { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: #4f46e5; color: white; }
+.animation-brand h1 { font-size: 19px; margin: 0; line-height: 1.5; font-weight: 650; letter-spacing: -.5px; }
+.animation-brand p { margin: 0; font-size: 12px; color: var(--color-text-sec); }
+.animation-pipeline { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--color-text-sec); }
+.animation-pipeline i { width: 28px; height: 1px; background: var(--color-border); }
+.animation-body { display: grid; grid-template-columns: 310px minmax(0, 1fr) 230px; flex: 1; min-height: 0; min-width: 0; }
+.animation-form, .animation-results, .animation-history { min-width: 0; min-height: 0; overflow-y: auto; padding: 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.animation-form { display: flex; flex-direction: column; gap: 14px; border-right: 1px solid var(--color-border); background: var(--color-bg-card); }
+.animation-section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.animation-section-title h2 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.animation-section-title > svg { color: var(--animation-accent); }
+.animation-section-title small { font-size: 12px; font-weight: 400; color: var(--color-text-sec); }
+.animation-form label { font-size: 13px; font-weight: 550; }
+.animation-form textarea, .animation-form > input { width: 100%; border: 1px solid var(--color-border); background: var(--color-bg-surface); color: var(--color-text); border-radius: 10px; padding: 12px; line-height: 1.7; font: inherit; font-size: 14px; }
+.animation-form textarea { resize: vertical; min-height: 160px; flex-shrink: 0; }
+.animation-form textarea::placeholder, .animation-form input::placeholder { color: var(--color-text-sec); }
+.animation-workspace :focus-visible { outline: 2px solid var(--animation-accent); outline-offset: 3px; }
+.animation-examples { display: flex; flex-wrap: wrap; gap: 7px; }
+.animation-examples button { display: flex; gap: 5px; align-items: center; border: 1px solid var(--color-border); background: transparent; color: var(--color-text-sec); padding: 7px 8px; border-radius: 7px; font-size: 12px; cursor: pointer; }
+.animation-examples button:hover { color: var(--animation-accent); border-color: var(--animation-accent); }
+.animation-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 10px; }
+.animation-fields > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.animation-fields .ant-select, .animation-fields .ant-input-number { width: 100%; }
+.animation-upload { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-height: 115px; padding: 16px; border: 1px dashed var(--color-border); border-radius: 11px; color: var(--color-text-sec); background: var(--color-bg-surface); text-align: center; }
+.animation-upload strong { font-size: 13px; color: var(--color-text); font-weight: 500; }
+.animation-upload span { font-size: 11px; font-weight: 400; }
+.animation-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.animation-hint, .animation-footnote { margin: 0; font-size: 12px; color: var(--color-text-sec); line-height: 1.7; }
+.animation-footnote { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.animation-form > .ant-btn { flex-shrink: 0; margin-top: 4px; }
+.animation-assets { list-style: none; margin: 0; padding: 0; }
+.animation-assets li, .animation-editing { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 8px; border-radius: 8px; background: var(--color-bg-elevated); }
+.animation-assets span, .animation-editing span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.animation-assets button, .animation-editing button { display: grid; place-items: center; background: transparent; border: 0; min-width: 28px; height: 28px; color: var(--color-text-sec); cursor: pointer; }
+.animation-results { display: flex; flex-direction: column; gap: 18px; padding: 26px clamp(18px, 2.5vw, 44px); }
+.animation-eyebrow { display: block; margin-bottom: 6px; font-size: 10px; font-weight: 650; letter-spacing: 1.8px; color: var(--color-text-sec); }
+.animation-results h2 { font-size: 20px; }
+.animation-format { padding: 5px 9px; font-size: 11px; font-weight: 700; border: 1px solid var(--color-border); border-radius: 6px; color: var(--animation-accent); background: var(--color-bg-card); }
+.animation-format.is-video { color: var(--animation-success); }
+.animation-canvas { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; min-height: 210px; max-height: 600px; background: #10121b; border: 1px solid #282b38; border-radius: 14px; overflow: hidden; }
+.animation-canvas iframe, .animation-canvas video { width: 100%; height: 100%; display: block; border: 0; object-fit: contain; }
+.animation-placeholder { padding: 28px 16px; color: #bbc0d1; text-align: center; }
+.animation-placeholder-mark { margin: 0 auto 18px; width: 86px; height: 86px; display: grid; place-items: center; color: #aaa7ff; border: 1px solid #39374c; border-radius: 24px; background: #1e1f33; transform: rotate(-6deg); }
+.animation-placeholder h3 { margin: 14px 0 10px; font-size: 21px; font-weight: 500; color: #f4f4fb; }
+.animation-placeholder p { font-size: 13px; line-height: 1.8; }
+.animation-placeholder > span { display: block; margin-top: 25px; font-size: 11px; color: #b1b5c8; }
+.animation-specs { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-size: 12px; color: var(--color-text-sec); }
+.animation-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.animation-progress { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.animation-progress span { flex: 1; }
+.animation-details { font-size: 13px; border-top: 1px solid var(--color-border); padding-top: 16px; color: var(--color-text-sec); }
+.animation-details summary { cursor: pointer; padding: 8px 0; }
+.animation-details p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.animation-history { border-left: 1px solid var(--color-border); background: var(--color-bg-card); padding: 20px 16px; }
+.animation-new { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px; margin: 18px 0; width: 100%; border: 1px dashed var(--color-border); border-radius: 8px; color: var(--color-text-sec); background: transparent; cursor: pointer; }
+.animation-history > ul { list-style: none; margin: 0; padding: 0; }
+.animation-history li { margin-bottom: 12px; }
+.animation-history li button { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-surface); color: var(--color-text); text-align: left; width: 100%; cursor: pointer; }
+.animation-history li button.is-selected { border-color: var(--animation-accent); box-shadow: 0 0 0 1px var(--animation-accent); }
+.animation-history-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: var(--color-bg-card); color: var(--animation-accent); margin-bottom: 4px; }
+.animation-history strong { font-size: 13px; font-weight: 550; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.animation-history li button > span:not(.animation-history-icon), .animation-history time { font-size: 11px; color: var(--color-text-sec); }
+.animation-mobile-tabs { display: none; }
+.animation-error { flex-shrink: 0; max-height: 130px; overflow-y: auto; border-radius: 0; }
+@media (max-width: 1199px) { .animation-body { grid-template-columns: 280px minmax(0, 1fr); } .animation-history { grid-column: 1 / -1; max-height: 190px; border-top: 1px solid var(--color-border); } .animation-body { grid-template-rows: minmax(0, 1fr) minmax(0, 190px); } .animation-history > ul { display: flex; gap: 12px; } .animation-history li { min-width: 180px; width: 180px; flex-shrink: 0; } .animation-history .animation-new { display: none; } }
+@media (max-width: 767px) {
+  .animation-header { padding: 12px 14px; }
+  .animation-brand h1 { font-size: 17px; }
+  .animation-brand p { font-size: 11px; }
+  .animation-pipeline { display: none; }
+  .animation-body { display: flex; flex-direction: column; }
+  .animation-mobile-tabs { display: grid; flex-shrink: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--color-border); }
+  .animation-mobile-tabs button { min-height: 44px; border: 0; background: var(--color-bg-card); color: var(--color-text-sec); font-size: 14px; cursor: pointer; }
+  .animation-mobile-tabs button[aria-current] { color: var(--animation-accent); box-shadow: inset 0 -2px var(--animation-accent); font-weight: 600; }
+  .animation-form, .animation-results, .animation-history { display: none; flex: 1; min-height: 0; overflow-y: auto; max-height: none; padding: 20px 16px max(24px, env(safe-area-inset-bottom)); border: 0; }
+  .animation-workspace[data-tab="create"] .animation-form, .animation-workspace[data-tab="preview"] .animation-results { display: flex; }
+  .animation-workspace[data-tab="history"] .animation-history { display: block; }
+  .animation-form textarea, .animation-form > input, .animation-form .ant-input-number-input { font-size: 16px; }
+  .animation-workspace .ant-btn, .animation-examples button, .animation-assets button, .animation-editing button { min-height: 44px; }
+  .animation-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .animation-actions > .ant-btn-primary { grid-column: 1 / -1; }
+  .animation-history > ul { display: block; }
+  .animation-history li { width: 100%; min-width: 0; }
+  .animation-history .animation-new { display: flex; }
+  .animation-canvas { min-height: 200px; border-radius: 10px; }
+}

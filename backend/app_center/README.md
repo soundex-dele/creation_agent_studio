@@ -40,6 +40,10 @@ timers, inventory and cooking history. See [`kitchen_assistant/README.md`](kitch
 
 ## Guided content applications
 
+The **动画制作** (`animation-studio`) dedicated workspace generates editable Remotion animations,
+previews them as isolated HTML, and renders MP4 only when the user explicitly exports a version.
+See [`animation_studio/README.md`](animation_studio/README.md) for dependencies, API and validation.
+
 The **会议与访谈助手** (`meeting-assistant`) workspace turns private recordings
 into timestamped transcripts, summaries and interview material. Users explicitly
 confirm action items before creating todos, and can save results as online documents.

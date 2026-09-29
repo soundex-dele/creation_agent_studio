@@ -7,7 +7,7 @@ import WorkspaceFilesPanel from '@/components/Workspace/WorkspaceFilesPanel';
 import { useChatConnection } from './ChatConnectionContext';
 import './ChatWorkspaceSidebar.css';
 
-export default function ChatWorkspaceSidebar({ conversationId }: { conversationId: string }) {
+export default function ChatWorkspaceSidebar({ conversationId }: { conversationId: string | null }) {
   const { api, online } = useChatConnection();
   const [open, setOpen] = useState(false);
   const [filesVisible, setFilesVisible] = useState(false);
@@ -22,7 +22,7 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
   };
 
   const openDirectory = async () => {
-    if (!online || openingDirectory) return;
+    if (!conversationId || !online || openingDirectory) return;
     setOpeningDirectory(true);
     try {
       await api.post(`/conversations/${conversationId}/open-workspace/`, {});
@@ -34,6 +34,7 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
   };
 
   const toggleFiles = () => {
+    if (!conversationId || !online) return;
     setFilesVisible(!filesVisible);
     if (!filesVisible) void files.refresh();
   };
@@ -62,16 +63,17 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
         destroyOnHidden
       >
         <div id={sidebarId} className="chat-workspace-sidebar">
+          {!conversationId && <Alert type="info" showIcon message="发送第一条消息后即可使用会话工作空间" />}
           <div className="chat-workspace-sidebar-actions">
             <Button
               icon={<FolderOpenOutlined />}
               loading={openingDirectory}
-              disabled={!online}
+              disabled={!conversationId || !online}
               onClick={() => void openDirectory()}
             >打开目录</Button>
             <Button
               icon={<FileSearchOutlined />}
-              disabled={!online}
+              disabled={!conversationId || !online}
               aria-expanded={filesVisible}
               aria-controls={filesId}
               onClick={toggleFiles}

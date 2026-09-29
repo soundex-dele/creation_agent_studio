@@ -1,0 +1,44 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: animation-studio
+  version: 1.0.0
+  name: 动画制作
+  description: AI 自由编排讲解与图文动画，先预览 HTML，再导出 MP4，保留每个版本及可编辑源码。
+  category: {slug: creative, name: 内容创作, order: 1}
+  icon: "动"
+  color: "#4f46e5"
+  tags: [动画, 图文动效, HTML 预览, MP4, Remotion]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: animation-studio
+    executor_protocol_version: 1
+    renderer_key: animation-studio
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: {type: string, enum: [generate, export]}
+        prompt: {type: string, maxLength: 16000}
+        aspect: {type: string, enum: ['16:9', '9:16', '1:1']}
+        duration: {type: integer, minimum: 5, maximum: 120}
+        style: {type: string, maxLength: 1000}
+        asset_ids: {type: array, maxItems: 10, uniqueItems: true, items: {type: string, format: uuid}}
+        source_run_id: {type: string, format: uuid}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated, timeout_seconds: 1200}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.animation_studio.backend.apps.AnimationStudioConfig
+    urlconf: app_center.animation_studio.backend.urls
+    executor_entrypoint: app_center.animation_studio.runtime.execute
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

@@ -204,12 +204,15 @@ def _can_access_run(request, run):
         except (Http404, APIException, ValueError):
             return False
         return True
-    if root.executor_key == "ai-drawing":
+    if root.executor_key in ("ai-drawing", "animation-studio"):
         if root.owner_id != request.user.id:
             return False
         from django.http import Http404
         from rest_framework.exceptions import APIException
-        from app_center.ai_drawing.backend.access import application_for
+        if root.executor_key == "animation-studio":
+            from app_center.animation_studio.backend.access import application_for
+        else:
+            from app_center.ai_drawing.backend.access import application_for
         try:
             application_for(request.user, root.organization_id, root.source_id)
         except (Http404, APIException, ValueError):
@@ -670,6 +673,7 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
             artifact=artifact,
             expires_at=expires_at,
         )
+        content_path = None
         if access_url is None:
             content_url = reverse(
                 "execution-v1:run-artifact-content",
@@ -679,13 +683,15 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
                     "artifact_id": artifact_id,
                 },
             )
-            access_url = request.build_absolute_uri(
-                f"{content_url}?token={artifact_token(artifact)}"
-            )
+            content_path = f"{content_url}?token={artifact_token(artifact)}"
+            access_url = request.build_absolute_uri(content_path)
         return Response(
             {
                 "artifact_id": str(artifact.id),
                 "url": access_url,
+                # Browser clients use their configured API origin/proxy instead
+                # of the internal host observed by Django behind a reverse proxy.
+                "content_path": content_path,
                 "expires_at": expires_at,
             }
         )

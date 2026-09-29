@@ -45,6 +45,20 @@ describe('mobile page scrolling', () => {
     expect(modal.padding).toContain('safe-area-inset-bottom');
   });
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('keeps form chat actions clear of the sidebar and preserves message scrolling at %ipx', (width) => {
+    const page = readSource('../../pages/Apps/ChatApplicationRuntimePage.css');
+    const chat = readSource('../../components/Chat/ChatContainer.css');
+    const tools = declarationsAt([page], ['.chat-app-tools'], width);
+    const toolbar = declarationsAt([chat], ['.chat-workspace-toolbar'], width);
+    const button = declarationsAt([chat], ['.chat-workspace-toolbar .ant-btn'], width);
+    const rightPadding = Number.parseFloat(toolbar.padding.split(' ')[1]);
+    expect(Number.parseFloat(tools.right)).toBeGreaterThanOrEqual(rightPadding + Number.parseFloat(button.width) + 8);
+    expect(declarationsAt([page], ['.chat-app-page'], width).height).toBe('100%');
+    expect(declarationsAt([page], ['.chat-app-chat'], width)['min-height']).toBe('0');
+    expect(declarationsAt([chat], ['.chat-container'], width).height).toBe('100%');
+    expect(declarationsAt([chat, page], ['.chat-messages', '.chat-app-chat .chat-messages'], width)['overflow-y']).toBe('auto');
+  });
+
   it('keeps viewport clipping in the shell and assigns scrolling to padded views', () => {
     for (const selector of ['body', '#root', '.app-main']) {
       expect(declarationsAt([globalStyles], [selector], 390).overflow).toBe('hidden');
