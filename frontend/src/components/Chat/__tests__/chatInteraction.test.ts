@@ -375,6 +375,9 @@ it('loads workspace files and previews only on explicit sidebar clicks, without 
   expect(openDirectory).toHaveBeenCalledWith('/conversations/c1/open-workspace/', {});
   await clickInSidebar('查看工作空间文件');
   expect(fileRequests()).toHaveLength(1);
+  expect(document.querySelector('.chat-workspace-files-modal [role="dialog"]')
+    ?? document.querySelector('.chat-workspace-files-modal[role="dialog"]')).not.toBeNull();
+  expect(document.querySelector('.chat-workspace-drawer .workspace-files-panel')).toBeNull();
   expect(document.querySelector('.workspace-file-preview')!.textContent).toContain('选择文件查看内容');
   await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
   expect(fileRequests()).toHaveLength(1);
@@ -384,8 +387,9 @@ it('loads workspace files and previews only on explicit sidebar clicks, without 
   expect(document.querySelector('.workspace-file-preview')!.textContent).toContain('hello');
   await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="刷新文件"]')!.click());
   expect(fileRequests()).toHaveLength(3);
-  await clickInSidebar('收起工作空间文件');
+  await act(async () => document.querySelector<HTMLButtonElement>('.chat-workspace-files-modal .ant-modal-close')!.click());
   await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+  expect(document.querySelector('.chat-workspace-files-modal')).toBeNull();
   expect(fileRequests()).toHaveLength(3);
   await renderChat({ conversationId: 'c2' });
   expect(button('[aria-label="打开右侧栏"]').getAttribute('aria-expanded')).toBe('false');

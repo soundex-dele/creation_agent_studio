@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Empty, Spin, message } from 'antd';
+import { Button, Empty, Spin, message } from 'antd';
 import {
   CopyOutlined,
   FileImageOutlined,
@@ -11,6 +11,7 @@ import {
 import type { WorkspaceFileEntry, WorkspaceFilePreview } from '@/types/workspaceFiles';
 import { workingDirectoryLabel } from '@/lib/workingDirectoryLabel';
 import { copyText } from '@/lib/clipboard';
+import WorkspaceFileContent from './WorkspaceFileContent';
 import './WorkspaceFilesPanel.css';
 
 interface Props {
@@ -46,11 +47,14 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkspaceFilePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (selectedPath && !entries.some((entry) => entry.path === selectedPath)) {
       setSelectedPath(null);
       setPreview(null);
       setPreviewLoading(false);
+      setPreviewError(false);
     }
   }, [entries, selectedPath]);
 
@@ -58,19 +62,20 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
     if (!selectedPath) return;
     let active = true;
     setPreview(null);
+    setPreviewError(false);
     setPreviewLoading(true);
     onReadFile(selectedPath)
       .then((result) => {
         if (active) setPreview(result);
       })
       .catch(() => {
-        if (active) setPreview(null);
+        if (active) setPreviewError(true);
       })
       .finally(() => {
         if (active) setPreviewLoading(false);
       });
     return () => { active = false; };
-  }, [onReadFile, selectedPath]);
+  }, [onReadFile, selectedPath, retry]);
 
   const copyDirectory = async () => {
     try {
@@ -110,6 +115,7 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
             className={`workspace-file-row${selectedPath === entry.path ? ' active' : ''}`}
             style={{ paddingLeft: `${12 + entry.depth * 16}px` }}
             disabled={entry.is_directory}
+            aria-pressed={selectedPath === entry.path}
             onClick={() => setSelectedPath(entry.path)}
           >
             <FileIcon entry={entry} />
@@ -123,6 +129,11 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
       <div className="workspace-file-preview">
         {previewLoading ? (
           <div className="workspace-file-preview-state"><Spin size="small" /></div>
+        ) : previewError ? (
+          <div className="workspace-file-preview-state" role="alert">
+            <span>文件读取失败，请重试</span>
+            <Button onClick={() => setRetry(value => value + 1)}>重试</Button>
+          </div>
         ) : !preview ? (
           <div className="workspace-file-preview-state">选择文件查看内容</div>
         ) : (
@@ -131,18 +142,7 @@ const WorkspaceFilesPanel: React.FC<Props> = ({
               <span title={preview.path}>{preview.name}</span>
               <small>{formatSize(preview.size)}</small>
             </div>
-            <div className="workspace-file-preview-body">
-              {preview.preview_kind === 'text' && <pre>{preview.content}</pre>}
-              {preview.preview_kind === 'image' && preview.data_url && (
-                <img src={preview.data_url} alt={preview.name} />
-              )}
-              {preview.preview_kind === 'image' && !preview.data_url && (
-                <div className="workspace-file-preview-state">图片较大，暂不支持在线预览</div>
-              )}
-              {preview.preview_kind === 'binary' && (
-                <div className="workspace-file-preview-state">该文件暂不支持在线预览</div>
-              )}
-            </div>
+            <WorkspaceFileContent key={preview.path} file={preview} />
             {preview.truncated && (
               <div className="workspace-file-preview-truncated">文件较大，仅展示部分内容</div>
             )}

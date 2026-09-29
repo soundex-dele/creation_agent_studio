@@ -21,17 +21,80 @@
   min-height: 44px;
 }
 
-.chat-workspace-sidebar-files:not([hidden]) {
+.chat-workspace-modal-files {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  height: min(76dvh, calc(100dvh - 120px), 840px);
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.chat-workspace-sidebar .workspace-files-panel {
+.chat-workspace-modal-files > .ant-alert {
+  flex-shrink: 0;
+}
+
+.chat-workspace-modal-files .workspace-files-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 26%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   flex: 1;
   width: 100%;
   min-width: 0;
   min-height: 0;
   border-left: 0;
+  animation: none;
+}
+
+.chat-workspace-modal-files .workspace-files-header {
+  grid-column: 1 / -1;
+}
+
+.chat-workspace-modal-files .workspace-files-tree {
+  min-height: 0;
+  border-bottom: 0;
+  border-right: 1px solid var(--color-border);
+}
+
+.chat-workspace-modal-files .workspace-file-preview {
+  min-width: 0;
+}
+
+.chat-workspace-files-modal .ant-modal-content {
+  padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767px) {
+  .chat-workspace-files-modal .ant-modal-content {
+    padding: 16px 12px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .chat-workspace-modal-files .workspace-files-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 24%) minmax(0, 1fr);
+  }
+
+  .chat-workspace-modal-files .workspace-files-tree {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+/* Short landscape screens need the file list beside the preview so that
+   headers and controls do not consume the entire preview height. */
+@media (max-height: 480px) {
+  .chat-workspace-modal-files .workspace-files-panel {
+    grid-template-columns: minmax(100px, 26%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .chat-workspace-modal-files .workspace-files-tree {
+    border-bottom: 0;
+    border-right: 1px solid var(--color-border);
+  }
+
+  .chat-workspace-modal-files .workspace-file-preview-toolbar small {
+    display: none;
+  }
 }

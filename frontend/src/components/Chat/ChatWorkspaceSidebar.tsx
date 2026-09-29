@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, Button, Drawer, Tooltip, message } from 'antd';
+import { Alert, Button, Drawer, Modal, Tooltip, message } from 'antd';
 import { FileSearchOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { SidebarSimple } from '@phosphor-icons/react';
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles';
@@ -33,10 +33,10 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
     }
   };
 
-  const toggleFiles = () => {
+  const showFiles = () => {
     if (!conversationId || !online) return;
-    setFilesVisible(!filesVisible);
-    if (!filesVisible) void files.refresh();
+    setFilesVisible(true);
+    void files.refresh();
   };
 
   return (
@@ -75,27 +75,35 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
               icon={<FileSearchOutlined />}
               disabled={!conversationId || !online}
               aria-expanded={filesVisible}
-              aria-controls={filesId}
-              onClick={toggleFiles}
-            >{filesVisible ? '收起工作空间文件' : '查看工作空间文件'}</Button>
-          </div>
-          <div id={filesId} className="chat-workspace-sidebar-files" hidden={!filesVisible}>
-            {filesVisible && (
-              <>
-                {files.error && <Alert type="error" showIcon message={files.error} />}
-                <WorkspaceFilesPanel
-                  workingDirectory={files.working_directory}
-                  entries={files.entries}
-                  truncated={files.truncated}
-                  isRefreshing={files.isRefreshing}
-                  onRefresh={() => { if (online) void files.refresh(); }}
-                  onReadFile={files.readFile}
-                />
-              </>
-            )}
+              aria-haspopup="dialog"
+              aria-controls={filesVisible ? filesId : undefined}
+              onClick={showFiles}
+            >查看工作空间文件</Button>
           </div>
         </div>
       </Drawer>
+      <Modal
+        title="工作空间文件"
+        open={filesVisible}
+        onCancel={() => setFilesVisible(false)}
+        footer={null}
+        width="min(1200px, calc(100vw - 24px))"
+        centered
+        className="chat-workspace-files-modal"
+        destroyOnHidden
+      >
+        <div id={filesId} className="chat-workspace-modal-files">
+          {files.error && <Alert type="error" showIcon message={files.error} />}
+          <WorkspaceFilesPanel
+            workingDirectory={files.working_directory}
+            entries={files.entries}
+            truncated={files.truncated}
+            isRefreshing={files.isRefreshing}
+            onRefresh={() => { if (online) void files.refresh(); }}
+            onReadFile={files.readFile}
+          />
+        </div>
+      </Modal>
     </>
   );
 }

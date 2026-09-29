@@ -9,13 +9,14 @@ const readSource = (relativePath: string) => readFileSync(
 
 // Inspect the actual CSS declarations at each breakpoint. This guards the
 // shell/page scroll contract; jsdom cannot measure layout or simulate panning.
-function declarationsAt(sources: string[], selectors: string[], width: number) {
+function declarationsAt(sources: string[], selectors: string[], width: number, height = 900) {
   const declarations: Record<string, string> = {};
   const visit = (container: Container) => container.nodes?.forEach((node) => {
     if (node.type === 'atrule' && node.name === 'media') {
-      const condition = node.params.match(/^\((min|max)-width:\s*(\d+)px\)$/);
+      const condition = node.params.match(/^\((min|max)-(width|height):\s*(\d+)px\)$/);
+      const dimension = condition?.[2] === 'height' ? height : width;
       if (condition && (condition[1] === 'min'
-        ? width >= Number(condition[2]) : width <= Number(condition[2]))) visit(node);
+        ? dimension >= Number(condition[3]) : dimension <= Number(condition[3]))) visit(node);
     } else if (node.type === 'rule' && node.selectors.some(selector => selectors.includes(selector))) {
       node.walkDecls(declaration => { declarations[declaration.prop] = declaration.value; });
     }
@@ -26,6 +27,39 @@ function declarationsAt(sources: string[], selectors: string[], width: number) {
 
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
+
+  it.each([320, 568, 667, 844])('keeps preview content available in a short %ipx viewport', width => {
+    const styles = [readSource('../../components/Chat/ChatWorkspaceSidebar.css')];
+    const panel = declarationsAt(styles, ['.chat-workspace-modal-files .workspace-files-panel'], width, 320);
+    expect(panel['grid-template-rows']).toBe('auto minmax(0, 1fr)');
+    expect(panel['grid-template-columns']).toBe('minmax(100px, 26%) minmax(0, 1fr)');
+  });
+
+  it.each([320, 375, 390, 767, 768, 844, 1440])('bounds the workspace file modal and its scroll panes at %ipx', width => {
+    const modal = readSource('../../components/Chat/ChatWorkspaceSidebar.css');
+    const panel = readSource('../../components/Workspace/WorkspaceFilesPanel.css');
+    const styles = [panel, modal];
+    const root = declarationsAt(styles, ['.chat-workspace-modal-files'], width);
+    expect(root.height).toBe('min(76dvh, calc(100dvh - 120px), 840px)');
+    expect(root.overflow).toBe('hidden');
+    const grid = declarationsAt(styles, ['.workspace-files-panel', '.chat-workspace-modal-files .workspace-files-panel'], width);
+    expect(grid['min-width']).toBe('0');
+    expect(grid['min-height']).toBe('0');
+    expect(grid['grid-template-rows']).toBe(width <= 767
+      ? 'auto minmax(0, 24%) minmax(0, 1fr)' : 'auto minmax(0, 1fr)');
+    const tree = declarationsAt(styles, ['.workspace-files-tree', '.chat-workspace-modal-files .workspace-files-tree'], width);
+    expect(tree['min-height']).toBe('0');
+    expect(tree['overflow-y']).toBe('auto');
+    const preview = declarationsAt(styles, ['.workspace-file-preview-body'], width);
+    expect(preview['min-height']).toBe('0');
+    expect(preview.overflow).toBe('auto');
+    expect(declarationsAt(styles, ['.workspace-file-html'], width).height).toBe('100%');
+    expect(declarationsAt(styles, ['.workspace-file-preview-state'], width)['min-height']).toBe('0');
+    const source = readSource('../../components/Chat/ChatWorkspaceSidebar.tsx');
+    expect(source).toContain('className="chat-workspace-modal-files"');
+    expect(source).toContain('className="chat-workspace-files-modal"');
+    expect(source).toContain('width="min(1200px, calc(100vw - 24px))"');
+  });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('bounds form templates and manual workflow setup at %ipx', (width) => {
     const chat = readSource('../../pages/Apps/ChatApplicationRuntimePage.css');
