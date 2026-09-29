@@ -4,3 +4,6 @@
 [submodule "teaching_data"]
 	path = teaching_data
 	url = https://github.com/soundex-dele/high-school-teaching-data.git
+[submodule "backend/third_party/Douyin_TikTok_Download_API"]
+	path = backend/third_party/Douyin_TikTok_Download_API
+	url = https://github.com/Evil0ctal/Douyin_TikTok_Download_API.git
