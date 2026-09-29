@@ -29,6 +29,10 @@ describe('WeChat article and cover parallel preset', () => {
       article_source: { from: 'steps.writer.output.artifacts.article_md' },
       strict: { value: true }, device_scale_factor: { value: 3 },
     });
+    expect(byKey['pages-png'].input_mapping).toMatchObject({
+      width: { value: 1080 }, height: { value: 1440 }, device_scale_factor: { value: 1 },
+      full_page: { value: true },
+    });
     expect(workflow.output_mapping).toMatchObject({
       pages: { from: 'steps.pages-png.output.files' },
       cover: { from: 'steps.cover-png.output.files' },

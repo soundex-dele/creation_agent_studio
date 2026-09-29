@@ -34,7 +34,7 @@ export function buildWechatParallelWorkflow(applications: ApplicationRuntime[]):
   };
   const png = (
     key: string, name: string, dependencies: string[], bindings: Record<string, Binding>,
-    width: number, height: number, selector: string, x: number, y: number,
+    width: number, height: number, selector: string, x: number, y: number, scale = 3,
   ) => {
     const app = bySlug.get('html-to-png')!;
     steps.push({
@@ -43,7 +43,7 @@ export function buildWechatParallelWorkflow(applications: ApplicationRuntime[]):
       config: { _editor: { position: { x, y } } },
       input_mapping: {
         ...bindings, strict: fixed(true), width: fixed(width), height: fixed(height),
-        selector: fixed(selector), full_page: fixed(!selector), device_scale_factor: fixed(3),
+        selector: fixed(selector), full_page: fixed(!selector), device_scale_factor: fixed(scale),
       },
     });
   };
@@ -74,7 +74,7 @@ export function buildWechatParallelWorkflow(applications: ApplicationRuntime[]):
   }, { manifest: 'pages/manifest.json', report: { path: 'pages/report.json', status: 'complete' } }, 1320, 40);
   png('pages-png', '正文页面导出 PNG', ['paginate'], {
     manifest_file: output('paginate', 'artifacts.manifest'),
-  }, 360, 480, '', 1640, 40);
+  }, 1080, 1440, '', 1640, 40, 1);
 
   chat('cover', '生成封面 · HTML 封面生成器', 'html-cover-generator', ['writer'], {
     source: output('writer', 'artifacts.article_md'), aspect: fixed('2.35:1'),
