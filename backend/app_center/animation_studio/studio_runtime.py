@@ -14,6 +14,7 @@ from core.agent_engine.adapters.codex import CodexAdapter
 from core.transcription import transcribe_segments
 from modules.execution.infrastructure.artifacts import get_artifact_storage
 from .backend.documents import validate_document, asset_ids, scene
+from .json_output import decode_json_object
 from .backend.projects import project_for, document_assets
 from .backend.models import AnimationProject, AnimationVersion, AnimationAsset
 from .backend.media import probe
@@ -30,9 +31,7 @@ def ask(run, application, payload, sink, system, content, workspace):
     record_usage(organization=run.organization, user=run.owner, resource_type="application", resource_id=str(application.id),
                  usage=response.usage.model_dump(), provider="codex", model=response.model)
     if not response.success: raise RuntimeError("AI 制作失败，请检查模型及网络设置。")
-    text = response.content.strip()
-    if text.startswith("```"): text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-    return json.loads(text)
+    return decode_json_object(response.content)
 
 
 def storyboard(run, app, payload, sink, doc, workspace):
@@ -46,7 +45,7 @@ def storyboard(run, app, payload, sink, doc, workspace):
         read_archive(old.artifacts.get(kind="animation-source"), folder)
         previous = {"source": (folder / "Animation.tsx").read_text("utf-8"), "storyboard": (folder / "storyboard.md").read_text("utf-8") if (folder / "storyboard.md").exists() else ""}
     result = ask(run, app, payload, sink,
-        '你是动画分镜导演。只返回 JSON {"scenes":[{"title":"标题","body":"画面文案","narration":"旁白","description":"画面描述","frames":300}]}。总时长 150–3600 帧，30fps，最多30幕。保留用户事实、数字与限定，不编造数据。',
+        '你是动画分镜导演。只返回 JSON {"scenes":[{"title":"标题","body":"画面文案","narration":"旁白","description":"画面描述","frames":300}]}。字符串内的换行、制表符和引号必须按 JSON 标准转义。总时长 150–3600 帧，30fps，最多30幕。保留用户事实、数字与限定，不编造数据。',
         {"prompt": doc["prompt"], "style": doc["style"], "aspect": doc["aspect"], "original_work": previous}, workspace)
     items = result.get("scenes", [])
     if not isinstance(items, list): raise RuntimeError("AI 分镜结果无效。")

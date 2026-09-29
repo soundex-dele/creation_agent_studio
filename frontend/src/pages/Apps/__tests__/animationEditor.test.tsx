@@ -29,10 +29,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 async function render() { await act(async () => root.render(<MemoryRouter><AnimationStudioEditor organizationId="org" applicationId="33" userId="user" showHeader onSelect={() => {}} /></MemoryRouter>)); }
 function button(name: string) { return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.replace(/\s/g, '') === name)!; }
 async function panel(name: string) {
-  await act(async () => {
-    const select = Array.from(host.querySelectorAll('select')).find(s => Array.from(s.options).some(o => o.value === 'scenes'))!;
-    select.value = name; select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await act(async () => host.querySelector<HTMLButtonElement>(`.studio-navigation button[data-page="${name}"]`)!.click());
 }
 
 describe('scene editor entry and panels', () => {

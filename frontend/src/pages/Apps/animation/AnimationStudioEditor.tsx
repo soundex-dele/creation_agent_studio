@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, Button, Empty, Spin } from 'antd';
-import { ArrowLeft, Clapperboard, Plus } from 'lucide-react';
+import { Alert, Button, Drawer, Empty, Spin } from 'antd';
+import { ArrowLeft, Clapperboard, Plus, FolderOpen, Film, AudioLines, Captions, Images, Palette, Layers, Play, Settings, Menu } from 'lucide-react';
+import useMediaQuery from '@/hooks/useMediaQuery';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { createApplicationRuntimeClient, type RunArtifact } from '@/services/applicationRuntime';
 import { animationApi, animationError, animationStatus, animationTerminal, type AnimationRun, type AnimationGeneration } from '@/services/animationStudio';
@@ -11,7 +12,24 @@ import { AssetPanel, BatchPanel, ExportFields, PresetPanel, SpeechSettings } fro
 import { useStudioDraft } from './useStudioDraft';
 import './StudioEditor.css';
 
-const modes = [['scenes', '分镜制作'], ['audio', '配音与音轨'], ['subtitles', '字幕'], ['assets', '素材库'], ['presets', '模板与品牌'], ['batch', '批量制作'], ['settings', '配音配置']];
+const navigation = [
+  { id: 'history', title: '我的作品', icon: FolderOpen },
+  { id: 'scenes', title: '分镜制作', icon: Film },
+  { id: 'audio', title: '配音与音轨', icon: AudioLines },
+  { id: 'subtitles', title: '字幕', icon: Captions },
+  { id: 'assets', title: '素材库', icon: Images },
+  { id: 'presets', title: '模板与品牌', icon: Palette },
+  { id: 'batch', title: '批量制作', icon: Layers },
+  { id: 'preview', title: '预览与版本', icon: Play },
+  { id: 'settings', title: '配音配置', icon: Settings },
+] as const;
+type StudioPage = typeof navigation[number]['id'];
+
+const taskNames: Record<string, string> = { generate: '生成动画', storyboard: '生成分镜', scene: '修改场景', speech: '合成配音', transcribe: '识别字幕' };
+const taskError = (message?: string) => message?.startsWith('Invalid control character')
+  ? 'AI 返回的内容格式不正确，请返回制作页面重新生成。'
+  : message || '请调整后重试。';
+
 export default function AnimationStudioEditor({ organizationId, applicationId, userId, initialRunId, showHeader, onSelect }: { organizationId: string; applicationId: string; userId: string; initialRunId?: string; showHeader: boolean; onSelect: (id: string) => void }) {
   const base = `${tenantApiRoot(organizationId)}/applications/${applicationId}/animation-studio`;
   const client = useMemo(() => projectApi(base), [base]); const legacy = useMemo(() => animationApi(base), [base]);
@@ -19,7 +37,17 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
   const draft = useStudioDraft(client, `${organizationId}:${applicationId}:${userId}`); const { project, doc } = draft;
   const [projects, setProjects] = useState<StudioProject[]>([]); const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [query, setQuery] = useState(''); const [archived, setArchived] = useState(false);
   const [assets, setAssets] = useState<LibraryAsset[]>([]); const [presets, setPresets] = useState<StudioPreset[]>([]); const [fonts, setFonts] = useState(['Noto Sans SC']); const [speech, setSpeech] = useState<SpeechConfig>();
-  const [tab, setTab] = useState(initialRunId ? 'preview' : 'create'); const [mode, setMode] = useState('scenes'); const [sceneId, setSceneId] = useState(''); const [selectedId, setSelectedId] = useState(initialRunId || ''); const [compareId, setCompareId] = useState('');
+  const [mode, setMode] = useState<StudioPage>(initialRunId ? 'preview' : 'scenes'); const [sceneId, setSceneId] = useState(''); const [selectedId, setSelectedId] = useState(initialRunId || ''); const [compareId, setCompareId] = useState('');
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const contentHeading = useRef<HTMLHeadingElement>(null);
+  const navigate = (next: StudioPage) => {
+    setMode(next);
+    setMenuOpen(false);
+    if (!isMobile) contentHeading.current?.focus();
+  };
+  useEffect(() => { if (!isMobile) setMenuOpen(false); }, [isMobile]);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [instruction, setInstruction] = useState(''); const [voice, setVoice] = useState(''); const [speed, setSpeed] = useState(1); const [options, setOptions] = useState(defaultExport);
   const requestKey = useRef<{ fingerprint: string; key: string }>(); const mounted = useRef(true); const initialized = useRef(false); const selecting = useRef(0); const busyRef = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -29,7 +57,7 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
   const refreshPresets = useCallback(async () => { const p = await client.presets(); if (mounted.current) { setPresets(p.results); setFonts(p.fonts); } }, [client]);
   const refreshList = useCallback(async () => { const result = await client.list(query, archived, page); if (mounted.current) { setProjects(result.results); setTotal(result.count); } }, [client, query, archived, page]);
   useEffect(() => { const timer = setTimeout(() => { void refreshList().catch(report); }, 200); return () => clearTimeout(timer); }, [refreshList, report]);
-  useEffect(() => { void refreshAssets().catch(report); void refreshPresets().catch(report); void client.speech().then(v => { if (mounted.current) { setSpeech(v); setVoice(v.voices[0]?.id || ''); } }).catch(report); }, [client, refreshAssets, refreshPresets, report, mode]);
+  useEffect(() => { void refreshAssets().catch(report); void refreshPresets().catch(report); void client.speech().then(v => { if (mounted.current) { setSpeech(v); setVoice(current => v.voices.some(voice => voice.id === current) ? current : v.voices[0]?.id || ''); } }).catch(report); }, [client, refreshAssets, refreshPresets, report, mode]);
   const adopt = draft.adopt;
   useEffect(() => {
     let alive = true;
@@ -63,7 +91,7 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
   const chooseProject = async (id: string) => {
     if (!await draft.flush()) return;
     const token = ++selecting.current; const p = await client.get(id);
-    if (mounted.current && token === selecting.current) { adopt(p); setSceneId(p.draft.scenes?.[0]?.id || ''); setSelectedId(''); setCompareId(''); setTab('create'); }
+    if (mounted.current && token === selecting.current) { adopt(p); setSceneId(p.draft.scenes?.[0]?.id || ''); setSelectedId(''); setCompareId(''); navigate('scenes'); }
   };
   const task = (action: string, extra: Record<string, unknown> = {}) => void runSafe(async () => {
     if (!await draft.flush()) return;
@@ -72,7 +100,7 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
     if (requestKey.current?.fingerprint !== fingerprint) requestKey.current = { fingerprint, key: crypto.randomUUID() };
     const run = await client.task(c.project.id, body, requestKey.current.key); requestKey.current = undefined;
     const p = await client.get(c.project.id); refreshProject(p);
-    if (action === 'generate') { setSelectedId(run.id); onSelect(run.id); setTab('preview'); }
+    if (action === 'generate') { setSelectedId(run.id); onSelect(run.id); navigate('preview'); }
   });
   const editScene = (patch: Partial<StudioScene>) => { if (doc && scene) change(withScenes(doc, doc.scenes.map(s => s.id === scene.id ? { ...s, ...patch, ...(patch.description !== undefined && patch.description !== s.description ? { source: '' } : {}) } : s))); };
   const attachAsset = (a: LibraryAsset) => {
@@ -89,23 +117,34 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
   };
   const pickVersion = (id: string) => { setSelectedId(id); if (id) onSelect(id); };
   const refresh = async () => { if (project) refreshProject(await client.get(project.id)); await refreshList(); };
-  return <section className="animation-workspace studio-workspace" data-tab={tab} aria-label="动画制作工作台">
-    <header className="animation-header"><div className="animation-brand">{showHeader && <Link to="/apps" aria-label="返回应用"><ArrowLeft size={20} /></Link>}<span className="animation-logo"><Clapperboard size={23} /></span><div><h1>动画制作</h1><p>分镜创作 · 有声动画 · 批量出片</p></div></div><span className="studio-save-status" role="status">{draft.status}</span></header>
-    <nav className="animation-mobile-tabs" aria-label="工作台面板">{[['history', '作品'], ['create', '制作'], ['preview', '预览与版本']].map(([id, title]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>{title}</button>)}</nav>
+  const menu = <StudioNavigation current={mode} onSelect={navigate} />;
+  const editing = mode !== 'history' && mode !== 'preview';
+  const title = navigation.find(item => item.id === mode)!.title;
+  return <section className="animation-workspace studio-workspace" data-page={mode} aria-label="动画制作工作台">
+    <header className="animation-header"><div className="animation-brand">{isMobile && <Button ref={menuButton} type="text" icon={<Menu size={20} />} aria-label="打开动画制作菜单" aria-expanded={menuOpen} aria-haspopup="dialog" onClick={() => setMenuOpen(true)} />}{showHeader && <Link to="/apps" aria-label="返回应用"><ArrowLeft size={20} /></Link>}<span className="animation-logo"><Clapperboard size={23} /></span><div><h1>动画制作</h1><p>分镜创作 · 有声动画 · 批量出片</p></div></div><span className="studio-save-status" role="status">{draft.status}</span></header>
+    {isMobile && <Drawer title="动画制作菜单" placement="left" width="min(88vw, 320px)" open={menuOpen}
+      onClose={() => setMenuOpen(false)} rootClassName="studio-menu-drawer"
+      afterOpenChange={open => { if (!open) menuButton.current?.focus(); }}>
+      {menu}
+    </Drawer>}
+    <div className="studio-notices" aria-label="工作台提示">
     {error && <Alert className="animation-error" type="error" showIcon message={error} closable onClose={() => setError('')} />}
     {draft.conflict && <Alert className="animation-error" type="warning" message="草稿保存冲突，本地内容已保留。" action={<div className="studio-buttons"><Button onClick={() => void runSafe(() => draft.resolve(true))}>保留本地草稿</Button><Button onClick={() => void runSafe(() => draft.resolve(false))}>加载服务器草稿</Button></div>} />}
+        {active.map(t => <div className="studio-task" key={t.id}><Spin size="small" /><span>{animationStatus(t.status)} · {taskNames[String(t.input.action)] || '制作任务'}</span><Button disabled={t.status === 'cancelling'} onClick={() => void runtime.sendCommand(t.id, { type: 'cancel', idempotency_key: crypto.randomUUID() }).then(refresh).catch(report)}>取消</Button></div>)}
+        {(project?.tasks || []).filter(t => t.status === 'succeeded' && t.output_summary.draft_applied === false).map(t => <Alert key={t.id} type="info" message="任务结果已保存；为保留你的后续修改，没有自动替换当前草稿。" action={<Button onClick={() => void runSafe(async () => { if (!await draft.flush()) return; const c = draft.current.current!; const p = await client.action(c.project.id, 'apply-result', { run_id: t.id, revision: c.project.revision }); adopt({ ...p, versions: c.project.versions, tasks: c.project.tasks }); })}>应用这次结果</Button>} />)}
+        {(project?.tasks || []).filter(t => t.status === 'failed').slice(0, 2).map(t => <Alert key={t.id} type="error" message={`上次${taskNames[String(t.input.action)] || '制作任务'}失败`} description={taskError(t.error_message)} />)}
+    </div>
     <div className="studio-body">
-      <aside className="animation-history studio-projects"><div className="animation-section-title"><h2>我的作品 <small>{total}</small></h2><Button aria-label="刷新作品" onClick={() => void refreshList().catch(report)}>刷新</Button></div><Button icon={<Plus size={16} />} disabled={busy} onClick={() => void runSafe(async () => { if (!await draft.flush()) return; const p = await client.create(); adopt(p); setSelectedId(''); setSceneId(''); setTab('create'); await refreshList(); })}>新的作品</Button><label>搜索作品<input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /></label><label><input type="checkbox" checked={archived} onChange={e => { setArchived(e.target.checked); setPage(1); }} />查看归档</label>
+      {!isMobile && <aside className="studio-sidebar">{menu}</aside>}
+      <div className="studio-content">
+        <h2 ref={contentHeading} tabIndex={-1} className="studio-page-title">{title}</h2>
+      <section className="studio-projects" hidden={mode !== 'history'} aria-label="我的作品">{loading && <Spin aria-label="正在加载作品" />}<div className="animation-section-title"><span>共 {total} 个作品</span><Button aria-label="刷新作品" onClick={() => void refreshList().catch(report)}>刷新</Button></div><Button icon={<Plus size={16} />} disabled={busy || loading} onClick={() => void runSafe(async () => { if (!await draft.flush()) return; const p = await client.create(); adopt(p); setSelectedId(''); setCompareId(''); setSceneId(''); navigate('scenes'); await refreshList(); })}>新的作品</Button><label>搜索作品<input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /></label><label><input type="checkbox" checked={archived} onChange={e => { setArchived(e.target.checked); setPage(1); }} />查看归档</label>
         {projects.map(p => <button className={`studio-project ${p.id === project?.id ? 'is-selected' : ''}`} key={p.id} onClick={() => void runSafe(() => chooseProject(p.id))}><strong>{p.title}</strong><small>{new Date(p.updated_at).toLocaleString('zh-CN')}</small></button>)}<div className="studio-buttons"><Button disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button><Button disabled={page * 20 >= total} onClick={() => setPage(page + 1)}>下一页</Button></div>
-      </aside>
-      <main className="animation-form studio-editor-pane">{loading ? <Spin /> : !project || !doc ? <Empty description="作品加载失败，请刷新页面重试" /> : <>
+      </section>
+      <section className="studio-editor-pane" hidden={!editing} aria-label="制作功能">{loading ? <Spin /> : !project || !doc ? <Empty description="作品加载失败，请刷新页面重试" /> : <>
         <label>作品名称<input key={project.id + project.title} defaultValue={project.title} onBlur={e => { const title = e.target.value; if (title !== project.title) void runSafe(async () => { await client.update(project.id, { title }); await refresh(); }); }} /></label><div className="studio-buttons"><Button onClick={() => void runSafe(async () => { if (!await draft.flush()) return; const p = await client.action(project.id, 'copy'); adopt(p); await refreshList(); })}>复制作品</Button><Button onClick={() => void runSafe(async () => { await client.update(project.id, { archived: !project.archived }); await refresh(); })}>{project.archived ? '恢复作品' : '归档作品'}</Button><Button onClick={() => void draft.flush()}>保存草稿</Button></div>
-        <label>工作面板<select value={mode} onChange={e => setMode(e.target.value)}>{modes.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select></label>
-        {active.map(t => <div className="studio-task" key={t.id}><Spin size="small" /><span>{animationStatus(t.status)} · {({ generate: '生成动画', storyboard: '编排分镜', scene: '修改场景', speech: '合成配音', transcribe: '识别字幕' } as Record<string, string>)[String(t.input.action)] || '制作任务'}</span><Button disabled={t.status === 'cancelling'} onClick={() => void runtime.sendCommand(t.id, { type: 'cancel', idempotency_key: crypto.randomUUID() }).then(refresh).catch(report)}>取消</Button></div>)}
-        {(project.tasks || []).filter(t => t.status === 'succeeded' && t.output_summary.draft_applied === false).map(t => <Alert key={t.id} type="info" message="任务结果已保存；为保留你的后续修改，没有自动替换当前草稿。" action={<Button onClick={() => void runSafe(async () => { if (!await draft.flush()) return; const c = draft.current.current!; const p = await client.action(project.id, 'apply-result', { run_id: t.id, revision: c.project.revision }); adopt({ ...p, versions: project.versions, tasks: project.tasks }); })}>应用这次结果</Button>} />)}
-        {(project.tasks || []).filter(t => t.status === 'failed').slice(0, 2).map(t => <Alert key={t.id} type="error" message={t.error_message || '任务失败，可调整后重试。'} />)}
-        {doc.schema_version !== 2 && !['assets', 'settings', 'batch'].includes(mode) ? <div className="studio-card"><h3>历史动画</h3><p>原作品可以预览、下载和导出。复制为分镜工程后，可编辑场景、配音和字幕；转换会重新生成画面，原版本保持不变。</p><Button disabled={!selected} onClick={() => void runSafe(async () => { const p = await client.action(project.id, 'convert', { version_id: selected!.id }); adopt(p); setSelectedId(''); await refreshList(); })}>复制并转换为分镜工程</Button><Button onClick={() => { if (selected) window.location.assign(`${window.location.pathname}?${new URLSearchParams({ entry: 'apps', standalone: '1', animation: selected.run.id, legacy: '1' })}`); }}>原版继续修改</Button></div> : <>
-          {mode === 'scenes' && <>
+        {doc.schema_version !== 2 && !['assets', 'settings', 'batch'].includes(mode) && <div className="studio-card"><h3>历史动画</h3><p>原作品可以预览、下载和导出。复制为分镜工程后，可编辑场景、配音和字幕；转换会重新生成画面，原版本保持不变。</p><Button disabled={!selected} onClick={() => void runSafe(async () => { const p = await client.action(project.id, 'convert', { version_id: selected!.id }); adopt(p); setSelectedId(''); await refreshList(); })}>复制并转换为分镜工程</Button><Button onClick={() => { if (selected) window.location.assign(`${window.location.pathname}?${new URLSearchParams({ entry: 'apps', standalone: '1', animation: selected.run.id, legacy: '1' })}`); }}>原版继续修改</Button></div>}
+          {doc.schema_version === 2 && <RetainedPanel active={mode === 'scenes'} name="scenes">
             <label>动画内容<textarea rows={4} value={doc.prompt} onChange={e => change({ ...doc, prompt: e.target.value })} /></label><div className="studio-fields"><label>画幅<select value={doc.aspect} disabled={doc.scenes.some(s => s.locked)} onChange={e => change({ ...doc, aspect: e.target.value as StudioDocument['aspect'], scenes: doc.scenes.map(s => ({ ...s, source: '' })) })}>{['16:9', '9:16', '1:1'].map(v => <option key={v}>{v}</option>)}</select></label><label>视觉风格<input value={doc.style} onChange={e => change({ ...doc, style: e.target.value, scenes: doc.scenes.map(s => s.locked ? s : { ...s, source: '' }) })} /></label></div><p>更改画幅后生成新版本预览；锁定场景须先解锁。</p>
             <div className="studio-buttons"><Button disabled={busy || !!active.length || !doc.prompt.trim()} onClick={() => task('storyboard')}>生成分镜</Button><Button disabled={busy || !!active.length || !doc.prompt.trim()} onClick={() => task('generate')}>一键生成动画</Button></div>
             <h3>分镜 · {(doc.scenes.reduce((n, s) => n + s.frames, 0) / 30).toFixed(1)} 秒</h3><div className="studio-scenes">{doc.scenes.map((s, i) => <button key={s.id} className={scene?.id === s.id ? 'is-selected' : ''} onClick={() => setSceneId(s.id)}>{i + 1}. {s.title} <small>{(s.frames / 30).toFixed(1)}s {s.locked ? '· 已锁定' : ''}</small></button>)}</div><Button disabled={doc.scenes.length >= 30} onClick={() => { const s = newScene(); change({ ...doc, scenes: [...doc.scenes, s] }); setSceneId(s.id); }}>添加场景</Button>
@@ -114,30 +153,50 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
               <label>只修改这一幕<textarea value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="例如：用柱状图展示数据，保留标题" /></label><Button disabled={busy || !!active.length || scene.locked || !instruction.trim()} onClick={() => task('scene', { scene_id: scene.id, instruction })}>AI 修改当前场景</Button></article>}
             <label>本次版本说明（可选）<input maxLength={1000} value={doc.note || ''} onChange={e => change({ ...doc, note: e.target.value })} /></label>
             <Button type="primary" disabled={busy || !!active.length || !doc.scenes.length} onClick={() => task('generate')}>确认分镜并生成预览</Button>
-          </>}
-          {mode === 'audio' && <><h3>场景配音</h3><label>场景<select value={scene?.id || ''} onChange={e => setSceneId(e.target.value)}>{doc.scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>{scene && <label>旁白文案<textarea disabled={scene.locked} value={scene.narration} onChange={e => editScene({ narration: e.target.value })} /></label>}<div className="studio-fields"><label>音色<select value={voice} onChange={e => setVoice(e.target.value)}><option value="">选择音色</option>{speech?.voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><label>语速<input type="number" min={0.5} max={2} step={0.1} value={speed} onChange={e => setSpeed(Number(e.target.value))} /></label></div>{!speech?.enabled && <p>尚未启用豆包配音，可在“配音配置”中设置，或直接上传录音。</p>}<Button disabled={!speech?.enabled || !scene || scene.locked || !voice || busy || !!active.length} onClick={() => task('speech', { scene_id: scene?.id, voice, speed })}>合成当前场景配音与字幕</Button>
+          </RetainedPanel>}
+          {doc.schema_version === 2 && <RetainedPanel active={mode === 'audio'} name="audio"><h3>场景配音</h3><label>场景<select value={scene?.id || ''} onChange={e => setSceneId(e.target.value)}>{doc.scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>{scene && <label>旁白文案<textarea disabled={scene.locked} value={scene.narration} onChange={e => editScene({ narration: e.target.value })} /></label>}<div className="studio-fields"><label>音色<select value={voice} onChange={e => setVoice(e.target.value)}><option value="">选择音色</option>{speech?.voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><label>语速<input type="number" min={0.5} max={2} step={0.1} value={speed} onChange={e => setSpeed(Number(e.target.value))} /></label></div>{!speech?.enabled && <p>尚未启用豆包配音，可在“配音配置”中设置，或直接上传录音。</p>}<Button disabled={!speech?.enabled || !scene || scene.locked || !voice || busy || !!active.length} onClick={() => task('speech', { scene_id: scene?.id, voice, speed })}>合成当前场景配音与字幕</Button>
             <label>添加录音、音乐或音效<select value="" onChange={e => { const a = assets.find(a => a.id === e.target.value); if (a) attachAsset(a); }}><option value="">选择音频素材</option>{assets.filter(a => a.duration !== null && !a.archived).map(a => <option value={a.id} key={a.id}>{a.name}</option>)}</select></label>
-            {doc.audio.map((t, i) => <article className="studio-card" key={i}><strong>{assets.find(a => a.id === t.asset_id)?.name || '音轨'}</strong><div className="studio-fields">{[['role', '用途'], ['scene_id', '所属场景']].map(([field, label]) => <label key={field}>{label}<select value={t[field as 'role' | 'scene_id'] || ''} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, [field]: e.target.value } : a) })}>{field === 'role' ? <><option value="narration">旁白</option><option value="music">背景音乐</option><option value="effect">音效</option></> : <><option value="">整个工程</option>{doc.scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</>}</select></label>)}{([['start', '开始时间'], ['trim_start', '素材裁剪起点'], ['frames', '播放长度'], ['fade_in', '淡入'], ['fade_out', '淡出']] as const).map(([field, label]) => <label key={field}>{label}（秒）<input type="number" min={0} step={0.1} value={(t[field] || 0) / 30} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, [field]: Math.round(Number(e.target.value) * 30) } : a) })} /></label>)}<label>音量<input type="number" min={0} max={2} step={0.1} value={t.volume} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, volume: Number(e.target.value) } : a) })} /></label></div><label><input type="checkbox" checked={!!t.loop} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, loop: e.target.checked } : a) })} />循环播放</label><div className="studio-buttons"><Button onClick={() => { setMode('assets'); }}>在素材库试听</Button><Button disabled={busy || !!active.length} onClick={() => task('transcribe', { asset_id: t.asset_id })}>识别为字幕</Button><Button onClick={() => change({ ...doc, audio: doc.audio.filter((_, j) => j !== i) })}>移除音轨</Button></div></article>)}
-          </>}
-          {mode === 'subtitles' && <><h3>字幕校对</h3><label><input type="checkbox" checked={doc.subtitle_style.enabled} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, enabled: e.target.checked } })} />在画面中显示字幕</label><div className="studio-fields"><label>字体<select value={doc.subtitle_style.font} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, font: e.target.value } })}>{fonts.map(f => <option key={f}>{f}</option>)}</select></label><label>字号<input type="number" min={12} max={120} value={doc.subtitle_style.size} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, size: Number(e.target.value) } })} /></label><label>颜色<input type="color" value={doc.subtitle_style.color} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, color: e.target.value } })} /></label><label>位置<select value={doc.subtitle_style.position} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, position: e.target.value as 'top' | 'center' | 'bottom' } })}><option value="top">顶部</option><option value="center">居中</option><option value="bottom">底部</option></select></label></div>{doc.subtitles.map((s, i) => <article className="studio-card" key={i}><div className="studio-fields">{(['start', 'end'] as const).map(field => <label key={field}>{field === 'start' ? '开始' : '结束'}（秒）<input type="number" min={0} step={1 / 30} value={s[field] / 30} onChange={e => change({ ...doc, subtitles: doc.subtitles.map((c, j) => i === j ? { ...c, [field]: Math.round(Number(e.target.value) * 30) } : c) })} /></label>)}</div><textarea aria-label={`字幕 ${i + 1}`} value={s.text} onChange={e => change({ ...doc, subtitles: doc.subtitles.map((c, j) => i === j ? { ...c, text: e.target.value } : c) })} /><Button onClick={() => change({ ...doc, subtitles: doc.subtitles.filter((_, j) => j !== i) })}>删除字幕</Button></article>)}<Button onClick={() => change({ ...doc, subtitles: [...doc.subtitles, { start: 0, end: Math.min(90, doc.scenes.reduce((n, s) => n + s.frames, 0)), text: '字幕文字' }] })}>添加字幕</Button><Button type="primary" disabled={!doc.scenes.length || busy || !!active.length} onClick={() => task('generate')}>生成含字幕的新版本</Button></>}
-          {mode === 'assets' && <AssetPanel client={client} assets={assets} refresh={refreshAssets} upload={async file => { await runSafe(async () => { await legacy.upload(file); await refreshAssets(); }); }} onUse={attachAsset} report={report} />}
-          {mode === 'presets' && <PresetPanel presets={presets} doc={doc} change={change} client={client} refresh={refreshPresets} fonts={fonts} assets={assets} report={report} />}
-          {mode === 'batch' && <BatchPanel client={client} presets={presets} report={report} download={(run, artifact) => void download(run, artifact).catch(report)} />}
-          {mode === 'settings' && <SpeechSettings client={client} report={report} />}
-        </>}
-      </>}</main>
-      <aside className="animation-results studio-preview-pane"><div className="animation-section-title animation-preview-heading"><h2>预览与版本</h2>{selected && <Button type="primary" onClick={() => { setTab('create'); setMode('scenes'); }}>继续修改</Button>}</div>
+            {doc.audio.map((t, i) => <article className="studio-card" key={i}><strong>{assets.find(a => a.id === t.asset_id)?.name || '音轨'}</strong><div className="studio-fields">{[['role', '用途'], ['scene_id', '所属场景']].map(([field, label]) => <label key={field}>{label}<select value={t[field as 'role' | 'scene_id'] || ''} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, [field]: e.target.value } : a) })}>{field === 'role' ? <><option value="narration">旁白</option><option value="music">背景音乐</option><option value="effect">音效</option></> : <><option value="">整个工程</option>{doc.scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</>}</select></label>)}{([['start', '开始时间'], ['trim_start', '素材裁剪起点'], ['frames', '播放长度'], ['fade_in', '淡入'], ['fade_out', '淡出']] as const).map(([field, label]) => <label key={field}>{label}（秒）<input type="number" min={0} step={0.1} value={(t[field] || 0) / 30} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, [field]: Math.round(Number(e.target.value) * 30) } : a) })} /></label>)}<label>音量<input type="number" min={0} max={2} step={0.1} value={t.volume} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, volume: Number(e.target.value) } : a) })} /></label></div><label><input type="checkbox" checked={!!t.loop} onChange={e => change({ ...doc, audio: doc.audio.map((a, j) => i === j ? { ...a, loop: e.target.checked } : a) })} />循环播放</label><div className="studio-buttons"><Button onClick={() => { navigate('assets'); }}>在素材库试听</Button><Button disabled={busy || !!active.length} onClick={() => task('transcribe', { asset_id: t.asset_id })}>识别为字幕</Button><Button onClick={() => change({ ...doc, audio: doc.audio.filter((_, j) => j !== i) })}>移除音轨</Button></div></article>)}
+          </RetainedPanel>}
+          {doc.schema_version === 2 && <RetainedPanel active={mode === 'subtitles'} name="subtitles"><h3>字幕校对</h3><label><input type="checkbox" checked={doc.subtitle_style.enabled} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, enabled: e.target.checked } })} />在画面中显示字幕</label><div className="studio-fields"><label>字体<select value={doc.subtitle_style.font} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, font: e.target.value } })}>{fonts.map(f => <option key={f}>{f}</option>)}</select></label><label>字号<input type="number" min={12} max={120} value={doc.subtitle_style.size} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, size: Number(e.target.value) } })} /></label><label>颜色<input type="color" value={doc.subtitle_style.color} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, color: e.target.value } })} /></label><label>位置<select value={doc.subtitle_style.position} onChange={e => change({ ...doc, subtitle_style: { ...doc.subtitle_style, position: e.target.value as 'top' | 'center' | 'bottom' } })}><option value="top">顶部</option><option value="center">居中</option><option value="bottom">底部</option></select></label></div>{doc.subtitles.map((s, i) => <article className="studio-card" key={i}><div className="studio-fields">{(['start', 'end'] as const).map(field => <label key={field}>{field === 'start' ? '开始' : '结束'}（秒）<input type="number" min={0} step={1 / 30} value={s[field] / 30} onChange={e => change({ ...doc, subtitles: doc.subtitles.map((c, j) => i === j ? { ...c, [field]: Math.round(Number(e.target.value) * 30) } : c) })} /></label>)}</div><textarea aria-label={`字幕 ${i + 1}`} value={s.text} onChange={e => change({ ...doc, subtitles: doc.subtitles.map((c, j) => i === j ? { ...c, text: e.target.value } : c) })} /><Button onClick={() => change({ ...doc, subtitles: doc.subtitles.filter((_, j) => j !== i) })}>删除字幕</Button></article>)}<Button onClick={() => change({ ...doc, subtitles: [...doc.subtitles, { start: 0, end: Math.min(90, doc.scenes.reduce((n, s) => n + s.frames, 0)), text: '字幕文字' }] })}>添加字幕</Button><Button type="primary" disabled={!doc.scenes.length || busy || !!active.length} onClick={() => task('generate')}>生成含字幕的新版本</Button></RetainedPanel>}
+          <RetainedPanel active={mode === 'assets'} name="assets"><AssetPanel client={client} assets={assets} refresh={refreshAssets} upload={async file => { await runSafe(async () => { await legacy.upload(file); await refreshAssets(); }); }} onUse={attachAsset} report={report} /></RetainedPanel>
+          {doc.schema_version === 2 && <RetainedPanel key={project.id} active={mode === 'presets'} name="presets"><PresetPanel presets={presets} doc={doc} change={change} client={client} refresh={refreshPresets} fonts={fonts} assets={assets} report={report} /></RetainedPanel>}
+          <RetainedPanel active={mode === 'batch'} name="batch"><BatchPanel client={client} presets={presets} report={report} download={(run, artifact) => void download(run, artifact).catch(report)} /></RetainedPanel>
+          <RetainedPanel active={mode === 'settings'} name="settings"><SpeechSettings client={client} report={report} /></RetainedPanel>
+      </>}</section>
+      <section className="studio-preview-pane" hidden={mode !== 'preview'} aria-label="预览与版本"><div className="animation-section-title animation-preview-heading"><span>预览、比较与导出</span>{selected && <Button type="primary" onClick={() => { navigate('scenes'); }}>继续修改</Button>}</div>
         <div className="studio-version-strip" aria-label="版本缩略图">{versions.map((v, i) => <button key={v.id} className={selected?.id === v.id ? 'is-selected' : ''} onClick={() => pickVersion(v.run.id)}><VersionThumbnail run={v.run} runtime={runtime} /><span>版本 {versions.length - i}</span></button>)}</div>
         <label>查看版本<select value={selected?.run.id || ''} onChange={e => pickVersion(e.target.value)}><option value="">选择版本</option>{versions.map((v, i) => <option key={v.id} value={v.run.id}>版本 {versions.length - i} · {animationStatus(v.run.status)} · {new Date(v.created_at).toLocaleString('zh-CN')}</option>)}</select></label>
-        {selected ? <><div className={compare ? "studio-comparison-grid" : undefined}><div className="animation-canvas" style={{ aspectRatio: (selected.run.input.aspect || '16:9').replace(':', '/') }}><AnimationPreview generation={selected.run} runtime={runtime} /></div>{compare && <div className="animation-canvas" style={{ aspectRatio: (compare.run.input.aspect || '16:9').replace(':', '/') }}><AnimationPreview generation={compare.run} runtime={runtime} /></div>}</div>{selected.run.error_message && <Alert type="error" message={selected.run.error_message} />}<p>{selected.note || '首次生成'}</p><Button disabled={busy} onClick={() => void runSafe(async () => { if (!project || !await draft.flush()) return; const c = draft.current.current!; const p = await client.action(project.id, 'restore', { version_id: selected.id, revision: c.project.revision }); adopt({ ...p, versions: project.versions }); setTab('create'); })}>复制此版本为草稿</Button>
+        {selected ? <><div className={compare ? "studio-comparison-grid" : undefined}><div className="animation-canvas" style={{ aspectRatio: (selected.run.input.aspect || '16:9').replace(':', '/') }}>{mode === 'preview' && <AnimationPreview generation={selected.run} runtime={runtime} />}</div>{compare && <div className="animation-canvas" style={{ aspectRatio: (compare.run.input.aspect || '16:9').replace(':', '/') }}>{mode === 'preview' && <AnimationPreview generation={compare.run} runtime={runtime} />}</div>}</div>{selected.run.error_message && <Alert type="error" message="此版本生成失败" description={taskError(selected.run.error_message)} />}<p>{selected.note || '首次生成'}</p><Button disabled={busy} onClick={() => void runSafe(async () => { if (!project || !await draft.flush()) return; const c = draft.current.current!; const p = await client.action(project.id, 'restore', { version_id: selected.id, revision: c.project.revision }); adopt({ ...p, versions: project.versions }); navigate('scenes'); })}>复制此版本为草稿</Button>
           <label>对比版本<select value={compareId} onChange={e => setCompareId(e.target.value)}><option value="">不对比</option>{versions.filter(v => v.id !== selected.id).map(v => <option key={v.id} value={v.run.id}>{v.note || v.created_at}</option>)}</select></label>{compare && <><div className="studio-diff"><h4>内容差异</h4>{(selected.document.scenes || []).map(s => { const old = compare.document.scenes?.find(o => o.id === s.id); return <p key={s.id}><strong>{s.title}</strong>：{!old ? '新增场景' : JSON.stringify(old) === JSON.stringify(s) ? '未变化' : `${old.body} → ${s.body}；${old.frames / 30}s → ${s.frames / 30}s`}</p>; })}{(compare.document.scenes || []).filter(s => !selected.document.scenes?.some(n => n.id === s.id)).map(s => <p key={s.id}>已移除：{s.title}</p>)}{selected.document.schema_version === 1 && <p>{String(compare.run.input.prompt)} → {String(selected.run.input.prompt)}</p>}</div></>}
           <h3>导出当前版本</h3><ExportFields value={options} onChange={setOptions} doc={selected.document} /><Button type="primary" disabled={busy || selected.run.status !== 'succeeded'} onClick={() => void runSafe(async () => { const fingerprint = JSON.stringify({ run: selected.run.id, options }); if (requestKey.current?.fingerprint !== fingerprint) requestKey.current = { fingerprint, key: crypto.randomUUID() }; await client.export(selected.run.id, options, requestKey.current.key); requestKey.current = undefined; await refresh(); })}>导出 {options.format.toUpperCase()}</Button>
           {selected.run.artifacts.filter(a => a.kind === 'animation-source').map(a => <Button key={a.id} onClick={() => void download(selected.run, a).catch(report)}>下载源码</Button>)}
           {selected.run.exports.map(e => <article className="studio-card" key={e.id}><small>{animationStatus(e.status)} · {String((e.input.export_options as { format?: string } | undefined)?.format || 'mp4').toUpperCase()}</small>{e.error_message && <p>{e.error_message}</p>}{!animationTerminal(e.status) && <Button onClick={() => void runtime.sendCommand(e.id, { type: 'cancel', idempotency_key: crypto.randomUUID() }).then(refresh).catch(report)}>取消导出</Button>}{e.artifacts.map(a => <Button key={a.id} onClick={() => void download(e, a).catch(report)}>下载 {String(a.metadata.filename || a.kind)}</Button>)}</article>)}
-        </> : <Empty description="确认分镜并生成预览后，版本将保存在这里" />}
-      </aside>
+        </> : loading ? <Spin aria-label="正在加载作品" /> : <Empty description={project ? "确认分镜并生成预览后，版本将保存在这里" : "作品加载失败，请刷新页面重试"} />}
+      </section>
+      </div>
     </div>
   </section>;
+}
+
+function StudioNavigation({ current, onSelect }: { current: StudioPage; onSelect: (page: StudioPage) => void }) {
+  return <nav className="studio-navigation" aria-label="动画制作功能">
+    {navigation.map(({ id, title, icon: Icon }) => <button type="button" key={id}
+      data-page={id} aria-current={current === id ? 'page' : undefined} onClick={() => onSelect(id)}>
+      <Icon size={19} aria-hidden="true" /><span>{title}</span>
+    </button>)}
+  </nav>;
+}
+
+/** Keep local form state after first visit, while hidden controls leave the tab order. */
+function RetainedPanel({ active, name, children }: { active: boolean; name: string; children: ReactNode }) {
+  const [visited, setVisited] = useState(active);
+  const element = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) setVisited(true);
+    else element.current?.querySelectorAll<HTMLMediaElement>('audio, video').forEach(media => media.pause());
+  }, [active]);
+  return visited || active ? <div ref={element} className="studio-panel" data-panel={name} hidden={!active}>{children}</div> : null;
 }
 
 function VersionThumbnail({ run, runtime }: { run: AnimationGeneration; runtime: ReturnType<typeof createApplicationRuntimeClient> }) {

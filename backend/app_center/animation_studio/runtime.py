@@ -113,10 +113,8 @@ def archive_source(workspace):
 
 
 def decode_result(text):
-    value = text.strip()
-    if value.startswith("```"):
-        value = value.split("\n", 1)[-1].rsplit("```", 1)[0]
-    result = json.loads(value)
+    from .json_output import decode_json_object
+    result = decode_json_object(text)
     if not isinstance(result, dict) or not isinstance(result.get("source"), str) or not result["source"].strip():
         raise ValueError("AI 未返回有效动画源码。")
     if len(result["source"]) > 150000:
