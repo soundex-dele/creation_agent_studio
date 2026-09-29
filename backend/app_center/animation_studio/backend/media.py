@@ -17,7 +17,7 @@ def probe(path):
         raise ValidationError("无法读取媒体，请检查文件及执行主机 ffprobe 配置。") from exc
 
 
-def inspect_upload(upload):
+def inspect_upload(upload, *, allow_short=False):
     if upload.size > 50 * 1024 * 1024:
         raise ValidationError("录音不能超过 50 MB；图片不能超过 20 MB。")
     content = upload.read(50 * 1024 * 1024 + 1)
@@ -44,6 +44,6 @@ def inspect_upload(upload):
         duration = float(info["format"]["duration"])
     except (KeyError, ValueError, TypeError):
         raise ValidationError("无法确定录音时长。") from None
-    if not math.isfinite(duration) or not 5 <= duration <= 120:
+    if not math.isfinite(duration) or not (0.05 if allow_short else 5) <= duration <= 120:
         raise ValidationError("录音时长须在 5–120 秒之间，不会自动截断录音。")
     return content, {"mime_type": {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4"}[extension], "duration": duration}

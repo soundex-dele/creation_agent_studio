@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: animation-studio
-  version: 1.0.0
+  version: 2.0.0
   name: 动画制作
   description: AI 自由编排讲解与图文动画，先预览 HTML，再导出 MP4，保留每个版本及可编辑源码。
   category: {slug: creative, name: 内容创作, order: 1}
@@ -26,7 +26,17 @@ spec:
       additionalProperties: false
       required: [action]
       properties:
-        action: {type: string, enum: [generate, export]}
+        action: {type: string, enum: [generate, export, storyboard, scene, speech, transcribe, batch]}
+        project_id: {type: string, format: uuid}
+        draft_revision: {type: integer, minimum: 1}
+        document: {type: object}
+        scene_id: {type: string, maxLength: 64}
+        instruction: {type: string, maxLength: 16000}
+        voice: {type: string, maxLength: 200}
+        speed: {type: number, minimum: 0.5, maximum: 2}
+        asset_id: {type: string, format: uuid}
+        batch_id: {type: string, format: uuid}
+        export_options: {type: object}
         prompt: {type: string, maxLength: 16000}
         aspect: {type: string, enum: ['16:9', '9:16', '1:1']}
         duration: {type: integer, minimum: 5, maximum: 120}
@@ -40,5 +50,5 @@ spec:
     django_app: app_center.animation_studio.backend.apps.AnimationStudioConfig
     urlconf: app_center.animation_studio.backend.urls
     executor_entrypoint: app_center.animation_studio.runtime.execute
-  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  database: {mode: django-migrations, schema_version: 2, tenant_scoped: true}
   install: {scope: per-organization, activate: true}

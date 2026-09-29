@@ -10,6 +10,7 @@ import { createApplicationRuntimeClient, type ApplicationRuntimeClient, type Run
 import { activeExport, animationApi, animationArtifact, animationError, animationStatus, animationTerminal, completedExport,
   type AnimationAspect, type AnimationAsset, type AnimationGeneration, type AnimationInput, type AnimationRun } from '@/services/animationStudio';
 import './AnimationStudioPage.css';
+import AnimationStudioEditor from './animation/AnimationStudioEditor';
 
 const EXAMPLES = [
   { title: '知识讲解', text: '用 30 秒讲清楚番茄工作法：专注 25 分钟、休息 5 分钟，用简洁的时钟和进度动画辅助说明。' },
@@ -79,7 +80,7 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
   const [listError, setListError] = useState('');
   const [connectionError, setConnectionError] = useState('');
   const [stage, setStage] = useState('');
-  const [tab, setTab] = useState('create');
+  const [tab, setTab] = useState(initialRunId ? 'preview' : 'create');
   const initialized = useRef(false);
   const selection = useRef(0);
   const submitting = useRef(false);
@@ -229,7 +230,7 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
         <p className="animation-footnote"><Check size={13} />先看效果，满意后再导出 MP4</p>
       </aside>
       <main className="animation-results">
-        <div className="animation-section-title"><div><span className="animation-eyebrow">YOUR ANIMATION</span><h2>{String(selected?.output_summary.title || '创作预览')}</h2></div><span className={`animation-format ${video ? 'is-video' : ''}`}>{video ? 'MP4' : 'HTML'}</span></div>
+        <div className="animation-section-title animation-preview-heading"><div><span className="animation-eyebrow">YOUR ANIMATION</span><h2>{String(selected?.output_summary.title || '创作预览')}</h2></div><div className="animation-preview-tools"><span className={`animation-format ${video ? 'is-video' : ''}`}>{video ? 'MP4' : 'HTML'}</span>{ready && <Button type="primary" disabled={busy} onClick={edit}>继续修改</Button>}</div></div>
         {connectionError && <Alert type="warning" message={connectionError} />}
         {active && <div className="animation-progress" role="status"><Spin size="small" /><span>{animationStatus(active.status, stage || (exporting ? 'rendering' : ''))}</span><Button size="small" disabled={busy || active.status === 'cancelling'} onClick={() => void cancel()}>取消任务</Button></div>}
         <div className="animation-canvas" style={{ aspectRatio: dimensions ? `${dimensions.width} / ${dimensions.height}` : aspect.replace(':', ' / ') }}>
@@ -241,7 +242,6 @@ export function AnimationStudioWorkspace({ organizationId, applicationId, initia
         <div className="animation-actions">
           {selected && ['failed', 'cancelled'].includes(selected.status) && <Button disabled={busy} onClick={() => void perform(selected.input)}>重试生成</Button>}
           {selected && sourceArtifact && <Button icon={<Code2 size={16} />} onClick={() => void download(selected, sourceArtifact)}>下载源码</Button>}
-          {ready && <Button disabled={busy} onClick={edit}>继续修改</Button>}
           {video && exported ? <Button type="primary" icon={<Download size={16} />} onClick={() => void download(exported, video)}>下载 MP4</Button> : <Button type="primary" icon={<Film size={16} />} disabled={!ready || Boolean(exporting) || busy} onClick={() => void perform()}>导出 MP4</Button>}
         </div>
         {selected && <details className="animation-details"><summary>创作说明与版本</summary><p>{selected.input.prompt}</p>{selected.input.source_run_id && <Button type="link" onClick={() => void open(selected.input.source_run_id!)}>查看上一个版本</Button>}<p>{String(previewArtifact?.metadata.storyboard || '')}</p></details>}
@@ -264,5 +264,6 @@ export default function AnimationStudioPage() {
   const initial = useRef(params.get('animation') || undefined);
   const onSelect = useCallback((id: string) => setParams(current => { const next = new URLSearchParams(current); next.set('animation', id); return next; }, { replace: true }), [setParams]);
   if (!applicationId || !organizationId || !userId) return <Empty description="请选择组织并登录后使用。" />;
+  if (params.get('legacy') !== '1') return <AnimationStudioEditor key={`${organizationId}:${userId}:${applicationId}`} organizationId={organizationId} applicationId={applicationId} userId={String(userId)} initialRunId={initial.current} onSelect={onSelect} showHeader={resolveApplicationPresentation(params).showApplicationHeader} />;
   return <AnimationStudioWorkspace key={`${organizationId}:${userId}:${applicationId}`} organizationId={organizationId} applicationId={applicationId} initialRunId={initial.current} onSelect={onSelect} showHeader={resolveApplicationPresentation(params).showApplicationHeader} />;
 }

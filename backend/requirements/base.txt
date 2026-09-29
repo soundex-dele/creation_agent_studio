@@ -27,6 +27,8 @@ croniter~=6.0.0
 faster-whisper==1.2.0
 pypdf~=6.0
 python-docx~=1.2
+openpyxl>=3.1.5,<4
+requests>=2.32.4,<3
 Pillow>=12.3,<13
 pgvector~=0.4
 sqlite-vec~=0.1

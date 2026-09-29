@@ -40,6 +40,9 @@
 .animation-results { display: flex; flex-direction: column; gap: 18px; padding: 26px clamp(18px, 2.5vw, 44px); }
 .animation-eyebrow { display: block; margin-bottom: 6px; font-size: 10px; font-weight: 650; letter-spacing: 1.8px; color: var(--color-text-sec); }
 .animation-results h2 { font-size: 20px; }
+.animation-preview-heading { flex-wrap: wrap; flex-shrink: 0; }
+.animation-preview-heading > div:first-child { flex: 1 1 160px; min-width: 0; }
+.animation-preview-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .animation-format { padding: 5px 9px; font-size: 11px; font-weight: 700; border: 1px solid var(--color-border); border-radius: 6px; color: var(--animation-accent); background: var(--color-bg-card); }
 .animation-format.is-video { color: var(--animation-success); }
 .animation-canvas { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; min-height: 210px; max-height: 600px; background: #10121b; border: 1px solid #282b38; border-radius: 14px; overflow: hidden; }

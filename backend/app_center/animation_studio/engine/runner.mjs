@@ -7,6 +7,7 @@ import {bundle} from '@remotion/bundler';
 import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import {validateSource} from './validate.mjs';
 import {fontCss} from './fonts.mjs';
+import {buildStructured} from './structured.mjs';
 
 const engine = path.dirname(fileURLToPath(import.meta.url));
 let browserExecutable = process.env.ANIMATION_BROWSER_EXECUTABLE || undefined;
@@ -16,14 +17,16 @@ if (!browserExecutable && process.platform === 'win32') {
   }
 }
 const [mode, directory] = process.argv.slice(2);
-if (!['preview', 'render', 'stills'].includes(mode) || !directory) throw new Error('Usage: node runner.mjs preview|render|stills <project>');
+if (!['preview', 'render', 'stills', 'cover'].includes(mode) || !directory) throw new Error('Usage: node runner.mjs preview|render|stills|cover <project>');
 const project = path.resolve(directory);
 const output = path.join(project, 'out');
 await fs.mkdir(output, {recursive: true});
 const config = JSON.parse(await fs.readFile(path.join(project, 'composition.json'), 'utf8'));
-if (![1080, 1920].includes(config.width) || ![1080, 1920].includes(config.height) || config.fps !== 30 || !Number.isInteger(config.durationInFrames) || config.durationInFrames < 150 || config.durationInFrames > 3600) throw new Error('Invalid composition metadata');
-const source = await fs.readFile(path.join(project, 'Animation.tsx'), 'utf8');
-validateSource(source);
+if (![720, 1080, 1280, 1920].includes(config.width) || ![720, 1080, 1280, 1920].includes(config.height) || config.fps !== 30 || !Number.isInteger(config.durationInFrames) || config.durationInFrames < 150 || config.durationInFrames > 3600) throw new Error('Invalid composition metadata');
+let document;
+try {document=JSON.parse(await fs.readFile(path.join(project,'project.json'),'utf8'));} catch(e) {if(e.code!=='ENOENT')throw e;}
+const source = document ? await buildStructured(project, document) : await fs.readFile(path.join(project, 'Animation.tsx'), 'utf8');
+if (!document) validateSource(source);
 const fonts = await fontCss(engine, source);
 const manifest = JSON.parse(await fs.readFile(path.join(project, 'assets.json'), 'utf8'));
 const assets = {};
@@ -103,12 +106,14 @@ createRoot(document.getElementById('root')).render(<Boundary><Player ref={window
   await fs.writeFile(indexPath,index.replace('<head>',`<head><link rel="icon" href="data:,"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">`));
   const options = {serveUrl, id:'Animation', browserExecutable, timeoutInMilliseconds:60000};
   const composition = await selectComposition(options);
-  if (mode === 'stills') {
+  if (mode === 'cover') {
+    await renderStill({...options,composition,frame:Math.min(config.coverFrame||0,config.durationInFrames-1),output:path.join(output,'cover.png')});
+  } else if (mode === 'stills') {
     for (const frame of frameList) await renderStill({...options,composition,frame,output:path.join(output,`frame-${frame}.png`)});
   } else {
     let previous = -1;
-    await renderMedia({...options,composition,codec:'h264',pixelFormat:'yuv420p',crf:20,concurrency:2,outputLocation:path.join(output,'animation.mp4'),
+    await renderMedia({...options,composition,codec:'h264',pixelFormat:'yuv420p',crf:config.quality==='high'?16:20,concurrency:2,outputLocation:path.join(output,'animation.mp4'),
       onProgress:({progress})=>{const percent=Math.floor(progress*100);if(percent!==previous){previous=percent;console.log(JSON.stringify({stage:'rendering',percent}))}}});
-    await renderStill({...options,composition,frame:Math.min(30,config.durationInFrames-1),output:path.join(output,'cover.png')});
+    await renderStill({...options,composition,frame:Math.min(config.coverFrame??30,config.durationInFrames-1),output:path.join(output,'cover.png')});
   }
 }

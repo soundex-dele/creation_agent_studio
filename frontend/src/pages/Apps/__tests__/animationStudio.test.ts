@@ -41,7 +41,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-async function render() { await act(async () => root.render(createElement(MemoryRouter, null, createElement(AnimationStudioWorkspace, { organizationId: 'org', applicationId: '12' })))); }
+async function render(initialRunId?: string) { await act(async () => root.render(createElement(MemoryRouter, null, createElement(AnimationStudioWorkspace, { organizationId: 'org', applicationId: '12', initialRunId })))); }
 function button(name: string) { return Array.from(host.querySelectorAll('button')).find(node => node.textContent?.replace(/\s/g, '') === name)!; }
 async function click(name: string) { await act(async () => button(name).click()); }
 async function write(text: string) {
@@ -54,6 +54,29 @@ async function write(text: string) {
 async function event(type = 'run.succeeded') { await act(async () => { await runtime.callbacks?.onEvent({ type, payload: {} }); }); }
 
 describe('animation workflow', () => {
+  it('opens a saved work link in preview with editing available above the canvas', async () => {
+    current = { ...generation(), id: 'saved-version', input: { ...generation().input, aspect: '9:16', duration: 45, style: '手绘', source_run_id: 'previous-version' } };
+    records = [generation()];
+    await render(current.id);
+    expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/generations/saved-version'));
+    expect(host.querySelector('.animation-workspace')?.getAttribute('data-tab')).toBe('preview');
+    const editButton = button('继续修改');
+    expect(editButton.disabled).toBe(false);
+    expect(editButton.closest('.animation-preview-heading')).not.toBeNull();
+    expect(editButton.compareDocumentPosition(host.querySelector('.animation-canvas')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click('继续修改');
+    expect(host.querySelector('.animation-workspace')?.getAttribute('data-tab')).toBe('create');
+    expect((host.querySelector('#animation-duration') as HTMLInputElement).value).toBe('45');
+    expect((host.querySelector('#animation-style') as HTMLInputElement).value).toBe('手绘');
+    await write('标题换成蓝色');
+    vi.mocked(api.post).mockResolvedValue({ ...generation('queued'), id: 'new-version' });
+    await click('生成新版本');
+    expect(api.post).toHaveBeenCalledWith(expect.stringContaining('/generations'), expect.objectContaining({ source_run_id: 'saved-version', prompt: '标题换成蓝色', aspect: '9:16', duration: 45, style: '手绘' }), expect.any(Object));
+  });
+  it('keeps the creation panel as the default when entering without a saved work link', async () => {
+    await render();
+    expect(host.querySelector('.animation-workspace')?.getAttribute('data-tab')).toBe('create');
+  });
   it('registers the dedicated route and previews HTML in an opaque sandbox without auto-export', async () => {
     expect(applicationPath({ id: 'animation-studio', applicationId: 12, rendererKey: 'animation-studio', kind: 'custom' })).toBe('/applications/12/animation-studio?entry=apps');
     await render();

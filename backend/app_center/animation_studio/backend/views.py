@@ -50,12 +50,19 @@ class BaseView(APIView):
 
 
 class AssetsView(BaseView):
+    def get(self, request, **kwargs):
+        app = self.application()
+        items = AnimationAsset.objects.for_organization(app.organization_id).filter(application=app, owner=request.user,
+            archived=request.query_params.get("archived") == "1", name__icontains=request.query_params.get("q", "")[:200]).order_by("-created_at")
+        return Response({"results": [{"id": str(i.id), "name": i.name, "category": i.category, "archived": i.archived,
+            "mime_type": i.mime_type, "size": i.size, "duration": i.duration} for i in items[:500]]})
+
     def post(self, request, **kwargs):
         application = self.application()
         upload = request.FILES.get("file")
         if not upload:
             raise ValidationError("请选择素材文件。")
-        content, metadata = inspect_upload(upload)
+        content, metadata = inspect_upload(upload, allow_short=True)
         asset_id = uuid.uuid4()
         key = f"animation-studio/{application.organization_id}/{request.user.id}/assets/{asset_id}"
         storage = get_artifact_storage()
@@ -93,11 +100,20 @@ class GenerationsView(BaseView):
 class GenerationView(BaseView):
     def get(self, request, run_id, **kwargs):
         application = self.application()
-        return Response(self.serialize(generation_for(request.user, application, run_id), application))
+        run = generation_for(request.user, application, run_id)
+        data = self.serialize(run, application)
+        from .models import AnimationVersion
+        linked = AnimationVersion.objects.filter(run=run).first()
+        data["project_id"] = str(linked.project_id) if linked else None
+        return Response(data)
 
 
 class ExportsView(BaseView):
     def post(self, request, run_id, **kwargs):
         application = self.application()
         source = generation_for(request.user, application, run_id, ready=True)
-        return self.start(application, {"action": "export", "source_run_id": str(source.id)})
+        from .studio_validation import export_options
+        values = {"action": "export", "source_run_id": str(source.id)}
+        if request.data:
+            values["export_options"] = export_options(request.data)
+        return self.start(application, values)

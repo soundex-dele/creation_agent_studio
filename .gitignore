@@ -51,6 +51,7 @@ node_modules/
 dist/
 dist-ssr/
 coverage/
+.cache/webpack/
 contracts/swagger.json
 
 # Editors and operating systems

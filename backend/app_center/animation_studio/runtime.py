@@ -79,11 +79,11 @@ def read_archive(artifact, workspace):
     # Only recover authored source and data. Never restore executable build configuration.
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         members = archive.infolist()
-        if sum(item.file_size for item in members) > MAX_ARCHIVE or len(members) > 60:
+        if sum(item.file_size for item in members) > MAX_ARCHIVE or len(members) > 150:
             raise RuntimeError("源码归档无效或过大。")
         for item in members:
             name = item.filename
-            if name in ("Animation.tsx", "composition.json", "assets.json", "storyboard.md") or (
+            if name in ("Animation.tsx", "composition.json", "assets.json", "storyboard.md", "project.json") or (
                 name.startswith("assets/") and name.count("/") == 1 and ".." not in name and "\\" not in name
             ):
                 target = Path(workspace) / name
@@ -96,14 +96,14 @@ def read_archive(artifact, workspace):
 def archive_source(workspace):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name in ("Animation.tsx", "composition.json", "assets.json", "storyboard.md"):
+        for name in ("Animation.tsx", "composition.json", "assets.json", "storyboard.md", "project.json"):
             target = Path(workspace) / name
             if target.exists():
                 archive.write(target, name)
         for target in sorted((Path(workspace) / "assets").glob("*")):
             if target.is_file():
                 archive.write(target, "assets/" + target.name)
-        for name in ("runner.mjs", "validate.mjs", "fonts.mjs", "package.json", "package-lock.json"):
+        for name in ("runner.mjs", "validate.mjs", "structured.mjs", "fonts.mjs", "package.json", "package-lock.json"):
             archive.write(ENGINE / name, name)
         archive.writestr("README.md", "# 动画源码\n\n需要 Node.js 20+、中文字体及 Chrome Headless Shell。\n\n"
             "1. npm ci\n2. npm run browser\n3. npm run preview（生成 out/preview.html，直接在浏览器打开）\n"
@@ -140,6 +140,9 @@ def _execute(payload, sink):
         serializer = AnimationInputSerializer(data=run.input)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
+        if "document" in values or values["action"] == "batch":
+            from .studio_runtime import execute_studio
+            return execute_studio(payload, sink, run, application, values)
         source = generation_for(run.owner, application, values["source_run_id"], ready=True) if values.get("source_run_id") else None
         source_artifact = source.artifacts.filter(kind="animation-source").first() if source else None
         asset_records = assets_for(run.owner, application, values.get("asset_ids", []))
@@ -155,6 +158,9 @@ def _execute(payload, sink):
         if source_artifact:
             read_archive(source_artifact, workspace)
         if values["action"] == "export":
+            if "export_options" in values:
+                from .studio_runtime import export_format
+                return export_format(workspace, node, sink, source.id, values["export_options"])
             return export_video(workspace, node, sink, source.id)
         previous_source = (workspace / "Animation.tsx").read_text("utf-8") if source else ""
         previous_story = (workspace / "storyboard.md").read_text("utf-8") if (workspace / "storyboard.md").exists() else ""
@@ -240,7 +246,7 @@ def export_video(workspace, node, sink, source_id):
     expected = config["durationInFrames"] / config["fps"]
     if (track.get("codec_name") != "h264" or track.get("width") != config["width"] or track.get("height") != config["height"]
             or abs(float(info["format"].get("duration", 0)) - expected) > 0.15
-            or (config.get("audioId") and not any(item.get("codec_type") == "audio" for item in streams))):
+            or ((config.get("audioId") or config.get("hasAudio")) and not any(item.get("codec_type") == "audio" for item in streams))):
         raise RuntimeError("导出视频的画幅、时长或录音校验失败，HTML 预览仍然可用。")
     run_process(["ffmpeg", "-v", "error", "-xerror", "-i", str(video), "-f", "null", "-"], workspace, sink, timeout=300)
     check_cancel(sink)

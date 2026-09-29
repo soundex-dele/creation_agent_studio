@@ -28,13 +28,13 @@ def generation_for(user, application, run_id, *, ready=False):
     return run
 
 
-def assets_for(user, application, ids):
+def assets_for(user, application, ids, *, multiple_audio=False):
     values = list(AnimationAsset.objects.for_organization(application.organization_id).filter(
         owner=user, application=application, id__in=ids))
     if len(values) != len(ids):
         raise ValidationError("素材不存在或不属于当前用户。")
     if sum(item.size for item in values) > 100 * 1024 * 1024:
         raise ValidationError("一部动画的素材总量不能超过 100 MB。")
-    if sum(item.duration is not None for item in values) > 1:
+    if not multiple_audio and sum(item.duration is not None for item in values) > 1:
         raise ValidationError("每部动画最多使用一段录音。")
     return values
