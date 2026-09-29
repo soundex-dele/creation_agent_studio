@@ -74,6 +74,16 @@ describe('AI drawing workspace', () => {
     expect(host.textContent).toContain('1024 × 1024');
     expect(runtime.abort).toHaveBeenCalled();
   });
+  it('fills a prompt example without generating and keeps a custom draft untouched', async () => {
+    await render();
+    await click('产品静物');
+    expect(host.querySelector('textarea')?.value).toContain('陶瓷咖啡杯');
+    expect(document.activeElement).toBe(host.querySelector('textarea'));
+    expect(api.post).not.toHaveBeenCalled();
+    await typePrompt('我自己的画面描述');
+    expect(host.querySelector('.drawing-examples')).toBeNull();
+    expect(host.querySelector('textarea')?.value).toBe('我自己的画面描述');
+  });
   it('restores history, edits its archived image, and leaves the original intact', async () => {
     current = run(); records = [current];
     await render('run-1'); await click('继续修改');

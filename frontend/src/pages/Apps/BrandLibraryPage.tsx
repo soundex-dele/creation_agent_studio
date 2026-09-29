@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Form, Input, List, Modal, Pagination, Popconfirm, Space, Spin, Tabs, Typography } from 'antd';
 import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { BookOpen, Fingerprint, Palette, Quote } from 'lucide-react';
 import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@/services/api';
 import { brandModules, brandSections, type BrandItem, type BrandPage, type BrandProfile, type BrandSection } from '@/services/brandLibrary';
@@ -42,7 +43,7 @@ function BrandEditor({ editor, base, onClose, onSaved, setDirty }: {
     finally { setSaving(false); }
   };
   const label = editor.kind === 'profiles' ? '品牌档案' : brandModules[editor.kind];
-  return <Modal open title={`${editor.item ? '编辑' : '新增'}${label}`} width={760}
+  return <Modal open className="brand-library-editor" title={`${editor.item ? '编辑' : '新增'}${label}`} width={760}
     onCancel={() => { if (!saving) onClose(); }} maskClosable={false} closable={!saving}
     footer={<Space><Button disabled={saving} onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存</Button></Space>}>
     {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
@@ -164,17 +165,18 @@ export function BrandLibraryWorkspace({ base, showHeader = true }: { base: strin
     catch (failure) { setError(entryError(failure)); }
     finally { setDeleting(false); }
   };
-  return <div className="brand-library-page">
+  return <div className="brand-library-page app-scroll-page">
     <header className="brand-library-header"><div>
       {showHeader && <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/apps')}>返回应用</Button>}
-      <h1>品牌资料库</h1><p>把定位、事实与风格沉淀下来，让每次创作保持一致。资料仅自己可见。</p>
+      <div className="brand-library-brand"><span className="brand-library-mark"><Fingerprint size={28} aria-hidden="true" /></span><div><span className="brand-library-eyebrow">创作的共同底稿</span><h1>品牌资料库</h1></div></div><p>把定位、事实与风格沉淀下来，让每次创作保持一致。资料仅自己可见。</p>
     </div><Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor({ kind: 'profiles' })}>新建档案</Button></header>
     {error && <Alert type="error" message={error} action={<Button onClick={() => setReload((n) => n + 1)}>重试</Button>} />}
     {success && <Alert type="success" message={success} closable />}
     <div className="brand-library-columns">
       <aside className="brand-library-list">
+        <div className="brand-library-list-heading"><h2>我的档案</h2><span>{loading ? '加载中' : `${count} 份${search ? '匹配' : ''}`}</span></div>
         <Input.Search aria-label="搜索品牌档案" placeholder="搜索品牌或账号" maxLength={200} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} allowClear />
-        {loading ? <Spin /> : <List dataSource={profiles} locale={{ emptyText: search ? '没有匹配的档案' : '从第一份品牌档案开始' }} renderItem={(profile) => (
+        {loading ? <div className="brand-library-loading" role="status"><Spin /><span>正在读取档案…</span></div> : <List dataSource={profiles} locale={{ emptyText: search ? '没有匹配的档案' : '从第一份品牌档案开始' }} renderItem={(profile) => (
           <List.Item><button className={`brand-library-select ${profile.id === selected?.id ? 'is-selected' : ''}`} onClick={() => setSelected(profile)} aria-pressed={profile.id === selected?.id}>
             <strong>{profile.name}</strong><span>{profile.positioning.platform || '品牌 / 账号'} · {new Date(profile.updated_at).toLocaleDateString()}</span>
           </button></List.Item>
@@ -182,9 +184,14 @@ export function BrandLibraryWorkspace({ base, showHeader = true }: { base: strin
         <Pagination current={page} pageSize={20} total={count} onChange={setPage} showSizeChanger={false} hideOnSinglePage simple />
       </aside>
       <main className="brand-library-detail">{selected ? <>
-        <div className="brand-library-detail-heading"><div><h2>{selected.name}</h2><Typography.Text type="secondary">更新于 {new Date(selected.updated_at).toLocaleString()}</Typography.Text></div>
+        <div className="brand-library-detail-heading"><div><span className="brand-library-eyebrow">{selected.positioning.platform || '品牌档案'}</span><h2>{selected.name}</h2><Typography.Text type="secondary">更新于 {new Date(selected.updated_at).toLocaleString()}</Typography.Text></div>
           <Space><Button icon={<EditOutlined />} onClick={() => openEditor({ kind: 'profiles', item: selected })}>编辑档案</Button>
             <Popconfirm title="删除整份品牌档案？" description="产品和范文一并删除，已发送到对话的内容会保留。" onConfirm={remove}><Button danger loading={deleting}>删除</Button></Popconfirm></Space>
+        </div>
+        <div className="brand-library-summary" aria-label="品牌摘要">
+          <div><Fingerprint size={19} aria-hidden="true" /><span>品牌定位</span><p>{selected.positioning.value || selected.positioning.introduction || '写下品牌的独特价值，让创作有方向。'}</p></div>
+          <div><Quote size={19} aria-hidden="true" /><span>表达气质</span><p>{selected.voice.keywords || '沉淀风格关键词，让表达保持一致。'}</p></div>
+          <div><Palette size={19} aria-hidden="true" /><span>视觉风格</span><p>{selected.visual.style || '记录画面风格，让品牌更容易被记住。'}</p></div>
         </div>
         <Tabs key={selected.id} items={Object.entries(brandModules).map(([module, label]) => ({ key: module, label,
           children: module === 'products' || module === 'examples' ? <BrandItems key={`${selected.id}:${module}:${reload}`} base={`${base}/profiles/${selected.id}`} kind={module} onEdit={openEditor} onChanged={() => setReload((n) => n + 1)} /> :
@@ -192,7 +199,7 @@ export function BrandLibraryWorkspace({ base, showHeader = true }: { base: strin
               <div className="brand-library-value">{selected[module as BrandSection][key] || <Typography.Text type="secondary">尚未填写</Typography.Text>}</div>
             </Card>)}</div>,
         }))} />
-      </> : <Empty description="选择一份档案查看，或新建你的品牌资料。" />}</main>
+      </> : <div className="brand-library-welcome"><span className="brand-library-welcome-icon"><BookOpen size={38} aria-hidden="true" /></span><span className="brand-library-eyebrow">从一份档案，建立一致的表达</span><h2>让每次创作，都带着你的品牌</h2><p>选择一份档案查看，或新建你的品牌资料。</p><div className="brand-library-welcome-topics"><span>账号定位</span><span>产品事实</span><span>品牌语气</span><span>优秀范文</span><span>视觉规范</span></div><Button icon={<PlusOutlined />} onClick={() => openEditor({ kind: 'profiles' })}>创建品牌档案</Button></div>}</main>
     </div>
     {editor && <BrandEditor editor={editor} base={editor.kind === 'profiles' ? base : `${base}/profiles/${selected?.id}`}
       setDirty={setDirty} onClose={closeEditor} onSaved={(saved) => {

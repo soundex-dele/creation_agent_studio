@@ -10,6 +10,12 @@ import { createApplicationRuntimeClient, type ApplicationRuntimeClient, type Run
 import { drawingApi, drawingError, drawingStatus, drawingTerminal, downloadDrawing, type DrawingInput, type DrawingOrientation, type DrawingPage, type DrawingRun } from '@/services/aiDrawing';
 import './AIDrawingPage.css';
 
+const promptExamples = [
+  { label: '自然光摄影', prompt: '一间阳光洒入的木屋书房，窗外是山林，温暖的自然光，细腻的胶片质感。' },
+  { label: '产品静物', prompt: '一只陶瓷咖啡杯放在浅色石台上，柔和的侧光，干净的背景，简约的产品摄影。' },
+  { label: '童话插画', prompt: '一只小狐狸在森林里的书店读书，窗外飘着细雨，暖黄色灯光，温柔的水彩插画。' },
+];
+
 function DrawingImage({ runId, artifact, runtime, large = false }: { runId: string; artifact: RunArtifact; runtime: ApplicationRuntimeClient; large?: boolean }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
@@ -154,6 +160,7 @@ export function AIDrawingWorkspace({ organizationId, applicationId, showHeader =
       <label htmlFor="drawing-prompt">{reference ? '描述你想修改的内容' : '描述你想看见的画面'}</label>
       <textarea id="drawing-prompt" ref={promptRef} value={prompt} maxLength={8000} rows={8} placeholder={reference ? '例如：把背景换成落日下的海边，保留主体和构图…' : '例如：一间阳光洒入的木屋书房，窗外是山林，温暖的电影质感…'} onChange={(event) => setPrompt(event.target.value)} />
       <div className="drawing-prompt-count">{prompt.length} / 8000</div>
+      {!reference && !prompt.trim() && <div className="drawing-examples" aria-label="提示词示例"><span>从一个灵感开始</span><div>{promptExamples.map((example) => <button key={example.label} type="button" onClick={() => { setPrompt(example.prompt); promptRef.current?.focus(); }}>{example.label}</button>)}</div></div>}
       <label htmlFor="drawing-orientation">画面方向</label>
       <Select id="drawing-orientation" value={orientation} onChange={setOrientation} options={[{ value: 'auto', label: '自动选择' }, { value: 'square', label: '方形' }, { value: 'landscape', label: '横向' }, { value: 'portrait', label: '纵向' }]} />
       <p className="drawing-hint">作为构图偏好，实际尺寸以生成结果为准。</p>
@@ -166,7 +173,7 @@ export function AIDrawingWorkspace({ organizationId, applicationId, showHeader =
     <main className="drawing-results">
       <div className="drawing-preview-header"><div><h2>{selected ? '创作预览' : '等待你的第一个灵感'}</h2><p aria-live="polite">{selected ? drawingStatus(selected.status, stage) : '从一段描述开始，也可以上传原图继续创作'}</p></div>{active && <Button disabled={busy || selected.status === 'cancelling'} onClick={() => void cancel()}>取消生成</Button>}</div>
       {connectionError && <Alert type="warning" message={connectionError} />}
-      <div className="drawing-canvas" aria-busy={Boolean(active) || opening}>
+      <div className={`drawing-canvas${artifact ? ' has-artwork' : ''}`} aria-busy={Boolean(active) || opening}>
         {artifact && selected ? <DrawingImage key={artifact.id} runId={selected.id} artifact={artifact} runtime={runtime} large /> : active || opening ? <div className="drawing-empty"><Spin /><p>{opening ? '正在打开作品' : drawingStatus(selected?.status || 'queued', stage)}</p><span>图片生成需要一些时间，你可以离开页面，稍后回来查看。</span></div> : <div className="drawing-empty"><Palette size={48} strokeWidth={1} /><h3>{selected?.status === 'failed' ? '这次没有生成图片' : selected?.status === 'cancelled' ? '生成已取消' : '让想象，有迹可循'}</h3><p>写下主体、场景、风格和光线，开始创作。</p></div>}
       </div>
       {selected?.error_message && <Alert type="error" showIcon message={selected.error_message} />}

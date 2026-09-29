@@ -103,6 +103,7 @@ describe('mobile page scrolling', () => {
   describe.each([
     ['KitchenAssistantPage', 'kitchen-page'],
     ['ResearchAssistantPage', 'research-host'],
+    ['BrandLibraryPage', 'brand-library-page'],
   ])('%s full-bleed scroll owner', (page, rootClass) => {
     const pageStyles = readSource(`../../pages/Apps/${page}.css`);
 
@@ -126,6 +127,48 @@ describe('mobile page scrolling', () => {
       // navigation visible, in an embed, or on a short landscape viewport.
       expect(declarations.height).not.toMatch(/vh|dvh/);
     });
+  });
+
+  it.each([320, 375, 390, 767, 768, 844, 1440])('preserves drawing and conversion scrollports at %ipx, including short embeds', width => {
+    const drawing = readSource('../../pages/Apps/AIDrawingPage.css');
+    const conversion = readSource('../../pages/Apps/DurableApplicationRuntimePage.css');
+    expect(readSource('../../pages/Apps/AIDrawingPage.tsx')).toContain('className="drawing-workspace"');
+    expect(readSource('../../pages/Apps/DurableApplicationRuntimePage.tsx')).toContain('"conversion-page app-scroll-page"');
+    for (const height of [320, 900]) {
+      for (const [styles, selectors] of [
+        [drawing, ['.drawing-workspace']],
+        [conversion, ['.app-scroll-page', '.conversion-page']],
+      ] as const) {
+        const root = declarationsAt([globalStyles, styles], [...selectors], width, height);
+        expect(root.height).toBe('100%');
+        expect(root['min-height']).toBe('0');
+        expect(root['min-width']).toBe('0');
+        expect(root['overflow-y']).toBe('auto');
+        expect(root.overflow).not.toBe('hidden');
+      }
+    }
+    if (width <= 767) {
+      expect(declarationsAt([drawing], ['.drawing-workspace'], width).display).toBe('block');
+      expect(declarationsAt([drawing], ['.drawing-results'], width).padding).toContain('safe-area-inset-bottom');
+      expect(declarationsAt([conversion], ['.conversion-settings'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
+      expect(declarationsAt([conversion], ['.conversion-advanced-fields'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
+    }
+  });
+
+  it.each([320, 375, 390, 767, 768, 1440])('bounds long brand and research forms at %ipx', width => {
+    for (const [page, selector] of [
+      ['BrandLibraryPage', '.brand-library-editor .ant-modal-body'],
+      ['ResearchAssistantPage', '.research-modal .ant-modal-body'],
+    ]) {
+      const rules = declarationsAt([readSource(`../../pages/Apps/${page}.css`)], [selector], width, 320);
+      expect(rules['max-height']).toBe('65dvh');
+      expect(rules['overflow-y']).toBe('auto');
+    }
+    if (width <= 767) {
+      const brand = readSource('../../pages/Apps/BrandLibraryPage.css');
+      expect(declarationsAt([brand], ['.brand-library-columns'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
+      expect(declarationsAt([brand], ['.brand-library-fields'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
+    }
   });
 
   it('keeps all five primary destinations reachable on narrow screens', () => {

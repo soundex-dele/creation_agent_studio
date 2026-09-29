@@ -1,0 +1,87 @@
+.runtime-console { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+/* The same parent-bounded scrollport works inside the padded shell and embeds. */
+.conversion-page { max-width: 1120px; margin: 0 auto; padding: 8px 8px calc(32px + env(safe-area-inset-bottom)); color: var(--color-text); }
+.conversion-page > * + * { margin-top: 24px; }
+.conversion-header { display: flex; align-items: center; gap: 16px; padding: 12px 0 8px; }
+.conversion-app-icon { display: grid; place-items: center; width: 58px; height: 58px; flex-shrink: 0; border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border)); border-radius: 17px; background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg-card)); color: var(--color-primary-hover); }
+.conversion-header > div { min-width: 0; }
+.conversion-eyebrow { font-size: 12px; letter-spacing: .06em; color: var(--color-text-sec); }
+.conversion-header h1 { margin: 4px 0 8px; font-size: clamp(24px, 3vw, 30px); line-height: 1.4; overflow-wrap: anywhere; }
+.conversion-header p { color: var(--color-text-sec); line-height: 1.8; margin: 0; }
+.conversion-format { margin-left: auto; flex-shrink: 0; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text-sec); font-size: 12px; letter-spacing: .05em; }
+.conversion-format > span { padding-inline: 6px; color: var(--color-primary-hover); }
+.conversion-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
+.conversion-section { min-width: 0; padding: 24px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-card); }
+.conversion-section-title { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
+.conversion-section-title > span { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; background: var(--color-bg-surface); color: var(--color-primary-hover); font-size: 12px; font-weight: 600; }
+.conversion-section-title > svg { margin-left: auto; flex-shrink: 0; color: var(--color-text-sec); }
+.conversion-section h2 { font-size: 17px; margin: 2px 0 8px; }
+.conversion-section-title p, .conversion-hint { color: var(--color-text-sec); font-size: 12px; line-height: 1.8; }
+.conversion-hint { margin: 16px 0 0; }
+.conversion-source-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 28px 16px; background: var(--color-bg-surface); border: 1px dashed var(--color-border); border-radius: 12px; }
+.conversion-source-empty svg { color: var(--color-primary-hover); margin-bottom: 14px; }
+.conversion-source-empty strong { font-size: 14px; font-weight: 500; }
+.conversion-source-empty p { font-size: 12px; color: var(--color-text-sec); margin: 8px 0 0; line-height: 1.8; }
+.conversion-directory-list { display: grid; gap: 14px; }
+.conversion-directory > label { display: block; font-size: 12px; margin-bottom: 8px; color: var(--color-text-sec); }
+.conversion-directory > div { display: flex; gap: 8px; }
+.conversion-directory .ant-input { min-width: 0; }
+.conversion-directory-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.conversion-orientation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; }
+.conversion-orientation .ant-radio-button-wrapper { height: auto; min-width: 0; padding: 16px 10px; line-height: 1.5; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-surface); }
+.conversion-orientation .ant-radio-button-wrapper::before { display: none; }
+.conversion-orientation .ant-radio-button-wrapper-checked { background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-card)); }
+.conversion-orientation .ant-radio-button-wrapper > span:last-child { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.conversion-orientation small { display: block; margin-top: 3px; font-size: 11px; color: var(--color-text-sec); }
+.conversion-ratio { display: block; flex-shrink: 0; border: 1px solid currentColor; background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg-card)); border-radius: 4px; }
+.conversion-ratio--wide { width: 42px; height: 20px; }
+.conversion-ratio--tall { width: 26px; height: 36px; }
+.conversion-dimensions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+.conversion-dimensions label, .conversion-advanced-fields label { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--color-text-sec); font-size: 12px; }
+.conversion-dimensions .ant-input-number { width: 100%; }
+.conversion-advanced { grid-column: 1 / -1; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-card); }
+.conversion-advanced > summary { display: flex; align-items: center; gap: 12px; padding: 20px 24px; min-height: 60px; cursor: pointer; }
+.conversion-advanced > summary::after { content: '+'; margin-left: auto; font-size: 20px; color: var(--color-text-sec); }
+.conversion-advanced[open] > summary::after { content: '−'; }
+.conversion-advanced > summary small { display: block; margin-top: 4px; font-size: 12px; color: var(--color-text-sec); }
+.conversion-advanced > summary::-webkit-details-marker { display: none; }
+.conversion-advanced > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
+.conversion-advanced-body { padding: 0 24px 24px; }
+.conversion-advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.conversion-options { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; }
+.conversion-submit { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-card); }
+.conversion-submit > span { font-size: 14px; }
+.conversion-submit small { display: block; color: var(--color-text-sec); font-size: 12px; margin-top: 6px; }
+.conversion-submit > .ant-btn { min-height: 46px; padding-inline: 28px; border-radius: 10px; }
+.conversion-result-empty { display: flex; align-items: center; gap: 16px; padding: 28px; border: 1px dashed var(--color-border); border-radius: 14px; color: var(--color-text-sec); }
+.conversion-result-empty > svg { flex-shrink: 0; }
+.conversion-result-empty h2 { color: var(--color-text); font-size: 16px; margin-bottom: 8px; }
+.conversion-result-empty p { font-size: 13px; line-height: 1.8; }
+.conversion-result .ant-typography { overflow-wrap: anywhere; }
+.conversion-page > .ant-card { border-radius: 16px; }
+@media (max-width: 991px) {
+  .conversion-settings { grid-template-columns: minmax(0, 1fr); }
+  .conversion-format { display: none; }
+}
+@media (max-width: 767px) {
+  .conversion-page { padding: 16px 8px calc(24px + env(safe-area-inset-bottom)); }
+  .conversion-header { align-items: flex-start; gap: 12px; }
+  .conversion-app-icon { width: 46px; height: 46px; }
+  .conversion-eyebrow { display: none; }
+  .conversion-header h1 { font-size: 22px; }
+  .conversion-section, .conversion-submit { padding: 18px; }
+  .conversion-section-title > svg { display: none; }
+  .conversion-dimensions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .conversion-dimensions label:last-child { grid-column: 1 / -1; }
+  .conversion-advanced > summary { padding: 18px; }
+  .conversion-advanced-body { padding: 0 18px 18px; }
+  .conversion-advanced-fields { grid-template-columns: minmax(0, 1fr); }
+  .conversion-options { flex-direction: column; gap: 12px; }
+  .conversion-options .ant-checkbox-wrapper { min-height: 44px; align-items: center; }
+  .conversion-submit { flex-wrap: wrap; }
+  .conversion-submit > .ant-btn { width: 100%; }
+  .conversion-page .ant-btn, .conversion-page .ant-select { min-height: 44px; }
+  .conversion-page .ant-input, .conversion-page .ant-input-number-input { min-height: 44px; font-size: 16px; }
+  .conversion-page > .ant-card > .ant-card-head .ant-card-head-wrapper { flex-wrap: wrap; gap: 12px; }
+  .conversion-page > .ant-card > .ant-card-head, .conversion-page > .ant-card > .ant-card-body { padding-inline: 18px; }
+}

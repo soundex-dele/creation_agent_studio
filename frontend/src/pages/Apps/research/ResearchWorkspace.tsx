@@ -137,11 +137,11 @@ export function ResearchWorkspace({ client, projectId, resultId, citationId, nav
     </li>)}</ul>}
   </section>;
   const resultPanel = <section className="research-results" aria-label="研究成果">
-    <div className="research-project-form"><label htmlFor="research-title">项目名称</label><Input id="research-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+    <div className="research-project-form"><h2 className="research-section-heading"><span>01</span> 确定研究目标</h2><label htmlFor="research-title">项目名称</label><Input id="research-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
       <label htmlFor="research-objective">研究目标</label><Input.TextArea id="research-objective" value={objective} rows={3} maxLength={8000} placeholder="例如：比较三份报告对行业增长的判断，整理支持和反对的依据。" onChange={(e) => setObjective(e.target.value)} />
       <Space wrap><Button disabled={busy || !title.trim()} onClick={() => void action(save)}>保存项目</Button><Popconfirm title="删除研究项目及全部原始资料？" description="历史出处链接将不可用，已导出的成果不受影响。" onConfirm={() => action(async () => { await client.remove(projectId); onChange(); navigate(null); })}><Button danger disabled={busy}>删除项目</Button></Popconfirm></Space>
     </div>
-    <div className="research-generation"><label htmlFor="research-kind">成果类型</label><Select id="research-kind" value={kind} onChange={setKind} options={Object.entries(researchKinds).map(([value, label]) => ({ value, label }))} />
+    <div className="research-generation"><h2 className="research-section-heading"><span>02</span> 组织研究成果</h2><label htmlFor="research-kind">成果类型</label><Select id="research-kind" value={kind} onChange={setKind} options={Object.entries(researchKinds).map(([value, label]) => ({ value, label }))} />
       <label htmlFor="research-instruction">补充关注点</label><Input.TextArea id="research-instruction" value={instruction} rows={2} maxLength={8000} placeholder="可选：重点关注的数据、观点或写作方向" onChange={(e) => setInstruction(e.target.value)} />
       <Button type="primary" icon={<Search size={16} aria-hidden="true" />} loading={busy} disabled={!selected.length || !title.trim() || !objective.trim()} onClick={() => void generate()}>基于 {selected.length} 份资料生成</Button>
     </div>
@@ -169,7 +169,7 @@ export function ResearchWorkspace({ client, projectId, resultId, citationId, nav
   return <div className="research-workspace">
     {error && <Alert className="research-error" type="error" message={error} closable onClose={() => setError('')} />}
     {!project ? !error && <Spin /> : screens.lg ? <div className="research-desktop">{sourcePanel}{resultPanel}</div> : <Tabs items={[{ key: 'results', label: '研究成果', children: resultPanel }, { key: 'sources', label: `资料 (${sources.length})`, children: sourcePanel }]} />}
-    <Modal title="粘贴文章" open={pasteOpen} onCancel={() => !busy && setPasteOpen(false)} confirmLoading={busy} okText="添加资料" okButtonProps={{ disabled: !article.trim() || !articleTitle.trim() }} onOk={() => void action(async () => { await client.addSource(projectId, { title: articleTitle, text: article }); setPasteOpen(false); setArticle(''); setArticleTitle(''); await refreshSources(); })}>
+    <Modal className="research-modal" title="粘贴文章" open={pasteOpen} onCancel={() => !busy && setPasteOpen(false)} confirmLoading={busy} okText="添加资料" okButtonProps={{ disabled: !article.trim() || !articleTitle.trim() }} onOk={() => void action(async () => { await client.addSource(projectId, { title: articleTitle, text: article }); setPasteOpen(false); setArticle(''); setArticleTitle(''); await refreshSources(); })}>
       {error && <Alert type="error" message={error} />}<label htmlFor="research-article-title">文章标题</label><Input id="research-article-title" value={articleTitle} maxLength={200} onChange={(e) => setArticleTitle(e.target.value)} />
       <label htmlFor="research-article">文章正文</label><Input.TextArea id="research-article" value={article} rows={12} onChange={(e) => setArticle(e.target.value)} />
     </Modal>
@@ -178,13 +178,13 @@ export function ResearchWorkspace({ client, projectId, resultId, citationId, nav
       for (const entry of entries) { try { await client.addSource(projectId, { origin_type: integration.target, origin_id: entry.id, application_id: integration.id }); } catch (e) { failures.push(`${entry.title}：${documentError(e)}`); } }
       await refreshSources(); if (failures.length) throw new Error(failures.join('；'));
     }} />}
-    <Modal title="保存研究成果" open={exportOpen} confirmLoading={busy} onCancel={() => !busy && setExportOpen(false)} okButtonProps={{ disabled: !exportApp }} onOk={() => void action(async () => {
+    <Modal className="research-modal" title="保存研究成果" open={exportOpen} confirmLoading={busy} onCancel={() => !busy && setExportOpen(false)} okButtonProps={{ disabled: !exportApp }} onOk={() => void action(async () => {
       const integration = integrations?.applications.find((i) => i.id === exportApp); if (!integration || !result) return;
       const hash = `${result.id}:${integration.id}`; if (exportKey.current?.hash !== hash) exportKey.current = { hash, key: crypto.randomUUID() };
       const saved = await client.export(projectId, result.id, integration, exportKey.current.key); setExportOpen(false); exportKey.current = undefined;
       void message.success(saved.target === 'document' ? '已保存为新的私有在线文档，可在在线文档中分享。' : '已保存到网盘根目录。');
     })}>{error && <Alert type="error" message={error} />}<p>创建独立副本，保留出处列表及回溯链接。网盘保存为 Markdown 文件。</p><Select aria-label="保存目标应用" style={{ width: '100%' }} value={exportApp} onChange={setExportApp} options={integrations?.applications.map((i) => ({ value: i.id, label: i.name }))} /></Modal>
-    <Drawer title="原文出处" open={!!citationId} onClose={() => navigate(projectId, resultId)} width={520}>
+    <Drawer rootClassName="research-citation-drawer" title="原文出处" open={!!citationId} onClose={() => navigate(projectId, resultId)} width={520}>
       {citationError ? <Alert type="error" message={citationError} /> : !citation ? <Spin /> : <div className="research-citation-detail"><h2>{citation.title}</h2><Tag>{citationLocation(citation)}</Tag><blockquote>{citation.quote}</blockquote><h3>所在原文片段</h3><p className="research-context">{highlightQuote(citation.context || '', citation.quote)}</p>
         <Button disabled={busy} icon={<FileText size={16} aria-hidden="true" />} onClick={() => void action(async () => saveResearchBlob(await client.original(projectId, citation.source_id), citation.filename || citation.title))}>下载导入时的原文件</Button>
         {citation.origin?.type === 'document' && <p><Link to={`/applications/${citation.origin.application_id}/documents?document=${citation.origin.id}`}>打开原始在线文档（当前版本）</Link></p>}
