@@ -589,10 +589,20 @@ class ExecutionCoordinator:
                 RunCommand.objects.filter(pk=command.pk).update(consumed_at=timezone.now())
 
         terminal = False
-        while True:
+        messages_drained = False
+        # A child can produce output faster than we persist it. Yield even if
+        # its queue never empties so heartbeats, commands and other children
+        # are serviced. Bound both cheap bursts and slow database writes.
+        message_deadline = time.monotonic() + min(
+            0.5, self.lease_seconds / (6 * self.max_children),
+        )
+        for _ in range(100):
+            if time.monotonic() >= message_deadline:
+                break
             try:
                 message = active.messages.get_nowait()
             except queue.Empty:
+                messages_drained = True
                 break
             try:
                 terminal = self._handle_message(active, message) or terminal
@@ -606,6 +616,7 @@ class ExecutionCoordinator:
             self._remove_child(attempt_id, active)
             return
 
+        now_monotonic = time.monotonic()
         if (
             active.cancel_requested_at is not None
             and now_monotonic - active.cancel_requested_at
@@ -628,6 +639,13 @@ class ExecutionCoordinator:
             except LeaseLost:
                 pass
             self._remove_child(attempt_id, active)
+            return
+
+        if not messages_drained:
+            # An exited child can still have a terminal message behind its
+            # output backlog. Start the missing-terminal grace only once the
+            # queue has drained, without delaying cancellation above.
+            active.exited_at = None
             return
 
         if not active.process.is_alive():

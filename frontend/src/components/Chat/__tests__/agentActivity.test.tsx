@@ -28,6 +28,33 @@ it('renders progress, diffs and actionable warnings while hiding technical activ
   for (const text of ['bubblewrap', '工具实时输出', '23 passed', '思考摘要', '检查测试结果']) expect(html).not.toContain(text);
 });
 
+const ignoredConfigNotice = 'Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.';
+const unstableFeatureNotice = 'Under-development features enabled: default_mode_request_user_input. Under-development features are incomplete and may behave unpredictably.';
+
+it('hides repeated Codex startup notices from live and saved activity without leaving an empty panel', () => {
+  const html = renderToStaticMarkup(<AgentActivityPanel activity={{ warnings: [
+    { method: 'configWarning', summary: ignoredConfigNotice, details: 'user (C:\\Users\\admin\\.codex\\config.toml): `disable_response_storage` is ignored.' },
+    { method: 'configWarning', summary: ignoredConfigNotice },
+    { method: 'warning', message: unstableFeatureNotice },
+    { message: 'Codex is ignoring 2 unrecognized configuration settings. Check for typos or deprecated settings.' },
+  ] }} />);
+  expect(html).toBe('');
+});
+
+it('keeps actionable configuration warnings and runtime errors alongside startup notices', () => {
+  const html = renderToStaticMarkup(<AgentActivityPanel activity={{ warnings: [
+    { method: 'warning', message: unstableFeatureNotice },
+    { method: 'configWarning', summary: '配置文件读取失败', details: 'Permission denied' },
+    { method: 'error', error: { message: '模型请求失败' } },
+    { method: 'guardianWarning', message: '操作需要审批' },
+    { method: 'error', message: ignoredConfigNotice },
+  ] }} />);
+  for (const message of ['配置文件读取失败', 'Permission denied', '模型请求失败', '操作需要审批', ignoredConfigNotice]) {
+    expect(html).toContain(message);
+  }
+  expect(html).not.toContain('Under-development features enabled:');
+});
+
 const question: AgentQuestion = { id: 'request-1', kind: 'question', header: '工具', question: '配置', options: [],
   elicitation: true, formSchema: { type: 'object', required: ['enabled'], properties: {
     enabled: { type: 'boolean' }, count: { type: 'integer', default: 3 },

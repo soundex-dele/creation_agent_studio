@@ -8,12 +8,19 @@ const warningText = (warning: Record<string, unknown>): string => text(
     ?? warning.reason ?? warning.method,
 );
 
+const isCodexStartupNotice = (warning: Record<string, unknown>): boolean => (
+  // Filter at render time so saved conversations receive the same treatment.
+  (warning.method == null || ['warning', 'configWarning'].includes(String(warning.method)))
+    && /^(?:Codex is ignoring \d+ unrecognized configuration settings?\.|Under-development features enabled:)/i.test(warningText(warning).trim())
+);
+
 export default function AgentActivityPanel({ activity }: { activity?: AgentActivityState }) {
   if (!activity) return null;
   const states: Record<string, string> = { pending: '待开始', inProgress: '进行中', completed: '已完成' };
   const agentStates: Record<string, string> = { started: '已启动', interacted: '收到新指令', interrupted: '已中断' };
   const warnings = activity.warnings?.filter(warning => (
     warning.method !== 'mcpServer/startupStatus/updated'
+      && !isCodexStartupNotice(warning)
       && !/Model metadata for .+ not found\. Defaulting to fallback metadata/i.test(warningText(warning))
       && !/Codex could not find bubblewrap on PATH\./i.test(warningText(warning))
   )) ?? [];
