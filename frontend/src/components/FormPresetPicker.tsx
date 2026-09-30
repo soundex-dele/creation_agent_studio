@@ -87,7 +87,7 @@ function FormPresetWorkspace({ applicationSlug, prompt, value, onChange, answers
         if (p) onChange({ ...p, kind: kind as FormPresetSnapshot['kind'], prompt_key: prompt.key });
       }} />
     {value?.description && <Typography.Text type="secondary">{value.description}</Typography.Text>}
-    <Space wrap><Button onClick={() => openEditor()}>另存为模板</Button><Button onClick={() => { setError(''); setManage(true); }}>管理我的模板</Button></Space>
+    <Space className="form-preset-actions" size={12} wrap><Button onClick={() => openEditor()}>另存为模板</Button><Button onClick={() => { setError(''); setManage(true); }}>管理我的模板</Button></Space>
     <Typography.Text type="secondary">本次填写优先，其次是品牌资料、模板和默认值。</Typography.Text>
     {error && !editor && !manage && <Alert type="error" message={error} action={<Button onClick={() => setRevision((n) => n + 1)}>重试</Button>} />}
     {manage && <Modal title="我的模板" open onCancel={() => setManage(false)} footer={null} destroyOnHidden>

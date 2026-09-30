@@ -12,5 +12,7 @@
   padding: 2px 4px calc(12px + env(safe-area-inset-bottom));
   overflow-wrap: anywhere;
 }
-.form-preset-picker .ant-space { flex-wrap: wrap; }
+.form-preset-actions {
+  margin-top: 4px;
+}
 .form-preset-editor label { display: block; }
