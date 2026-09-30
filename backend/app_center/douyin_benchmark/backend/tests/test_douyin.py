@@ -215,13 +215,15 @@ def test_script_versions_conflict_and_export(ctx):
     run.status = "succeeded"; run.save(); task.run = run; task.save()
     ScriptVersion.objects.create(task=task, revision=1, content=script())
     url = ctx.url + f"/tasks/{task.pk}/versions"
-    updated = {**script(), "title": "第二版"}
+    updated = {**script(), "title": "第二版", "production_format": "screencast"}
     response = ctx.client.post(url, {"revision": 1, "content": updated}, format="json")
     assert response.status_code == 201, response.data
     assert ctx.client.post(url, {"revision": 1, "content": updated}, format="json").status_code == 409
     assert task.versions.count() == 2 and task.versions.last().content["title"] == "新的表达"
     download = ctx.client.get(url + f'/{response.data["id"]}/download')
     assert "第二版" in download.content.decode()
+    assert response.data["content"]["production_format"] == "screencast"
+    assert "视频形式：录屏演示" in download.content.decode()
 
 
 def test_connection_does_not_expose_credentials(ctx, settings):
@@ -230,7 +232,8 @@ def test_connection_does_not_expose_credentials(ctx, settings):
     assert not response.data["connected"] and "top-secret" not in str(response.data)
 
 
-def test_breakdown_topics_script_pipeline(ctx, monkeypatch):
+@pytest.mark.parametrize("production_format,label", [("talking_head", "真人口播"), ("screencast", "录屏演示"), ("animation", "动画演示"), ("live_action", "实景拍摄"), ("mixed", "混合形式")])
+def test_breakdown_topics_script_pipeline(ctx, monkeypatch, production_format, label):
     work = add_work(ctx)
     task = Task.objects.get(pk=post(ctx, {"kind": "breakdown", "work_id": str(work.pk)}).data["id"])
     from app_center.douyin_benchmark import runtime
@@ -248,20 +251,26 @@ def test_breakdown_topics_script_pipeline(ctx, monkeypatch):
     assert task.output["segments"][0]["id"] == "s1"
     task.run.status = "succeeded"; task.run.save()
     topics = [{"title": f"选题{i}", "angle": "换一个角度", "hook": "你有没有遇到过"} for i in range(3)]
-    topic_response = post(ctx, {"kind": "topics", "source_task_id": str(task.pk), "positioning": "读书", "theme": "表达", "duration": 90}, key="topics")
+    topic_response = post(ctx, {"kind": "topics", "source_task_id": str(task.pk), "positioning": "读书", "theme": "表达", "duration": 90, "production_format": production_format}, key="topics")
     assert topic_response.status_code == 201, topic_response.data
     topic_task = Task.objects.get(pk=topic_response.data["id"])
     model.return_value = {"topics": topics}
     execute(*claim(topic_task))
+    assert label in model.call_args.args[1]
+    topic_task.refresh_from_db()
+    assert topic_task.output["production_format"] == production_format
     topic_task.run.status = "succeeded"; topic_task.run.save()
-    response = post(ctx, {"kind": "script", "source_task_id": str(topic_task.pk), "topic_index": 2}, key="script-new")
+    response = post(ctx, {"kind": "script", "source_task_id": str(topic_task.pk), "topic_index": 2, "production_format": "live_action"}, key="script-new")
     assert response.status_code == 201, response.data
     script_task = Task.objects.get(pk=response.data["id"])
     assert script_task.input["brief"]["duration"] == 90
+    assert script_task.input["brief"]["production_format"] == production_format
     assert script_task.input["topic"]["title"] == "选题2"
-    model.return_value = script()
+    model.return_value = {**script(), "production_format": "wrong-model-value"}
     execute(*claim(script_task))
     assert script_task.versions.count() == 1
+    assert script_task.versions.first().content["production_format"] == production_format
+    assert label in model.call_args.args[1]
     assert "key" not in str(ctx.client.get(ctx.url + f"/tasks/{task.pk}").data["output"]["frames"])
 
 

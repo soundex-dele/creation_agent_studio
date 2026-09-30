@@ -8,6 +8,12 @@ const script: Script = { title: '读书的方法', cover: '先提出问题', nar
 ] };
 
 describe('Douyin script to animation', () => {
+  it('retains the selected production format and does not turn silent shots into spoken instructions', () => {
+    const { document } = scriptToAnimation({ ...script, production_format: 'animation', scenes: [{ time: '0–5秒', visual: '标题淡入', spoken: '' }] });
+    expect(document.prompt).toContain('原脚本视频形式：动画演示');
+    expect(document.scenes[0].narration).toBe('');
+    expect(document.scenes[0].description).toContain('标题淡入');
+  });
   it('preserves script content and converts time ranges into ordered editable scenes', () => {
     const { document, estimated } = scriptToAnimation(script);
     expect(estimated).toBe(false);

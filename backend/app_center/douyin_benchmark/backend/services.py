@@ -9,6 +9,7 @@ from modules.execution.application.start_runs import start_application_run
 from modules.execution.application.commands import submit_run_command
 from modules.execution.application.errors import CommandNotAllowed
 from .models import Task, Snapshot
+from .creation_formats import DEFAULT_FORMAT
 
 ACTIVE = {"queued", "running", "waiting_input", "waiting_children", "cancelling"}
 
@@ -51,6 +52,7 @@ def frozen_input(account, values):
             if not values.get("theme", "").strip() or not values.get("positioning", "").strip():
                 raise ValidationError("请填写自己的账号定位和创作主题。")
             data["brief"] = {k: data[k] for k in ("positioning", "audience", "theme", "duration", "conditions")}
+            data["brief"]["production_format"] = data.get("production_format", DEFAULT_FORMAT)
             if values.get("brand_profile_id"):
                 from app_center.brand_library.backend.views import private_profiles
                 profile = get_object_or_404(private_profiles(account.organization_id, account.owner), pk=values["brand_profile_id"])
@@ -60,7 +62,7 @@ def frozen_input(account, values):
                     raise ValidationError("品牌资料过长，请精简定位与语气资料。")
                 data["brief"]["brand"] = brand
         else:
-            data["brief"] = source.input["brief"]
+            data["brief"] = {"production_format": DEFAULT_FORMAT, **source.input["brief"]}
             data["topic"] = source.output["topics"][values["topic_index"]]
             data["reference"] = source.input["reference"]
     return data, work

@@ -11,6 +11,7 @@ from django.utils import timezone
 from modules.tenancy.database import tenant_database_context
 from modules.execution.models import Run, RunLease
 from .backend.transcription import transcribe_segments
+from .backend.creation_formats import DEFAULT_FORMAT, format_instruction
 from .backend.models import Task, Work, Snapshot, ScriptVersion
 from .backend.access import account_for
 from .backend.provider import CollectionError
@@ -151,14 +152,14 @@ def execute(payload, sink):
             save("completed", output)
         elif kind == "topics":
             save("生成选题")
-            result = analysis.call_model(task, '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。',
+            result = analysis.call_model(task, '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。' + format_instruction(data["brief"]),
                 {"brief": data["brief"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
-            save("completed", analysis.validate_topics(result))
+            save("completed", {**analysis.validate_topics(result), "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
         else:
             save("生成拍摄脚本")
-            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"拍摄画面","spoken":"口播"}],"checklist":["拍摄准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。',
+            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。' + format_instruction(data["brief"]),
                 {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
-            output = analysis.validate_script(result)
+            output = analysis.validate_script({**result, "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
             with current(payload, sink) as active:
                 ScriptVersion.objects.create(task=active, revision=1, content=output)
             save("completed", output)

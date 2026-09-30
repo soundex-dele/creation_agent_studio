@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Input, Select, Spin } from 'antd';
-import { type DouyinClient, type Script, type ScriptVersion } from '@/services/douyinBenchmark';
+import { Alert, Button, Input, Select, Spin, Tag } from 'antd';
+import { productionFormats, type DouyinClient, type Script, type ScriptVersion } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
 import { saveResearchBlob } from '@/services/researchAssistant';
 import { ImportAnimationModal } from './ImportAnimationModal';
@@ -20,6 +20,7 @@ export function ScriptEditor({ client, accountId, taskId }: { client: DouyinClie
     {error && <Alert type="error" message={error} />}
     {saved && <Alert type="success" message="已保存新版本，之前的脚本仍保留。" />}
     {!content ? <Spin /> : <>
+      <div><Tag>视频形式：{content.production_format ? productionFormats[content.production_format]?.label : '真人口播（历史脚本）'}</Tag></div>
       <label>历史版本<Select aria-label="脚本历史版本" value={selected} disabled={dirty || busy} options={versions.map((v) => ({ value: v.id, label: `版本 ${v.revision} · ${new Date(v.created_at).toLocaleString('zh-CN')}` }))} onChange={(id) => { setSelected(id); setContent(versions.find((v) => v.id === id)!.content); setSaved(false); }} /></label>
       <label>标题<Input aria-label="脚本标题" value={content.title} maxLength={2000} onChange={(e) => edit({ ...content, title: e.target.value })} /></label>
       <label>封面短句<Input aria-label="封面短句" value={content.cover} maxLength={2000} onChange={(e) => edit({ ...content, cover: e.target.value })} /></label>

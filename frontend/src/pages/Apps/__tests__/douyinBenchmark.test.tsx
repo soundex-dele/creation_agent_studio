@@ -51,6 +51,16 @@ async function setText(label: string, value: string) {
 }
 
 describe('Douyin benchmark workflow', () => {
+  it.each(['talking_head', 'screencast', 'animation', 'live_action', 'mixed'])('passes the selected %s format to topic generation', async format => {
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    await click('作品库'); await click('转写并拆解'); await click('用这份拆解创作');
+    await act(async () => container.querySelector<HTMLInputElement>(`input[name="production-format"][value="${format}"]`)!.click());
+    await setText('positioning', '知识分享'); await setText('theme', '高效读书');
+    await click('生成 3 个选题方向');
+    expect(api.post).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks', expect.objectContaining({ kind: 'topics', source_task_id: 't1', production_format: format }), expect.anything());
+    expect(container.querySelector<HTMLInputElement>(`input[value="${format}"]`)?.checked).toBe(true);
+  });
+
   it('registers its route and distinguishes unavailable metrics from zero', () => {
     expect(applicationPath({ id: 'douyin-benchmark', applicationId: 42, rendererKey: 'douyin-benchmark', kind: 'custom' })).toBe('/applications/42/douyin-benchmark?entry=apps');
     expect(metric(null)).toBe('未获取'); expect(metric(0)).toBe('0');

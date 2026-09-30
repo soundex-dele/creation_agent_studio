@@ -1,5 +1,5 @@
 import { newDocument, newScene, type StudioDocument } from './animationProjects';
-import type { Script } from './douyinBenchmark';
+import { productionFormats, type Script } from './douyinBenchmark';
 
 export interface AnimationDestination { id: number; name: string }
 
@@ -20,17 +20,18 @@ export function scriptToAnimation(script: Script): { document: StudioDocument; e
   const prompt = [
     `从抖音对标创作脚本制作动画，保留原稿事实与表达，按下方分镜制作。`,
     `标题：${script.title}`, `封面短句：${script.cover}`,
+    ...(script.production_format ? [`原脚本视频形式：${productionFormats[script.production_format].label}。导入后将其画面表达改编为动画，保留口播内容。`] : []),
     `完整口播稿：\n${script.narration}`, `拍摄清单：\n${script.checklist.join('\n')}`,
   ].join('\n\n');
   if (prompt.length > 16000) throw new Error('脚本正文与拍摄清单超过动画制作的 16000 字符限制，请精简后另存版本再导入。');
   const source = script.scenes.length ? script.scenes : [{ time: '', visual: script.cover, spoken: script.narration }];
   if (source.length > 30) throw new Error('动画制作最多支持 30 个分镜，请拆分脚本后再导入。');
   let estimated = false;
-  const scenes = source.map((scene, index) => {
+  const scenes = source.map((scene) => {
     const duration = durationOf(scene.time);
     if (duration === undefined) estimated = true;
     const frames = Math.max(1, Math.round((duration ?? Math.max(5, Math.ceil(scene.spoken.length / 4))) * 30));
-    return { ...newScene(), title: `镜头 ${index + 1}`, body: '', narration: scene.spoken,
+    return { ...newScene(), title: '', body: '', narration: scene.spoken,
       description: [scene.visual, scene.time ? `原脚本时间：${scene.time}` : ''].filter(Boolean).join('\n'), frames };
   });
   const total = scenes.reduce((sum, scene) => sum + scene.frames, 0);

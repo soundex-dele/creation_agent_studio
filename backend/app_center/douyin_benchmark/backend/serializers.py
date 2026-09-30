@@ -2,6 +2,7 @@ from rest_framework import serializers
 from drf_yasg.utils import swagger_serializer_method
 from .models import Account, Task, ScriptVersion
 from .provider import source_url, work_web_url
+from .creation_formats import DEFAULT_FORMAT, FORMAT_LABELS
 
 
 class AccountInput(serializers.Serializer):
@@ -44,7 +45,13 @@ class TaskInput(serializers.Serializer):
     theme = serializers.CharField(max_length=2000, allow_blank=True, default="")
     duration = serializers.IntegerField(min_value=15, max_value=600, default=60)
     conditions = serializers.CharField(max_length=3000, allow_blank=True, default="")
+    production_format = serializers.ChoiceField(choices=list(FORMAT_LABELS.items()), default=DEFAULT_FORMAT)
     brand_profile_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if attrs["kind"] == "topics" and attrs["production_format"] == "animation" and attrs["duration"] > 120:
+            raise serializers.ValidationError({"duration": "动画演示最长支持120秒，请调整目标时长。"})
+        return attrs
 
 
 class TaskSerializer(serializers.ModelSerializer):

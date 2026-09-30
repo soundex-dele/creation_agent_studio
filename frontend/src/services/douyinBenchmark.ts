@@ -11,7 +11,15 @@ export interface DouyinWork {
   collects: number | null; shares: number | null; ratio: number | null; outstanding: boolean; has_upload: boolean;
 }
 export interface Claim { type: 'observation' | 'inference' | 'suggestion'; text: string; refs: string[] }
-export interface Script { title: string; cover: string; narration: string; scenes: { time: string; visual: string; spoken: string }[]; checklist: string[] }
+export const productionFormats = {
+  talking_head: { label: '真人口播', hint: '出镜表达、景别机位、动作与提词' },
+  screencast: { label: '录屏演示', hint: '屏幕操作、步骤高亮、同步解说' },
+  animation: { label: '动画演示', hint: '图形动效、画面转场、旁白配合' },
+  live_action: { label: '实景拍摄', hint: '场地道具、运镜动作、环境声音' },
+  mixed: { label: '混合形式', hint: '组合多种形式，逐镜头标明用途' },
+} as const;
+export type ProductionFormat = keyof typeof productionFormats;
+export interface Script { production_format?: ProductionFormat; title: string; cover: string; narration: string; scenes: { time: string; visual: string; spoken: string }[]; checklist: string[] }
 export type Kind = 'collect' | 'account' | 'breakdown' | 'topics' | 'script';
 export interface DouyinTask {
   id: string; kind: Kind; work_id: string | null; run_id: string; status: string; stage: string; error: string; created_at: string;
@@ -26,7 +34,7 @@ export interface DouyinTask {
 }
 export interface WorkResult { items: DouyinWork[]; sample_size: number; median_likes: number | null; explanation: string; batch: DouyinTask | null }
 export interface ScriptVersion { id: string; revision: number; content: Script; created_at: string }
-export interface Brief { positioning: string; audience: string; theme: string; duration: number; conditions: string; brand_profile_id?: string | null }
+export interface Brief { production_format: ProductionFormat; positioning: string; audience: string; theme: string; duration: number; conditions: string; brand_profile_id?: string | null }
 export const kindLabels: Record<Kind, string> = { collect: '采集', account: '账号分析', breakdown: '视频拆解', topics: '选题', script: '脚本' };
 export const isActive = (task: DouyinTask) => !['succeeded', 'failed', 'cancelled'].includes(task.status);
 export const metric = (value: number | null | undefined) => value == null ? '未获取' : value.toLocaleString('zh-CN');

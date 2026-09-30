@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Select, Spin, Tabs, Tag, Upload } from 'antd';
 import { ChartNoAxesCombined, Clapperboard, Film, NotebookPen, RefreshCw, ScanSearch, UsersRound } from 'lucide-react';
-import { type Brief, type DouyinAccount, type DouyinClient, type DouyinTask, type WorkResult, type Kind, kindLabels, isActive, metric } from '@/services/douyinBenchmark';
+import { type Brief, type DouyinAccount, type DouyinClient, type DouyinTask, type WorkResult, type Kind, type ProductionFormat, productionFormats, kindLabels, isActive, metric } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
 import { AnalysisResult } from './AnalysisResult';
 import { ScriptEditor } from './ScriptEditor';
@@ -15,7 +15,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
   const [count, setCount] = useState(50); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0); const [editing, setEditing] = useState(false); const [deleting, setDeleting] = useState(false);
   const [notes, setNotes] = useState({ group: '', notes: '' }); const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
-  const [brief, setBrief] = useState<Brief>({ positioning: '', audience: '', theme: '', duration: 60, conditions: '' }); const [source, setSource] = useState('');
+  const [brief, setBrief] = useState<Brief>({ production_format: 'talking_head', positioning: '', audience: '', theme: '', duration: 60, conditions: '' }); const [source, setSource] = useState('');
   useEffect(() => { let active = true; void client.brands().then((rows) => { if (active) setBrands(rows); }).catch(() => { /* Brand reference is optional; ordinary creation remains available. */ }); return () => { active = false; }; }, [client]);
   useEffect(() => {
     let active = true; let timer: ReturnType<typeof setTimeout>;
@@ -79,16 +79,21 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
       </>}
       {tab === 'breakdown' && <div className="douyin-guide"><span className="douyin-guide-icon"><Clapperboard size={26} aria-hidden="true" /></span><div><h3>拆开一条视频，理解它的表达方式</h3><p className="douyin-hint">在作品库中选择视频开始拆解，或在下方打开历史成果。最多抽取16帧，结论可以逐条核对出处。</p><Button onClick={() => setTab('works')}>前往作品库</Button></div></div>}
       {tab === 'create' && <div className="douyin-form">
+        <fieldset className="douyin-format-field"><legend>视频形式</legend><div className="douyin-format-options">
+          {(Object.entries(productionFormats) as [ProductionFormat, typeof productionFormats[ProductionFormat]][]).map(([value, option]) => <label key={value} className={brief.production_format === value ? 'is-selected' : ''}><input type="radio" name="production-format" value={value} checked={brief.production_format === value} onChange={() => setBrief({ ...brief, production_format: value })} /><span><strong>{option.label}</strong><small>{option.hint}</small></span></label>)}
+        </div><p className="douyin-footnote">新选题会保存所选形式，后续分镜沿用该选题的形式。更换形式后请重新生成选题。</p></fieldset>
         <label>参考拆解<Select aria-label="参考拆解" value={source || undefined} placeholder="选择已完成的视频拆解" options={tasks.filter((t) => t.kind === 'breakdown' && t.status === 'succeeded').map((t) => ({ value: t.id, label: `${new Date(t.created_at).toLocaleString('zh-CN')} · ${t.work_id?.slice(0, 8)}` }))} onChange={setSource} /></label>
         <div className="douyin-form-grid">{(['positioning', 'audience', 'theme', 'conditions'] as const).map((field) => <label key={field}>{({ positioning: '我的账号定位', audience: '目标受众', theme: '本次主题', conditions: '拍摄条件与真实经历' })[field]}<Input.TextArea aria-label={field} maxLength={field === 'conditions' ? 3000 : 2000} rows={3} value={brief[field]} onChange={(e) => setBrief({ ...brief, [field]: e.target.value })} /></label>)}</div>
-        <div className="douyin-toolbar"><label>目标时长（秒）<InputNumber aria-label="目标时长" min={15} max={600} value={brief.duration} onChange={(value) => setBrief({ ...brief, duration: value || 60 })} /></label><label>品牌定位与语气（可选）<Select aria-label="引用品牌资料" allowClear value={brief.brand_profile_id || undefined} options={brands.map((b) => ({ value: b.id, label: b.name }))} onChange={(value) => setBrief({ ...brief, brand_profile_id: value || null })} /></label></div>
-        <Button type="primary" loading={busy} disabled={!source || !brief.positioning.trim() || !brief.theme.trim()} onClick={() => void run({ kind: 'topics', source_task_id: source, ...brief })}>生成 3 个选题方向</Button>
+        <div className="douyin-toolbar"><label>目标时长（秒）<InputNumber aria-label="目标时长" min={15} max={brief.production_format === 'animation' ? 120 : 600} value={brief.duration} onChange={(value) => setBrief({ ...brief, duration: value || 60 })} /></label><label>品牌定位与语气（可选）<Select aria-label="引用品牌资料" allowClear value={brief.brand_profile_id || undefined} options={brands.map((b) => ({ value: b.id, label: b.name }))} onChange={(value) => setBrief({ ...brief, brand_profile_id: value || null })} /></label></div>
+        {brief.production_format === 'animation' && <Alert type={brief.duration > 120 ? 'warning' : 'info'} message="动画演示最多 30 个分镜、120 秒，可在脚本保存后导入动画制作。" />}
+        <Button type="primary" loading={busy} disabled={!source || !brief.positioning.trim() || !brief.theme.trim() || (brief.production_format === 'animation' && brief.duration > 120)} onClick={() => void run({ kind: 'topics', source_task_id: source, ...brief })}>生成 3 个选题方向</Button>
       </div>}
       <div className="douyin-history"><h3>历史{tab === 'create' ? '选题与脚本' : tab === 'works' ? '采集任务' : tab === 'account' ? '账号分析' : '视频拆解'}</h3><Select aria-label="历史任务" placeholder="选择历史任务" value={visibleTask?.id} options={taskOptions.map((t) => ({ value: t.id, label: `${kindLabels[t.kind]} · ${new Date(t.created_at).toLocaleString('zh-CN')} · ${t.stage}` }))} onChange={setSelectedId} />{tasks.length < taskCount && <Button onClick={() => { void client.tasks(accountId, taskPage + 1).then((data) => { setTasks((old) => [...old, ...data.results.filter((t) => !old.some((v) => v.id === t.id))]); setTaskPage((p) => p + 1); }).catch((e) => setError(documentError(e))); }}>加载更早记录</Button>}</div>
       {visibleTask && <section className="douyin-task"><div className="douyin-section-title"><h3>{kindLabels[visibleTask.kind]} · {visibleTask.stage}</h3>{isActive(visibleTask) && <Button onClick={() => { void client.cancel(accountId, visibleTask.id).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))); }}>取消任务</Button>}</div>
         <div role="status" aria-live="polite">{isActive(visibleTask) && <><Spin size="small" /> 正在处理，可离开页面后回来查看</>}{visibleTask.status === 'cancelled' && '任务已取消，之前的成果仍保留。'}</div>
         {visibleTask.progress.total != null && visibleTask.progress.total > 0 && <Progress percent={Math.min(100, Math.round((visibleTask.progress.current || 0) / visibleTask.progress.total * 100))} />}
         {visibleTask.error && <Alert type="error" message={visibleTask.error} />}
+        {visibleTask.output.production_format && <Tag>视频形式：{productionFormats[visibleTask.output.production_format]?.label}</Tag>}
         {visibleTask.kind === 'collect' && <p>已获取 {visibleTask.output.actual ?? visibleTask.progress.current ?? 0} 条。{visibleTask.output.warning}</p>}
         {['account', 'breakdown'].includes(visibleTask.kind) && <AnalysisResult key={visibleTask.id} client={client} accountId={accountId} task={visibleTask} />}
         {visibleTask.kind === 'breakdown' && visibleTask.status === 'succeeded' && <Button type="primary" onClick={() => { setSource(visibleTask.id); setTab('create'); }}>用这份拆解创作</Button>}

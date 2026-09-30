@@ -36,7 +36,7 @@ describe('import saved scripts into animation', () => {
     expect(api.get).toHaveBeenCalledWith('/organizations/org/applications/22/douyin-benchmark/animation-integrations');
     await act(async () => submit().click());
     expect(api.post).toHaveBeenCalledWith('/organizations/org/applications/33/animation-studio/projects', expect.objectContaining({
-      title: script.title, draft: expect.objectContaining({ aspect: '9:16', scenes: [expect.objectContaining({ narration: '镜头口播', frames: 300 })] }),
+      title: script.title, draft: expect.objectContaining({ aspect: '9:16', scenes: [expect.objectContaining({ title: '', narration: '镜头口播', frames: 300 })] }),
     }));
     expect(host.querySelector('output')?.textContent).toBe('/applications/33/animation-studio?project=imported-project&entry=home&embedded=1');
   });
