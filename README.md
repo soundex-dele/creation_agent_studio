@@ -64,7 +64,17 @@ bash install-dependencies.sh --system-deps --with-codex
 与 Remotion 浏览器启动自检。Python 依赖已包含 openpyxl、faster-whisper、Pillow 等应用组件。
 Windows 使用 `backend/venv`；
 Linux/macOS 优先复用 `backend/.venv`，其次 `backend/venv`，新环境使用 `.venv`。
-所有 pip 操作均在该虚拟环境内执行。前端构建所需的开发依赖也会安装。
+所有 pip 操作均由项目虚拟环境执行。抖音对标助手的 DTK 依赖单独安装到
+`backend/.venv-dtk`，不会混入 Django 环境。前端构建所需的开发依赖也会安装。
+
+默认全量安装或指定 `-App douyin-benchmark` / `--app douyin-benchmark` 时，脚本会
+校验固定版本的 DTK Git 子模块，创建或复用独立 Python 3.12/3.13 环境，安装采集依赖，
+并执行依赖检查和离线签名、解析测试。新建环境时优先使用兼容的项目 Python；若主项目使用
+Python 3.11 等不兼容版本，则自动在项目环境安装 uv 并准备 Python 3.13（可能需要下载）。
+已有环境版本不兼容或不完整时会报错，不会覆盖；将旧 `backend/.venv-dtk` 移走后重跑即可。
+DTK 校验需要保留 Git 子模块元数据，使用 `--skip-submodules` 时也需事先准备固定版本的干净检出。
+Web 与 media worker 均需部署此环境；如果设置了 `DOUYIN_DTK_PYTHON`，需自行维护其目标环境，
+或取消覆盖以使用脚本安装的默认路径。个人 Cookie 仍需在应用采集设置中填写。
 
 `-SystemDeps` / `--system-deps` 会通过 Windows winget、macOS Homebrew 或
 Debian/Ubuntu apt 安装 FFmpeg；Linux 同时安装中文字体和 Chromium 系统库，可能需要

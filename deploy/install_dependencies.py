@@ -13,6 +13,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 PNG = ROOT / "backend/app_center/html_to_png"
 ANIMATION = ROOT / "backend/app_center/animation_studio/engine"
+DTK = ROOT / "backend/app_center/douyin_benchmark"
+DTK_VENV = ROOT / "backend/.venv-dtk"
 CATALOG = ROOT / "deploy/application_dependencies.json"
 CODEX_VERSION = "0.155.0"  # Keep aligned with backend/Dockerfile.
 
@@ -30,6 +32,49 @@ def require_program(name):
     if not program:
         raise RuntimeError(f"{name} is missing from PATH. Install it and open a new terminal first.")
     return program
+
+
+def ensure_windows_venv_idle(venv=None):
+    """Fail before pip can partially uninstall DLLs loaded by running services."""
+    if sys.platform != "win32":
+        return
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); "
+        "@(Get-CimInstance Win32_Process | "
+        "Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine) | "
+        "ConvertTo-Json -Compress"
+    )
+    output = subprocess.check_output(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        text=True, encoding="utf-8",
+    )
+    processes = json.loads(output or "[]")
+    if isinstance(processes, dict):
+        processes = [processes]
+    # Windows venv Python uses a launcher plus a host-interpreter child.
+    # Ignore this installer and its ancestors, but not other venv processes.
+    parents = {process["ProcessId"]: process["ParentProcessId"] for process in processes}
+    ancestors = {os.getpid()}
+    parent = os.getppid()
+    while parent and parent not in ancestors:
+        ancestors.add(parent)
+        parent = parents.get(parent)
+    prefix = str(Path(venv or sys.prefix).resolve()).replace("\\", "/").casefold().rstrip("/") + "/"
+    busy = []
+    for process in processes:
+        if process["ProcessId"] in ancestors:
+            continue
+        executable = (process.get("ExecutablePath") or "").replace("\\", "/").casefold()
+        command = (process.get("CommandLine") or "").replace("\\", "/").casefold()
+        if executable.startswith(prefix) or command.lstrip('"').startswith(prefix):
+            busy.append(f"PID {process['ProcessId']}: {process.get('CommandLine') or process.get('ExecutablePath')}")
+    if busy:
+        raise RuntimeError(
+            "The backend virtual environment is in use. Windows cannot replace loaded .pyd/DLL files "
+            "(WinError 5). Stop these backend services/workers, then rerun the same installer:\n"
+            + "\n".join(busy)
+        )
 
 
 def npm_command(node):
@@ -93,6 +138,31 @@ def install_animation(execute, node, npm):
     execute([node, "-e", smoke], cwd=ANIMATION)
 
 
+def install_dtk(execute):
+    """Keep DTK's Python and packages separate from the Django environment."""
+    execute([sys.executable, "-X", "utf8", DTK / "deploy/verify_source.py"])
+    python = DTK_VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    if not python.is_file():
+        if DTK_VENV.exists():
+            raise RuntimeError(f"Incomplete DTK environment: {DTK_VENV}. Move it aside and rerun the installer.")
+        if (3, 12) <= sys.version_info < (3, 14):
+            execute([sys.executable, "-m", "venv", "--without-pip", DTK_VENV])
+        else:
+            # uv can provision Python 3.13 even when Django uses Python 3.11.
+            execute([sys.executable, "-m", "pip", "install", "uv>=0.6,<1"])
+            execute([sys.executable, "-m", "uv", "venv", "--python", "3.13", DTK_VENV])
+    # Fail before pip changes an existing environment with an unsupported Python.
+    execute([python, "-X", "utf8", "-c",
+             "import sys; "
+             "sys.exit(0 if (3, 12) <= sys.version_info < (3, 14) and sys.prefix != sys.base_prefix "
+             "else 'DTK requires a separate Python 3.12/3.13 virtual environment; move backend/.venv-dtk aside and rerun.')"])
+    # --python also supports uv/--without-pip environments without their own pip.
+    pip = [sys.executable, "-m", "pip", "--python", python]
+    execute(pip + ["install", "-r", ROOT / "backend/scripts/douyin_video_url.requirements.txt"])
+    execute(pip + ["check"])
+    execute([python, "-X", "utf8", DTK / "collector_source_checks.py"])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--development", action="store_true", help="Include test/development Python packages")
@@ -132,6 +202,10 @@ def main(argv=None):
         raise RuntimeError("Python 3.11+ is required; Python 3.12 is recommended.")
     if args.with_creation_master and sys.platform != "win32":
         raise RuntimeError("Creation Master's desktop requirements include Windows automation; use this option on Windows only.")
+    if not args.dry_run:
+        ensure_windows_venv_idle()
+        if "dtk" in runtimes:
+            ensure_windows_venv_idle(DTK_VENV)
     node = require_program("node")
     version = subprocess.check_output([node, "--version"], text=True).strip()
     major, minor = (int(value) for value in version.lstrip("v").split(".")[:2])
@@ -161,6 +235,8 @@ def main(argv=None):
     if args.with_creation_master:
         execute(pip + ["install", "-r", ROOT / "backend/app_center/creation_master/requirements.txt"])
     execute(pip + ["check"])
+    if "dtk" in runtimes:
+        install_dtk(execute)
     # App Center React sources share the root frontend's dependencies and aliases.
     # Include dev dependencies even under NODE_ENV=production: Vite/tsc need them.
     folders = [ROOT / "frontend"]
@@ -181,7 +257,7 @@ def main(argv=None):
         install_animation(execute, node, npm)
     if args.with_creation_master:
         execute([sys.executable, "-m", "playwright", "install", "chromium"])
-    print("\nDependency installation plan complete." if args.dry_run else "\nRepository dependencies installed; selected browsers verified.")
+    print("\nDependency installation plan complete." if args.dry_run else "\nRepository dependencies installed; selected runtimes verified.")
     if ffmpeg_missing and args.system_deps and sys.platform == "win32":
         print("Open a new terminal so the FFmpeg PATH update takes effect before starting workers.")
     print("Configure backend/.env and service credentials, then run migrations/start services separately.")

@@ -14,7 +14,9 @@ powershell -ExecutionPolicy Bypass -File .\install-dependencies.ps1 -SystemDeps 
 
 前置条件、可选桌面端/移动端依赖和预演参数见根目录 [README](../README.md)。安装脚本会将依赖安装到后端虚拟环境及 npm 包目录，不会安装系统服务或修改 `.env`。下方 Compose 方案在镜像内部安装依赖。
 
-默认包含全部仓库内应用的共享依赖、HTML 转 PNG 浏览器以及动画制作 Remotion 引擎和无头浏览器。
+默认包含全部仓库内应用的共享依赖、HTML 转 PNG 浏览器、动画制作 Remotion 引擎和无头浏览器，
+以及抖音对标助手的 DTK 独立环境 `backend/.venv-dtk`。DTK 会校验固定版本 Git 子模块并执行
+离线测试；主项目 Python 不兼容时通过 uv 准备 Python 3.13。采集 Cookie 仍需自行配置。
 用 `--list-apps`（Windows `-ListApps`）查看应用清单；用 `--app animation-studio`
 （Windows `-App animation-studio`）只补齐该应用的额外组件，共享依赖仍会安装。
 外部 Skill 目录、模型登录和服务凭据会列为后续配置项；安装完成不等于这些服务已经联调。

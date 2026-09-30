@@ -12,8 +12,20 @@
 
 ## 部署与页面配置
 
-1. 部署上述固定 commit 的 DTK 源码至 `backend/third_party/Douyin_TikTok_Download_API`。此目录是独立源码依赖，部署时需一并提供；勿将其依赖安装进主项目 Python 3.11 环境。
-2. 参照 `backend/scripts/douyin_video_url.md` 建立独立环境：
+1. 从仓库根目录使用统一安装脚本（默认全量安装也包含此步骤）：
+
+```powershell
+# Windows
+.\install-dependencies.ps1 -App douyin-benchmark
+```
+
+```sh
+# Linux / macOS
+bash install-dependencies.sh --app douyin-benchmark
+```
+
+脚本初始化并校验上述固定 commit 的 DTK Git 子模块，创建或复用 `backend/.venv-dtk`，安装采集依赖并运行离线测试。新建时优先使用主项目 Python 3.12/3.13，否则通过 uv 准备 Python 3.13。已有环境不兼容或不完整时会报错，需移走旧环境后重跑。使用 `--skip-submodules` 时仍需保留固定版本的干净 Git 检出。FFmpeg 缺失时加 `-SystemDeps` / `--system-deps`。
+2. 也可参照 `backend/scripts/douyin_video_url.md` 手动部署固定版本源码并建立独立环境：
 
 ```sh
 uv venv --python 3.13 backend/.venv-dtk
