@@ -5,6 +5,7 @@ root = "applications/<int:application_id>/douyin-benchmark"
 account = root + "/accounts/<uuid:account_id>"
 task = account + "/tasks/<uuid:task_id>"
 urlpatterns = [
+    path(root + "/animation-integrations", views.AnimationIntegrationsView.as_view()),
     path(root + "/collector-config", views.CollectorConfigView.as_view()),
     path(root + "/connection", views.ConnectionView.as_view()),
     path(root + "/brands", views.BrandsView.as_view()),

@@ -3,11 +3,13 @@ import { Alert, Button, Input, Select, Spin } from 'antd';
 import { type DouyinClient, type Script, type ScriptVersion } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
 import { saveResearchBlob } from '@/services/researchAssistant';
+import { ImportAnimationModal } from './ImportAnimationModal';
 
 export function ScriptEditor({ client, accountId, taskId }: { client: DouyinClient; accountId: string; taskId: string }) {
   const [versions, setVersions] = useState<ScriptVersion[]>([]); const [selected, setSelected] = useState('');
   const [content, setContent] = useState<Script | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false); const [saved, setSaved] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => {
     let active = true;
     void client.versions(accountId, taskId).then((rows) => { if (active) { setVersions(rows); setSelected(rows[0]?.id || ''); setContent(rows[0]?.content || null); } }).catch((e) => { if (active) setError(documentError(e)); });
@@ -28,8 +30,10 @@ export function ScriptEditor({ client, accountId, taskId }: { client: DouyinClie
       <div className="douyin-actions"><Button type="primary" loading={busy} disabled={!dirty} onClick={() => {
         setBusy(true); setError(''); void client.saveScript(accountId, taskId, versions[0].revision, content).then((v) => { setVersions((old) => [v, ...old]); setSelected(v.id); setContent(v.content); setDirty(false); setSaved(true); }).catch((e) => setError(documentError(e))).finally(() => setBusy(false));
       }}>保存新版本</Button><Button disabled={dirty || busy} onClick={() => { setError(''); void client.download(accountId, taskId, selected).then((blob) => saveResearchBlob(blob, `${content.title}.md`)).catch((e) => setError(documentError(e))); }}>导出 Markdown</Button>
+      <Button disabled={dirty || busy} onClick={() => setImporting(true)}>导入动画制作</Button>
       {dirty && <Button onClick={() => { setContent(versions.find((v) => v.id === selected)!.content); setDirty(false); }}>撤销本次编辑</Button>}</div>
-      {dirty && <small>有未保存修改，请保存后切换版本或导出。</small>}
+      {importing && <ImportAnimationModal client={client} script={content} onClose={() => setImporting(false)} />}
+      {dirty && <small>有未保存修改，请保存后切换版本、导出或导入动画制作。</small>}
     </>}
   </div>;
 }

@@ -87,7 +87,9 @@ describe('Douyin benchmark workflow', () => {
   it('saves a new script version without overwriting the prior one', async () => {
     vi.mocked(api.post).mockResolvedValue({ id: 'v2', revision: 2, content: { ...script, narration: '改成我的表达。' }, created_at: '2026-09-29' });
     await render(<ScriptEditor client={douyinApi('/dy')} accountId="a1" taskId="t1" />);
-    await setText('完整口播稿', '改成我的表达。'); await click('保存新版本');
+    await setText('完整口播稿', '改成我的表达。');
+    expect([...container.querySelectorAll('button')].find(button => button.textContent === '导入动画制作')?.disabled).toBe(true);
+    await click('保存新版本');
     expect(api.post).toHaveBeenCalledWith('/dy/accounts/a1/tasks/t1/versions', { revision: 1, content: { ...script, narration: '改成我的表达。' } });
     expect(container.textContent).toContain('已保存新版本');
   });

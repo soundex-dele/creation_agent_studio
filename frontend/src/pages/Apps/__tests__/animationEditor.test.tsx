@@ -33,6 +33,25 @@ async function panel(name: string) {
 }
 
 describe('scene editor entry and panels', () => {
+  it('opens the requested imported project instead of the first project in history', async () => {
+    const imported = { ...project, id: 'imported', title: '导入的抖音脚本', draft: { ...newDocument(), scenes: [{ ...newScene(), narration: '导入的旁白' }] } };
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/projects/imported') ? Promise.resolve(imported) : original(url, ...args));
+    await act(async () => root.render(<MemoryRouter><AnimationStudioEditor organizationId="org" applicationId="33" userId="user" initialProjectId="imported" showHeader onSelect={() => {}} /></MemoryRouter>));
+    expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/projects/imported'));
+    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/projects/project-1'));
+    expect(api.post).not.toHaveBeenCalled();
+    expect([...host.querySelectorAll('textarea')].some(input => input.value === '导入的旁白')).toBe(true);
+  });
+
+  it('reports an unavailable project without creating a replacement', async () => {
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/projects/missing') ? Promise.reject(new Error('作品不可访问')) : original(url, ...args));
+    await act(async () => root.render(<MemoryRouter><AnimationStudioEditor organizationId="org" applicationId="33" userId="user" initialProjectId="missing" showHeader onSelect={() => {}} /></MemoryRouter>));
+    expect(host.textContent).toContain('作品不可访问');
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
   it('loads existing projects without creating duplicates and exposes every workspace panel', async () => {
     await render(); expect(api.post).not.toHaveBeenCalled();
     expect(host.querySelector('.studio-editor-pane')).not.toBeNull();

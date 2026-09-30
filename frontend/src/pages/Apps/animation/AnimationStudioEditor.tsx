@@ -44,7 +44,7 @@ const taskError = (message?: string) => message?.startsWith('Invalid control cha
   ? 'AI 返回的内容格式不正确，请返回制作页面重新生成。'
   : message || '请调整后重试。';
 
-export default function AnimationStudioEditor({ organizationId, applicationId, userId, initialRunId, showHeader, onSelect }: { organizationId: string; applicationId: string; userId: string; initialRunId?: string; showHeader: boolean; onSelect: (id: string) => void }) {
+export default function AnimationStudioEditor({ organizationId, applicationId, userId, initialRunId, initialProjectId, showHeader, onSelect, onProjectSelect }: { organizationId: string; applicationId: string; userId: string; initialRunId?: string; initialProjectId?: string; showHeader: boolean; onSelect: (id: string) => void; onProjectSelect?: (id: string) => void }) {
   const base = `${tenantApiRoot(organizationId)}/applications/${applicationId}/animation-studio`;
   const client = useMemo(() => projectApi(base), [base]); const legacy = useMemo(() => animationApi(base), [base]);
   const runtime = useMemo(() => createApplicationRuntimeClient({ organizationId, applicationId }), [organizationId, applicationId]);
@@ -81,6 +81,11 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
     let alive = true;
     if (initialized.current) return;
     void (async () => {
+      if (initialProjectId) {
+        const p = await client.get(initialProjectId);
+        if (alive) { initialized.current = true; adopt(p); setSceneId(p.draft.scenes?.[0]?.id || ''); }
+        return;
+      }
       const list = await client.list();
       if (!alive) return;
       let id: string | undefined = list.results[0]?.id;
@@ -92,8 +97,9 @@ export default function AnimationStudioEditor({ organizationId, applicationId, u
       if (alive) { initialized.current = true; adopt(p); setProjects(list.results); setSceneId(p.draft.scenes?.[0]?.id || ''); }
     })().catch(report).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [client, legacy, initialRunId, adopt, report]);
+  }, [client, legacy, initialRunId, initialProjectId, adopt, report]);
   const refreshProject = draft.refresh; const projectId = project?.id;
+  useEffect(() => { if (projectId) onProjectSelect?.(projectId); }, [projectId, onProjectSelect]);
   useEffect(() => { setDetailedRun(undefined); }, [projectId]);
   useEffect(() => {
     if (!projectId) return;

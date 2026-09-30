@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { AnimationDestination } from './douyinAnimation';
 
 export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; screen: string; language: string; timezone: string; updated_at: string | null }
 export type CollectorConfigInput = Pick<CollectorConfig, 'user_agent' | 'screen' | 'language' | 'timezone'> & { cookies?: string };
@@ -34,6 +35,7 @@ export function douyinApi(base: string) {
   const account = (id: string) => `${base}/accounts/${id}`;
   const task = (id: string, taskId: string) => `${account(id)}/tasks/${taskId}`;
   return {
+    animationDestinations: () => api.get<AnimationDestination[]>(`${base}/animation-integrations`),
     collectorConfig: () => api.get<CollectorConfig>(`${base}/collector-config`),
     saveCollectorConfig: (body: CollectorConfigInput) => api.put<CollectorConfig>(`${base}/collector-config`, body),
     clearCollectorConfig: () => api.delete(`${base}/collector-config`),

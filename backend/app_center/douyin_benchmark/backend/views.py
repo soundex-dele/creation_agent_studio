@@ -47,6 +47,16 @@ class BaseView(APIView):
         return get_object_or_404(qs.select_for_update() if lock else qs, pk=self.kwargs["task_id"])
 
 
+class AnimationIntegrationsView(BaseView):
+    def get(self, request, **kwargs):
+        from apps.applications.models import Application
+        from core.resource_access import accessible_resources
+        app = self.app()
+        targets = accessible_resources(Application.objects.for_organization(app.organization_id).filter(
+            slug="animation-studio", kind="custom", is_active=True), request.user, operation="run")
+        return Response([{"id": target.id, "name": target.name} for target in targets])
+
+
 class ConnectionView(BaseView):
     @swagger_auto_schema(responses={200: ConnectionSerializer})
     def get(self, request, **kwargs):
