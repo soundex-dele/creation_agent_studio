@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { api } from '@/services/api';
 
 export interface Project {
+  scope?: 'default' | 'cowork';
+  directory_source?: 'managed' | 'explicit';
   id: number;
   title: string;
   description: string;

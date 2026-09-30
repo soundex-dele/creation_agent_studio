@@ -28,6 +28,36 @@ function declarationsAt(sources: string[], selectors: string[], width: number, h
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('bounds CoWork navigation and chat panes at %ipx, including short screens', width => {
+    const page = readSource('../../pages/Apps/CoWorkPage.tsx');
+    const styles = [readSource('../../pages/Apps/CoWorkPage.css'), readSource('../../components/Chat/ChatContainer.css')];
+    const route = readSource('../../router/index.tsx');
+    expect(route).toContain("path: '/apps/cowork'");
+    expect(route).toContain('<ApplicationShell fullBleed>{page(<CoWorkPage />)}</ApplicationShell>');
+    expect(page).toContain('className="cowork-page"');
+    expect(page).toContain('className="cowork-sidebar-scroll"');
+    expect(page).toContain('className="cowork-chat"');
+    for (const height of [320, 900]) {
+      for (const selector of ['.cowork-page', '.cowork-main', '.cowork-sidebar-content']) {
+        const rules = declarationsAt(styles, [selector], width, height);
+        expect(rules.height).toBe('100%');
+        expect(rules['min-height']).toBe('0');
+        expect(rules['min-width']).toBe('0');
+        expect(rules.overflow).toBe('hidden');
+      }
+      for (const selector of ['.cowork-sidebar-scroll', '.chat-messages', '.cowork-chat .chat-empty']) {
+        const rules = declarationsAt(styles, [selector], width, height);
+        expect(rules['min-height']).toBe('0');
+        expect(rules['overflow-y']).toBe('auto');
+      }
+      expect(declarationsAt(styles, ['.cowork-chat'], width, height)['min-height']).toBe('0');
+      expect(declarationsAt(styles, ['.cowork-page'], width, height)['grid-template-columns'])
+        .toBe(width < 768 ? 'minmax(0, 1fr)' : '280px minmax(0, 1fr)');
+    }
+    expect(declarationsAt(styles, ['.cowork-chat .chat-input-area'], width)['padding-bottom']).toContain('safe-area-inset-bottom');
+    expect(declarationsAt(styles, ['.cowork-navigation-drawer .ant-drawer-body'], width).overflow).toBe('hidden');
+  });
+
   it.each([320, 568, 667, 844])('keeps preview content available in a short %ipx viewport', width => {
     const styles = [readSource('../../components/Chat/ChatWorkspaceSidebar.css')];
     const panel = declarationsAt(styles, ['.chat-workspace-modal-files .workspace-files-panel'], width, 320);

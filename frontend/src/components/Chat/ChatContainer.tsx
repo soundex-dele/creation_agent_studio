@@ -9,6 +9,7 @@ import MessageList from './MessageList';
 import type { AssistantMessageRenderContext } from './MessageList';
 import MessageInput from './MessageInput';
 import type { ComposerAgent, ComposerContext } from './MessageInput';
+import type { Project } from '@/stores/useProjectStore';
 import AgentQuestionCard from './AgentQuestionCard';
 import ChatWorkspaceSidebar from './ChatWorkspaceSidebar';
 import './ChatContainer.css';
@@ -21,6 +22,12 @@ interface ChatSuggestion {
 }
 
 export interface ChatContainerProps {
+  workspaceControl?: {
+    selection: Pick<ComposerContext, 'projectId' | 'workingDirectory'>;
+    projects: Project[];
+    onChange: (selection: Pick<ComposerContext, 'projectId' | 'workingDirectory'>) => Promise<void>;
+    busy?: boolean;
+  };
   conversationId: string | null;
   /** When false, skip auto-fetching the conversation on mount/id change.
    *  The workspace uses this to seed a guided conversation without a fetch
@@ -37,6 +44,7 @@ export interface ChatContainerProps {
   };
   suggestions?: ChatSuggestion[];
   emptyTitle?: string;
+  emptyIcon?: React.ReactNode;
   emptyDescription?: string;
   inputPlaceholder?: string;
   draftRequest?: { id: number; text: string } | null;
@@ -65,6 +73,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   creationContext,
   suggestions = defaultSuggestions,
   emptyTitle,
+  emptyIcon,
   emptyDescription,
   inputPlaceholder,
   draftRequest,
@@ -73,6 +82,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   composerMode = 'default',
   inputAccessory,
   renderAssistantContent,
+  workspaceControl,
 }) => {
   const { store: useConversationStore, api, remote, online } = useChatConnection();
   const { user } = useAuthStore();
@@ -345,7 +355,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       )}
       {isEmpty && !isLoading ? (
         <div className="chat-empty">
-          <div className="chat-empty-icon">{agent?.icon || '✦'}</div>
+          <div className="chat-empty-icon">{emptyIcon ?? (agent?.icon || '✦')}</div>
           <h3>{emptyTitle || (agent ? `我是${agent.name}，请问有什么可以帮您？` : '开始处理你的任务')}</h3>
           <p>
             {emptyDescription || (agent
@@ -444,16 +454,17 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               isStopping={isStopping}
               visible={composerVisible}
               currentAgent={currentConversation?.agent || defaultAgent}
-              workspace={remote ? workspace : undefined}
-              onWorkspaceChange={remote && conversationId ? handleWorkspaceChange : undefined}
-              workspaceLocked={Boolean(
+              projectsOverride={workspaceControl?.projects}
+              workspace={workspaceControl?.selection ?? (remote ? workspace : undefined)}
+              onWorkspaceChange={workspaceControl?.onChange ?? (remote && conversationId ? handleWorkspaceChange : undefined)}
+              workspaceLocked={workspaceControl ? Boolean(workspaceControl.busy || (conversationId && (!currentConversation || currentConversation.workspace_locked !== false))) : Boolean(
                 (conversationId && (!remote || !currentConversation || currentConversation.workspace_locked !== false))
                 || projectId || creationContext?.applicationId
                 || creationContext?.workflowStepRunId
               )}
               mode={composerMode}
               disabled={
-                !user || !online || isLoading || isCreatingConversation || isRunning || workspaceChanging
+                !user || !online || isLoading || isCreatingConversation || isRunning || workspaceChanging || workspaceControl?.busy
                 || (!conversationId && !createOnFirstSend)
               }
               placeholder={user ? (inputPlaceholder || '描述你的需求...') : '请先登录'}

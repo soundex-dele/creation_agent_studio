@@ -43,6 +43,7 @@ interface SkillOption {
 export type ComposerAgent = Pick<Agent, 'id' | 'name' | 'description'>;
 
 interface MessageInputProps {
+  projectsOverride?: Project[];
   value?: string;
   onValueChange?: (value: string) => void;
   onSendMessage: (
@@ -81,6 +82,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   workspaceLocked = false,
   workspace,
   onWorkspaceChange,
+  projectsOverride,
   mode = 'default',
 }) => {
   const { api, remote, online = true } = useChatConnection();
@@ -121,7 +123,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const { projects: localProjects, loadProjects } = useProjectStore();
   const [remoteProjects, setRemoteProjects] = useState<Project[]>([]);
-  const projects = remote ? remoteProjects : localProjects;
+  const projects = projectsOverride ?? (remote ? remoteProjects : localProjects);
+  const hasProjectOverride = projectsOverride !== undefined;
   useEffect(() => {
     if (!workspace) return;
     setSelectedProject(projects.find(project => project.id === workspace.projectId) || null);
@@ -151,11 +154,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
         .then(result => { if (!cancelled) setRemoteAgents(result); })
         .catch(() => { if (!cancelled) setRemoteAgents([]); });
     } else {
-      void loadProjects();
+      if (!hasProjectOverride) void loadProjects();
       void loadAgents();
     }
     return () => { cancelled = true; };
-  }, [loadAgents, loadProjects, mode, api, remote, organizationId]);
+  }, [loadAgents, loadProjects, mode, api, remote, organizationId, hasProjectOverride]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +225,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       try {
         await onSendMessage(content.trim(), {
           projectId: selectedProject?.id,
-          workingDirectory: selectedSystemDirectory || undefined,
+          workingDirectory: selectedProject ? undefined : selectedSystemDirectory || undefined,
           agentId: selectedAgent?.id ?? null,
           agent: selectedAgent,
           permissionMode: effectivePermissionMode,
@@ -280,8 +283,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
     if (disabled || workspaceLocked) return;
     try {
       await onWorkspaceChange?.({ projectId: project?.id, workingDirectory: directory });
-      setSelectedProject(project);
-      setSelectedSystemDirectory(directory);
+      if (!projectsOverride) {
+        setSelectedProject(project);
+        setSelectedSystemDirectory(directory);
+      }
     } catch {
       message.error('切换工作空间失败，原工作空间保持不变，请重试。');
     }
@@ -491,7 +496,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             title={selectedProject?.title || selectedSystemDirectory || (workspaceLocked ? '当前对话不支持切换工作空间' : '选择工作空间')}>
             <FolderOutlined />
             <span>{selectedProject?.title
-              || (selectedSystemDirectory ? workingDirectoryLabel(selectedSystemDirectory) : '选择工作空间')}</span>
+              || (selectedSystemDirectory ? workingDirectoryLabel(selectedSystemDirectory) : projectsOverride ? '默认会话目录' : '选择工作空间')}</span>
           </button>
         </Dropdown>
         <Dropdown

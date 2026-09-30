@@ -8,6 +8,8 @@ import { ChatConnectionContext } from '../ChatConnectionContext';
 import { api } from '@/services/api';
 import ChatContainer, { type ChatContainerProps } from '../ChatContainer';
 import MessageList from '../MessageList';
+import type { Project } from '@/stores/useProjectStore';
+import { createCoworkApi } from '@/services/cowork';
 
 vi.mock('@/stores/useAuthStore', () => ({ useAuthStore: () => ({ user: { id: 1 } }) }));
 vi.mock('@/stores/useAgentStore', () => ({ useAgentStore: () => ({ agents: [], loadAgents: vi.fn() }) }));
@@ -59,13 +61,24 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-async function renderChat(props: Partial<ChatContainerProps> = {}, online = true) {
+async function renderChat(props: Partial<ChatContainerProps> = {}, online = true, client = api) {
   await act(async () => root.render(React.createElement(ChatConnectionContext.Provider, {
-    value: { store: useConversationStore, api, remote: false, online },
+    value: { store: useConversationStore, api: client, remote: false, online },
   }, React.createElement(ChatContainer, {
     conversationId: 'c1', autoFetch: false, composerMode: 'study', ...props,
   }))));
 }
+
+it('loads CoWork workspace files through its scoped connection', async () => {
+  const get = vi.mocked(api.get).mockImplementation(async path => path.includes('workspace-files')
+    ? { working_directory: '/work/project', entries: [], file_count: 0, truncated: false } as never
+    : { skills: [], require_tool_approval: false } as never);
+  await renderChat({}, true, createCoworkApi());
+  await click('[aria-label="打开右侧栏"]');
+  const showFiles = [...document.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent?.includes('查看工作空间文件'))!;
+  await act(async () => showFiles.click());
+  expect(get).toHaveBeenCalledWith('/conversations/c1/workspace-files/?scope=cowork', undefined, undefined);
+});
 
 function button(selector: string) {
   const element = host.querySelector<HTMLButtonElement>(selector);
@@ -161,6 +174,23 @@ it('shows send instead of stop when leaving a running conversation for a new cha
   expect(host.querySelector('[aria-label="结束任务"]')).toBeNull();
   await enterDraft('新账号的消息');
   expect(button('[aria-label="发送消息"]').disabled).toBe(false);
+});
+
+it('creates a CoWork draft in the controlled project only on first send', async () => {
+  mobile = false;
+  const createConversation = vi.fn(async () => ({ id: 'new-cowork', title: 'Task', project: 42, created_at: '', updated_at: '' }));
+  const sendMessageStream = vi.fn(() => Object.assign(new AbortController(), { submitted: Promise.resolve() }));
+  const onConversationCreated = vi.fn();
+  useConversationStore.setState({ createConversation, sendMessageStream });
+  await renderChat({ conversationId: null, createOnFirstSend: true, onConversationCreated,
+    workspaceControl: { selection: { projectId: 42, workingDirectory: '/work/project' },
+      projects: [{ id: 42, title: 'Project' } as Project], onChange: vi.fn() } });
+  expect(createConversation).not.toHaveBeenCalled();
+  await enterDraft('Work in this project');
+  await click('.chat-send-btn');
+  expect(createConversation).toHaveBeenCalledWith('Work in this project', undefined, 42, undefined, { workingDirectory: undefined });
+  expect(sendMessageStream).toHaveBeenCalledWith('new-cowork', 'Work in this project', expect.anything());
+  expect(onConversationCreated).toHaveBeenCalledWith('new-cowork');
 });
 
 it('does not show another conversation running state while switching views', async () => {

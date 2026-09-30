@@ -14,7 +14,7 @@ export default function ChatWorkspaceSidebar({ conversationId }: { conversationI
   const [openingDirectory, setOpeningDirectory] = useState(false);
   const sidebarId = useId();
   const filesId = useId();
-  const files = useWorkspaceFiles(undefined, conversationId);
+  const files = useWorkspaceFiles(undefined, conversationId, api);
 
   const close = () => {
     setOpen(false);

@@ -73,7 +73,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
+        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id', 'scope',
                   'agent_locked',
                   'application_id',
                   'working_directory',
@@ -104,7 +104,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id',
+        fields = ['id', 'organization_id', 'title', 'agent', 'project', 'process_id', 'scope',
                   'agent_locked',
                   'application_id',
                   'working_directory',
@@ -156,6 +156,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
 
 class CreateConversationSerializer(serializers.Serializer):
     """创建对话序列化器"""
+    scope = serializers.ChoiceField(choices=('default', 'cowork'), default='default')
     title = serializers.CharField(required=False, allow_blank=True, max_length=200)
     agent_id = serializers.IntegerField(required=False)
     project_id = serializers.IntegerField(required=False)
@@ -165,6 +166,13 @@ class CreateConversationSerializer(serializers.Serializer):
         required=False, allow_blank=True, max_length=1000)
     skill_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, default=list)
+
+    def validate(self, attrs):
+        if attrs['scope'] == 'cowork' and (attrs.get('application_id') or attrs.get('process_id')):
+            raise serializers.ValidationError('CoWork 对话不能绑定其他应用或流程。')
+        if attrs.get('project_id') and attrs.get('working_directory'):
+            raise serializers.ValidationError('项目和目录不能同时选择。')
+        return attrs
 
     def validate_working_directory(self, value):
         if not value.strip():

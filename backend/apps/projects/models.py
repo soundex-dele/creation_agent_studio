@@ -3,6 +3,13 @@ from apps.users.models import User
 from modules.tenancy.models import TenantOwnedQuerySet
 
 class Project(models.Model):
+    scope = models.CharField(
+        max_length=20, default='default', db_index=True,
+        choices=[('default', '默认'), ('cowork', 'CoWork')])
+    directory_source = models.CharField(
+        max_length=20, default='managed',
+        choices=[('managed', '自动分配'), ('explicit', '显式绑定')])
+    directory_key = models.CharField(max_length=64, blank=True, default='')
     STATUS_CHOICES = [
         ('draft', '草稿'),
         ('active', '进行中'),
@@ -38,7 +45,12 @@ class Project(models.Model):
         constraints = [models.CheckConstraint(
             condition=(models.Q(application__isnull=True) |
                        models.Q(workflow__isnull=True)),
-            name='project_has_single_origin')]
+            name='project_has_single_origin'),
+            models.UniqueConstraint(fields=['organization', 'user', 'directory_key'],
+                condition=models.Q(scope='cowork'), name='unique_cowork_directory'),
+            models.CheckConstraint(condition=(~models.Q(scope='cowork') | (
+                models.Q(directory_source='explicit', application__isnull=True, workflow__isnull=True)
+                & ~models.Q(directory_key='') & ~models.Q(working_directory=''))), name='cowork_requires_directory')]
 
     def __str__(self):
         return self.title

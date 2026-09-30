@@ -3,6 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from .services.cowork import resource_scope
 from .models import Project, ProjectAsset
 from .serializers import ProjectListSerializer, ProjectDetailSerializer, CreateProjectSerializer, ProjectAssetSerializer
 from .services.workspace_files import (
@@ -18,6 +21,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Project.objects.filter(
             organization=organization,
             user=self.request.user,
+            scope=resource_scope(self.request),
         ).select_related('application', 'workflow').prefetch_related('conversations')
 
     def get_serializer_class(self):
@@ -36,6 +40,21 @@ class ProjectViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         detail = ProjectDetailSerializer(serializer.instance, context={'request': request})
         return Response(detail.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        project = get_object_or_404(
+            self.get_queryset().select_related(None).prefetch_related(None).select_for_update(),
+            pk=kwargs['pk'],
+        )
+        if project.scope == 'cowork':
+            from apps.conversations.serializers import ConversationDetailSerializer
+            conversations = list(project.conversations.select_for_update().order_by('pk'))
+            if any(ConversationDetailSerializer().get_active_run(item) for item in conversations):
+                return Response({'detail': '项目中有正在执行的任务，请先停止任务。'}, status=409)
+        # Only database resources are deleted; never remove the bound directory.
+        project.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'])
     def recent(self, request):

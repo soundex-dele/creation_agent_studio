@@ -26,6 +26,9 @@ def message_attachment_upload_to(instance, filename):
 
 class Conversation(models.Model):
     """对话会话"""
+    scope = models.CharField(
+        max_length=20, default='default', db_index=True,
+        choices=[('default', '默认'), ('cowork', 'CoWork')])
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations')
     organization = models.ForeignKey(
         'enterprise.Organization', on_delete=models.CASCADE,

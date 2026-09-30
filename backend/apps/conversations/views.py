@@ -21,6 +21,7 @@ from apps.applications.runtime_skills import (
 from apps.applications.serializers import application_definition
 from apps.enterprise.permissions import resolve_organization
 from apps.projects.models import Project
+from apps.projects.services.cowork import bind_directory, resource_scope
 from apps.projects.services.workspace_files import (
     WorkspaceFileError,
     list_conversation_workspace_files,
@@ -68,7 +69,7 @@ class ConversationViewSet(viewsets.ViewSet):
     def get_conversation(self, request, pk):
         organization = resolve_organization(request)
         conversation = get_object_or_404(
-            Conversation.objects.filter(organization=organization),
+            Conversation.objects.filter(organization=organization, scope=resource_scope(request)),
             pk=pk,
             user=request.user,
         )
@@ -92,7 +93,8 @@ class ConversationViewSet(viewsets.ViewSet):
 
     def list(self, request):
         organization = resolve_organization(request)
-        queryset = request.user.conversations.filter(organization=organization)
+        scope = resource_scope(request)
+        queryset = request.user.conversations.filter(organization=organization, scope=scope)
         from django.apps import apps
         if apps.is_installed("app_center.documents.backend"):
             # Document sessions are accessed through document permissions, not
@@ -124,7 +126,7 @@ class ConversationViewSet(viewsets.ViewSet):
             process_id = request.query_params.get("process_id")
             if process_id:
                 queryset = queryset.filter(process_id=process_id)
-        elif not application_id and not getattr(request, 'remote_connector', False):
+        elif scope != 'cowork' and not application_id and not getattr(request, 'remote_connector', False):
             queryset = queryset.filter(project__isnull=True)
         search = request.query_params.get("search")
         if search:
@@ -198,7 +200,7 @@ class ConversationViewSet(viewsets.ViewSet):
         project = None
         if data.get("project_id"):
             project = get_object_or_404(
-                Project.objects.filter(organization=organization),
+                Project.objects.filter(organization=organization, scope=data['scope']),
                 id=data["project_id"],
                 user=request.user,
             )
@@ -252,6 +254,11 @@ class ConversationViewSet(viewsets.ViewSet):
                     ConversationSkillBinding.Source.USER, {})
 
         with transaction.atomic():
+            if data['scope'] == 'cowork':
+                if requested_directory:
+                    project = bind_directory(request.user, organization, requested_directory)
+                if project:
+                    project = get_object_or_404(Project.objects.select_for_update(), pk=project.pk)
             conversation = Conversation.objects.create(
                 user=request.user,
                 organization=organization,
@@ -261,6 +268,7 @@ class ConversationViewSet(viewsets.ViewSet):
                 project=project,
                 process_id=data.get("process_id", "") or "",
                 working_directory=requested_directory,
+                scope=data['scope'],
             )
             conversation_working_directory(conversation)
             ConversationSkillBinding.objects.bulk_create([
@@ -306,17 +314,33 @@ class ConversationViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         with transaction.atomic():
-            conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+            # Lock projects before conversations, as project removal does.
+            target_project = None
+            if conversation.scope == 'cowork':
+                if data.get('working_directory'):
+                    target_project = bind_directory(request.user, conversation.organization, data['working_directory'])
+                elif data.get('project_id') is not None:
+                    target_project = get_object_or_404(Project.objects.filter(
+                        organization=conversation.organization, user=request.user, scope='cowork'), pk=data['project_id'])
+                ids = {p for p in (conversation.project_id, target_project.pk if target_project else None) if p}
+                locked_ids = set(Project.objects.select_for_update().filter(pk__in=ids).order_by('pk').values_list('pk', flat=True))
+                if locked_ids != ids:
+                    transaction.set_rollback(True)
+                    return Response({'detail': '项目已被移除，请刷新。'}, status=409)
+            conversation = get_object_or_404(Conversation.objects.select_for_update(), pk=conversation.pk)
             if conversation.workspace_locked:
+                transaction.set_rollback(True)
                 return Response({'detail': '此对话使用应用或流程的固定工作空间。'}, status=409)
             if ConversationDetailSerializer().get_active_run(conversation):
+                transaction.set_rollback(True)
                 return Response({'detail': '请等待当前任务结束后再切换工作空间。'}, status=409)
-            project = None
-            if data.get('project_id') is not None:
+            project = target_project
+            if conversation.scope != 'cowork' and data.get('project_id') is not None:
                 project = get_object_or_404(
                     Project.objects.filter(
                         organization_id=conversation.organization_id,
                         user=request.user,
+                        scope=conversation.scope,
                     ), pk=data['project_id'],
                 )
             previous = (conversation.project_id, conversation.working_directory)

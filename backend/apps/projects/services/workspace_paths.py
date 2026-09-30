@@ -46,6 +46,12 @@ def system_working_directory(
 
 def application_working_directory(project) -> str:
     """Create or restore the directory owned by a standalone application run."""
+    if project.scope == 'cowork' and project.directory_source == 'explicit':
+        from rest_framework.exceptions import ValidationError
+        try:
+            return validate_system_working_directory(project.working_directory)
+        except (ValueError, OSError, RuntimeError) as exc:
+            raise ValidationError({'working_directory': str(exc)}) from exc
     if project.working_directory:
         return str(_create_managed(Path(project.working_directory)))
     scope = _scope_root(project.user, project.organization)
@@ -96,6 +102,14 @@ def validate_system_working_directory(raw_path: str) -> str:
 
 def conversation_working_directory(conversation) -> str:
     """Resolve and persist the effective directory for any conversation source."""
+    if conversation.scope == 'cowork':
+        path = (application_working_directory(conversation.project)
+                if conversation.project_id else system_working_directory(
+                    conversation.user, conversation.organization, conversation.id))
+        if conversation.working_directory != path:
+            conversation.working_directory = path
+            conversation.save(update_fields=['working_directory'])
+        return path
     # Only an ordinary conversation may own an explicitly selected external
     # system directory. Managed application/workflow directories are resolved
     # again so a directory removed on disk is safely recreated before a run.

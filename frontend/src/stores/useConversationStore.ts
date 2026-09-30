@@ -54,6 +54,7 @@ interface Message {
 }
 
 export interface Conversation {
+  scope?: 'default' | 'cowork';
   id: string;
   title: string;
   agent?: any;
@@ -284,7 +285,7 @@ interface ConversationState {
   clearError: () => void;
 }
 
-export const createConversationStore = (connection?: RemoteConnection, apiOverride?: typeof defaultApi) => {
+export const createConversationStore = (connection?: RemoteConnection, apiOverride?: typeof defaultApi, storageName?: string) => {
   const api = apiOverride ?? (connection ? createConnectionApi(connection) : defaultApi);
   const runTenantRoot = (id: string) => connection ? `/organizations/${id}` : tenantApiRoot(id);
   let latestConversationDetailRequest = 0;
@@ -994,7 +995,7 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
       };
     },
     {
-      name: connection ? `remote-conversation-${connection.deviceId}` : 'conversation-storage',
+      name: storageName ?? (connection ? `remote-conversation-${connection.deviceId}` : 'conversation-storage'),
       ...(connection || apiOverride ? { storage: {
         getItem: () => null,
         setItem: () => undefined,

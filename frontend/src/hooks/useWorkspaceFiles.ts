@@ -9,7 +9,7 @@ const EMPTY_LISTING: WorkspaceFileListing = {
   truncated: false,
 };
 
-export function useWorkspaceFiles(projectId?: number, conversationId?: string | null) {
+export function useWorkspaceFiles(projectId?: number, conversationId?: string | null, client: typeof api = api) {
   const [listing, setListing] = useState<WorkspaceFileListing>(EMPTY_LISTING);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function useWorkspaceFiles(projectId?: number, conversationId?: string | 
     setIsRefreshing(true);
     setError(null);
     try {
-      const response = await api.get<WorkspaceFileListing>(
+      const response = await client.get<WorkspaceFileListing>(
         endpoint,
       );
       if (
@@ -50,15 +50,15 @@ export function useWorkspaceFiles(projectId?: number, conversationId?: string | 
         && conversationIdRef.current === conversationId
       ) setIsRefreshing(false);
     }
-  }, [conversationId, endpoint, projectId]);
+  }, [conversationId, endpoint, projectId, client]);
 
   const readFile = useCallback(async (path: string) => {
     if (!endpoint) throw new Error('工作目录尚未准备好');
-    return api.get<WorkspaceFilePreview>(
+    return client.get<WorkspaceFilePreview>(
       endpoint,
       { path },
     );
-  }, [endpoint]);
+  }, [endpoint, client]);
 
   useEffect(() => {
     setListing(EMPTY_LISTING);

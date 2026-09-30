@@ -5,6 +5,11 @@ import {
 } from '../applicationCatalog';
 
 describe('application renderer registry', () => {
+  it('opens CoWork with independent navigation from both entry points', () => {
+    const app = { id: 'cowork', applicationId: 99, kind: 'custom' as const, rendererKey: 'cowork' };
+    expect(applicationPath(app)).toBe('/apps/cowork?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/apps/cowork?entry=home');
+  });
   it('opens Pocket Salvager from the home and applications catalog', () => {
     const app = { id: 'pocket-salvager', applicationId: 43, kind: 'custom' as const, rendererKey: 'pocket-salvager' };
     expect(applicationPath(app)).toBe('/applications/43/pocket-salvager?entry=apps');

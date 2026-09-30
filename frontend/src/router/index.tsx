@@ -9,6 +9,7 @@ const TaskCenterPage = lazy(() => import('@/pages/Tasks/TaskCenterPage'));
 const BuildPage = lazy(() => import('@/pages/Hubs/BuildPage'));
 const ResourceLibraryPage = lazy(() => import('@/pages/Hubs/ResourceLibraryPage'));
 const ChatPage = lazy(() => import('@/pages/Chat/ChatPage'));
+const CoWorkPage = lazy(() => import('@/pages/Apps/CoWorkPage'));
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage'));
 const SsoCallbackPage = lazy(() => import('@/pages/Auth/SsoCallbackPage'));
@@ -84,6 +85,10 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  {
+    path: '/apps/cowork',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<CoWorkPage />)}</ApplicationShell></ProtectedRoute>,
+  },
   ...['/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId',
     '/apps/my-computer/:deviceId/terminals', '/apps/my-computer/:deviceId/terminals/:sessionId', '/apps/my-computer/:deviceId/files'].map(path => ({
     path,
