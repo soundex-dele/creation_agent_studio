@@ -22,7 +22,7 @@ def test_package_discovery_and_idempotent_install(tmp_path, settings):
     for _ in range(2):
         call_command("sync_app_center", package_id="ideas-todos", organization_id=str(org.id))
     application = Application.objects.get(organization=org, slug="ideas-todos")
-    assert application.name == "想法&待办" and application.is_active
+    assert application.name == "随手记" and application.is_active
     assert application.visibility == Application.Visibility.ORGANIZATION
     assert application.category.slug == "productivity"
     assert application.draft.content["renderer_key"] == "ideas-todos"

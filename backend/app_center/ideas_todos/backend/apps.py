@@ -5,4 +5,4 @@ class IdeasTodosConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "app_center.ideas_todos.backend"
     label = "ideas_todos"
-    verbose_name = "想法&待办"
+    verbose_name = "随手记"

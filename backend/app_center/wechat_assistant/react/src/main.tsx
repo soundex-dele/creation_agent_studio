@@ -90,7 +90,7 @@ export function WechatAssistantApp({ apiBasePath, requester, openConversation }:
   return <div className="wechat-assistant">
     <header className="wechat-heading"><div className="wechat-heading-icon"><MessageOutlined aria-hidden /></div><div><Typography.Title level={2}>微信助手</Typography.Title><Typography.Paragraph type="secondary">在微信里，随时与自己的智能体对话。</Typography.Paragraph></div></header>
     <details className="wechat-guide"><summary><QuestionCircleOutlined aria-hidden /><span>如何使用微信助手</span><RightOutlined className="wechat-guide-chevron" aria-hidden /></summary>
-      <div className="wechat-guide-body"><p>选择智能体 → 保存 → 扫码绑定，即可开始。</p><p>发送“菜单”或 /menu 管理会话和任务，也可直接发送“添加想法”“添加待办”“查询想法”“查询待办”。添加时每行保存一条，与“想法&待办”应用同步。</p><p>任务需要回答问题或批准操作时，请打开当前会话处理。</p></div>
+      <div className="wechat-guide-body"><p>选择智能体 → 保存 → 扫码绑定，即可开始。</p><p>发送“菜单”或 /menu 管理会话和任务，也可直接发送“添加想法”“添加待办”“查询想法”“查询待办”。添加时每行保存一条，与“随手记”应用同步。</p><p>任务需要回答问题或批准操作时，请打开当前会话处理。</p></div>
     </details>
     <div aria-live="polite" aria-atomic="true">{notice && <Alert type="success" message={notice} showIcon />}</div>
     {error && <Alert type="error" role="alert" message={error} showIcon action={<Button loading={refreshing} disabled={working} onClick={() => void refresh()}>重试</Button>} />}

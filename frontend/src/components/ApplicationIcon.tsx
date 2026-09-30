@@ -1,10 +1,13 @@
 import { AppstoreOutlined, CloudOutlined, DesktopOutlined, WechatOutlined } from '@ant-design/icons';
 import type { AppItem } from '@/types';
-import { Boxes, Ship } from 'lucide-react';
+import { Boxes, FolderOpen, Ship } from 'lucide-react';
 
 export default function ApplicationIcon({ app }: {
   app: Pick<AppItem, 'id' | 'icon' | 'rendererKey'>;
 }) {
+  if (app.rendererKey === 'cowork' || app.id === 'cowork') {
+    return <FolderOpen size="1em" aria-hidden="true" />;
+  }
   if (app.rendererKey === 'pocket-salvager' || app.id === 'pocket-salvager') {
     return <Ship size="1em" aria-hidden="true" />;
   }

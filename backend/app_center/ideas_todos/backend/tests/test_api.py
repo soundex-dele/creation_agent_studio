@@ -19,7 +19,7 @@ def context(db):
         Membership.objects.create(organization=org, user=member, role=Membership.Role.VIEWER)
     category = ApplicationCategory.objects.create(name="Ideas productivity", slug="ideas-productivity")
     application = Application.objects.create(
-        organization=org, category=category, name="想法&待办", slug="ideas-todos",
+        organization=org, category=category, name="随手记", slug="ideas-todos",
         created_by=owner, kind=Application.Kind.CUSTOM, visibility=Application.Visibility.ORGANIZATION,
     )
     client = APIClient()

@@ -3,7 +3,7 @@ kind: ApplicationPackage
 metadata:
   id: ideas-todos
   version: 1.1.0
-  name: 想法&待办
+  name: 随手记
   description: 私有的灵感笔记、待办清单与备忘，记录想法、安排事项、留存信息，让日常更有条理。
   category:
     slug: productivity
@@ -11,7 +11,7 @@ metadata:
     description: 日常协作与任务工具
     icon: desktop
     order: 30
-  icon: "想"
+  icon: "记"
   color: "#0D9488"
   tags: [想法, 待办, 备忘, 笔记, 个人效率]
   developer: Agent Studio

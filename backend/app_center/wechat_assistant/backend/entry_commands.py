@@ -48,7 +48,7 @@ def dispatch_entries(binding, incoming, text=None):
         ), binding.user, operation="run",
     ).first()
     if application is None:
-        return reply("“想法&待办”应用尚未启用或你没有使用权限，请在应用中心检查。")
+        return reply("“随手记”应用尚未启用或你没有使用权限，请在应用中心检查。")
 
     from app_center.ideas_todos.backend.serializers import IdeaSerializer, TodoSerializer
 
@@ -78,7 +78,7 @@ def dispatch_entries(binding, incoming, text=None):
         # The caller holds the binding/incoming transaction. Validate the entire
         # batch before saving; replaying a handled message cannot insert again.
         serializer.save(application=application, organization_id=binding.organization_id, owner=binding.user)
-        return reply(f"已添加 {len(rows)} 条{label}，可发送“查询{label}”查看，也可在“想法&待办”应用中管理。")
+        return reply(f"已添加 {len(rows)} 条{label}，可发送“查询{label}”查看，也可在“随手记”应用中管理。")
 
     if payload and (not payload.isascii() or not payload.isdecimal() or len(payload) > 9 or int(payload) < 1):
         return reply(f"查询格式：{command}，或“{command} 2”查看第 2 页。")

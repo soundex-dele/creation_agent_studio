@@ -54,7 +54,7 @@ backend\venv\Scripts\python.exe backend/manage.py run_wechat_connector
 
 ## 想法与待办指令
 
-需在当前组织启用“想法&待办”应用，并具有使用权限。尚未安装时，在仓库根目录执行 `backend\venv\Scripts\python.exe backend/manage.py sync_app_center --package ideas-todos`，并按上面的步骤运行迁移。微信与网页共用数据，只查询和添加当前组织、当前应用中本人的记录。
+需在当前组织启用“随手记”应用，并具有使用权限。尚未安装时，在仓库根目录执行 `backend\venv\Scripts\python.exe backend/manage.py sync_app_center --package ideas-todos`，并按上面的步骤运行迁移。微信与网页共用数据，只查询和添加当前组织、当前应用中本人的记录。
 
 直接发送以下任一种消息，无需先打开菜单：
 
@@ -74,7 +74,7 @@ backend\venv\Scripts\python.exe backend/manage.py run_wechat_connector
 
 仅发送“添加想法”或“添加待办”（或选择菜单 6、7）后，会等待下一条消息作为内容，每个非空行一条，5 分钟内有效。此时普通文字作为内容保存，回复 `0` / “退出菜单”取消，发送“菜单”返回主菜单；超过有效期的内容不会保存或交给模型。保存后自动回到聊天。
 
-发送“查询想法”查看本人想法，发送“查询待办”查看本人未完成待办。每条记录单独一行，每页 10 条；发送 `查询想法 2` / `查询待办 2` 查看第 2 页。完成、编辑和删除记录在“想法&待办”网页应用中操作。四个指令不调用模型，在智能体执行任务期间或当前智能体不可用时仍可使用。
+发送“查询想法”查看本人想法，发送“查询待办”查看本人未完成待办。每条记录单独一行，每页 10 条；发送 `查询想法 2` / `查询待办 2` 查看第 2 页。完成、编辑和删除记录在“随手记”网页应用中操作。四个指令不调用模型，在智能体执行任务期间或当前智能体不可用时仍可使用。
 
 可选设置 `WECHAT_ASSISTANT_PUBLIC_URL=https://your-site.example`，在待办提醒中附上会话链接。地址必须可从手机访问；未配置时仅提醒从项目打开会话，不发送 localhost 链接。
 

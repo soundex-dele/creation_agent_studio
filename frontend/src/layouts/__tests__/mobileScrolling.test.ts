@@ -178,6 +178,60 @@ describe('mobile page scrolling', () => {
     });
   });
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('keeps Ideas & Todos cards, filters and editor bounded at %ipx', width => {
+    const source = readSource('../../pages/Apps/IdeasTodosPage.tsx');
+    const css = readSource('../../pages/Apps/IdeasTodosPage.css');
+    expect(source).toContain('className="ideas-todos-page app-scroll-page"');
+    expect(source).toContain('resolveApplicationPresentation(searchParams)');
+    expect(readSource('../../router/index.tsx').replace(/\s+/g, ''))
+      .toContain('<ApplicationShellfullBleed>{page(<IdeasTodosPage/>)}</ApplicationShell>');
+    for (const height of [320, 900]) {
+      const root = declarationsAt([globalStyles, css], ['.app-scroll-page', '.ideas-todos-page'], width, height);
+      expect(root.height).toBe('100%');
+      expect(root['min-width']).toBe('0');
+      expect(root['min-height']).toBe('0');
+      expect(root['overflow-y']).toBe('auto');
+      expect(root.padding).toContain('safe-area-inset-bottom');
+      expect(declarationsAt([css], ['.ideas-todos-grid'], width, height)['grid-template-columns'])
+        .toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+      expect(declarationsAt([css], ['.ideas-todos-card.is-todo'], width, height)['grid-template-columns'])
+        .toBe(width <= 1000 ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) auto');
+      expect(declarationsAt([css], ['.ideas-todos-form-row'], width, height)['grid-template-columns'])
+        .toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+      expect(declarationsAt([css], ['.ideas-todos-editor .ant-modal-body'], width, height)['overflow-y']).toBe('auto');
+      expect(declarationsAt([css], ['.ideas-todos-editor .ant-modal-content'], width, height)['max-height'])
+        .toBe(width <= 767 ? '92dvh' : 'calc(100dvh - 64px)');
+      if (width <= 767) {
+        expect(declarationsAt([css], ['.ideas-todos-filters'], width, height).display).toBe('none');
+        expect(declarationsAt([css], ['.ideas-todos-filters', '.ideas-todos-filters.is-open'], width, height).display).toBe('grid');
+        expect(declarationsAt([css], ['.ideas-todos-tabs > .ant-tabs-nav .ant-tabs-nav-list'], width, height).width).toBe('100%');
+      }
+    }
+  });
+
+  it.each([320, 375, 390, 767, 768, 844, 1440])('reflows Douyin filters and work cards without changing the scroll owner at %ipx', width => {
+    const css = readSource('../../pages/Apps/DouyinBenchmarkPage.css');
+    const workspace = readSource('../../pages/Apps/douyin/DouyinWorkspace.tsx');
+    expect(workspace).toContain('className="douyin-work-filters"');
+    expect(workspace).toContain('className="douyin-work-cover"');
+    for (const height of [320, 900]) {
+      const root = declarationsAt([globalStyles, css], ['.app-scroll-page', '.douyin-host'], width, height);
+      expect(root.height).toBe('100%');
+      expect(root['overflow-y']).toBe('auto');
+      expect(declarationsAt([css], ['.douyin-work-filters'], width, height)['grid-template-columns'])
+        .toBe(width <= 767 ? 'minmax(0, 1fr)' : width <= 1100 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1fr) auto');
+      expect(declarationsAt([css], ['.douyin-work'], width, height)['grid-template-columns'])
+        .toBe(width <= 767 ? '72px minmax(0, 1fr)' : width <= 900 ? '96px minmax(0, 1fr)' : '112px minmax(0, 1fr) 148px');
+      expect(declarationsAt([css], ['.douyin-work dl'], width, height)['grid-template-columns'])
+        .toBe(width <= 420 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))');
+      expect(declarationsAt([css], ['.douyin-work-filters .douyin-outstanding-filter'], width, height).display).toBe('inline-flex');
+      if (width <= 767) {
+        expect(declarationsAt([css], ['.douyin-work-actions'], width, height)['grid-column']).toBe('1 / -1');
+        expect(declarationsAt([css], ['.douyin-work-actions > .ant-upload-wrapper'], width, height)['grid-column']).toBe('1 / -1');
+      }
+    }
+  });
+
   it.each([320, 375, 390, 767, 768, 844, 1440])('preserves drawing and conversion scrollports at %ipx, including short embeds', width => {
     const drawing = readSource('../../pages/Apps/AIDrawingPage.css');
     const conversion = readSource('../../pages/Apps/DurableApplicationRuntimePage.css');

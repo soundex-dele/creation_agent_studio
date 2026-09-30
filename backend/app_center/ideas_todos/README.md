@@ -1,4 +1,4 @@
-# 想法&待办
+# 随手记
 
 Personal ideas, tasks and memos, installed per organization. The application catalog is
 organization-visible; records are always scoped to organization, application,
