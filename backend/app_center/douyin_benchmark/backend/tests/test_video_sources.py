@@ -22,13 +22,26 @@ def video():
 def test_file_urls_and_source_pages_are_distinct():
     item = normalize_work(video())
     assert item["platform_id"] == VIDEO_ID
-    assert item["url"] == f"https://www.douyin.com/video/{VIDEO_ID}"
+    assert item["url"] == f"https://www.douyin.com/?modal_id={VIDEO_ID}"
     assert item["_media_urls"] == [PLAY_URL]
     assert video_urls({"kind": "video", "web_url": item["url"]}) == []
     album = normalize_work({**video(), "kind": "image_album"})
-    assert album["url"] == f"https://www.douyin.com/note/{VIDEO_ID}"
+    assert album["url"] == f"https://www.douyin.com/?modal_id={VIDEO_ID}"
     assert album["_media_urls"] == []
     assert work_web_url({**album, "url": "https://evil.example"}) == album["url"]
+
+
+@pytest.mark.parametrize("kind,slug", [("video", "video"), ("image_album", "note")])
+def test_historical_source_links_use_web_modal(kind, slug):
+    platform_id = "7449986776569040166"
+    assert work_web_url({"platform_id": platform_id, "kind": kind,
+        "url": f"https://www.douyin.com/{slug}/{platform_id}"}) == (
+        f"https://www.douyin.com/?modal_id={platform_id}")
+
+
+@pytest.mark.parametrize("platform_id", [None, "", "１２３", "123&modal_id=456", "1e19"])
+def test_source_links_require_an_exact_numeric_id(platform_id):
+    assert work_web_url({"platform_id": platform_id, "url": PLAY_URL}) == ""
 
 
 def test_collected_media_survives_without_entering_analysis_evidence(ctx, monkeypatch):
@@ -42,6 +55,14 @@ def test_collected_media_survives_without_entering_analysis_evidence(ctx, monkey
     assert "token=test-only" not in str(ctx.task.snapshots.get().data)
     result = ctx.client.get(ctx.url + "/works").data["items"][0]
     assert result["video_url"] == PLAY_URL and result["url"] != PLAY_URL
+    # Old snapshots and analysis evidence must be corrected at read time too.
+    snapshot = ctx.task.snapshots.get()
+    snapshot.data["url"] = f"https://www.douyin.com/video/{VIDEO_ID}"
+    snapshot.save(update_fields=["data"])
+    assert ctx.client.get(ctx.url + "/works").data["items"][0]["url"] == f"https://www.douyin.com/?modal_id={VIDEO_ID}"
+    analysis = post(ctx, {"kind": "account"}, key="account-analysis")
+    assert analysis.status_code == 201
+    assert analysis.data["sources"][0]["url"] == f"https://www.douyin.com/?modal_id={VIDEO_ID}"
     task = Task.objects.get(pk=post(ctx, {"kind": "breakdown", "work_id": str(work.pk)}).data["id"])
     assert task.input["media_urls"] == [PLAY_URL]
     assert "token=test-only" not in str(task.input["metadata"])

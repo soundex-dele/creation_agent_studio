@@ -98,21 +98,14 @@ def video_urls(content):
 
 
 def work_web_url(item):
+    """Open a work in the web app, including for previously stored /video URLs."""
     content_id = str(item.get("content_id") or item.get("platform_id") or "")
     if not content_id.isascii() or not content_id.isdigit():
         return ""
-    slug = "note" if item.get("kind") == "image_album" else "video"
-    canonical = f"https://www.douyin.com/{slug}/{content_id}"
-    # Only accept a returned source link that matches this work, never a media URL.
-    supplied = item.get("web_url") or item.get("url") or ""
-    try:
-        parsed = urlsplit(supplied)
-        if (parsed.scheme == "https" and parsed.netloc == "www.douyin.com"
-                and parsed.path.rstrip("/") == f"/{slug}/{content_id}"):
-            return supplied
-    except ValueError:
-        pass
-    return canonical
+    # DTK synthesizes /video and /note links; those detail routes can report an
+    # unavailable work even when the API still returns it as public. The web
+    # app's modal entry supports both videos and image albums.
+    return f"https://www.douyin.com/?modal_id={content_id}"
 
 
 def normalize_work(item):
