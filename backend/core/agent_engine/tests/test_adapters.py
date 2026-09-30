@@ -260,6 +260,11 @@ class CodexIntegrationTest(TestCase):
                         self.assertTrue(response.success)
                         thread_call, turn_call = transport.request.call_args_list
                         self.assertEqual(thread_call.args[0], "thread/resume" if resume else "thread/start")
+                        if resume:
+                            self.assertIs(thread_call.args[1]["excludeTurns"], True)
+                            self.assertEqual(thread_call.args[1]["threadId"], "thread-1")
+                        else:
+                            self.assertNotIn("excludeTurns", thread_call.args[1])
                         self.assertEqual(thread_call.args[1]["sandbox"], sandbox)
                         self.assertEqual(thread_call.args[1]["approvalPolicy"], approval)
                         self.assertEqual(thread_call.args[1]["approvalsReviewer"], "user")

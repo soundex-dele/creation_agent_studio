@@ -61,6 +61,7 @@ interface MessageInputProps {
   placeholder?: string;
   currentAgent?: ComposerAgent | null;
   workspaceLocked?: boolean;
+  showWorkspaceSelector?: boolean;
   workspace?: Pick<ComposerContext, 'projectId' | 'workingDirectory'>;
   onWorkspaceChange?: (workspace: Pick<ComposerContext, 'projectId' | 'workingDirectory'>) => Promise<void>;
   mode?: 'default' | 'study' | 'document';
@@ -80,6 +81,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = '输入消息...',
   currentAgent = null,
   workspaceLocked = false,
+  showWorkspaceSelector = true,
   workspace,
   onWorkspaceChange,
   projectsOverride,
@@ -473,7 +475,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
       ) : <div className="chat-composer-toolbar">
-        <Dropdown
+        {showWorkspaceSelector && <Dropdown
           trigger={['click']}
           menu={{
             items: workspaceItems,
@@ -498,7 +500,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             <span>{selectedProject?.title
               || (selectedSystemDirectory ? workingDirectoryLabel(selectedSystemDirectory) : projectsOverride ? '默认会话目录' : '选择工作空间')}</span>
           </button>
-        </Dropdown>
+        </Dropdown>}
         <Dropdown
           trigger={['click']}
           menu={{

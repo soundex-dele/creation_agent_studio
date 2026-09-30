@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from django.conf import settings
 from rest_framework.test import APIClient
 
-from apps.conversations.models import Conversation
+from apps.conversations.models import Conversation, Message
 from apps.enterprise.models import Organization, Membership
 from apps.projects.models import Project
 from apps.projects.services.workspace_paths import conversation_working_directory
@@ -118,6 +118,40 @@ class CoworkTest(TestCase):
         saved = Conversation.objects.get(pk=conversation['id'])
         self.assertEqual(saved.project_id, conversation['project'])
         self.assertEqual(saved.working_directory, conversation['working_directory'])
+
+    def test_first_user_message_locks_workspace_and_rejects_every_switch(self):
+        project = self.project()
+        for initial in ({}, {'project_id': project['id']}):
+            with self.subTest(initial=initial):
+                conversation = self.conversation(**initial)
+                endpoint = f"/api/v1/conversations/{conversation['id']}/?scope=cowork"
+                self.assertFalse(self.client.get(endpoint).data['workspace_locked'])
+                Message.objects.create(conversation_id=conversation['id'], role='user', content='Start work')
+                self.assertTrue(self.client.get(endpoint).data['workspace_locked'])
+                another = Path(self.temp.name) / 'another'
+                another.mkdir(exist_ok=True)
+                for payload in ({'project_id': project['id']},
+                                {'project_id': None, 'working_directory': ''},
+                                {'working_directory': str(another)}):
+                    response = self.workspace(conversation, payload)
+                    self.assertEqual(response.status_code, 409, response.data)
+                    self.assertIn('新建对话', response.data['detail'])
+                saved = Conversation.objects.get(pk=conversation['id'])
+                self.assertEqual(saved.project_id, conversation['project'])
+                self.assertEqual(saved.working_directory, conversation['working_directory'])
+                self.assertEqual(Project.objects.filter(scope='cowork').count(), 1)
+
+    def test_system_message_does_not_lock_an_unsent_cowork_conversation(self):
+        conversation = self.conversation()
+        Message.objects.create(conversation_id=conversation['id'], role='system', content='Instructions')
+        response = self.workspace(conversation, {'working_directory': str(self.folder)})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(response.data['workspace_locked'])
+
+    def test_default_conversation_is_not_locked_by_a_user_message(self):
+        conversation = Conversation.objects.create(user=self.user, organization=self.organization)
+        Message.objects.create(conversation=conversation, role='user', content='Hello')
+        self.assertFalse(conversation.workspace_locked)
 
     def test_missing_bound_directory_does_not_fall_back_or_recreate(self):
         conversation = self.conversation(working_directory=str(self.folder))

@@ -51,6 +51,8 @@ export interface ChatContainerProps {
   projectId?: number;
   defaultAgent?: ComposerAgent | null;
   composerMode?: 'default' | 'study' | 'document';
+  showWorkspaceSelector?: boolean;
+  showWorkspaceSidebar?: boolean;
   inputAccessory?: React.ReactNode;
   /** Allows a feature page to specialize assistant presentation while keeping
    * the shared conversation, streaming, attachments, and composer behavior. */
@@ -80,6 +82,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   projectId,
   defaultAgent = null,
   composerMode = 'default',
+  showWorkspaceSelector = true,
+  showWorkspaceSidebar = true,
   inputAccessory,
   renderAssistantContent,
   workspaceControl,
@@ -335,7 +339,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const canCollapseComposer = isMobile && !isEmpty;
   const composerVisible = !canCollapseComposer || composerExpanded;
   const agent = currentConversation?.agent;
-  const showWorkspaceSidebar = Boolean(
+  const hasWorkspaceSidebar = showWorkspaceSidebar && Boolean(
     (conversationId || (createOnFirstSend && creationContext?.applicationId))
     && !remote && composerMode !== 'document',
   );
@@ -348,9 +352,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }, [composerVisible]);
 
   return (
-    <div className={`chat-container${showWorkspaceSidebar ? ' chat-container--with-toolbar' : ''}${!composerVisible ? ' chat-container--composer-collapsed' : ''}`}>
+    <div className={`chat-container${hasWorkspaceSidebar ? ' chat-container--with-toolbar' : ''}${!composerVisible ? ' chat-container--composer-collapsed' : ''}`}>
       {error && <Alert message={error} type="error" showIcon closable onClose={clearError} />}
-      {showWorkspaceSidebar && (
+      {hasWorkspaceSidebar && (
         <ChatWorkspaceSidebar key={conversationId} conversationId={conversationId} />
       )}
       {isEmpty && !isLoading ? (
@@ -455,6 +459,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               visible={composerVisible}
               currentAgent={currentConversation?.agent || defaultAgent}
               projectsOverride={workspaceControl?.projects}
+              showWorkspaceSelector={showWorkspaceSelector}
               workspace={workspaceControl?.selection ?? (remote ? workspace : undefined)}
               onWorkspaceChange={workspaceControl?.onChange ?? (remote && conversationId ? handleWorkspaceChange : undefined)}
               workspaceLocked={workspaceControl ? Boolean(workspaceControl.busy || (conversationId && (!currentConversation || currentConversation.workspace_locked !== false))) : Boolean(

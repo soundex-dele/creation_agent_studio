@@ -848,6 +848,9 @@ class _AppServerCodex:
         approval_policy, approvals_reviewer = _approval_settings(approval_mode)
         params = {
             "threadId": thread_id,
+            # Conversation history comes from our database; resume only needs
+            # metadata. Full-history hydration is deprecated for paginated threads.
+            "excludeTurns": True,
             "cwd": cwd or self._cwd,
             "approvalPolicy": approval_policy,
             "approvalsReviewer": approvals_reviewer,

@@ -14,14 +14,18 @@ vi.mock('@/stores/useOrganizationStore', () => ({ useOrganizationStore: (select:
 vi.mock('@/hooks/useMediaQuery', () => ({ default: () => false }));
 vi.mock('../FolderPickerModal', () => ({ default: ({ open, onSelect }: { open: boolean; onSelect: (path: string) => void }) => open ? <button onClick={() => onSelect('/work/project')}>选择测试目录</button> : null }));
 let chat: ChatContainerProps;
+let chatStore: ReturnType<typeof useChatConnection>['store'];
 vi.mock('@/components/Chat/ChatContainer', () => ({ default: function MockChatContainer(props: ChatContainerProps) {
   chat = props;
   const { store } = useChatConnection();
+  chatStore = store;
   return <div data-testid="chat" data-project={props.workspaceControl?.selection.projectId ?? ''}>
     {props.emptyTitle}
+    {props.inputAccessory}
+    <input aria-label="任务草稿" />
     <button onClick={async () => {
       const conversation = await store.getState().createConversation('First task', undefined, props.workspaceControl?.selection.projectId);
-      store.getState().setCurrentConversation({ ...conversation, messages: [] } as ConversationDetail);
+      store.getState().setCurrentConversation({ ...conversation, messages: [{ id: '1', role: 'user', content: 'First task', created_at: '' }] } as ConversationDetail);
       props.onConversationCreated?.(conversation.id);
     }}>发送第一条消息</button>
   </div>;
@@ -36,6 +40,11 @@ function Location() { return <output data-testid="location">{useLocation().searc
 const settle = async () => act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
 const click = async (label: string) => {
   const target = [...document.querySelectorAll<HTMLButtonElement>('button')].find(item => item.getAttribute('aria-label') === label || item.textContent?.replace(/\s/g, '') === label.replace(/\s/g, ''));
+  expect(target, label).toBeTruthy();
+  await act(async () => target!.click()); await settle();
+};
+const chooseWorkspace = async (label: string) => {
+  const target = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent === label);
   expect(target, label).toBeTruthy();
   await act(async () => target!.click()); await settle();
 };
@@ -136,4 +145,112 @@ it('blocks an expired project link instead of sending into a default directory',
   expect(host.textContent).toContain('项目不存在或已移除');
   expect(host.querySelector('[data-testid="chat"]')).toBeNull();
   expect(api.post).not.toHaveBeenCalled();
+});
+
+it('merges the workspace menu above the composer and preserves the draft when switching', async () => {
+  projects = [project];
+  await render();
+  expect(chat.showWorkspaceSelector).toBe(false);
+  const draft = host.querySelector<HTMLInputElement>('[aria-label="任务草稿"]')!;
+  draft.value = 'Keep my draft';
+  await click('切换工作空间：默认会话目录');
+  await chooseWorkspace('project');
+  expect(host.querySelector('.cowork-workspace-name')?.textContent).toBe('project');
+  expect(chat.workspaceControl?.selection.projectId).toBe(4);
+  expect(host.querySelector('[aria-label="任务草稿"]')).toBe(draft);
+  expect(draft.value).toBe('Keep my draft');
+  await click('切换工作空间：project');
+  await chooseWorkspace('使用默认会话目录');
+  expect(chat.workspaceControl?.selection.projectId).toBeUndefined();
+  expect(api.post).not.toHaveBeenCalled();
+});
+
+it('binds a folder from the upper menu without resetting the draft', async () => {
+  await render();
+  const draft = host.querySelector<HTMLInputElement>('[aria-label="任务草稿"]')!;
+  draft.value = 'Keep folder task';
+  await click('切换工作空间：默认会话目录');
+  await chooseWorkspace('选择系统目录…');
+  expect(chat.workspaceControl?.busy).toBe(true);
+  await click('选择测试目录');
+  expect(chat.workspaceControl?.selection.projectId).toBe(4);
+  expect(host.querySelector('[aria-label="任务草稿"]')).toBe(draft);
+  expect(draft.value).toBe('Keep folder task');
+  expect(api.post).toHaveBeenCalledTimes(1);
+});
+
+it('locks the workspace after the first message and enables it again for a new chat', async () => {
+  projects = [project];
+  await render('/apps/cowork?project=4');
+  await click('发送第一条消息');
+  expect(host.querySelector('.cowork-workspace-strip button')).toBeNull();
+  expect(host.querySelector('.cowork-workspace-name')?.textContent).toBe('project');
+  expect(host.querySelector('.cowork-workspace-strip')?.textContent).not.toContain('已锁定');
+  const requests = vi.mocked(api.post).mock.calls.length;
+  await act(async () => { await expect(chat.workspaceControl!.onChange({})).rejects.toThrow('已锁定'); });
+  expect(api.post).toHaveBeenCalledTimes(requests);
+  await click('New chat');
+  expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(false);
+  expect(host.querySelector('.cowork-workspace-status')).toBeNull();
+});
+
+it('keeps a reopened conversation read-only using the server lock', async () => {
+  await render('/apps/cowork?conversation=9');
+  expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(true);
+  await act(async () => chatStore.getState().setCurrentConversation({
+    id: '9', title: 'Existing', workspace_locked: true, messages: [],
+    working_directory: '/work/existing', created_at: '', updated_at: '',
+  }));
+  expect(host.querySelector('.cowork-workspace-strip button')).toBeNull();
+  expect(host.querySelector('.cowork-workspace-control')?.getAttribute('title')).toContain('/work/existing');
+});
+
+it('blocks switching while the first conversation is being created and recovers after failure', async () => {
+  await render();
+  await act(async () => chatStore.setState({ isLoading: true }));
+  expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(true);
+  await act(async () => { await expect(chat.workspaceControl!.onChange({ projectId: 4 })).rejects.toThrow('请等待'); });
+  await act(async () => chatStore.setState({ isLoading: false }));
+  expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(false);
+});
+
+it('highlights a project conversation once and falls back to Recents when its project is collapsed', async () => {
+  projects = [project];
+  await render('/apps/cowork?project=4');
+  await click('发送第一条消息');
+  expect(host.querySelectorAll('.cowork-conversation[aria-current="page"]')).toHaveLength(1);
+  expect(host.querySelector('.cowork-project-chats .cowork-conversation[aria-current="page"]')).not.toBeNull();
+  expect(host.querySelector('.cowork-project-row.is-active')).toBeNull();
+  await click('收起 project');
+  expect(host.querySelectorAll('.cowork-conversation[aria-current="page"]')).toHaveLength(1);
+  expect(host.querySelector('.cowork-project-chats')).toBeNull();
+  await click('展开 project');
+  expect(host.querySelectorAll('.cowork-conversation[aria-current="page"]')).toHaveLength(1);
+  expect(host.querySelector('.cowork-project-chats .cowork-conversation[aria-current="page"]')).not.toBeNull();
+});
+
+it('starts a fresh draft in the project selected by its New chat button', async () => {
+  projects = [project];
+  await render();
+  await click('发送第一条消息');
+  const previousDraft = host.querySelector('[aria-label="任务草稿"]');
+  await click('在 project 中新建对话');
+  expect(chat.conversationId).toBeNull();
+  expect(chat.workspaceControl?.selection.projectId).toBe(4);
+  expect(host.querySelector('[aria-label="任务草稿"]')).not.toBe(previousDraft);
+  expect(host.querySelector('output')?.textContent).toContain('project=4');
+  expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(false);
+  await click('发送第一条消息');
+  expect(api.post).toHaveBeenLastCalledWith('/conversations/?scope=cowork', expect.objectContaining({ project_id: 4 }), expect.anything());
+});
+
+it('opens the workspace sidebar from the top-right header without a duplicate chat toolbar', async () => {
+  await render();
+  expect(chat.showWorkspaceSidebar).toBe(false);
+  expect(host.querySelector('.cowork-header [aria-label="新建对话"]')).toBeNull();
+  expect(host.querySelectorAll('[aria-label="打开右侧栏"]')).toHaveLength(1);
+  expect(host.querySelector('.cowork-header [aria-label="打开右侧栏"]')).not.toBeNull();
+  await click('打开右侧栏');
+  expect(document.body.textContent).toContain('会话工作空间');
+  expect(host.querySelector('[aria-label="打开右侧栏"]')?.getAttribute('aria-expanded')).toBe('true');
 });

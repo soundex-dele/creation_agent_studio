@@ -74,6 +74,18 @@ describe('mobile page scrolling', () => {
     }
     expect(declarationsAt(styles, ['.cowork-chat .chat-input-area'], width)['padding-bottom']).toContain('safe-area-inset-bottom');
     expect(declarationsAt(styles, ['.cowork-navigation-drawer .ant-drawer-body'], width).overflow).toBe('hidden');
+    const workspaceControl = declarationsAt(styles, ['.cowork-workspace-control'], width);
+    expect(workspaceControl['min-width']).toBe('0');
+    expect(workspaceControl['min-height']).toBe('44px');
+    expect(declarationsAt(styles, ['.cowork-workspace-name'], width)['text-overflow']).toBe('ellipsis');
+    const projectActions = declarationsAt(styles, ['.cowork-project-action'], width);
+    expect(projectActions.opacity).toBe(width <= 767 ? '1' : '0');
+    expect(projectActions['pointer-events']).toBe(width <= 767 ? 'auto' : 'none');
+    for (const state of ['hover', 'focus-within']) {
+      const focusedActions = declarationsAt(styles, [`.cowork-project-row:${state} .cowork-project-action`], width);
+      expect(focusedActions.opacity).toBe('1');
+      expect(focusedActions['pointer-events']).toBe('auto');
+    }
   });
 
   it.each([320, 568, 667, 844])('keeps preview content available in a short %ipx viewport', width => {

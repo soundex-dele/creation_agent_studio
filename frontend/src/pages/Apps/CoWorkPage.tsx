@@ -3,6 +3,7 @@ import { Alert, Button, Drawer, Dropdown, Input, Modal, Spin, message } from 'an
 import { ChevronDown, ChevronRight, Folder, Menu, Monitor, MoreHorizontal, Plus, Sparkles, SquarePen, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import ChatContainer from '@/components/Chat/ChatContainer';
+import ChatWorkspaceSidebar from '@/components/Chat/ChatWorkspaceSidebar';
 import { ChatConnectionContext } from '@/components/Chat/ChatConnectionContext';
 import type { ComposerContext } from '@/components/Chat/MessageInput';
 import { createConversationStore, type Conversation, type ConversationDetail } from '@/stores/useConversationStore';
@@ -17,6 +18,10 @@ import './CoWorkPage.css';
 type CoworkApi = ReturnType<typeof createCoworkApi>;
 type Selection = Pick<ComposerContext, 'projectId' | 'workingDirectory'>;
 type Page<T> = { results: T[]; next: string | null };
+
+const workspaceIsLocked = (conversation: ConversationDetail | null) => Boolean(
+  conversation?.workspace_locked || conversation?.messages.some(item => item.role === 'user'),
+);
 
 function useProjects(api: CoworkApi, revision: number, selectedId?: number) {
   const [items, setItems] = useState<Project[]>([]);
@@ -105,27 +110,35 @@ function ConversationRows({ list, selected, onSelect }: {
   </>;
 }
 
-function ProjectRow({ project, api, revision, selected, active, disabled, onNew, onSelect, onManage }: {
+function ProjectRow({ project, api, revision, selected, active, disabled, onNew, onSelect, onManage, onSelectionVisible }: {
   project: Project; api: CoworkApi; revision: number; selected: string | null; active: boolean; disabled: boolean;
   onNew: (project: Project) => void; onSelect: (conversation: Conversation) => void;
   onManage: (project: Project, action: 'rename' | 'delete') => void;
+  onSelectionVisible: (id: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(active);
   const list = useConversations(api, revision, project.id, expanded);
   useEffect(() => { if (active) setExpanded(true); }, [active]);
+  useEffect(() => {
+    if (!active) return;
+    onSelectionVisible(expanded && list.items.some(item => item.id === selected) ? selected : null);
+    return () => onSelectionVisible(null);
+  }, [active, expanded, list.items, selected, onSelectionVisible]);
   return <div className="cowork-project">
-    <div className={`cowork-project-row${active ? ' is-active' : ''}`}>
+    <div className="cowork-project-row">
       <button className="cowork-icon" aria-label={`${expanded ? '收起' : '展开'} ${project.title}`} aria-expanded={expanded}
         onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
       <button className="cowork-project-name" disabled={disabled} onClick={() => onNew(project)} title={project.working_directory}>
         <Folder size={17} aria-hidden="true" /><span>{project.title}</span>
       </button>
+      <button className="cowork-icon cowork-project-action" disabled={disabled} onClick={() => onNew(project)}
+        aria-label={`在 ${project.title} 中新建对话`} title="New chat"><SquarePen size={17} aria-hidden="true" /></button>
       <Dropdown trigger={['click']} menu={{ items: [{ key: 'rename', label: '重命名' }, { key: 'delete', label: '移除项目', danger: true }],
         onClick: ({ key }) => onManage(project, key as 'rename' | 'delete') }}>
-        <button className="cowork-icon" disabled={disabled} aria-label={`管理 ${project.title}`}><MoreHorizontal size={17} /></button>
+        <button className="cowork-icon cowork-project-action" disabled={disabled} aria-label={`管理 ${project.title}`}><MoreHorizontal size={17} /></button>
       </Dropdown>
     </div>
-    {expanded && <div className="cowork-project-chats"><ConversationRows list={list} selected={selected} onSelect={onSelect} /></div>}
+    {expanded && <div className="cowork-project-chats"><ConversationRows list={list} selected={active ? selected : null} onSelect={onSelect} /></div>}
   </div>;
 }
 
@@ -140,6 +153,8 @@ function CoWorkWorkspace() {
   const [store] = useState(() => createConversationStore(undefined, api, 'cowork-conversations'));
   const current = store(state => state.currentConversation);
   const runStatus = store(state => state.activeRun?.status);
+  const loadingConversation = store(state => state.isLoading);
+  const streamingMessageId = store(state => state.streamingMessageId);
   const [params, setParams] = useSearchParams();
   const mounted = useRef(true);
   const locationKey = useRef(params.toString());
@@ -153,8 +168,10 @@ function CoWorkWorkspace() {
   const { items: projects, setItems: setProjects, loading: projectsLoading, error: projectsError, more: projectsMore, loadMore: loadMoreProjects } = useProjects(api, revision, projectId);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [recentsExpanded, setRecentsExpanded] = useState(true);
+  const [visibleProjectSelection, setVisibleProjectSelection] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [workspaceFolderOpen, setWorkspaceFolderOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draftVersion, setDraftVersion] = useState(0);
   const [management, setManagement] = useState<{ project: Project; action: 'rename' | 'delete' } | null>(null);
@@ -166,6 +183,12 @@ function CoWorkWorkspace() {
   const invalidProject = !conversationId && Boolean(requestedProject) && !projectsLoading && !projectsError && !selectedProject;
   const connection = useMemo(() => ({ api, store, online: true, remote: false }), [api, store]);
   const selection = useMemo<Selection>(() => ({ projectId }), [projectId]);
+  const workspaceLocked = ownsConversation && workspaceIsLocked(current);
+  const workspaceUnavailable = busy || loadingConversation || Boolean(streamingMessageId)
+    || Boolean(conversationId && !ownsConversation)
+    || Boolean(!conversationId && requestedProject && !selectedProject);
+  const workspacePath = selectedProject?.working_directory || (ownsConversation ? current?.working_directory : undefined);
+  const workspaceName = selectedProject?.title || (projectId ? '正在加载工作空间…' : '默认会话目录');
   const refresh = useCallback(() => setRevision(value => value + 1), []);
 
   useEffect(() => {
@@ -184,6 +207,7 @@ function CoWorkWorkspace() {
       return next;
     }, { replace });
     setSidebarOpen(false);
+    setWorkspaceFolderOpen(false);
   };
   const newChat = (project?: Project) => {
     if (busy) return;
@@ -196,7 +220,11 @@ function CoWorkWorkspace() {
     navigate(item.id, item.project ?? undefined);
   };
   const changeWorkspace = async (next: Selection) => {
-    if (busy) throw new Error('正在更新工作空间');
+    const latest = store.getState();
+    if (conversationId && latest.currentConversation?.id === conversationId && workspaceIsLocked(latest.currentConversation)) {
+      throw new Error('发送消息后工作空间已锁定，如需切换请新建对话。');
+    }
+    if (workspaceUnavailable || latest.isLoading || latest.streamingMessageId) throw new Error('请等待当前操作完成后再切换工作空间');
     setBusy(true);
     const origin = locationKey.current;
     try {
@@ -218,6 +246,12 @@ function CoWorkWorkspace() {
       } else navigate(null, next.projectId, true);
       refresh();
     } finally { setBusy(false); }
+  };
+  const selectWorkspace = async (next: Selection) => {
+    try {
+      await changeWorkspace(next);
+      setWorkspaceFolderOpen(false);
+    } catch (error) { message.error(coworkError(error, '切换工作空间失败')); }
   };
   const createProject = async (path: string) => {
     if (busy) return;
@@ -268,6 +302,7 @@ function CoWorkWorkspace() {
       {projectsExpanded && <div className="cowork-projects">
         {projects.map(project => <ProjectRow key={project.id} project={project} api={api} revision={revision}
           selected={conversationId} active={projectId === project.id} disabled={busy} onNew={newChat} onSelect={selectConversation}
+          onSelectionVisible={setVisibleProjectSelection}
           onManage={(project, action) => { setManagement({ project, action }); setTitle(project.title); setManagementError(''); }} />)}
         {projectsLoading && <div className="cowork-list-state"><Spin size="small" /></div>}
         {projectsError && <div role="alert" className="cowork-list-state">{projectsError}<Button type="link" onClick={refresh}>重试</Button></div>}
@@ -275,7 +310,7 @@ function CoWorkWorkspace() {
         {projectsMore && <button className="cowork-more" disabled={projectsLoading} onClick={loadMoreProjects}>Show more</button>}
       </div>}
       <div className="cowork-section-heading"><button aria-expanded={recentsExpanded} onClick={() => setRecentsExpanded(value => !value)}>Recents</button></div>
-      {recentsExpanded && <ConversationRows list={recents} selected={conversationId} onSelect={selectConversation} />}
+      {recentsExpanded && <ConversationRows list={recents} selected={visibleProjectSelection === conversationId ? null : conversationId} onSelect={selectConversation} />}
     </div>
   </div>;
 
@@ -286,7 +321,7 @@ function CoWorkWorkspace() {
         <header className="cowork-header">
           {mobile && <button className="cowork-icon" aria-label="打开 CoWork 导航" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>}
           <span title={selectedProject?.working_directory}>{selectedProject?.title || 'CoWork'}</span>
-          <button className="cowork-icon" disabled={busy} onClick={() => newChat()} aria-label="新建对话"><SquarePen size={18} /></button>
+          <ChatWorkspaceSidebar key={conversationId || 'draft'} conversationId={conversationId} />
         </header>
         <div className="cowork-chat">
           {invalidProject ? <Alert type="error" showIcon message="项目不存在或已移除" action={<Button onClick={() => newChat()}>新建对话</Button>} /> :
@@ -295,14 +330,42 @@ function CoWorkWorkspace() {
               emptyTitle={selectedProject ? `在 ${selectedProject.title} 中，我们要完成什么？` : '今天，我们一起完成什么？'}
               emptyDescription={selectedProject ? '描述任务，AI 将在这个项目的文件夹中协作。' : '直接开始对话，或绑定文件夹创建一个 Project。'}
               inputPlaceholder="描述你的任务…"
-              inputAccessory={<div className="cowork-workspace-strip"><span title={selectedProject?.working_directory}><Folder size={16} aria-hidden="true" />{selectedProject?.title || '默认会话目录'}</span><span><Monitor size={16} aria-hidden="true" />当前后端</span></div>}
-              workspaceControl={{ selection, projects, onChange: changeWorkspace, busy: busy || Boolean(conversationId && !ownsConversation) || Boolean(!conversationId && requestedProject && !selectedProject) }}
+              showWorkspaceSelector={false}
+              showWorkspaceSidebar={false}
+              inputAccessory={<div className="cowork-workspace-strip">
+                {workspaceLocked ? <div className="cowork-workspace-control" title={workspacePath || workspaceName}>
+                  <Folder size={16} aria-hidden="true" /><span className="cowork-workspace-name">{workspaceName}</span>
+                </div> : <Dropdown trigger={['click']} disabled={workspaceUnavailable} menu={{
+                  selectedKeys: [projectId ? String(projectId) : 'none'],
+                  items: [
+                    { key: 'none', label: '使用默认会话目录' },
+                    { key: 'system-directory', label: '选择系统目录…' },
+                    ...projects.map(project => ({ key: String(project.id), label: project.title })),
+                    ...(projectsMore ? [{ key: 'more', label: '加载更多工作空间', disabled: projectsLoading }] : []),
+                  ],
+                  onClick: ({ key }) => {
+                    if (workspaceUnavailable) return;
+                    if (key === 'more') loadMoreProjects();
+                    else if (key === 'system-directory') setWorkspaceFolderOpen(true);
+                    else void selectWorkspace({ projectId: key === 'none' ? undefined : Number(key) });
+                  },
+                }}>
+                  <button type="button" className="cowork-workspace-control" disabled={workspaceUnavailable}
+                    aria-label={`切换工作空间：${workspaceName}`} title={workspacePath || '发送第一条消息前可以切换工作空间'}>
+                    <Folder size={16} aria-hidden="true" /><span className="cowork-workspace-name">{workspaceName}</span><ChevronDown size={14} aria-hidden="true" />
+                  </button>
+                </Dropdown>}
+                <span className="cowork-workspace-host"><Monitor size={16} aria-hidden="true" />当前后端</span>
+              </div>}
+              workspaceControl={{ selection, projects, onChange: changeWorkspace, busy: workspaceUnavailable || workspaceFolderOpen }}
               onConversationCreated={id => { navigate(id, store.getState().currentConversation?.project ?? undefined, true); refresh(); }} />}
         </div>
       </main>
       <Drawer open={mobile && sidebarOpen} onClose={() => setSidebarOpen(false)} placement="left" width="min(88vw, 320px)"
         closable={false} rootClassName="cowork-navigation-drawer" aria-label="CoWork 导航">{sidebar}</Drawer>
       <FolderPickerModal apiClient={api} title="选择项目文件夹（当前后端机器）" open={folderOpen} onClose={() => { if (!busy) setFolderOpen(false); }} onSelect={path => void createProject(path)} />
+      <FolderPickerModal apiClient={api} title="选择工作空间（当前后端机器）" open={workspaceFolderOpen && !workspaceLocked}
+        onClose={() => { if (!busy) setWorkspaceFolderOpen(false); }} onSelect={path => void selectWorkspace({ workingDirectory: path })} />
       <Modal title={management?.action === 'delete' ? '移除 Project' : '重命名 Project'} open={Boolean(management)}
         onCancel={() => { if (!busy) setManagement(null); }} onOk={() => void saveManagement()} confirmLoading={busy}
         okText={management?.action === 'delete' ? '移除项目和对话' : '保存'} cancelText="取消"

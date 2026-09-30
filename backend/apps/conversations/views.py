@@ -330,7 +330,10 @@ class ConversationViewSet(viewsets.ViewSet):
             conversation = get_object_or_404(Conversation.objects.select_for_update(), pk=conversation.pk)
             if conversation.workspace_locked:
                 transaction.set_rollback(True)
-                return Response({'detail': '此对话使用应用或流程的固定工作空间。'}, status=409)
+                detail = ('发送消息后工作空间已锁定，如需切换请新建对话。'
+                          if conversation.scope == 'cowork'
+                          else '此对话使用应用或流程的固定工作空间。')
+                return Response({'detail': detail}, status=409)
             if ConversationDetailSerializer().get_active_run(conversation):
                 transaction.set_rollback(True)
                 return Response({'detail': '请等待当前任务结束后再切换工作空间。'}, status=409)

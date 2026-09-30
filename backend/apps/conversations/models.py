@@ -76,6 +76,7 @@ class Conversation(models.Model):
     def workspace_locked(self):
         return bool(
             self.chat_application_id or self.process_id or self.agent_locked
+            or (self.scope == 'cowork' and self.messages.filter(role='user').exists())
             or hasattr(self, 'document_session')
             or (self.project_id and (
                 self.project.application_id or self.project.workflow_id
