@@ -28,6 +28,24 @@ function declarationsAt(sources: string[], selectors: string[], width: number, h
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('keeps prompt master document scrolling bounded at %ipx', width => {
+    const page = readSource('../../pages/Apps/PromptMasterPage.tsx');
+    const css = readSource('../../pages/Apps/PromptMasterPage.css');
+    expect(page).toContain('className="prompt-master-page app-scroll-page"');
+    expect(readSource('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<PromptMasterPage />)}</ApplicationShell>');
+    for (const height of [320, 900]) {
+      const root = declarationsAt([globalStyles, css], ['.app-scroll-page', '.prompt-master-page'], width, height);
+      expect(root.height).toBe('100%');
+      expect(root['min-width']).toBe('0');
+      expect(root['min-height']).toBe('0');
+      expect(root['overflow-y']).toBe('auto');
+      expect(root.padding).toContain('safe-area-inset-bottom');
+      expect(declarationsAt([css], ['.pm-results-grid'], width, height)['grid-template-columns'])
+        .toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+    }
+    expect(css).not.toMatch(/(?:100dvh|100vh|touch-action:\s*none)/);
+  });
+
   it.each([320, 375, 390, 767, 768, 844, 1440])('bounds CoWork navigation and chat panes at %ipx, including short screens', width => {
     const page = readSource('../../pages/Apps/CoWorkPage.tsx');
     const styles = [readSource('../../pages/Apps/CoWorkPage.css'), readSource('../../components/Chat/ChatContainer.css')];

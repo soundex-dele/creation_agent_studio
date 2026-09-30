@@ -36,6 +36,7 @@ const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'))
 const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
 const KitchenAssistantPage = lazy(() => import('@/pages/Apps/KitchenAssistantPage'));
+const PromptMasterPage = lazy(() => import('@/pages/Apps/PromptMasterPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
@@ -85,6 +86,10 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  {
+    path: '/applications/:applicationId/prompt-master',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<PromptMasterPage />)}</ApplicationShell></ProtectedRoute>,
+  },
   {
     path: '/apps/cowork',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<CoWorkPage />)}</ApplicationShell></ProtectedRoute>,
