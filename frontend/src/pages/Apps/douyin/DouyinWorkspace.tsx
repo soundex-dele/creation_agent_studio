@@ -17,6 +17,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
   const [refresh, setRefresh] = useState(0); const [editing, setEditing] = useState(false); const [deleting, setDeleting] = useState(false);
   const [notes, setNotes] = useState({ group: '', notes: '' }); const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
   const [brief, setBrief] = useState<Brief>({ production_format: 'talking_head', positioning: '', audience: '', theme: '', duration: 60, conditions: '' }); const [source, setSource] = useState('');
+  useEffect(() => { let active = true; if (client.profiles) void client.profiles().then(data => { const profile = data.results?.find(p => p.is_default); if (active && profile) setBrief(old => ({ ...old, positioning: old.positioning || profile.positioning, audience: old.audience || profile.audience, conditions: old.conditions || profile.conditions })); }).catch(() => { /* Manual creation remains available. */ }); return () => { active = false; }; }, [client]);
   useEffect(() => { let active = true; void client.brands().then((rows) => { if (active) setBrands(rows); }).catch(() => { /* Brand reference is optional; ordinary creation remains available. */ }); return () => { active = false; }; }, [client]);
   useEffect(() => {
     let active = true; let timer: ReturnType<typeof setTimeout>;
@@ -119,7 +120,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
         {visibleTask.kind === 'script' && visibleTask.status === 'succeeded' && <ScriptEditor key={visibleTask.id} client={client} accountId={accountId} taskId={visibleTask.id} />}
       </section>}
       <Modal className="douyin-modal" open={editing} title="账号备注" onCancel={() => setEditing(false)} confirmLoading={busy} onOk={() => { setBusy(true); void client.save(accountId, notes).then((a) => { setAccount(a); setEditing(false); }).catch((e) => setError(documentError(e))).finally(() => setBusy(false)); }}><div className="douyin-form"><label>分组<Input value={notes.group} maxLength={100} onChange={(e) => setNotes({ ...notes, group: e.target.value })} /></label><label>备注<Input.TextArea rows={6} value={notes.notes} maxLength={5000} onChange={(e) => setNotes({ ...notes, notes: e.target.value })} /></label></div></Modal>
-      <Modal title="移除对标账号" open={deleting} okText="移除账号" okButtonProps={{ danger: true }} onCancel={() => setDeleting(false)} onOk={() => { void client.remove(accountId).then(onRemoved).catch((e) => setError(documentError(e))); }}><p>将删除该账号的作品数据、分析和脚本历史，并取消正在执行的任务。已导出的文件保留。</p></Modal>
+      <Modal title="移除对标账号" open={deleting} okText="移除账号" okButtonProps={{ danger: true }} onCancel={() => setDeleting(false)} onOk={() => { void client.remove(accountId).then(onRemoved).catch((e) => setError(documentError(e))); }}><p>将停止该账号订阅、取消关联任务，并删除作品数据及依赖它的研究结果。已保存的独立选题和创作文案保留，来源标记不可用；已导出的文件保留。</p></Modal>
     </>}
   </section>;
 }

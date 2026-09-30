@@ -160,6 +160,7 @@ print('STUDIO_SUPERUSER_EXISTS=' + str(get_user_model().objects.filter(**filters
     Start-ManagedService 'backend' $pythonBin @('manage.py', 'runserver', "${backendHost}:$backendPort", '--noreload') $backendDir
     if ($workerEnabled) {
         Start-ManagedService 'worker' $pythonBin @('manage.py', 'run_execution_coordinator', '--worker-pool', 'all') $backendDir
+        Start-ManagedService 'scheduler' $pythonBin @('manage.py', 'run_automation_scheduler') $backendDir
     }
     if (Test-Enabled $hostEnabled) {
         Start-ManagedService 'remote-connector' $pythonBin @('manage.py', 'run_remote_connector') $backendDir

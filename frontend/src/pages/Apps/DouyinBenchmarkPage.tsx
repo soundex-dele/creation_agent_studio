@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Alert, Button, Empty, Input, Modal, Pagination, Select, Spin } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Pagination, Select, Spin, Tabs } from 'antd';
 import { ArrowLeft, ArrowRight, ArrowUpRight, Clapperboard, FolderOpen, LockKeyhole, Plus, ScanSearch, Settings2, UsersRound } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -11,11 +11,15 @@ import { douyinApi, type DouyinAccount } from '@/services/douyinBenchmark';
 import { DouyinWorkspace } from './douyin/DouyinWorkspace';
 import { CollectorSettings } from './douyin/CollectorSettings';
 import './DouyinBenchmarkPage.css';
+import { ResearchHub } from './douyin/ResearchHub';
+import './douyin/ResearchHub.css';
 
 export function DouyinHome({ base }: { base: string }) {
   const client = useMemo(() => douyinApi(base), [base]);
   const [params, setParams] = useSearchParams();
   const accountId = params.get('account');
+  const view = params.get('view') || '';
+  const setView = (value: string) => setParams(old => { const next = new URLSearchParams(old); next.delete('account'); if (value) next.set('view', value); else next.delete('view'); return next; });
   const [accounts, setAccounts] = useState<DouyinAccount[]>([]);
   const [connection, setConnection] = useState<{ connected: boolean; message: string } | null>(null);
   const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
@@ -23,7 +27,7 @@ export function DouyinHome({ base }: { base: string }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [open, setOpen] = useState(false); const [busy, setBusy] = useState(false); const [formError, setFormError] = useState('');
   const [form, setForm] = useState({ source: '', count: 50, group: '', notes: '' });
-  const navigate = (id: string | null) => setParams((old) => { const next = new URLSearchParams(old); if (id) next.set('account', id); else next.delete('account'); return next; });
+  const navigate = (id: string | null) => setParams((old) => { const next = new URLSearchParams(old); if (id) { next.set('account', id); next.delete('view'); } else { next.delete('account'); next.delete('view'); }  return next; });
   useEffect(() => {
     let active = true;
     setLoading(true); setError('');
@@ -37,14 +41,16 @@ export function DouyinHome({ base }: { base: string }) {
       <div className="douyin-title"><span className="douyin-app-mark"><ScanSearch size={26} aria-hidden="true" /></span><div><small>内容研究 · 创作工作台</small><h1>抖音对标助手</h1></div></div>
       <p>找到值得研究的作品，把结构与方法变成你的拍摄脚本。</p>
     </div><div className="douyin-actions douyin-header-actions"><Button icon={<Settings2 size={16} aria-hidden="true" />} onClick={() => setSettingsOpen(true)}>采集设置</Button>{accountId && <Button icon={<UsersRound size={16} aria-hidden="true" />} onClick={() => navigate(null)}>全部账号</Button>}<Button type="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => { setOpen(true); setFormError(''); }}>添加对标账号</Button></div></header>
-    {!accountId && <section className="douyin-intro" aria-label="研究与创作流程">
+    <Tabs className="douyin-top-nav" activeKey={view || 'research'} onChange={setView} items={[{ key: 'research', label: '对标研究' }, { key: 'ideas', label: '选题库' }, { key: 'create', label: '创作中心' }, { key: 'review', label: '作品复盘' }, { key: 'subscriptions', label: '订阅通知' }]} />
+    {!accountId && !view && <div className="douyin-actions"><Button type="primary" onClick={() => setView('research')}>跨账号研究与选题雷达</Button><Button onClick={() => setView('profiles')}>个人创作档案</Button></div>}
+    {!accountId && !view && <section className="douyin-intro" aria-label="研究与创作流程">
       <div className="douyin-intro-copy"><span className="douyin-eyebrow">从观察到表达</span><h2>读懂好内容，<br />找到你的创作方向。</h2><p>把值得学习的账号放在一起，<br />从真实作品中积累下一条视频的灵感。</p></div>
       <ol className="douyin-process">
         {[{ icon: UsersRound, title: '收集对标', description: '建立账号库，采集作品样本' }, { icon: ScanSearch, title: '研究内容', description: '拆解口播与画面，核对分析出处' }, { icon: Clapperboard, title: '开始创作', description: '结合自身定位，形成拍摄脚本' }].map(({ icon: Icon, title, description }, index) => <li key={title}><span className="douyin-process-icon"><Icon size={20} aria-hidden="true" /></span><div><span className="douyin-step-number">0{index + 1}</span><h3>{title}</h3><p>{description}</p></div></li>)}
       </ol>
     </section>}
     {connection && <Alert className="douyin-connection" type={connection.connected ? 'success' : 'warning'} showIcon message={connection.message} action={<Button size="small" onClick={() => setRefresh((v) => v + 1)}>检查配置</Button>} />}
-    {accountId ? <DouyinWorkspace key={accountId} client={client} accountId={accountId} onRemoved={() => { navigate(null); setRefresh((v) => v + 1); }} /> : <section className="douyin-panel douyin-library">
+    {view ? <ResearchHub base={base} section={view} onSection={setView} openAccount={navigate} /> : accountId ? <DouyinWorkspace key={accountId} client={client} accountId={accountId} onRemoved={() => { navigate(null); setRefresh((v) => v + 1); }} /> : <section className="douyin-panel douyin-library">
       <div className="douyin-section-title"><div><span className="douyin-eyebrow">账号库</span><h2>我的对标账号 {!loading && !error && <span className="douyin-count">{count}</span>}</h2></div><span className="douyin-private"><LockKeyhole size={14} aria-hidden="true" />个人资料与创作历史仅自己可见</span></div>
       {error ? <Alert type="error" message={error} action={<Button onClick={() => setRefresh((v) => v + 1)}>重试</Button>} /> : loading ? <div className="douyin-loading" role="status"><Spin /><span>正在加载对标账号…</span></div> : !accounts.length ? <div className="douyin-empty"><Empty image={<span className="douyin-empty-icon"><UsersRound size={32} aria-hidden="true" /></span>} description={<><h3>你的内容研究，从这里开始</h3><p>添加第一个账号，开始研究选题和内容结构</p></>}><Button type="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => { setOpen(true); setFormError(''); }}>添加账号</Button></Empty></div> : <div className="douyin-account-grid">{accounts.map((a) => <button type="button" className="douyin-account-card" key={a.id} onClick={() => navigate(a.id)}><span className="douyin-card-top"><span className="douyin-avatar" aria-hidden="true">{Array.from(a.name || '待')[0]}</span><ArrowUpRight className="douyin-card-arrow" size={20} aria-hidden="true" /></span><strong className="douyin-card-name">{a.name || '待采集账号'}</strong><span className="douyin-card-description">{a.profile.signature || a.notes || '采集作品后查看账号分析'}</span><span className="douyin-card-footer"><span className="douyin-group"><FolderOpen size={14} aria-hidden="true" />{a.group || '未分组'}</span><span className="douyin-card-enter">进入研究<ArrowRight size={14} aria-hidden="true" /></span></span></button>)}</div>}
       <Pagination current={page} total={count} pageSize={20} showSizeChanger={false} hideOnSinglePage onChange={setPage} />

@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: douyin-benchmark
-  version: 1.0.0
+  version: 1.1.0
   name: 抖音对标助手
-  description: 采集对标账号，拆解突出作品，复刻改写爆款文案，创作有依据的口播与拍摄脚本。
+  description: 跨账号发现选题，拆解视频与评论需求，积累创作档案和脚本，订阅作品增长并复盘自己的内容。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
   icon: "标"
   color: "#2563EB"
@@ -34,5 +34,5 @@ spec:
     django_app: app_center.douyin_benchmark.backend.apps.DouyinBenchmarkConfig
     urlconf: app_center.douyin_benchmark.backend.urls
     executor_entrypoint: app_center.douyin_benchmark.runtime.execute
-  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  database: {mode: django-migrations, schema_version: 2, tenant_scoped: true}
   install: {scope: per-organization, activate: true}

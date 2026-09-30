@@ -25,7 +25,7 @@ class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         ref_name = "DouyinAccount"
-        fields = ["id", "source_url", "platform_id", "name", "group", "notes", "profile", "updated_at"]
+        fields = ["id", "source_url", "platform_id", "name", "group", "notes", "is_owned", "profile", "updated_at"]
         read_only_fields = ["id", "source_url", "platform_id", "name", "profile", "updated_at"]
         extra_kwargs = {"notes": {"max_length": 5000}}
 
@@ -50,6 +50,7 @@ class TaskInput(serializers.Serializer):
     conditions = serializers.CharField(max_length=3000, allow_blank=True, default="")
     production_format = serializers.ChoiceField(choices=list(FORMAT_LABELS.items()), default=DEFAULT_FORMAT)
     brand_profile_id = serializers.UUIDField(required=False, allow_null=True)
+    profile_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs["kind"] == "transcribe":
@@ -77,7 +78,7 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         ref_name = "DouyinTask"
-        fields = ["id", "kind", "work_id", "run_id", "status", "stage", "error", "progress", "output", "sources", "copy_context", "created_at"]
+        fields = ["id", "account_id", "kind", "work_id", "run_id", "status", "stage", "error", "progress", "output", "sources", "copy_context", "created_at"]
 
     def get_status(self, obj) -> str:
         return obj.run.status if obj.run else "failed"
@@ -92,6 +93,11 @@ class TaskSerializer(serializers.ModelSerializer):
     @swagger_serializer_method(serializer_or_field=serializers.JSONField())
     def get_output(self, obj):
         value = dict(obj.output)
+        if obj.kind == 'variants' and obj.input.get('source_version_id'):
+            source = ScriptVersion.objects.filter(pk=obj.input['source_version_id'], task__owner_id=obj.owner_id,
+                task__application_id=obj.application_id, task__organization_id=obj.organization_id).first()
+            if source:
+                value['source_task_id'] = str(source.task_id)
         if "frames" in value:
             value["frames"] = [{"id": f["id"], "time": f["time"]} for f in value["frames"]]
         return value
@@ -118,6 +124,9 @@ class ScriptEdit(serializers.Serializer):
     def validate_content(self, value):
         from .analysis import validate_script, validate_rewrite
         try:
+            if self.context.get('kind') == 'variants':
+                from .research_runtime import validate_variants
+                return validate_variants(value)
             return (validate_rewrite if self.context.get("kind") == "rewrite" else validate_script)(value)
         except (ValueError, AttributeError) as exc:
             raise serializers.ValidationError(str(exc))

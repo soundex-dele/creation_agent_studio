@@ -94,7 +94,14 @@ class CollectorConfigView(BaseView):
 
     @swagger_auto_schema(responses={204: "已清除个人采集配置"})
     def delete(self, request, **kwargs):
-        CollectorConfig.objects.filter(organization_id=self.kwargs["organization_id"], application=self.app(), owner=request.user).delete()
+        from .models import Subscription
+        from django.db.models import F
+        app = self.app()
+        with transaction.atomic():
+            CollectorConfig.objects.filter(organization_id=self.kwargs['organization_id'], application=app, owner=request.user).delete()
+            Subscription.objects.filter(application=app, owner=request.user).update(enabled=False, next_run_at=None, blocked_reason='采集配置已清除。', revision=F('revision') + 1)
+            for task in Task.objects.filter(application=app, owner=request.user, kind__in=['collect', 'comments', 'refresh']).select_related('run'):
+                cancel(task)
         return Response(status=204)
 
 
@@ -140,8 +147,27 @@ class AccountView(BaseView):
     @transaction.atomic
     def delete(self, request, **kwargs):
         account = self.account(True)
+        from .models import TaskSource, Inspiration
+        related = Task.objects.filter(source_links__account=account).distinct()
+        for task in related.select_related('run'):
+            cancel(task)
+        authored = related.filter(kind__in=['script', 'rewrite', 'variants'])
+        for document in authored:
+            document.account_id, document.work_id, document.input = None, None, {}
+            document.request_key = f'preserved:{document.pk}'
+            document.save(update_fields=['account', 'work', 'input', 'request_key'])
+            document.source_links.all().delete()
+        related.delete()
         for task in account.tasks.select_related("run"):
             cancel(task)
+        # Authored documents survive account removal with their frozen context scrubbed.
+        authored = account.tasks.filter(kind__in=['script', 'rewrite', 'variants'])
+        for document in authored:
+            document.account_id, document.work_id, document.input = None, None, {}
+            document.request_key = f'preserved:{document.pk}'
+            document.save(update_fields=['account', 'work', 'input', 'request_key'])
+            document.source_links.all().delete()
+        Inspiration.objects.filter(work__account=account).update(source_task=None, source_ref='', source_time=None)
         # Private files are cleaned by the maintenance command after rows are removed.
         account.delete()
         return Response(status=204)
@@ -252,7 +278,7 @@ class VersionsView(BaseView):
     @transaction.atomic
     def post(self, request, **kwargs):
         task = self.task(True)
-        if task.kind not in ("script", "rewrite") or not task.run or task.run.status != "succeeded":
+        if task.kind not in ("script", "rewrite", "variants") or not task.run or task.run.status != "succeeded":
             raise ValidationError("请选择已完成的脚本或改写文案。")
         serializer = ScriptEdit(data=request.data, context={"kind": task.kind})
         serializer.is_valid(raise_exception=True)
@@ -267,7 +293,10 @@ class DownloadView(BaseView):
     def get(self, request, **kwargs):
         task = self.task()
         version = get_object_or_404(task.versions, pk=kwargs["version_id"])
-        body = version.content["text"] if task.kind == "rewrite" else markdown(version.content)
+        if task.kind == 'variants':
+            body = '\n\n'.join(f'## {label}\n' + '\n\n'.join(f'{index + 1}. {row["text"]}\n\n{row["angle"]}' for index, row in enumerate(version.content.get(key, []))) for key, label in [('hooks', '开头'), ('titles', '标题'), ('covers', '封面短句')])
+        else:
+            body = version.content["text"] if task.kind == "rewrite" else markdown(version.content)
         response = HttpResponse(body, content_type="text/markdown; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="douyin-{task.kind}-v{version.revision}.md"'
         return response

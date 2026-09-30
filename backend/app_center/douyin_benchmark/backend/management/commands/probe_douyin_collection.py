@@ -20,6 +20,7 @@ class Command(BaseCommand):
         parser.add_argument("--application", required=True, type=int)
         parser.add_argument("--owner", required=True, type=int)
         parser.add_argument("--account", required=True, help="Saved account UUID")
+        parser.add_argument('--comments', action='store_true', help='Also verify a bounded first page of normalized comments.')
 
     def handle(self, *args, **options):
         try:
@@ -40,13 +41,17 @@ class Command(BaseCommand):
             if not video:
                 raise ValueError("前两页没有10分钟内可供验证的视频。")
             detail = client.detail(video["platform_id"])
+            comment_count = None
+            if options['comments']:
+                comment_rows, _ = next(client.comment_pages(video['platform_id'], 20))
+                comment_count = len(comment_rows)
             media = (detail.get("media") or {}).get("video") or {}
             if not media.get("url"):
                 raise ValueError("没有可下载的视频地址。")
             with tempfile.TemporaryDirectory(prefix="douyin-probe-") as directory, override_settings(DOUYIN_MEDIA_ROOT=Path(directory)):
                 path = download(media["url"], "probe/source.mp4", lambda: None, headers=client.media_headers())
                 duration = probe(path)
-            self.stdout.write(json.dumps({"verified": True, "pages": pages, "works": len(items), "video_duration": duration,
+            self.stdout.write(json.dumps({"verified": True, "pages": pages, "works": len(items), "video_duration": duration, 'comments': comment_count,
                 "metrics_present": {k: sum(item[k] is not None for item in items) for k in ("likes", "comments", "collects", "shares")}}, ensure_ascii=False))
         except (CollectionError, ValueError) as exc:
             raise CommandError(str(exc)) from None

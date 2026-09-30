@@ -94,8 +94,47 @@ class LocalDTKClient(DTKClient):
 
     @log_operation
     def fetch(self, path, params):
-        operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail"}[path]
-        return invoke(operation, private_config(config_for(self.application, self.owner)), params, self.check)
+        operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail", "/comments": "comments", "/replies": "replies"}[path]
+        for attempt in range(2):
+            try:
+                return invoke(operation, private_config(config_for(self.application, self.owner)), params, self.check)
+            except CollectionError as exc:
+                if attempt or exc.code not in {'timeout', 'unavailable'}:
+                    raise
+                for _ in range(8):
+                    self.check()
+                    time.sleep(.25)
+
+    def comment_pages(self, platform_id, count, parent_id=None):
+        cursor, cursors, seen = None, set(), set()
+        while len(seen) < count:
+            self.check()
+            params = {'count': min(20, count - len(seen))}
+            params.update({'item_id': platform_id, 'comment_id': parent_id} if parent_id else {'aweme_id': platform_id})
+            if cursor:
+                params['cursor'] = cursor
+            page = self.fetch('/replies' if parent_id else '/comments', params)
+            if not isinstance(page, dict) or not isinstance(page.get('items'), list):
+                raise CollectionError('invalid')
+            rows = []
+            for row in page['items']:
+                key = str(row.get('comment_id') or '')
+                if not key or not isinstance(row.get('text'), str):
+                    raise CollectionError('invalid')
+                if key not in seen:
+                    seen.add(key)
+                    rows.append(row)
+                if len(seen) >= count:
+                    break
+            done = len(seen) >= count or not page.get('has_more')
+            yield rows, done
+            if done:
+                return
+            cursor = page.get('cursor')
+            if not cursor or cursor in cursors:
+                raise CollectionError('pagination')
+            cursors.add(cursor)
+            time.sleep(1)
 
     def media_headers(self):
         config = config_for(self.application, self.owner)

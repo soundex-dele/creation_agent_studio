@@ -10,10 +10,11 @@ from django.db import OperationalError, connection, transaction
 from django.utils import timezone
 from modules.tenancy.database import tenant_database_context
 from modules.execution.models import Run, RunLease
+from modules.execution.runtime.child import _SuspendExecution
 from .backend.transcription import transcribe_segments
 from .backend.creation_formats import DEFAULT_FORMAT, format_instruction
 from .backend.models import Task, Work, Snapshot, ScriptVersion
-from .backend.access import account_for
+from .backend.access import account_for, application_for
 from .backend.provider import CollectionError
 from .backend.collector_config import LocalDTKClient as DTKClient
 from .backend.scoring import rank
@@ -23,15 +24,19 @@ from .backend import media, analysis
 @contextmanager
 def current(payload, sink):
     with tenant_database_context(payload["organization_id"]), transaction.atomic():
-        task = Task.objects.select_for_update().select_related("account__owner", "account__organization", "account__application", "run").filter(
-            pk=payload["input"]["task_id"], run_id=payload["run_id"], account__organization_id=payload["organization_id"]).first()
+        task = Task.objects.select_for_update().select_related("account", "owner", "organization", "application", "run").filter(
+            pk=payload["input"]["task_id"], run_id=payload["run_id"], organization_id=payload["organization_id"]).first()
         run = Run.objects.select_for_update().filter(pk=payload["run_id"], status="running", current_attempt_id=payload["attempt_id"]).first()
         if sink.cancelled or not task or not run or not RunLease.objects.filter(attempt_id=payload["attempt_id"],
                 released_at__isnull=True, expires_at__gt=timezone.now()).exists():
             raise InterruptedError("任务已取消或执行租约已失效。")
-        if run.owner_id != task.account.owner_id or str(run.source_id) != str(task.account.application_id):
+        if run.owner_id != task.owner_id or str(run.source_id) != str(task.application_id):
             raise PermissionError("任务不匹配。")
-        account_for(task.account.owner, payload["organization_id"], task.account.application_id, task.account_id)
+        application_for(task.owner, payload["organization_id"], task.application_id)
+        if task.account_id:
+            account_for(task.owner, payload["organization_id"], task.application_id, task.account_id)
+        if task.source_links.exclude(account__organization_id=task.organization_id, account__application_id=task.application_id, account__owner_id=task.owner_id).exists():
+            raise PermissionError('来源归属已变更。')
         yield task
 
 
@@ -84,19 +89,43 @@ def execute(payload, sink):
                 active.account.profile = profile
                 active.account.save()
             captured = timezone.now()
+            had_samples = task.account.works.exists()
             complete, reason = False, ""
             try:
                 for items, complete in client.pages(profile["platform_id"], data["count"]):
                     with current(payload, sink) as active:
                         for item in items:
-                            work, _ = Work.objects.update_or_create(account=active.account, platform_id=item["platform_id"], defaults={"media_urls": item.pop("_media_urls", []), "metadata": item})
+                            work, created = Work.objects.update_or_create(account=active.account, platform_id=item["platform_id"], defaults={"media_urls": item.pop("_media_urls", []), "metadata": item})
                             Snapshot.objects.update_or_create(batch=active, work=work, defaults={"data": item, "captured_at": captured})
+                            from .backend.research import record_observation, task_scope
+                            from .backend.subscriptions import growth_notice, notice
+                            point, new_point = record_observation(active, work, item, captured)
+                            if new_point:
+                                growth_notice(active, work, point)
+                            if created and had_samples and active.input.get('subscription_id'):
+                                notice(task_scope(active), f'new:{work.pk}', '对标账号发布了新作品', 'new_work',
+                                    {'title': item.get('title', ''), 'task_id': str(active.pk)}, active.account, work)
                         size = active.snapshots.count()
                     save("采集作品", progress={"current": size, "total": data["count"]})
             except CollectionError as exc:
                 reason = str(exc)
+                with current(payload, sink) as active:
+                    from .backend.subscriptions import collection_failure
+                    collection_failure(active, exc.code, reason)
                 if not task.snapshots.exists():
                     raise
+            if data.get('tracked_work_ids') and not reason:
+                from .backend.research_runtime import refresh_work
+                for tracked in task.account.works.filter(pk__in=data['tracked_work_ids']).exclude(snapshot__batch=task):
+                    try:
+                        refresh_work(task, tracked, client, payload, sink)
+                    except CollectionError as exc:
+                        reason = str(exc)
+                        with current(payload, sink) as active:
+                            from .backend.subscriptions import collection_failure
+                            collection_failure(active, exc.code, reason)
+                        if exc.code in {'auth', 'credentials', 'challenge', 'risk_control'}:
+                            break
             rows = [{"id": str(s.work_id), **s.data} for s in task.snapshots.all()]
             result = rank(rows, captured)
             result.update({"requested": data["count"], "actual": len(rows), "complete": complete,
@@ -198,9 +227,10 @@ def execute(payload, sink):
                 ScriptVersion.objects.create(task=active, revision=1, content=output)
             save("completed", output)
         else:
-            raise ValueError("不支持的抖音任务类型。")
+            from .backend.research_runtime import execute_research
+            execute_research(task, payload, sink, save, check, config)
         return {"task_id": str(task.pk)}
-    except InterruptedError:
+    except (InterruptedError, _SuspendExecution):
         raise
     except Exception as exc:
         # Keep diagnostics useful without logging exception text, locals, URLs or credentials.
@@ -210,6 +240,10 @@ def execute(payload, sink):
             " > ".join(f"{f.name}:{f.lineno}" for f in frames))
         message = str(exc) if isinstance(exc, (ValueError, CollectionError)) else f"{last_stage}失败（{type(exc).__name__}），请检查执行服务日志后重试。"
         try:
+            if isinstance(exc, CollectionError):
+                with current(payload, sink) as active:
+                    from .backend.subscriptions import collection_failure
+                    collection_failure(active, exc.code, message)
             save("failed", error=message[:500])
         except (InterruptedError, PermissionError):
             pass

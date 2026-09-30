@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from douyin_video_url import (ADAPTER, NativeSigner, Platform, SigningRequest,
     SigningSession, StaticFingerprint, RequestSpec, WreqTransport, Outcome,
     load_cookies, make_identity, configure, httpx, DtkError, VideoUrlError)
-from dtk.platforms.douyin.endpoints import AUTHOR_PROFILE, AUTHOR_POSTS, CONTENT_DETAIL
+from dtk.platforms.douyin.endpoints import AUTHOR_PROFILE, AUTHOR_POSTS, CONTENT_DETAIL, COMMENTS, COMMENT_REPLIES
 from dtk.urls import resolve, identify, ResourceKind
 
 
@@ -70,6 +70,10 @@ async def request(endpoint, params, identity, transport=None):
             result = ADAPTER.parse_author(payload)
         elif endpoint == AUTHOR_POSTS:
             result = ADAPTER.parse_author_posts(payload, fetched_at=now)
+        elif endpoint == COMMENTS:
+            result = ADAPTER.parse_comments(payload, content_id=params['aweme_id'])
+        elif endpoint == COMMENT_REPLIES:
+            result = ADAPTER.parse_comment_replies(payload, content_id=params['item_id'], parent_id=params['comment_id'])
         else:
             result = ADAPTER.parse_content(payload, fetched_at=now)
         return result.model_dump(mode="json")
@@ -100,6 +104,10 @@ async def run(data):
         return await request(AUTHOR_POSTS, params, identity)
     if operation == "detail":
         return await request(CONTENT_DETAIL, params, identity)
+    if operation == "comments":
+        return await request(COMMENTS, params, identity)
+    if operation == "replies":
+        return await request(COMMENT_REPLIES, params, identity)
     raise BridgeError("invalid")
 
 

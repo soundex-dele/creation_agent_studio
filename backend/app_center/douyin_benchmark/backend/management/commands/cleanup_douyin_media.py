@@ -14,7 +14,7 @@ class Command(BaseCommand):
         task_ids, uploads = set(), set()
         for org_id in Organization.objects.values_list("id", flat=True).iterator():
             with tenant_database_context(org_id):
-                tasks = Task.objects.filter(account__organization_id=org_id)
+                tasks = Task.objects.filter(organization_id=org_id)
                 task_ids.update(str(pk) for pk in tasks.values_list("id", flat=True))
                 keys = list(Work.objects.filter(account__organization_id=org_id).values_list("media_key", flat=True))
                 keys += [value.get("media_key", "") for value in tasks.values_list("input", flat=True)]

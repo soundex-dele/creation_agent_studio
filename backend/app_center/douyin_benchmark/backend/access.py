@@ -29,7 +29,11 @@ def can_access_run(user, run):
         return False
     try:
         task = Task.objects.get(pk=run.input.get("task_id"), run=run)
-        account_for(user, run.organization_id, run.source_id, task.account_id)
+        application_for(user, run.organization_id, run.source_id)
+        if task.owner_id != user.id or task.organization_id != run.organization_id or str(task.application_id) != str(run.source_id):
+            return False
+        if task.account_id:
+            account_for(user, run.organization_id, run.source_id, task.account_id)
         return True
     except (Task.DoesNotExist, Http404, APIException, ValueError, ValidationError):
         return False

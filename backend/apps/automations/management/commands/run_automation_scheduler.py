@@ -35,6 +35,11 @@ class Command(BaseCommand):
                 max(30, int(options["poll_interval"] * 3)),
             )
             self.dispatch_due()
+            try:
+                from app_center.douyin_benchmark.backend.subscriptions import dispatch_due
+                dispatch_due()
+            except Exception:
+                logger.exception("douyin.subscription scheduler pass failed")
             if options["once"]:
                 return
             time.sleep(options["poll_interval"])

@@ -198,6 +198,9 @@ case "${EXECUTION_WORKERS_ENABLED}" in
     start_service "worker" \
       bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all' \
       _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+    start_service "scheduler" \
+      bash -c 'cd "$1" && exec "$2" manage.py run_automation_scheduler' \
+      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
     ;;
 esac
 

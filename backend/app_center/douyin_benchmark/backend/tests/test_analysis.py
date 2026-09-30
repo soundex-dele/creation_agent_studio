@@ -13,7 +13,7 @@ from .. import analysis
 def context(monkeypatch):
     organization = SimpleNamespace(providers=Mock())
     organization.providers.exists.return_value = False
-    task = SimpleNamespace(id="task", account=SimpleNamespace(organization=organization, owner=object()))
+    task = SimpleNamespace(id="task", organization=organization, owner=object())
     route = Mock(side_effect=analysis.ProviderUnavailable())
     engine = Mock(adapter_name="codex")
     engine.complete.return_value = LLMResponse(content='```json\n{"claims": []}\n```',
@@ -31,9 +31,9 @@ def context(monkeypatch):
 def test_unconfigured_text_uses_system_engine_and_records_usage(context):
     cancelled = Mock(return_value=False)
     assert analysis.call_model(context.task, "分析账号", {"works": []}, {}, cancelled=cancelled) == {"claims": []}
-    context.quota.assert_called_once_with(context.task.account.organization, context.task.account.owner)
+    context.quota.assert_called_once_with(context.task.organization, context.task.owner)
     context.request.assert_not_called()
-    assert context.factory.call_args.args == (context.task.account.organization,)
+    assert context.factory.call_args.args == (context.task.organization,)
     assert not Path(context.factory.call_args.kwargs["working_directory"]).exists()
     options = context.engine.complete.call_args.kwargs
     assert options["cancelled"] is cancelled and options["permission_mode"] == "default"
@@ -49,7 +49,7 @@ def test_unconfigured_text_uses_system_engine_and_records_usage(context):
     ({}, None, True),
 ])
 def test_explicit_api_routes_vision_and_disabled_providers_do_not_fallback(context, config, frames, has_providers):
-    context.task.account.organization.providers.exists.return_value = has_providers
+    context.task.organization.providers.exists.return_value = has_providers
     with pytest.raises(ValueError, match="组织设置"):
         analysis.call_model(context.task, "test", {}, config, frames=frames)
     context.factory.assert_not_called()

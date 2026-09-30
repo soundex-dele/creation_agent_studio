@@ -4,6 +4,56 @@ import { describe, expect, it } from 'vitest';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 describe('Douyin document workspace layout contract', () => {
+  it.each([320, 375, 390, 767, 768, 1280])('reflows research columns at %spx without changing scroll ownership', width => {
+    const css = postcss.parse(read('../../pages/Apps/douyin/ResearchHub.css'));
+    const columns: Record<string, string> = {};
+    const names = ['.douyin-research-filters', '.douyin-idea-board', '.douyin-research-metrics'];
+    css.walkRules(rule => {
+      if (rule.parent?.type === 'atrule' && rule.parent.name === 'media') {
+        const max = rule.parent.params.match(/max-width:\s*(\d+)px/);
+        if (max && width > Number(max[1])) return;
+      }
+      for (const name of names) if (rule.selectors.includes(name)) rule.walkDecls('grid-template-columns', decl => { columns[name] = decl.value; });
+    });
+    expect(columns['.douyin-research-filters']).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))');
+    expect(columns['.douyin-idea-board']).toBe(width <= 767 ? 'minmax(0, 1fr)' : width <= 1100 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))');
+    expect(columns['.douyin-research-metrics']).toBe(width <= 767 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))');
+  });
+  it('uses text and chart tokens with sufficient light and dark card contrast', () => {
+    const variables = postcss.parse(read('../../styles/variables.css'));
+    const luminance = (hex: string) => {
+      const channels = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+      return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+    };
+    let themes = 0;
+    variables.walkRules(rule => {
+      const tokens: Record<string, string> = {};
+      rule.walkDecls(decl => { tokens[decl.prop] = decl.value; });
+      if (!tokens['--color-bg-card'] || !tokens['--color-text-sec']) return;
+      const ratio = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
+      expect(ratio(tokens['--color-text'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(tokens['--color-text-sec'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(tokens['--color-primary'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(3);
+      themes++;
+    });
+    expect(themes).toBe(2);
+  });
+  it('keeps research filters, board and metric cards shrinkable and responsive', () => {
+    const source = read('../../pages/Apps/douyin/ResearchHub.css');
+    const css = postcss.parse(source);
+    expect(source).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(source).toContain('.douyin-research-card .ant-checkbox-wrapper { display: inline-flex; align-items: center');
+    expect(source).toContain('.douyin-research-field');
+    expect(source).not.toMatch(/\.douyin-research-hub\s+label\s*\{/);
+    expect(source).toContain('var(--color-bg-card)');
+    css.walkRules(rule => {
+      if (rule.selector.includes('.douyin-research-hub')) rule.walkDecls('height', decl => expect(decl.value).not.toMatch(/vh/));
+    });
+    expect(source).toContain('@media (max-width: 767px)');
+    expect(source).toContain('.douyin-research-filters, .douyin-research-grid, .douyin-comparison-grid, .douyin-idea-board { grid-template-columns: minmax(0, 1fr); }');
+    expect(source).toContain('min-height: 44px');
+    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+  });
   it.each([320, 375, 390, 767, 768, 1280])('keeps replication text columns within the scroll page at %spx', width => {
     const css = postcss.parse(read('../../pages/Apps/DouyinBenchmarkPage.css'));
     let columns = '';

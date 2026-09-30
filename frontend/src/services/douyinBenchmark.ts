@@ -4,7 +4,7 @@ import type { AnimationDestination } from './douyinAnimation';
 export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; screen: string; language: string; timezone: string; updated_at: string | null }
 export type CollectorConfigInput = Pick<CollectorConfig, 'user_agent' | 'screen' | 'language' | 'timezone'> & { cookies?: string };
 
-export interface DouyinAccount { id: string; source_url: string; name: string; group: string; notes: string; profile: { signature?: string }; updated_at: string }
+export interface DouyinAccount { is_owned?: boolean; id: string; source_url: string; name: string; group: string; notes: string; profile: { signature?: string }; updated_at: string }
 export interface DouyinWork {
   id: string; platform_id: string; title: string; description: string; url: string; video_url?: string; cover: string; kind: string;
   published_at: string | null; duration: number | null; likes: number | null; comments: number | null;
@@ -40,13 +40,14 @@ export interface WorkResult { items: DouyinWork[]; sample_size: number; median_l
 export interface ScriptVersion { id: string; revision: number; content: Script; created_at: string }
 export interface Brief { production_format: ProductionFormat; positioning: string; audience: string; theme: string; duration: number; conditions: string; brand_profile_id?: string | null }
 export const kindLabels: Record<Kind, string> = { collect: '采集', account: '账号分析', breakdown: '视频拆解', topics: '选题', script: '脚本', transcribe: '文案转写', rewrite: '文案复刻' };
-export const isActive = (task: DouyinTask) => !['succeeded', 'failed', 'cancelled'].includes(task.status);
+export const isActive = (task: { status: string }) => !['succeeded', 'failed', 'cancelled'].includes(task.status);
 export const metric = (value: number | null | undefined) => value == null ? '未获取' : value.toLocaleString('zh-CN');
 const key = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } });
 export function douyinApi(base: string) {
   const account = (id: string) => `${base}/accounts/${id}`;
   const task = (id: string, taskId: string) => `${account(id)}/tasks/${taskId}`;
   return {
+    profiles: () => api.get<{ count: number; results: { id: string; name: string; positioning: string; audience: string; conditions: string; is_default: boolean }[] }>(`${base}/creator-profiles`),
     animationDestinations: () => api.get<AnimationDestination[]>(`${base}/animation-integrations`),
     collectorConfig: () => api.get<CollectorConfig>(`${base}/collector-config`),
     saveCollectorConfig: (body: CollectorConfigInput) => api.put<CollectorConfig>(`${base}/collector-config`, body),

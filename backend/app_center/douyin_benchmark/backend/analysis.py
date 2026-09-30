@@ -32,7 +32,7 @@ def parse_result(raw):
 
 @log_operation
 def call_engine(task, prompt, content, cancelled):
-    account = task.account
+    account = task
     try:
         # Analysis needs only the supplied evidence, never the repository or tools.
         with TemporaryDirectory(prefix="douyin-analysis-", ignore_cleanup_errors=True) as directory:
@@ -58,7 +58,7 @@ def call_engine(task, prompt, content, cancelled):
 
 @log_operation
 def call_model(task, prompt, data, config, frames=None, *, cancelled=None):
-    account = task.account
+    account = task
     enforce_member_token_quota(account.organization, account.owner)
     if cancelled and cancelled():
         raise InterruptedError("任务已取消。")

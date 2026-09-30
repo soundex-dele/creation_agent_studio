@@ -71,6 +71,11 @@ def frozen_input(account, values):
                 raise ValidationError("请填写自己的账号定位和创作主题。")
             data["brief"] = {k: data[k] for k in ("positioning", "audience", "theme", "duration", "conditions")}
             data["brief"]["production_format"] = data.get("production_format", DEFAULT_FORMAT)
+            from .models import CreatorProfile
+            profiles = CreatorProfile.objects.filter(organization_id=account.organization_id, application_id=account.application_id, owner_id=account.owner_id)
+            profile = get_object_or_404(profiles, pk=values['profile_id']) if values.get('profile_id') else profiles.filter(is_default=True).first()
+            if profile:
+                data['brief']['profile'] = {key: getattr(profile, key) for key in ['name', 'positioning', 'audience', 'experiences', 'products', 'voice', 'conditions']}
             if values.get("brand_profile_id"):
                 from app_center.brand_library.backend.views import private_profiles
                 profile = get_object_or_404(private_profiles(account.organization_id, account.owner), pk=values["brand_profile_id"])
@@ -111,7 +116,7 @@ def start(account, values, key):
 def cancel(task):
     if task.run and task.run.status in ACTIVE - {"cancelling"}:
         try:
-            submit_run_command(run_id=task.run_id, organization_id=task.account.organization_id, actor=task.account.owner,
+            submit_run_command(run_id=task.run_id, organization_id=task.organization_id, actor=task.owner,
                 command_type="cancel", idempotency_key=f"dy-cancel:{task.pk}")
         except CommandNotAllowed:
             task.run.refresh_from_db()
