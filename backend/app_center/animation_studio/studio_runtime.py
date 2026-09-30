@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import copy
 import json
 import math
@@ -20,6 +22,7 @@ from .backend.media import probe
 from .runtime import ENGINE, PACKAGE, AnimationBuildError, ai_progress, check_cancel, require_engine, report_build_failure, run_process, archive_source, export_video
 
 
+@log_operation
 def ask(run, application, payload, sink, system, content, workspace, *, progress=None):
     check_cancel(sink)
     enforce_member_token_quota(run.organization, run.owner)
@@ -34,6 +37,7 @@ def ask(run, application, payload, sink, system, content, workspace, *, progress
     return decode_json_object(response.content)
 
 
+@log_operation
 def storyboard(run, app, payload, sink, doc, workspace):
     sink.emit("progress.updated", {"stage": "storyboard"})
     previous = {}
@@ -55,6 +59,7 @@ def storyboard(run, app, payload, sink, doc, workspace):
     return validate_document(doc, complete=True)
 
 
+@log_operation
 def persist_result(run, project, values, doc, sink):
     check_cancel(sink)
     sink.emit("progress.updated", {"stage": "saving"})
@@ -65,6 +70,7 @@ def persist_result(run, project, values, doc, sink):
     return {"project_id": str(project.id), "draft_applied": bool(changed), "title": project.title}
 
 
+@log_operation
 def execute_studio(payload, sink, run, app, values):
     if values["action"] == "batch":
         from .backend.batch import execute_batch
@@ -179,6 +185,7 @@ def execute_studio(payload, sink, run, app, values):
         return {**persist_result(run, project, values, doc, sink), "preview_ready": action == "generate"}
 
 
+@log_operation
 def prepare(workspace, doc, user, app):
     doc = validate_document(doc, complete=True)
     records = document_assets(user, app, doc)

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import time
+import logging
 
 import requests
 
 from .models import VideoConfig, VideoTask, VideoTaskStatus
+
+logger = logging.getLogger(__name__)
 
 
 class VideoProvider:
@@ -21,6 +26,7 @@ class VideoProvider:
     def __init__(self, config: VideoConfig) -> None:
         self._config = config
 
+    @log_operation
     def submit(self, prompt: str, **kwargs) -> VideoTask:
         """Submit a video generation task.
 
@@ -48,6 +54,7 @@ class VideoProvider:
                 timeout=self._config.timeout,
             )
             if not resp.ok:
+                logger.error("video.submit state=rejected http_status=%s", resp.status_code)
                 return VideoTask(
                     task_id="",
                     status=VideoTaskStatus.FAILED,
@@ -55,6 +62,7 @@ class VideoProvider:
                 )
             return self._parse_submit_response(resp.json())
         except (requests.ConnectionError, requests.Timeout) as exc:
+            logger.exception("video.submit state=failed")
             return VideoTask(
                 task_id="",
                 status=VideoTaskStatus.FAILED,
@@ -76,6 +84,7 @@ class VideoProvider:
         try:
             resp = requests.get(url, headers=headers, timeout=self._config.timeout)
             if not resp.ok:
+                logger.error("video.poll state=rejected http_status=%s", resp.status_code)
                 return VideoTask(
                     task_id=task_id,
                     status=VideoTaskStatus.FAILED,
@@ -83,12 +92,14 @@ class VideoProvider:
                 )
             return self._parse_check_response(resp.json(), task_id)
         except (requests.ConnectionError, requests.Timeout) as exc:
+            logger.exception("video.poll state=failed")
             return VideoTask(
                 task_id=task_id,
                 status=VideoTaskStatus.FAILED,
                 error=str(exc),
             )
 
+    @log_operation
     def wait_until_done(self, task_id: str, max_wait: float = 600) -> VideoTask:
         """Poll a video task until it completes or fails.
 
@@ -102,11 +113,17 @@ class VideoProvider:
             Final VideoTask state.
         """
         deadline = time.time() + max_wait
+        previous_status = None
         while time.time() < deadline:
             task = self.check(task_id)
+            if task.status != previous_status:
+                logger.log(logging.ERROR if task.status == VideoTaskStatus.FAILED else logging.INFO,
+                           "video.poll state=%s", task.status)
+                previous_status = task.status
             if task.status in (VideoTaskStatus.COMPLETED, VideoTaskStatus.FAILED):
                 return task
             time.sleep(self._config.poll_interval)
+        logger.error("video.poll state=timed_out max_wait_seconds=%s", max_wait)
         return VideoTask(
             task_id=task_id,
             status=VideoTaskStatus.FAILED,
@@ -117,6 +134,7 @@ class VideoProvider:
         """Parse the submit API response. Override for custom formats."""
         task_id = data.get("id") or data.get("task_id") or data.get("request_id", "")
         if not task_id:
+            logger.error("video.submit state=invalid_response reason=missing_task_id")
             return VideoTask(
                 task_id="",
                 status=VideoTaskStatus.FAILED,

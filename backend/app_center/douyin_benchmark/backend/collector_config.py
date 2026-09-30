@@ -1,4 +1,6 @@
 """Personal credentials: encrypted at rest and passed only over a child stdin pipe."""
+
+from core.observability import log_operation
 import base64
 import hashlib
 import json
@@ -42,6 +44,7 @@ def private_config(config):
 
 
 @sensitive_variables()
+@log_operation
 def invoke(operation, config, params=None, check=lambda: None):
     backend = Path(__file__).resolve().parents[3]
     executable = getattr(settings, "DOUYIN_DTK_PYTHON", os.environ.get("DOUYIN_DTK_PYTHON", "")) or str(backend / ".venv-dtk" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
@@ -89,6 +92,7 @@ class LocalDTKClient(DTKClient):
         self.owner = account.owner if account is not None else owner
         self.check = check
 
+    @log_operation
     def fetch(self, path, params):
         operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail"}[path]
         return invoke(operation, private_config(config_for(self.application, self.owner)), params, self.check)
@@ -99,5 +103,6 @@ class LocalDTKClient(DTKClient):
             raise CollectionError("not_configured")
         return {"User-Agent": config.user_agent, "Referer": "https://www.douyin.com/"}
 
+    @log_operation
     def validate(self):
         return invoke("validate", private_config(config_for(self.application, self.owner)), check=self.check)

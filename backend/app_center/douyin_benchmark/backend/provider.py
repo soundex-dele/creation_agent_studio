@@ -2,6 +2,8 @@
 
 The application uses collector_config.LocalDTKClient for direct source calls.
 """
+
+from core.observability import log_operation
 import os
 import re
 import time
@@ -138,6 +140,7 @@ class DTKClient:
         self.session.trust_env = False
         self.session.headers["Authorization"] = f"Bearer {self.key}"
 
+    @log_operation
     def request(self, method, path, **kwargs):
         self.check()
         try:
@@ -157,6 +160,7 @@ class DTKClient:
             raise CollectionError("auth" if any(s in code for s in ("AUTH", "IDENTITY", "COOKIE")) else "limited" if "LIMIT" in code else "unavailable")
         return body.get("data")
 
+    @log_operation
     def fetch(self, path, params):
         data = self.request("GET", path, params={**params, "wait": 0, "refresh": "true"})
         deadline = time.monotonic() + 180
@@ -173,6 +177,7 @@ class DTKClient:
             data = self.request("GET", f'/api/v1/tasks/{data["task_id"]}')
         return data
 
+    @log_operation
     def profile(self, url):
         value = self.fetch("/api/v1/douyin/user", {"url": url})
         if not isinstance(value, dict) or value.get("platform") != "douyin" or not value.get("uid"):
@@ -209,5 +214,6 @@ class DTKClient:
             time.sleep(1)
         raise CollectionError("pagination")
 
+    @log_operation
     def detail(self, platform_id):
         return self.fetch("/api/v1/douyin/video", {"aweme_id": platform_id})

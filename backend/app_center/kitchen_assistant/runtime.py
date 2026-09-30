@@ -1,4 +1,6 @@
 """Kitchen AI executor integrated with platform runs, quotas and usage accounting."""
+
+from core.observability import log_operation
 import json
 import requests
 from django.db import transaction
@@ -17,6 +19,7 @@ PROMPTS = {
 }
 
 
+@log_operation
 def call_model(task, config):
     state = task.state
     enforce_member_token_quota(state.organization, state.owner)
@@ -55,6 +58,7 @@ def call_model(task, config):
         raise ValueError("模型未返回有效 JSON，请手动重试。") from None
 
 
+@log_operation
 def execute(payload, sink):
     run = Run.objects.select_related("owner").get(pk=payload["run_id"], organization_id=payload["organization_id"])
     task = KitchenAITask.objects.for_organization(run.organization_id).select_related("state__owner", "state__organization").get(

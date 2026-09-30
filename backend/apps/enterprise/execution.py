@@ -1,5 +1,7 @@
 """Durable Evaluation adapter that executes a frozen target per test case."""
 
+from core.observability import log_operation
+
 from decimal import Decimal
 
 from django.utils import timezone
@@ -49,6 +51,7 @@ def _score(snapshot, outputs):
     return overall, overall >= threshold, results
 
 
+@log_operation
 def execute_evaluation(run_payload, sink):
     snapshot = dict(run_payload.get("definition_snapshot") or {})
     organization_id = run_payload["organization_id"]

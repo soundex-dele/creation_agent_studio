@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 from django.apps import apps
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -46,6 +48,7 @@ def check_conversation_access(conversation, user):
     return document_for(user, doc.organization_id, doc.application_id, doc.pk)
 
 
+@log_operation
 def prepare_document_message(conversation, user, instruction, context):
     doc = check_conversation_access(conversation, user)
     if doc is None:

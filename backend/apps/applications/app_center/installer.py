@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import importlib
 from copy import deepcopy
 from dataclasses import dataclass
@@ -40,6 +42,7 @@ def _load_callable(dotted_path: str):
     return callback
 
 
+@log_operation
 def sync_package(package: DiscoveredPackage, organization: Organization) -> SyncResult:
     manifest = package.manifest
     metadata = manifest.metadata
@@ -132,6 +135,7 @@ def sync_package(package: DiscoveredPackage, organization: Organization) -> Sync
     return result
 
 
+@log_operation
 def sync_packages(packages: list[DiscoveredPackage], *, organization_id=None) -> SyncResult:
     organizations = Organization.objects.filter(is_active=True).select_related("owner")
     if organization_id:
@@ -143,6 +147,7 @@ def sync_packages(packages: list[DiscoveredPackage], *, organization_id=None) ->
     return total
 
 
+@log_operation
 def install_for_organization(organization: Organization) -> SyncResult:
     """Install every valid per-organization package for a newly created tenant."""
 

@@ -1,4 +1,6 @@
 """Browser-native downloads: scoped cookies and bounded, resumable relay reads."""
+
+from core.observability import log_operation
 import asyncio
 import base64
 import json
@@ -69,6 +71,7 @@ def topic_for_owner(device_id, owner_id):
     return f'device:{device.id}:{device.session_id}'
 
 
+@log_operation
 async def file_rpc(device_id, owner_id, method, path, body=None, key=''):
     validate_request(method, path, body)
     topic = await sync_to_async(topic_for_owner, thread_sensitive=True)(device_id, owner_id)
@@ -135,6 +138,7 @@ def error_response(exc):
 
 
 @csrf_exempt
+@log_operation
 async def create_download(request, device_id):
     if request.method != 'POST':
         return JsonResponse({'detail': '仅支持 POST。'}, status=405)

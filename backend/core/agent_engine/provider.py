@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 
 import requests
 
 from .models import EngineConfig, LLMResponse, TokenUsage
+from core.observability import log_operation
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider:
@@ -15,6 +19,7 @@ class LLMProvider:
         self._config = config
         self._total_usage = TokenUsage()
 
+    @log_operation
     def complete(self, messages: list[dict], **kwargs) -> LLMResponse:
         """Send a chat completion request and return the parsed response."""
         url = f"{self._config.base_url.rstrip('/')}/chat/completions"
@@ -37,6 +42,7 @@ class LLMProvider:
                     timeout=self._config.timeout,
                 )
                 if not resp.ok:
+                    logger.error("llm.complete state=rejected http_status=%s", resp.status_code)
                     return LLMResponse(
                         content="",
                         usage=TokenUsage(),
@@ -47,6 +53,8 @@ class LLMProvider:
                 return self._parse_response(resp.json())
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_error = exc
+                logger.warning("llm.complete state=connection_failed attempt=%s max_attempts=%s",
+                               attempt + 1, self._config.max_retries + 1, exc_info=True)
                 if attempt < self._config.max_retries:
                     time.sleep(attempt + 1)
 
@@ -72,6 +80,8 @@ class LLMProvider:
         the request are retried up to ``max_retries`` times. The underlying
         response is closed when the generator exits.
         """
+        started = time.perf_counter()
+        logger.info("llm.stream state=started messages=%s", len(messages))
         url = f"{self._config.base_url.rstrip('/')}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._config.api_key}",
@@ -96,14 +106,18 @@ class LLMProvider:
                     timeout=self._config.timeout, stream=True,
                 )
                 if not resp.ok:
+                    logger.error("llm.stream state=rejected http_status=%s", resp.status_code)
                     raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
                 break
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_error = exc
                 resp = None
+                logger.warning("llm.stream state=connection_failed attempt=%s max_attempts=%s",
+                               attempt + 1, self._config.max_retries + 1, exc_info=True)
                 if attempt < self._config.max_retries:
                     time.sleep(attempt + 1)
         if resp is None:
+            logger.error("llm.stream state=retry_exhausted")
             raise RuntimeError(str(last_error))
 
         try:
@@ -125,8 +139,15 @@ class LLMProvider:
                         yield delta
                 except (json.JSONDecodeError, KeyError, IndexError):
                     continue
+            logger.info("llm.stream state=completed duration_ms=%.1f",
+                        (time.perf_counter() - started) * 1000)
+        except Exception:
+            logger.exception("llm.stream state=failed")
+            raise
         finally:
             resp.close()
+            logger.info("llm.stream state=closed duration_ms=%.1f",
+                        (time.perf_counter() - started) * 1000)
 
     def _parse_response(self, data: dict) -> LLMResponse:
         try:
@@ -141,6 +162,7 @@ class LLMProvider:
             self._total_usage = self._total_usage + usage
             return LLMResponse(content=content, usage=usage, model=model)
         except (KeyError, IndexError, TypeError) as exc:
+            logger.exception("llm.complete state=invalid_response")
             return LLMResponse(
                 content="",
                 usage=TokenUsage(),

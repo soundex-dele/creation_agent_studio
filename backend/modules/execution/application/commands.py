@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 import time
@@ -347,6 +349,7 @@ def _submit_run_command_once(
     return command, False
 
 
+@log_operation
 def submit_run_command(
     *,
     run_id,

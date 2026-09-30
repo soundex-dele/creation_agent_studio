@@ -1,4 +1,6 @@
 """Durable media adapter. All private result writes are version/lease fenced."""
+
+from core.observability import log_operation
 from contextlib import contextmanager
 from django.db import transaction
 from django.utils import timezone
@@ -30,6 +32,7 @@ def current_record(payload, sink):
         yield record
 
 
+@log_operation
 def execute_meeting(payload, sink):
     def cancelled():
         if sink.cancelled:

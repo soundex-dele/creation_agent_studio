@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import logging
 import time
 from dataclasses import dataclass
@@ -125,6 +127,7 @@ def sync_run_queue_entry(run):
         RunQueueEntry.objects.filter(run=run).delete()
 
 
+@log_operation
 def create_run(
     *,
     organization,
@@ -232,6 +235,7 @@ def mirror_child_output_event(*, child_run_id, organization_id, event_type, payl
     return event
 
 
+@log_operation
 def record_artifact(
     *,
     run_id,
@@ -304,6 +308,7 @@ def record_artifact(
     return artifact, event, True
 
 
+@log_operation
 def suspend_attempt_for_input(
     *,
     run_id,
@@ -397,6 +402,7 @@ def suspend_attempt_for_input(
     return event
 
 
+@log_operation
 def suspend_attempt_for_children(
     *,
     run_id,
@@ -601,6 +607,7 @@ def append_event_and_transition(
     raise ConcurrentRunUpdate("Unable to append event after retries")
 
 
+@log_operation
 def finish_attempt(
     *,
     run_id,
@@ -696,6 +703,7 @@ def finish_attempt(
     return event
 
 
+@log_operation
 def fail_attempt(
     *,
     run_id,

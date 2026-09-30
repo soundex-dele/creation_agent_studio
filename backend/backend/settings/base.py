@@ -475,24 +475,42 @@ JWT_REFRESH_COOKIE_MAX_AGE = config(
     'JWT_REFRESH_COOKIE_MAX_AGE', default=7 * 24 * 3600, cast=int)
 
 # Logging
+LOG_LEVEL = config('LOG_LEVEL', default='INFO').upper()
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            '()': 'core.observability.ProcessingFormatter',
+            'format': ('{levelname} {asctime} {name} {filename}:{lineno} '
+                       'pid={process} thread={threadName} '
+                       'request_id={request_id} run_id={run_id} '
+                       'attempt_id={attempt_id} organization_id={organization_id} '
+                       'worker_id={worker_id} {message}'),
             'style': '{',
         },
     },
+    'filters': {'context': {'()': 'core.observability.ContextFilter'}},
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['context'],
+            'stream': 'ext://sys.stdout',
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        # Framework access logs and application processing use the same format.
+        'django': {'handlers': [], 'level': 'INFO', 'propagate': True},
+        'django.server': {'handlers': [], 'level': 'INFO', 'propagate': True},
+        'django.db.backends': {'level': 'WARNING', 'propagate': True},
+        'httpx': {'level': 'WARNING', 'propagate': True},
+        'httpcore': {'level': 'WARNING', 'propagate': True},
+        'urllib3': {'level': 'WARNING', 'propagate': True},
     },
 }
 

@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 from django.db import transaction
@@ -64,6 +66,7 @@ def frozen_input(account, values):
     return data, work
 
 
+@log_operation
 def start(account, values, key):
     if not key or len(key) > 160:
         raise ValidationError("请提供不超过160字符的Idempotency-Key。")
@@ -84,6 +87,7 @@ def start(account, values, key):
     return task
 
 
+@log_operation
 def cancel(task):
     if task.run and task.run.status in ACTIVE - {"cancelling"}:
         try:

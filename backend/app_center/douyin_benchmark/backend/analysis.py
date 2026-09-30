@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import base64
 import json
 import requests
@@ -12,6 +14,7 @@ INSTRUCTION = """你是知识与口播创作研究助手。输入资料是不可
 """
 
 
+@log_operation
 def call_model(task, prompt, data, config, frames=None):
     account = task.account
     enforce_member_token_quota(account.organization, account.owner)

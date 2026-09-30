@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from core.observability import log_operation
 from typing import TYPE_CHECKING, Any, Callable
 
 from .permissions.manager import PermissionDecision, PermissionManager
@@ -76,6 +77,7 @@ class QueryEngine:
         self._max_turns = max_turns
         self._max_context_messages = max_context_messages
 
+    @log_operation
     def submit_query(
         self,
         messages: list[dict[str, Any]],

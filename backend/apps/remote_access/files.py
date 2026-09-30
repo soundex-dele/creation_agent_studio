@@ -1,4 +1,7 @@
 """Bounded connector-owned file transfers. All file I/O runs outside the event loop."""
+
+from core.observability import log_operation
+import logging
 import asyncio
 import base64
 import errno
@@ -177,6 +180,7 @@ class FileManager:
                 self.streams.clear()
         await asyncio.to_thread(close)
 
+    @log_operation
     def create(self, direction, body, key):
         fingerprint = json.dumps([direction, body], sort_keys=True)
         if key in self.creations:
@@ -257,6 +261,7 @@ class FileManager:
         item['state'] = 'transferring'
         return self.public(item)
 
+    @log_operation
     def complete(self, item):
         if item['state'] == 'completed':
             return self.public(item)
@@ -290,6 +295,7 @@ class FileManager:
                 continue
         raise FileError(409, '同名文件过多，请更换目录或文件名。')
 
+    @log_operation
     def open_stream(self, item, stream_id):
         # A crashed relay cannot retain a slot forever; slow readers reacquire before reading.
         now = time.monotonic()
@@ -315,6 +321,7 @@ class FileManager:
                 item.update(state='failed', detail=exc.detail)
             raise
 
+    @log_operation
     def read_file(self, item, offset, length):
         with regular_file(Path(item['path'])) as source:
             if signature(os.fstat(source.fileno())) != item['signature']:
@@ -345,6 +352,7 @@ class FileManager:
         item['state'] = 'completed' if item['offset'] == item['size'] else 'transferring'
         return self.public(item)
 
+    @log_operation(level=logging.DEBUG)
     def execute(self, method, target, body, key):
         path = validate_request(method, target, body)
         if method == 'POST' and (not isinstance(key, str) or not 1 <= len(key) <= 160):

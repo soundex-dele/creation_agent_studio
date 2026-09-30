@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import base64
 import binascii
 import hashlib
@@ -195,6 +197,7 @@ def license_file_path() -> Path | None:
     return Path(value) if value else None
 
 
+@log_operation
 def save_installed_license(token: str) -> None:
     path = license_file_path()
     if path is None:

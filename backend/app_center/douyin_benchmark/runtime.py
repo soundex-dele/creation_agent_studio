@@ -1,4 +1,6 @@
 """Private durable jobs: input snapshots and all writes fenced by the active lease."""
+
+from core.observability import log_operation
 from contextlib import contextmanager
 from datetime import datetime
 from django.db import transaction
@@ -29,6 +31,7 @@ def current(payload, sink):
         yield task
 
 
+@log_operation
 def execute(payload, sink):
     def check():
         with current(payload, sink):

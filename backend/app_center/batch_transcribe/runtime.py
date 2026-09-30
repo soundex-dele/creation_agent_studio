@@ -1,5 +1,7 @@
 """Durable execution adapter for batch transcription."""
 
+from core.observability import log_operation
+
 import os
 from pathlib import Path
 
@@ -13,6 +15,7 @@ def _is_within_allowed_roots(path, allowed_roots):
     return any(path == root or root in path.parents for root in allowed_roots)
 
 
+@log_operation
 def execute_batch_transcribe(run_payload, sink):
     config = {
         **dict(run_payload.get("effective_config") or {}),

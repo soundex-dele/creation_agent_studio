@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 import time
@@ -362,6 +364,7 @@ def _start_once(
     return run, False
 
 
+@log_operation
 def start_application_run(
     *,
     organization_id,
@@ -402,6 +405,7 @@ def start_application_run(
     raise RuntimeError("Unable to create run after retries")
 
 
+@log_operation
 def start_agent_run(
     *,
     organization_id,
@@ -558,6 +562,7 @@ def start_agent_run(
     return run, False
 
 
+@log_operation
 def start_supervisor_run(
     *,
     organization_id,
@@ -819,6 +824,7 @@ def start_supervisor_run(
     return run, False
 
 
+@log_operation
 def start_workflow_run(
     *, organization, workflow_id, workflow_name, steps, actor,
     input_data, priority, idempotency_key, input_schema=None, output_mapping=None,

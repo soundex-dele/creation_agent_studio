@@ -1,4 +1,6 @@
 """Discover the latest filesystem Skills for the selected Agent adapter."""
+
+from core.observability import log_operation
 import re
 from pathlib import Path
 
@@ -33,6 +35,7 @@ def _frontmatter_value(content: str, key: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+@log_operation
 def discover_runtime_skills(adapter_name: str = "") -> list[dict]:
     """Read current SKILL.md metadata directly from the adapter directory."""
 
@@ -63,6 +66,7 @@ def discover_runtime_skills(adapter_name: str = "") -> list[dict]:
     return sorted(discovered.values(), key=lambda item: item["name"].casefold())
 
 
+@log_operation
 def resolve_runtime_skills(skill_names, adapter_name: str = "") -> list[dict]:
     """Resolve selected names against a fresh adapter-directory scan."""
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import json
 import re
 
@@ -355,6 +357,7 @@ def _final_summary(snapshot, run_input, plan, results, artifacts):
     return response.content
 
 
+@log_operation
 def execute_supervisor(run_payload, sink):
     snapshot = dict(run_payload.get("definition_snapshot") or {})
     snapshot["organization_id"] = run_payload["organization_id"]

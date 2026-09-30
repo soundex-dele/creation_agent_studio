@@ -75,8 +75,7 @@ if not REDIS_ENABLED:
         }
     }
 
-# More verbose logging
-LOGGING['root']['level'] = 'DEBUG'
+# Processing logs are enabled in base settings; LOG_LEVEL=DEBUG opts into detail.
 
 # Email backend for development
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

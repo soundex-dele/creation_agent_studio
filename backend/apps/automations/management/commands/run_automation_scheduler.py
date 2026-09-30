@@ -1,4 +1,7 @@
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand
@@ -23,6 +26,8 @@ class Command(BaseCommand):
         parser.add_argument("--poll-interval", type=float, default=30)
 
     def handle(self, *args, **options):
+        logger.info("automation.scheduler state=started poll_interval=%s once=%s",
+                    options['poll_interval'], options['once'])
         while True:
             cache.set(
                 "automation-scheduler",
@@ -41,6 +46,8 @@ class Command(BaseCommand):
             trigger_type=Automation.TriggerType.SCHEDULE,
             next_run_at__lte=now,
         ).values_list("id", "organization_id")[:500])
+        if candidates:
+            logger.info("automation.scheduler state=dispatching count=%s", len(candidates))
         for automation_id, organization_id in candidates:
             with tenant_database_context(organization_id), transaction.atomic():
                 queryset = Automation.objects.select_related(
@@ -61,6 +68,8 @@ class Command(BaseCommand):
                     scheduled_for = latest_due_time(automation, now)
                     next_run_at = advance_after_due(automation, now)
                 except ScheduleValidationError as exc:
+                    logger.warning("automation.schedule state=blocked automation_id=%s", automation_id,
+                                   exc_info=True)
                     automation.status = Automation.Status.BLOCKED
                     automation.is_active = False
                     automation.next_run_at = None

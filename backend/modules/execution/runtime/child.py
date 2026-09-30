@@ -5,9 +5,14 @@ import queue
 from uuid import uuid4
 from pathlib import Path
 
+from core.observability import log_context, operation, _identifier
+
+
+logger = logging.getLogger(__name__)
+
 
 class _SuspendExecution(Exception):
-    pass
+    log_outcome = "suspended"
 
 
 def _initialize_django():
@@ -55,6 +60,7 @@ class ChildEventSink:
         if self._controls is None:
             raise RuntimeError("Live provider input requires a bidirectional worker")
         request_id = str(uuid4())
+        logger.info("execution.input state=waiting input_request_id=%s", request_id)
         self._queue.put({"kind": "live_input", "input_request_id": request_id,
                          "input_kind": request.get("input_kind", "answer"),
                          "request_payload": request})
@@ -70,6 +76,7 @@ class ChildEventSink:
                     self._deferred_commands.append(command)
             return None
         finally:
+            logger.info("execution.input state=resolved input_request_id=%s", request_id)
             self._queue.put({"kind": "live_input_resolved", "input_request_id": request_id})
 
     @property
@@ -77,6 +84,26 @@ class ChildEventSink:
         return self._cancel_event.is_set()
 
     def emit(self, event_type, payload):
+        # Payloads contain prompts, tool arguments and generated text. Log only
+        # the event type here; durable events retain the detailed UI content.
+        if str(event_type) not in {"output.delta", "output.snapshot", "agent.item"}:
+            level = logging.ERROR if str(event_type).endswith(".failed") else logging.INFO
+            stage = str((payload or {}).get("stage", ""))
+            if event_type == "progress.updated" or str(event_type).endswith(".progress"):
+                # Keep long media jobs observable without logging every audio frame.
+                now = time.monotonic()
+                if (stage == getattr(self, "_last_progress_stage", None)
+                        and now - getattr(self, "_last_progress_log", float("-inf")) < 5):
+                    level = logging.DEBUG
+                else:
+                    self._last_progress_log = now
+                    self._last_progress_stage = stage
+            # Stages are bounded labels; exclude free-text messages/tool arguments.
+            counts = " ".join(f"{key}={payload[key]}" for key in
+                              ("current", "total", "done", "seconds")
+                              if isinstance((payload or {}).get(key), (int, float)))
+            logger.log(level, "execution.event type=%s stage=%s %s",
+                       event_type, _identifier(stage), counts)
         self._queue.put(
             {
                 "kind": "event",
@@ -94,6 +121,7 @@ class ChildEventSink:
             content = content.encode("utf-8")
         if not isinstance(content, bytes):
             raise TypeError("Artifact content must be bytes or text")
+        logger.info("execution.artifact state=submitted bytes=%s", len(content))
         self._queue.put({
             "kind": "artifact",
             "artifact_kind": str(kind),
@@ -138,22 +166,33 @@ class ChildEventSink:
 def execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint, controls=None):
     """Spawn-safe process entry point; adapters receive data and an IPC sink."""
 
+    with log_context(**{key: run_payload.get(key) for key in
+                        ("run_id", "attempt_id", "organization_id", "worker_id")}):
+        _execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint, controls)
+
+
+def _execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint, controls):
     started = time.perf_counter()
     try:
         _initialize_django()
-        logging.getLogger(__name__).info(
+        logger.info(
             "chat_latency stage=child_django_ready run_id=%s init_ms=%.1f",
             run_payload.get("run_id", "unknown"), (time.perf_counter() - started) * 1000,
         )
-        adapter = _load_entrypoint(adapter_entrypoint)
-        output = adapter(run_payload, ChildEventSink(message_queue, cancel_event, controls))
+        with operation("execution.adapter", logger=logger):
+            logger.info("execution.adapter entrypoint=%s state=loading", adapter_entrypoint)
+            adapter = _load_entrypoint(adapter_entrypoint)
+            output = adapter(run_payload, ChildEventSink(message_queue, cancel_event, controls))
         outcome = "cancelled" if cancel_event.is_set() else "succeeded"
+        logger.info("execution.child state=%s duration_ms=%.1f", outcome,
+                    (time.perf_counter() - started) * 1000)
         message_queue.put(
             {"kind": "terminal", "outcome": outcome, "output": output or {}}
         )
     except _SuspendExecution:
         return
     except BaseException as exc:
+        logger.exception("execution.child state=failed error_type=%s", type(exc).__name__)
         message_queue.put(
             {
                 "kind": "terminal",

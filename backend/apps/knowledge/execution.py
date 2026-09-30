@@ -1,3 +1,6 @@
+from core.observability import log_operation
+import logging
+
 import re
 import time
 
@@ -13,7 +16,10 @@ from .models import KnowledgeChunk, KnowledgeDocument
 from .providers import ProviderUnavailable, answer_question, embed_texts
 from .retrieval import chunk_sections
 
+logger = logging.getLogger(__name__)
 
+
+@log_operation
 def execute_knowledge_index(run_payload, sink):
     snapshot = run_payload.get("definition_snapshot") or {}
     revision = int(snapshot["revision"])
@@ -99,6 +105,8 @@ def execute_knowledge_index(run_payload, sink):
                 if "Embedding dimension mismatch" in str(exc):
                     raise
                 embedding_warning = str(exc)[:500]
+                logger.warning("knowledge.index state=lexical_fallback document_id=%s", document.id,
+                               exc_info=True)
                 vectors = [[] for _ in chunks]
         if sink.cancelled:
             _mark_index_cancelled(document.id, revision, run_id)
@@ -206,6 +214,7 @@ def _mark_index_cancelled(document_id, revision, run_id):
         ])
 
 
+@log_operation
 def execute_knowledge_answer(run_payload, sink):
     snapshot = run_payload.get("definition_snapshot") or {}
     results = list(snapshot.get("results") or [])

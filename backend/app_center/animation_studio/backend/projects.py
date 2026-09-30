@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import copy
 from django.db import transaction
 from django.utils import timezone
@@ -23,6 +25,7 @@ def document_assets(user, app, doc):
 
 
 @transaction.atomic
+@log_operation
 def save_draft(project, expected, document):
     doc = validate_document(document, previous=project.draft if project.draft.get("schema_version") == 2 else None)
     updated = AnimationProject.objects.filter(pk=project.pk, revision=expected).update(draft=doc, revision=expected + 1, updated_at=timezone.now())
@@ -37,6 +40,7 @@ def legacy_document(run):
 
 
 @transaction.atomic
+@log_operation
 def import_history(user, app):
     """Idempotently group only chains from this owner/application/tenant."""
     runs = list(runs_for(user, app).filter(input__action="generate").order_by("created_at", "id"))

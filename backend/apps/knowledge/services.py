@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 import uuid
@@ -29,6 +31,7 @@ def source_object_key(document, revision):
 
 
 @transaction.atomic
+@log_operation
 def create_document(*, knowledge_base, actor, title, source_type, filename,
                     mime_type, content, run_context=None):
     checksum = hashlib.sha256(content).hexdigest()
@@ -87,6 +90,7 @@ def create_document(*, knowledge_base, actor, title, source_type, filename,
 
 
 @transaction.atomic
+@log_operation
 def reindex_document(document, actor):
     if document.is_deleted:
         raise ValueError("Deleted documents cannot be reindexed.")
@@ -146,6 +150,7 @@ def replay_answer_run(*, organization, actor, request_data, idempotency_key):
 
 
 @transaction.atomic
+@log_operation
 def start_answer_run(*, organization, actor, query, results, retrieval_mode,
                      answer_provider, answer_model, idempotency_key, request_data):
     fingerprint = _fingerprint(request_data)

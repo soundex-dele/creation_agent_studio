@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 
 import requests
+from core.observability import log_operation
 
 from .models import (
     AsyncTask,
@@ -30,11 +30,11 @@ class JieKouAIService:
     def __init__(self, config: JieKouConfig) -> None:
         self._config = config
         self._total_usage = TokenUsage()
-        logger.info("JieKouAIService initialized, base_url=%s, model=%s",
-                     config.base_url, config.model)
+        logger.info("JieKouAIService initialized, model=%s", config.model)
 
     # ─── Chat ────────────────────────────────────────────────────────
 
+    @log_operation
     def chat(
         self,
         messages: list[dict],
@@ -73,6 +73,7 @@ class JieKouAIService:
 
     # ─── Models ──────────────────────────────────────────────────────
 
+    @log_operation
     def list_models(self) -> list[dict]:
         """Return the model list from the API.
 
@@ -80,7 +81,7 @@ class JieKouAIService:
         On failure returns an empty list.
         """
         url = f"{self._base}/openai/v1/models"
-        logger.info("Fetching model list from %s", url)
+        logger.info("provider.models state=fetching")
         try:
             resp = requests.get(url, headers=self._headers(),
                                 timeout=self._config.timeout)
@@ -89,11 +90,12 @@ class JieKouAIService:
             logger.info("Fetched %d models", len(data))
             return data
         except Exception as exc:
-            logger.warning("Failed to fetch models: %s", exc)
+            logger.warning("provider.models state=failed", exc_info=True)
             return []
 
     # ─── Image (async) ───────────────────────────────────────────────
 
+    @log_operation
     def submit_image(
         self,
         prompt: str,
@@ -108,7 +110,7 @@ class JieKouAIService:
         """
         url = f"{self._base}/v3/async/qwen-image-txt2img"
         body = {"prompt": prompt, "size": size}
-        logger.info("Submit image task: prompt=%r, size=%s", prompt, size)
+        logger.info("provider.image state=submitting size=%s", size)
         return self._post(url, body, parse=self._parse_async_submit)
 
     # ─── Task query (shared by image / video / audio) ────────────────
@@ -122,6 +124,7 @@ class JieKouAIService:
         return self._get(url, params={"task_id": task_id},
                          parse=self._parse_task_result)
 
+    @log_operation
     def wait_for_task(self, task_id: str, max_wait: float = 600) -> AsyncTask:
         """Poll ``get_task_result`` until the task completes or times out."""
         logger.info("Waiting for task %s (max %.0fs)", task_id, max_wait)
@@ -176,7 +179,7 @@ class JieKouAIService:
         last_error: Exception | None = None
         for attempt in range(self._config.max_retries + 1):
             try:
-                logger.info("POST %s body=%s", url, json.dumps(body, ensure_ascii=False))
+                logger.info("provider.request method=POST state=started attempt=%s", attempt + 1)
                 resp = requests.post(
                     url, json=body, headers=self._headers(),
                     timeout=self._config.timeout, stream=stream,
@@ -184,14 +187,14 @@ class JieKouAIService:
                 if stream:
                     resp.raise_for_status()
                     return resp
-                logger.info("POST %s response: HTTP %d body=%s", url, resp.status_code, resp.text)
+                logger.info("provider.request method=POST state=received http_status=%s", resp.status_code)
                 if not resp.ok:
                     return _err(parse, resp=resp)
                 return parse(resp.json())
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_error = exc
-                logger.warning("POST %s error (attempt %d/%d): %s",
-                               url, attempt + 1, self._config.max_retries + 1, exc)
+                logger.warning("provider.request method=POST state=connection_failed attempt=%s max_attempts=%s",
+                               attempt + 1, self._config.max_retries + 1, exc_info=True)
                 if attempt < self._config.max_retries:
                     time.sleep(attempt + 1)
         return _err(parse, last_error=last_error)
@@ -200,19 +203,19 @@ class JieKouAIService:
         last_error: Exception | None = None
         for attempt in range(self._config.max_retries + 1):
             try:
-                logger.info("GET %s params=%s", url, params)
+                logger.debug("provider.request method=GET state=started attempt=%s", attempt + 1)
                 resp = requests.get(
                     url, headers=self._headers(), params=params,
                     timeout=self._config.timeout,
                 )
-                logger.info("GET %s response: HTTP %d body=%s", url, resp.status_code, resp.text)
+                logger.debug("provider.request method=GET state=received http_status=%s", resp.status_code)
                 if not resp.ok:
                     return _err(parse, resp=resp)
                 return parse(resp.json())
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_error = exc
-                logger.warning("GET %s error (attempt %d/%d): %s",
-                               url, attempt + 1, self._config.max_retries + 1, exc)
+                logger.warning("provider.request method=GET state=connection_failed attempt=%s max_attempts=%s",
+                               attempt + 1, self._config.max_retries + 1, exc_info=True)
                 if attempt < self._config.max_retries:
                     time.sleep(attempt + 1)
         return _err(parse, last_error=last_error)
@@ -240,7 +243,7 @@ class JieKouAIService:
             return LLMResponse(content=content, usage=usage,
                                 model=data.get("model", self._config.model))
         except (KeyError, IndexError, TypeError) as exc:
-            logger.error("Failed to parse chat response: %s", exc)
+            logger.exception("provider.chat state=invalid_response")
             return LLMResponse(content="", usage=TokenUsage(),
                                 model=self._config.model, success=False,
                                 error=f"Parse error: {exc}")
@@ -248,7 +251,7 @@ class JieKouAIService:
     def _parse_async_submit(self, data: dict) -> AsyncTask:
         task_id = data.get("task_id", "")
         if not task_id:
-            logger.error("No task_id in async submit response: %s", data)
+            logger.error("provider.task state=invalid_response reason=missing_task_id")
             return AsyncTask(success=False,
                              error=f"No task_id in response: {data}")
         logger.info("Async task submitted: task_id=%s", task_id)
@@ -277,7 +280,7 @@ class JieKouAIService:
             video_urls=[v.get("video_url", "") for v in videos if v.get("video_url")],
             audio_urls=[a.get("audio_url", "") for a in data.get("audios", []) if a.get("audio_url")],
         )
-        logger.info("Task result: id=%s, status=%s (raw=%s), images=%d, videos=%d",
+        logger.debug("Task result: id=%s, status=%s (raw=%s), images=%d, videos=%d",
                       result.task_id, status, raw_status,
                       len(result.image_urls), len(result.video_urls))
         return result
@@ -287,7 +290,9 @@ def _err(parse_fn, resp: requests.Response | None = None,
          last_error: Exception | None = None):
     err = f"HTTP {resp.status_code}: {resp.text}" if resp else str(last_error)
     name = parse_fn.__name__
-    logger.error("Request error (%s): %s", name, err)
+    logger.error("provider.request state=failed parser=%s http_status=%s error_type=%s",
+                 name, resp.status_code if resp is not None else "-",
+                 type(last_error).__name__ if last_error else "-")
     if "chat" in name:
         return LLMResponse(content="", usage=TokenUsage(),
                             model="", success=False, error=err)

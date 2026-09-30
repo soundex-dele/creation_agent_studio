@@ -1,4 +1,7 @@
 """Connector-owned, bounded, ephemeral terminal sessions (no relay persistence)."""
+
+from core.observability import log_operation
+import logging
 import asyncio
 from collections import deque
 from datetime import datetime, timezone
@@ -139,6 +142,7 @@ class TerminalManager:
             self.creations.clear()
             await asyncio.gather(*(session.close() for session in sessions), return_exceptions=True)
 
+    @log_operation(level=logging.DEBUG)
     async def request(self, method, target, body, key):
         path = validate_request(method, target, body)
         suffix = path[len(TERMINAL_ROOT):].strip('/').split('/')
@@ -165,6 +169,7 @@ class TerminalManager:
                     self.sessions.pop(sid)
                 process = await asyncio.to_thread(self.factory, body['cols'], body['rows'])
                 session = Session(process)
+                logging.getLogger(__name__).info("terminal.session state=created session_id=%s", session.id)
                 self.sessions[session.id] = session
                 self.creations[key] = (dict(body), session.id)
                 return 201, session.info(), None
@@ -189,6 +194,7 @@ class TerminalManager:
             result = {'resized': True}
         else:
             await session.close()
+            logging.getLogger(__name__).info("terminal.session state=closed session_id=%s", session.id)
             self.sessions.pop(sid, None)
             result = {'closed': True}
         return 200, result, None

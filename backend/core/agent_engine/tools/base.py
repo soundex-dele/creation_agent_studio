@@ -9,6 +9,8 @@ Following claw_agent_engine's ToolManager pattern:
 from __future__ import annotations
 
 import json
+import logging
+from core.observability import operation
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -178,9 +180,15 @@ class ToolManager:
         """
         tool = self._tools.get(name)
         if tool is None:
+            logging.getLogger(__name__).warning("tool.execute state=unknown_tool")
             return ToolResult.error(f"Unknown tool: {name}")
         try:
-            return tool.execute(**kwargs)
+            with operation(type(tool).__name__, logger=logging.getLogger(__name__)):
+                result = tool.execute(**kwargs)
+                logging.getLogger(__name__).log(
+                    logging.INFO if result.success else logging.ERROR,
+                    "tool.execute state=returned success=%s", result.success)
+                return result
         except Exception as exc:
             return ToolResult.error(f"Tool '{name}' execution failed: {exc}")
 

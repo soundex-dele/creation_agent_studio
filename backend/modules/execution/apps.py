@@ -42,6 +42,11 @@ class ExecutionConfig(AppConfig):
     verbose_name = "Durable Execution"
 
     def ready(self):
+        from django.db.models.signals import post_save
+        from .event_logging import log_run_event
+
+        post_save.connect(log_run_event, sender="execution.RunEvent",
+                          dispatch_uid="execution.log_run_event")
         connection_created.connect(
             configure_sqlite_connection,
             dispatch_uid="execution.configure_sqlite_connection",

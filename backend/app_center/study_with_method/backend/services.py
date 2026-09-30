@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import uuid
 from datetime import timedelta
 from itertools import cycle
@@ -53,6 +55,7 @@ def active_enrollment(profile: StudyProfile, subject=Subject.MATH):
     return profile.enrollments.filter(subject=subject, is_active=True).first()
 
 
+@log_operation
 def generate_multi_subject_week_plan(profile: StudyProfile, *, replace_pending=False):
     """Build a bounded adaptive seven-day plan without rewriting completed work."""
 
@@ -191,6 +194,7 @@ def generate_multi_subject_week_plan(profile: StudyProfile, *, replace_pending=F
     return created
 
 
+@log_operation
 def generate_week_plan(profile: StudyProfile, enrollment: SubjectEnrollment):
     today = timezone.localdate()
     weak_topics = enrollment.weak_topics or []
@@ -228,6 +232,7 @@ def generate_week_plan(profile: StudyProfile, enrollment: SubjectEnrollment):
     return created
 
 
+@log_operation
 def reschedule_overdue_tasks(profile: StudyProfile):
     today = timezone.localdate()
     overdue = list(
@@ -246,6 +251,7 @@ def reschedule_overdue_tasks(profile: StudyProfile):
             task.save(update_fields=("status", "metadata", "updated_at"))
 
 
+@log_operation
 def record_attempt(
     *, problem: Problem, response: str, thought: str, duration_seconds: int, is_correct=None
 ):
@@ -308,6 +314,7 @@ def record_attempt(
     return attempt
 
 
+@log_operation
 def record_mastery_evidence(
     *, profile: StudyProfile, knowledge_point: CurriculumNode, subject: str,
     grade_stage: str, is_correct: bool, hint_level=0, duration_seconds=0,
@@ -352,6 +359,7 @@ def _review_interval_days(schedule: ReviewSchedule, rating: str):
     return (3, 7, 14, 30, 60)[index]
 
 
+@log_operation
 def complete_review(schedule: ReviewSchedule, rating: str, *, record_evidence=True):
     if rating not in REVIEW_RATINGS:
         raise ValueError("复习结果必须是 again、hard 或 good。")
@@ -408,6 +416,7 @@ DIAGNOSTIC_CURRICULA = {
 }
 
 
+@log_operation
 def create_diagnostic_assessment(profile: StudyProfile, subjects=None, *, skip=False):
     selected = [
         value for value in (subjects or profile.focus_subjects or [profile.primary_subject])
@@ -475,6 +484,7 @@ def create_diagnostic_assessment(profile: StudyProfile, subjects=None, *, skip=F
 
 
 @transaction.atomic
+@log_operation
 def submit_diagnostic_assessment(assessment: DiagnosticAssessment, answers: list[dict]):
     locked = DiagnosticAssessment.objects.select_for_update().get(pk=assessment.pk)
     if locked.status != DiagnosticAssessment.Status.IN_PROGRESS:
@@ -562,6 +572,7 @@ def submit_diagnostic_assessment(assessment: DiagnosticAssessment, answers: list
     return locked
 
 
+@log_operation
 def build_weekly_report(profile: StudyProfile, enrollment: SubjectEnrollment):
     today = timezone.localdate()
     week_start = monday_for(today)
@@ -624,6 +635,7 @@ def build_weekly_report(profile: StudyProfile, enrollment: SubjectEnrollment):
     return report
 
 
+@log_operation
 def build_weekly_quiz(profile: StudyProfile, enrollment: SubjectEnrollment):
     mistakes = list(
         profile.mistakes.filter(subject=enrollment.subject, is_archived=False)
@@ -671,6 +683,7 @@ def build_weekly_quiz(profile: StudyProfile, enrollment: SubjectEnrollment):
 
 
 @transaction.atomic
+@log_operation
 def submit_weekly_quiz(quiz: WeeklyQuiz, answers: list[dict]):
     locked = WeeklyQuiz.objects.select_for_update().get(pk=quiz.pk)
     if locked.status == WeeklyQuiz.Status.COMPLETED:
@@ -759,6 +772,7 @@ def submit_weekly_quiz(quiz: WeeklyQuiz, answers: list[dict]):
     return locked
 
 
+@log_operation
 def build_answer_card(
     profile: StudyProfile,
     enrollment: SubjectEnrollment,
@@ -965,6 +979,7 @@ def _upsert_answer_card_mistake(
 
 
 @transaction.atomic
+@log_operation
 def submit_answer_card(card: AnswerCard, answers: list[dict]):
     locked = AnswerCard.objects.select_for_update().get(pk=card.pk)
     if locked.status == AnswerCard.Status.COMPLETED:
@@ -1031,6 +1046,7 @@ def submit_answer_card(card: AnswerCard, answers: list[dict]):
     return locked
 
 
+@log_operation
 def start_tutor_run(
     *, problem: Problem, actor, operation: str, student_thought="", hint_level=1,
     agent_id=None,

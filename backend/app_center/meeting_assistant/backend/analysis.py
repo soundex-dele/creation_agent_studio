@@ -1,4 +1,6 @@
 """Grounded, bounded map/reduce analysis. Model timestamps are never trusted."""
+
+from core.observability import log_operation
 import json
 from datetime import date
 from core.llm.factory import build_agent_engine
@@ -81,6 +83,7 @@ def validate_analysis(data, segments, kind):
     return result
 
 
+@log_operation
 def analyze(record, *, cancelled, progress, model=""):
     with tenant_database_context(record.organization_id):
         engine = build_agent_engine(organization=record.organization, model=model)

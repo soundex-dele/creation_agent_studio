@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import ipaddress
 import json
 import os
@@ -26,6 +28,7 @@ def path_for(key):
     return path
 
 
+@log_operation
 def store_upload(upload):
     if not upload.size or upload.size > MAX_BYTES:
         raise ValueError("视频需大于0字节且不超过500 MB。")
@@ -72,6 +75,7 @@ def checked_media_url(url, *, redirected=False):
     return url
 
 
+@log_operation
 def download(url, key, check, *, headers=None):
     path = path_for(key)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +112,7 @@ def download(url, key, check, *, headers=None):
         session.close()
 
 
+@log_operation
 def download_video(cached_urls, client, platform_id, key, check):
     """Use the post-list media first; renew details only when missing or expired."""
     headers = client.media_headers()
@@ -148,6 +153,7 @@ def download_video(cached_urls, client, platform_id, key, check):
     return path
 
 
+@log_operation
 def command(args, timeout=90):
     try:
         return subprocess.run(args, capture_output=True, check=True, timeout=timeout).stdout
@@ -155,6 +161,7 @@ def command(args, timeout=90):
         raise ValueError("视频处理失败，请检查FFmpeg安装及视频文件。") from None
 
 
+@log_operation
 def probe(path):
     raw = command(["ffprobe", "-v", "error", "-protocol_whitelist", "file,pipe", "-show_format", "-show_streams", "-of", "json", str(path)])
     try:
@@ -174,6 +181,7 @@ def frame_times(duration):
     return sorted(set(round(min(end, t), 3) for t in [0, 1, 2, 3] + [duration * i / 12 for i in range(1, 13)]))[:16]
 
 
+@log_operation
 def extract(path, prefix, check):
     duration = probe(path)
     directory = path_for(prefix)

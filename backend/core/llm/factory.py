@@ -1,12 +1,15 @@
 """Django-side factories for pluggable agent and media providers."""
 from __future__ import annotations
 
+from core.observability import log_operation
+
 from django.conf import settings
 
 from core.agent_engine import AgentEngine, ImageConfig
 from core.agent_engine.image_provider import ImageProvider
 
 
+@log_operation
 def build_agent_engine(
     organization=None,
     model: str = '',
@@ -33,6 +36,7 @@ def build_agent_engine(
     )
 
 
+@log_operation
 def build_image_provider() -> ImageProvider | None:
     """Construct an image-generation provider from Django settings.
 

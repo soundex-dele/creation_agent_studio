@@ -1,4 +1,6 @@
 """Managed process. No request handler or import starts threads or connections."""
+
+from core.observability import log_operation
 import asyncio
 import base64
 import json
@@ -42,6 +44,7 @@ def local_origin():
     return value
 
 
+@log_operation
 async def run_connection(config, terminals=None, files=None):
     credentials = decrypt_credentials(config.credentials)
     endpoint = config.server_url.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
@@ -250,6 +253,7 @@ async def monitor_files(files):
             await asyncio.sleep(1)
 
 
+@log_operation
 async def run_connector():
     terminals = TerminalManager()
     files = FileManager(Path(settings.REMOTE_CONNECTOR_LOCK_PATH).resolve().parent / 'remote-file-transfers')

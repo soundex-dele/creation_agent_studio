@@ -6,6 +6,8 @@ Called by the conversations app after an assistant reply is persisted, so that
 anything the model produced — image URLs or substantial text — lands in the
 workspace's asset panel automatically.
 """
+
+from core.observability import log_operation
 import re
 import logging
 
@@ -51,6 +53,7 @@ def _derive_text_name(content):
     return '文本内容'
 
 
+@log_operation
 def collect_assets_from_message(project, conversation, message, output_type=''):
     """Create/refresh ProjectAsset rows for images and text found in ``message``.
 

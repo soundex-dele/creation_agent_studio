@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import copy
 import csv
 import io
@@ -176,6 +178,7 @@ class BatchView(BaseView):
         return response
 
 
+@log_operation
 def execute_batch(payload, sink, root, app, values):
     batch = AnimationBatch.objects.for_organization(app.organization_id).get(id=values["batch_id"], application=app, owner=root.owner)
     with transaction.atomic():

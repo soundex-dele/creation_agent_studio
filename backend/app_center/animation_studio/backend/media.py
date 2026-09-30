@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import json
 import math
 import subprocess
@@ -8,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 from app_center.ai_drawing.backend.images import inspect_image
 
 
+@log_operation
 def probe(path):
     try:
         result = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
@@ -17,6 +20,7 @@ def probe(path):
         raise ValidationError("无法读取媒体，请检查文件及执行主机 ffprobe 配置。") from exc
 
 
+@log_operation
 def inspect_upload(upload, *, allow_short=False):
     if upload.size > 50 * 1024 * 1024:
         raise ValidationError("录音不能超过 50 MB；图片不能超过 20 MB。")

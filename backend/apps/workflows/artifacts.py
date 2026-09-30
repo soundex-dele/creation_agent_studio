@@ -1,4 +1,6 @@
 """Explicit file outputs for workflow Agent steps; never infer paths from prose."""
+
+from core.observability import log_operation
 import json
 import mimetypes
 from pathlib import Path
@@ -49,6 +51,7 @@ def workflow_artifact_baseline(snapshot, workspace):
     return baseline
 
 
+@log_operation
 def collect_workflow_artifacts(snapshot, workspace, baseline=None):
     artifacts = {}
     for field, descriptor in artifact_contract(snapshot).items():
@@ -70,6 +73,7 @@ def collect_workflow_artifacts(snapshot, workspace, baseline=None):
     return artifacts
 
 
+@log_operation
 def publish_workflow_artifacts(artifacts, sink):
     """Publish only files already validated by the workflow output contract."""
     seen = set()

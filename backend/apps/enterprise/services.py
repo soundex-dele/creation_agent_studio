@@ -1,3 +1,6 @@
+from core.observability import log_operation
+import logging
+
 import hashlib
 import math
 import os
@@ -17,6 +20,8 @@ from django.utils import timezone
 from rest_framework.exceptions import Throttled
 
 from .models import Membership, QuotaPolicy, RunTrace, UsageRecord
+
+logger = logging.getLogger(__name__)
 
 
 def monthly_usage_records(organization):
@@ -65,6 +70,7 @@ def enforce_quota(organization):
         raise Throttled(detail='Concurrent run quota exceeded.')
 
 
+@log_operation
 def record_usage(*, organization, user, resource_type, resource_id='', usage=None,
                  provider='', model='', cost=0, latency_ms=0, status='success',
                  metadata=None):
@@ -126,6 +132,7 @@ def _validated_connector_url(connector):
     return connector.endpoint
 
 
+@log_operation
 def invoke_connector(connector, payload):
     """Invoke a generic webhook connector without exposing referenced secrets."""
     if not connector.is_active:
@@ -160,6 +167,7 @@ def invoke_connector(connector, payload):
         raise RuntimeError(f'Connector returned HTTP {exc.code}.') from exc
 
 
+@log_operation
 def resolve_provider(organization, model=''):
     providers = organization.providers.filter(is_active=True).order_by('-routing_weight', 'id')
     if model:
@@ -194,6 +202,7 @@ def evaluate_value(actual, expected, evaluator):
 
 
 @transaction.atomic
+@log_operation
 def start_evaluation(suite, actor, target_version=""):
     """Create a durable Evaluation Run pinned to an immutable target revision."""
 
@@ -375,6 +384,7 @@ def _apply_content_guardrails(policy, content):
     return content
 
 
+@log_operation
 def apply_input_guardrails(organization, content):
     if organization is None:
         return content
@@ -383,6 +393,7 @@ def apply_input_guardrails(organization, content):
     return _apply_content_guardrails(policy, content)
 
 
+@log_operation
 def apply_output_guardrails(organization, content):
     return apply_input_guardrails(organization, content)
 
@@ -443,6 +454,7 @@ def enforce_skill_policy(organization, skills):
     return skills
 
 
+@log_operation
 def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
     from .models import RunTrace
     payload = {**dict(trigger.input_mapping or {}), **dict(payload or {})}
@@ -517,6 +529,7 @@ def dispatch_automation(trigger, user, payload=None, scheduled_for=None):
         else:
             raise ValueError('Unsupported automation target type.')
     except Exception as exc:
+        logger.exception("automation.dispatch state=failed trigger_id=%s", trigger.id)
         trace.status = RunTrace.Status.FAILED
         trace.error = str(exc)
     trace.finished_at = timezone.now() if trace.status != RunTrace.Status.QUEUED else None

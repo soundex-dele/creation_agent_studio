@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 from urllib.parse import urlsplit
@@ -58,6 +60,7 @@ def public_origin(request):
     return request.build_absolute_uri("/").rstrip("/")
 
 
+@log_operation
 def ingest(project, user, values):
     """Caller holds the project lock. Imports are independent immutable copies."""
     limits = source_limits()
@@ -121,6 +124,7 @@ def ingest(project, user, values):
     return source, False
 
 
+@log_operation
 def cancel(run, user, reason):
     if run and run.status not in {"succeeded", "failed", "cancelled", "cancelling"}:
         try:
@@ -132,6 +136,7 @@ def cancel(run, user, reason):
                 raise
 
 
+@log_operation
 def delete_project(project):
     project.deleted_at = project.deleted_at or timezone.now()
     project.cleanup_pending = True
@@ -146,6 +151,7 @@ def delete_project(project):
         cancel(run, project.owner, "project_deleted")
 
 
+@log_operation
 def cleanup_project(project):
     for document in project.knowledge_base.documents.all():
         delete_document_index(document.id)
@@ -160,6 +166,7 @@ def cleanup_project(project):
 
 
 @transaction.atomic
+@log_operation
 def export_result(result, user, values, key, origin):
     from .models import ResearchProject
     ResearchProject.objects.select_for_update().get(pk=result.project_id)

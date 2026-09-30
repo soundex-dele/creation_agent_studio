@@ -1,4 +1,6 @@
 """Private audio storage; never use public MEDIA_URL for recordings."""
+
+from core.observability import log_operation
 import os
 from pathlib import Path
 from django.conf import settings
@@ -18,6 +20,7 @@ def object_path(key):
     return path
 
 
+@log_operation
 def probe_audio(path):
     import av
     try:
@@ -45,6 +48,7 @@ def probe_audio(path):
         raise ValidationError("录音无法解码，请上传有效的音频文件。") from exc
 
 
+@log_operation
 def store_upload(upload, key):
     if Path(upload.name).suffix.lower() not in EXTENSIONS:
         raise ValidationError("支持 MP3、WAV、M4A、AAC、FLAC 和 OGG。")

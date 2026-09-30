@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import json
 
@@ -41,6 +43,7 @@ def canonical_content_hash(content):
     return hashlib.sha256(encoded).hexdigest()
 
 
+@log_operation
 def update_application_draft(*, application, actor, expected_version, content):
     """Replace a draft with a portable compare-and-swap update."""
 
@@ -110,6 +113,7 @@ def _publish(*, definition, draft_model, revision_model, relation_name, actor, e
         )
 
 
+@log_operation
 def publish_agent(*, agent, actor, expected_draft_version, release_notes=""):
     return _publish(
         definition=agent,
@@ -122,6 +126,7 @@ def publish_agent(*, agent, actor, expected_draft_version, release_notes=""):
     )
 
 
+@log_operation
 def publish_skill(*, skill, actor, expected_draft_version, release_notes=""):
     return _publish(
         definition=skill,
@@ -134,6 +139,7 @@ def publish_skill(*, skill, actor, expected_draft_version, release_notes=""):
     )
 
 
+@log_operation
 def update_skill_draft(*, skill, actor, expected_version, content):
     draft = SkillDraft.objects.filter(skill=skill).first()
     if draft is None or draft.organization_id != skill.organization_id:
@@ -160,6 +166,7 @@ def update_skill_draft(*, skill, actor, expected_version, content):
     return SkillDraft.objects.get(pk=draft.pk)
 
 
+@log_operation
 def switch_skill_deployment(*, skill, actor, revision_id, expected_version):
     revision = SkillRevision.objects.filter(
         pk=revision_id,
@@ -219,6 +226,7 @@ def switch_skill_deployment(*, skill, actor, revision_id, expected_version):
         raise
 
 
+@log_operation
 def rollback_skill_deployment(*, skill, actor, expected_version):
     with transaction.atomic():
         deployment = SkillDeployment.objects.select_for_update().filter(
@@ -242,6 +250,7 @@ def rollback_skill_deployment(*, skill, actor, expected_version):
         return deployment
 
 
+@log_operation
 def publish_application(*, application, actor, expected_draft_version, release_notes=""):
     draft = ApplicationDraft.objects.filter(application=application).first()
     if draft is None:
@@ -281,6 +290,7 @@ def publish_application(*, application, actor, expected_draft_version, release_n
     return revision
 
 
+@log_operation
 def switch_agent_deployment(
     *, agent, actor, revision_id, expected_version, config_override=None
 ):
@@ -333,6 +343,7 @@ def switch_agent_deployment(
         return deployment
 
 
+@log_operation
 def rollback_agent_deployment(*, agent, actor, expected_version):
     with transaction.atomic():
         deployment = AgentDeployment.objects.select_for_update().filter(
@@ -386,6 +397,7 @@ def _deployment_revision(*, application, revision_id):
     return revision
 
 
+@log_operation
 def switch_application_deployment(
     *,
     application,
@@ -465,6 +477,7 @@ def switch_application_deployment(
         raise
 
 
+@log_operation
 def rollback_application_deployment(
     *, application, actor, expected_version
 ):

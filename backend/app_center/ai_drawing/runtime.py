@@ -1,4 +1,6 @@
 """Codex image generation executed by the durable media worker."""
+
+from core.observability import log_operation
 import logging
 import os
 import shutil
@@ -74,6 +76,7 @@ def _read_output(path_value, workspace):
     return content, inspect_image(content)
 
 
+@log_operation
 def execute(payload, sink):
     if str(settings.CODEX_TRANSPORT).lower() != "app-server":
         raise RuntimeError("AI 绘图需要 CODEX_TRANSPORT=app-server。")

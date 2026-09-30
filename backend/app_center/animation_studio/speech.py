@@ -3,6 +3,8 @@
 Protocol: https://www.volcengine.com/docs/6561/1598757
 Only the official endpoint is used; credentials never enter task snapshots.
 """
+
+from core.observability import log_operation
 import base64
 import json
 import uuid
@@ -13,6 +15,7 @@ from apps.enterprise.services import resolve_secret
 ENDPOINT = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
 
 
+@log_operation
 def synthesize(application, text, voice, speed, *, cancelled=lambda: False):
     config = AnimationSpeechConfig.objects.for_organization(application.organization_id).filter(application=application, enabled=True).first()
     if not config: raise RuntimeError("尚未配置豆包配音，请联系组织管理员或上传录音。")

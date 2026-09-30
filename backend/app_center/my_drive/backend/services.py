@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import hashlib
 import logging
 import mimetypes
@@ -76,6 +78,7 @@ def subtree(queryset, root):
 
 
 @transaction.atomic
+@log_operation
 def create_folder(space, application, data):
     lock_space(space.pk)
     qs = entries(space, application)
@@ -85,6 +88,7 @@ def create_folder(space, application, data):
 
 
 @transaction.atomic
+@log_operation
 def create_upload(space, application, data):
     lock_space(space.pk)
     if data["size"] > settings.MY_DRIVE_MAX_FILE_BYTES:
@@ -125,6 +129,7 @@ def write_chunk(space, application, pk, offset, digest, content):
 
 
 @transaction.atomic
+@log_operation
 def complete_upload(space, application, pk):
     lock_space(space.pk)
     upload = get_object_or_404(DriveUpload, pk=pk, space=space, application=application)
@@ -148,6 +153,7 @@ def complete_upload(space, application, pk):
 
 
 @transaction.atomic
+@log_operation
 def cancel_upload(space, application, pk):
     lock_space(space.pk)
     upload = get_object_or_404(DriveUpload, pk=pk, space=space, application=application)
@@ -161,6 +167,7 @@ def cancel_upload(space, application, pk):
 
 
 @transaction.atomic
+@log_operation
 def apply_action(space, application, data):
     lock_space(space.pk)
     qs = entries(space, application)
@@ -213,6 +220,7 @@ def apply_action(space, application, data):
             qs.filter(pk__in=subtree(qs, item)).update(purge_pending=True)
 
 
+@log_operation
 def maintain_space(space_id):
     """Idempotent: failures retain rows/quota so later maintenance can retry."""
     with transaction.atomic():

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import json
 import os
 import shutil
@@ -121,6 +123,7 @@ def _capture_config(config, files):
     }
 
 
+@log_operation
 def execute_html_to_png(run_payload, sink):
     config = {
         **dict(run_payload.get("effective_config") or {}),

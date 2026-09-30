@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import logging
 from django.db import transaction
 from rest_framework.exceptions import APIException, ValidationError
@@ -25,6 +27,7 @@ def check_idle(record):
         raise Conflict("记录正在处理，请等待完成或取消后再修改。")
 
 
+@log_operation
 def start(record, user, key, operation="process"):
     if operation not in ("process", "analyze"):
         raise ValidationError({"operation": "请选择转录或分析。"})
@@ -52,6 +55,7 @@ def start(record, user, key, operation="process"):
     return run
 
 
+@log_operation
 def cancel(record, user):
     if record.active_run and record.active_run.status in ACTIVE - {"cancelling"}:
         try:
@@ -64,6 +68,7 @@ def cancel(record, user):
                 raise
 
 
+@log_operation
 def delete_audio(key):
     try:
         object_path(key).unlink(missing_ok=True)
@@ -71,6 +76,7 @@ def delete_audio(key):
         logging.getLogger(__name__).warning("Deferred meeting audio cleanup: %s", key)
 
 
+@log_operation
 def delete_record(record, user):
     cancel(record, user)
     key = record.object_key

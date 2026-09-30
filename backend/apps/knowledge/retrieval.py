@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import math
 import re
 
@@ -91,6 +93,7 @@ def cosine_similarity(left, right):
     return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
 
 
+@log_operation
 def search(*, organization_id, query, knowledge_base_ids=None, limit=10, query_embedding=None,
            document_ids=None, internal=False):
     from .models import KnowledgeBase

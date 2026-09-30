@@ -1,8 +1,11 @@
 """Durable fallback executor for structured tutoring operations."""
 
+from core.observability import log_operation
+
 from .backend.strategies import get_subject_strategy
 
 
+@log_operation
 def execute_study_with_method(run_payload, sink):
     data = {
         **dict(run_payload.get("effective_config") or {}),

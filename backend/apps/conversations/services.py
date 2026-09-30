@@ -1,5 +1,7 @@
 """Reusable attachment persistence for durable conversation starters."""
 
+from core.observability import log_operation
+
 import hashlib
 import mimetypes
 import uuid
@@ -11,6 +13,7 @@ from rest_framework.exceptions import ValidationError
 from .models import MessageAttachment
 
 
+@log_operation
 def prepare_image_specs(images):
     """Read stable image metadata once before transaction retries begin."""
 
@@ -35,6 +38,7 @@ def prepare_image_specs(images):
     return specs
 
 
+@log_operation
 def persist_message_attachments(*, message, conversation, specs, saved_storage_names):
     """Persist validated uploads and return JSON-safe Codex attachment input."""
 
@@ -72,6 +76,7 @@ def persist_message_attachments(*, message, conversation, specs, saved_storage_n
     return runtime_attachments
 
 
+@log_operation
 def attach_existing_image(*, message, conversation, image_field):
     """Attach an already persisted local image without duplicating its storage blob."""
 

@@ -1,5 +1,7 @@
 """Platform adapters for the unified durable execution plane."""
 
+from core.observability import log_operation
+
 import json
 
 from modules.catalog.guided_prompts import compose_guided_prompt
@@ -631,6 +633,7 @@ def _execute_workflow_durable(run_payload, sink):
     }
 
 
+@log_operation
 def execute_workflow(run_payload, sink):
     """Execute a DAG exclusively through durable child Runs."""
     snapshot = run_payload.get("definition_snapshot") or {}

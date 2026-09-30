@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import requests
 from django.conf import settings
 
@@ -34,6 +36,7 @@ def _provider(organization, provider_name, model):
     return routed["provider"], routed["api_key"], routed["model"]
 
 
+@log_operation
 def embed_texts(organization, provider_name, model, texts):
     provider, api_key, selected_model = _provider(organization, provider_name, model)
     if not selected_model:
@@ -67,6 +70,7 @@ def embed_texts(organization, provider_name, model, texts):
     )
 
 
+@log_operation
 def answer_question(organization, provider_name, model, query, results):
     provider, api_key, selected_model = _provider(organization, provider_name, model)
     if not selected_model:

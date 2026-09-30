@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import time
+import logging
 
 import requests
 
 from .models import ImageConfig, ImageResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ImageProvider:
@@ -17,6 +22,7 @@ class ImageProvider:
     def __init__(self, config: ImageConfig) -> None:
         self._config = config
 
+    @log_operation
     def generate(self, prompt: str, **kwargs) -> ImageResponse:
         """Generate an image from a text prompt.
 
@@ -49,6 +55,7 @@ class ImageProvider:
                     timeout=self._config.timeout,
                 )
                 if not resp.ok:
+                    logger.error("image.generate state=rejected http_status=%s", resp.status_code)
                     return ImageResponse(
                         success=False,
                         error=f"HTTP {resp.status_code}: {resp.text[:300]}",
@@ -56,6 +63,10 @@ class ImageProvider:
                 return self._parse_response(resp.json())
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_error = exc
+                logger.warning("image.generate state=%s attempt=%s max_attempts=%s error_type=%s",
+                               "retrying" if attempt < self._config.max_retries else "failed",
+                               attempt + 1, self._config.max_retries + 1, type(exc).__name__,
+                               exc_info=True)
                 if attempt < self._config.max_retries:
                     time.sleep(attempt + 1)
 
@@ -73,6 +84,7 @@ class ImageProvider:
                 revised_prompt=image_data.get("revised_prompt"),
             )
         except (KeyError, IndexError, TypeError) as exc:
+            logger.exception("image.generate state=invalid_response")
             return ImageResponse(
                 success=False,
                 error=f"Failed to parse image response: {exc}",

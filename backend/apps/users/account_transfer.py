@@ -1,5 +1,7 @@
 """CSV import/export helpers for administrator-managed accounts."""
 
+from core.observability import log_operation
+
 import csv
 import io
 
@@ -55,6 +57,7 @@ def _csv_text(rows):
     return "\ufeff" + output.getvalue()
 
 
+@log_operation
 def export_accounts_csv(queryset):
     rows = []
     for user in queryset.order_by("id"):
@@ -135,6 +138,7 @@ def _serializer_errors(row_number, errors):
     return result
 
 
+@log_operation
 def import_accounts_csv(upload, *, request=None):
     if not upload:
         raise AccountImportError("请选择要导入的 CSV 文件。")

@@ -1,4 +1,6 @@
 """Resolve private brand data only when a user explicitly requests a reference."""
+
+from core.observability import log_operation
 from copy import deepcopy
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
@@ -16,6 +18,7 @@ def section_text(section, data):
     return "\n".join(f"{label}：{data[key]}" for key, label in SECTION_FIELDS[section].items() if data.get(key))
 
 
+@log_operation
 def resolve_brand_snapshot(*, request, application, definition, reference):
     config = definition.get("default_config", {}).get("brand_reference", {})
     if not config.get("enabled"):

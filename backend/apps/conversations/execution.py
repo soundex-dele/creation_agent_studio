@@ -1,4 +1,6 @@
 """Shared durable conversation execution for web and messaging channels."""
+
+from core.observability import log_operation
 import logging
 import time
 from django.conf import settings
@@ -150,6 +152,7 @@ def application_agent_overrides(conversation, agent):
     return dict((binding or {}).get("config_overrides") or {})
 
 
+@log_operation
 def create_conversation_run(
     actor,
     conversation,

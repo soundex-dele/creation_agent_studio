@@ -1,5 +1,6 @@
 import os
 import socket
+import logging
 from contextlib import nullcontext
 
 from django.conf import settings
@@ -16,6 +17,8 @@ from modules.execution.infrastructure.coordinator_lock import (
 )
 from modules.execution.models import Run
 from modules.execution.telemetry import configure_telemetry
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -77,6 +80,10 @@ class Command(BaseCommand):
                 else nullcontext()
             )
             with lock:
+                logger.info("worker state=started worker_id=%s pools=%s max_children=%s adapters=%s",
+                            worker_id, ','.join(worker_pools), options['max_children'],
+                            sum(len(getattr(settings, 'EXECUTION_CHILD_ADAPTERS', {}).get(pool, {}))
+                                for pool in worker_pools))
                 self.stdout.write(
                     f"Execution coordinator {worker_id} started "
                     f"for database={connection.vendor} "
@@ -90,5 +97,9 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         except KeyboardInterrupt:
             self.stdout.write("Execution coordinator stopping")
+        except Exception:
+            logger.exception("worker state=failed worker_id=%s", worker_id)
+            raise
         finally:
             coordinator.stop()
+            logger.info("worker state=stopped worker_id=%s", worker_id)

@@ -1,4 +1,8 @@
 """Recoverable per-account connector; never hold a DB transaction during HTTP."""
+
+from core.observability import log_operation
+import logging
+
 import uuid
 from datetime import timedelta
 
@@ -15,6 +19,8 @@ from .models import Binding, IncomingMessage, OutgoingMessage
 from .protocol import BASE_URL, WechatClient, WechatError, seal, unseal, trusted_base
 from .menu import clear_menu
 from .services import active_lease, check_access, collect_results, dispatch_message, enqueue, store_updates
+
+logger = logging.getLogger(__name__)
 
 LOGIN_STATES = ("qr_pending", "wait", "scaned", "need_verifycode")
 LEASE_SECONDS = 120
@@ -44,6 +50,7 @@ def renew(binding_id, owner):
     ) == 1
 
 
+@log_operation
 def login_step(snapshot, owner, client_factory=WechatClient):
     if snapshot.login_expires_at <= timezone.now():
         with tenant_database_context(snapshot.organization_id):
@@ -113,6 +120,7 @@ def login_step(snapshot, owner, client_factory=WechatClient):
         current.save()
 
 
+@log_operation
 def deliver(snapshot, owner, client):
     # Bound each pass; subsequent cycles resume in order.
     for _ in range(20):
@@ -131,6 +139,7 @@ def deliver(snapshot, owner, client):
                 if not reply or reply.next_attempt_at > timezone.now():
                     return
                 if reply.attempts >= 5:
+                    logger.error("wechat.delivery state=retry_exhausted message_id=%s", reply.pk)
                     reply.state = "failed"
                     reply.last_error = "回复重试已达上限，请在项目中查看结果。"
                     reply.save(update_fields=["state", "last_error"])
@@ -142,6 +151,8 @@ def deliver(snapshot, owner, client):
         try:
             client.send(snapshot.peer_id, context, reply.text, str(reply.id))
         except WechatError as exc:
+            logger.warning("wechat.delivery state=failed message_id=%s attempt=%s expired=%s",
+                           reply.pk, reply.attempts, exc.expired, exc_info=True)
             with tenant_database_context(snapshot.organization_id):
                 OutgoingMessage.objects.filter(pk=reply.pk, state="sending").update(
                     state="failed" if reply.attempts >= 5 else "retry",
@@ -203,6 +214,8 @@ def cycle(organization_id, binding_id, client_factory=WechatClient):
         process_pending(snapshot, owner)
         deliver(snapshot, owner, client)
     except (WechatError, InvalidToken, IntegrityError, ValidationError) as exc:
+        logger.warning("wechat.connection state=retry_scheduled binding_id=%s error_type=%s",
+                       binding_id, type(exc).__name__, exc_info=True)
         if snapshot is not None:
             with tenant_database_context(organization_id):
                 updates = {"last_error": str(exc) if isinstance(exc, WechatError) else "绑定或权限不可用，请检查配置或重新扫码。", "next_poll_at": timezone.now() + timedelta(seconds=15)}

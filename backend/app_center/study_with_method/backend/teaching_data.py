@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import glob
 import json
 from dataclasses import dataclass
@@ -206,6 +208,7 @@ def _load_bundle(root_value: str, data_version: str) -> TeachingDataBundle:
     )
 
 
+@log_operation
 def load_teaching_data() -> TeachingDataBundle:
     root = Path(settings.TEACHING_DATA_ROOT)
     manifest = _read_yaml(root / "manifest.yaml")
@@ -279,6 +282,7 @@ def get_knowledge_point(*, subject: str, curriculum_id: str, code: str) -> dict:
     return point
 
 
+@log_operation
 def sync_curriculum_nodes() -> int:
     bundle = load_teaching_data()
     changed = 0

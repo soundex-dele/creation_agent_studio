@@ -1,4 +1,6 @@
 """Tenant-local persistence and dispatch. Network I/O belongs to the connector."""
+
+from core.observability import log_operation
 import hashlib
 import uuid
 from datetime import timedelta
@@ -51,6 +53,7 @@ def is_busy(binding):
     ).exists()
 
 
+@log_operation
 def new_conversation(binding):
     binding.conversation = Conversation.objects.create(
         user=binding.user, organization=binding.organization, agent=binding.agent,
@@ -61,6 +64,7 @@ def new_conversation(binding):
 
 
 @transaction.atomic
+@log_operation
 def configure(binding, agent_id=None, *, reset=False):
     binding = Binding.objects.select_for_update().get(pk=binding.pk)
     check_access(binding, require_agent=False)
@@ -81,6 +85,7 @@ def configure(binding, agent_id=None, *, reset=False):
 
 
 @transaction.atomic
+@log_operation
 def start_login(binding):
     binding = Binding.objects.select_for_update().get(pk=binding.pk)
     check_access(binding)
@@ -100,6 +105,7 @@ def start_login(binding):
 
 
 @transaction.atomic
+@log_operation
 def unbind(binding):
     binding = Binding.objects.select_for_update().get(pk=binding.pk)
     binding.enabled = False
@@ -116,6 +122,7 @@ def unbind(binding):
     return binding
 
 
+@log_operation
 def enqueue(incoming, event_key, text):
     # Conservative text chunks, stable IDs and ordering across process restarts.
     for part, start in enumerate(range(0, len(text), 1000)):
@@ -166,6 +173,7 @@ def store_updates(binding_id, owner, generation, data):
 
 
 @transaction.atomic
+@log_operation
 def dispatch_message(message_id, owner):
     item = IncomingMessage.objects.select_related("binding").get(pk=message_id)
     binding = active_lease(item.binding_id, owner, item.generation).select_for_update().first()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import csv
 import io
 from datetime import date, datetime
@@ -61,6 +63,7 @@ def _nonnegative_int(row, field):
     return value
 
 
+@log_operation
 def parse_metrics_csv(uploaded, workspace):
     try:
         content = uploaded.read().decode("utf-8-sig")
@@ -122,6 +125,7 @@ def parse_metrics_csv(uploaded, workspace):
 
 
 @transaction.atomic
+@log_operation
 def commit_metrics_rows(rows, *, workspace, organization, user):
     publication_ids = set()
     snapshot_ids = set()

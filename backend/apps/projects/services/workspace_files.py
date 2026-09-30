@@ -1,4 +1,6 @@
 """Safe directory listing and previews for managed project workspaces."""
+
+from core.observability import log_operation
 import base64
 import mimetypes
 from datetime import datetime, timezone
@@ -140,18 +142,22 @@ def _read_workspace_file(root, relative_path):
     return response
 
 
+@log_operation
 def list_workspace_files(project):
     return _list_workspace_files(_project_workspace_root(project))
 
 
+@log_operation
 def read_workspace_file(project, relative_path):
     return _read_workspace_file(_project_workspace_root(project), relative_path)
 
 
+@log_operation
 def list_conversation_workspace_files(conversation):
     return _list_workspace_files(_conversation_workspace_root(conversation))
 
 
+@log_operation
 def read_conversation_workspace_file(conversation, relative_path):
     return _read_workspace_file(
         _conversation_workspace_root(conversation), relative_path)

@@ -1,3 +1,5 @@
+
+from core.observability import log_operation
 import os
 import logging
 from pathlib import Path
@@ -43,6 +45,7 @@ def append_chunk(upload, content):
         raise StorageUnavailable() from exc
 
 
+@log_operation
 def finalize_object(upload):
     temporary = object_path(upload_key(upload, True))
     final = object_path(upload_key(upload))

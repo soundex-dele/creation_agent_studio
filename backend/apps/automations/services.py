@@ -1,3 +1,6 @@
+from core.observability import log_operation
+import logging
+
 import hashlib
 import json
 import secrets
@@ -13,6 +16,8 @@ from modules.execution.models import Run
 
 from .models import Automation, AutomationInvocation
 from .scheduling import next_fire_time
+
+logger = logging.getLogger(__name__)
 
 
 ACTIVE_RUN_STATUSES = {
@@ -134,6 +139,7 @@ def verify_secret(automation, secret):
     )
 
 
+@log_operation
 def enable_automation(automation):
     try:
         validate_configuration(automation)
@@ -155,6 +161,7 @@ def enable_automation(automation):
     return automation
 
 
+@log_operation
 def disable_automation(automation):
     automation.status = Automation.Status.PAUSED
     automation.is_active = False
@@ -218,6 +225,7 @@ def _start_target_run(automation, invocation, payload):
 
 
 @transaction.atomic
+@log_operation
 def dispatch_automation(
     automation,
     *,
@@ -252,9 +260,12 @@ def dispatch_automation(
             raise IdempotencyConflict(
                 "Idempotency-Key 已被不同的请求载荷使用。"
             )
+        logger.info("automation.dispatch state=replayed automation_id=%s invocation_id=%s",
+                    automation.pk, invocation.pk)
         return invocation, True
 
     if pending_run_count(automation) >= MAX_PENDING_RUNS:
+        logger.warning("automation.dispatch state=capacity_limited automation_id=%s", automation.pk)
         invocation.outcome = AutomationInvocation.Outcome.SKIPPED_CAPACITY
         invocation.error = "同一自动化已有 100 个未结束的执行。"
         invocation.save(update_fields=("outcome", "error"))
@@ -270,6 +281,7 @@ def dispatch_automation(
             last_triggered_at=timezone.now()
         )
     except AutomationValidationError as exc:
+        logger.warning("automation.dispatch state=blocked automation_id=%s", automation.pk, exc_info=True)
         automation.status = Automation.Status.BLOCKED
         automation.is_active = False
         automation.next_run_at = None
@@ -281,6 +293,7 @@ def dispatch_automation(
         invocation.error = str(exc)
         invocation.save(update_fields=("outcome", "error"))
     except Exception as exc:
+        logger.exception("automation.dispatch state=failed automation_id=%s", automation.pk)
         invocation.outcome = AutomationInvocation.Outcome.FAILED
         invocation.error = str(exc)
         invocation.save(update_fields=("outcome", "error"))

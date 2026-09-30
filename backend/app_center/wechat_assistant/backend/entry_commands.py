@@ -1,4 +1,6 @@
 """WeChat commands backed by the existing private ideas/todos application."""
+
+from core.observability import log_operation
 import re
 from datetime import timedelta
 
@@ -15,6 +17,7 @@ PAGE_SIZE = 10
 MAX_BATCH = 100
 
 
+@log_operation
 def dispatch_entries(binding, incoming, text=None):
     from .menu import CHAT_HINT, clear_menu, save_menu
     from .services import enqueue

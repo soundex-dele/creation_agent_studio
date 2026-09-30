@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connections, transaction
 from django.utils import timezone
+from core.observability import log_context
 
 from modules.execution.application.errors import LeaseLost
 from modules.execution.application.ports import execution_domain_port
@@ -135,6 +136,7 @@ class ExecutionCoordinator:
             "run_id": str(claimed.run.id),
             "attempt_id": str(claimed.attempt.id),
             "organization_id": str(claimed.run.organization_id),
+            "worker_id": self.worker_id,
             "executor_key": claimed.run.executor_key,
             "definition_snapshot": claimed.run.definition_snapshot,
             "effective_config": claimed.run.definition_snapshot.get(
@@ -212,6 +214,8 @@ class ExecutionCoordinator:
             controls=controls,
             span=span,
         )
+        logger.info("execution.child state=spawned run_id=%s attempt_id=%s executor=%s worker=%s",
+                    claimed.run.id, claimed.attempt.id, claimed.run.executor_key, self.worker_id)
 
     @staticmethod
     def _fence(active):
@@ -224,6 +228,9 @@ class ExecutionCoordinator:
         claimed = active.claimed
         fence = self._fence(active)
         outcome = message.get("outcome")
+        logger.log(logging.ERROR if outcome == "failed" else logging.INFO,
+                   "execution.child state=terminal outcome=%s error_code=%s",
+                   outcome, message.get("error_code", "-"))
         annotate_execution_span(
             getattr(active, "span", None),
             "execution.child.outcome",
@@ -236,6 +243,7 @@ class ExecutionCoordinator:
                     claimed.run.organization, output
                 )
             except Exception as exc:
+                logger.exception("execution.output state=guardrail_rejected")
                 fail_attempt(
                     run_id=claimed.run.id,
                     organization_id=claimed.run.organization_id,
@@ -256,6 +264,7 @@ class ExecutionCoordinator:
                     validator_type.check_schema(schema)
                     validator_type(schema).validate(output)
                 except Exception as exc:
+                    logger.exception("execution.output state=schema_rejected")
                     fail_attempt(
                         run_id=claimed.run.id,
                         organization_id=claimed.run.organization_id,
@@ -552,6 +561,8 @@ class ExecutionCoordinator:
                 lease_seconds=self.lease_seconds,
             )
             if not renewed:
+                if not active.cancel_event.is_set():
+                    logger.warning("execution.lease state=lost")
                 active.cancel_event.set()
             active.next_heartbeat_at = now_monotonic + self.lease_seconds / 3
 
@@ -561,6 +572,7 @@ class ExecutionCoordinator:
         if run_status == Run.Status.CANCELLING:
             active.cancel_event.set()
             if active.cancel_requested_at is None:
+                logger.info("execution.cancel state=requested")
                 active.cancel_requested_at = now_monotonic
             RunCommand.objects.filter(
                 run_id=active.claimed.run.id,
@@ -607,6 +619,7 @@ class ExecutionCoordinator:
             try:
                 terminal = self._handle_message(active, message) or terminal
             except LeaseLost:
+                logger.warning("execution.event state=lease_lost")
                 active.cancel_event.set()
                 terminal = True
             if terminal:
@@ -626,6 +639,7 @@ class ExecutionCoordinator:
             # may nevertheless be blocked in native/network code, so enforce
             # the user-requested cancellation after a short grace period.
             if active.process.is_alive():
+                logger.warning("execution.cancel state=terminating grace_seconds=%s", self.cancel_grace_seconds)
                 active.process.terminate()
                 active.process.join(timeout=1)
             try:
@@ -696,8 +710,12 @@ class ExecutionCoordinator:
             if claimed is None:
                 break
             try:
-                self._start_claimed(claimed)
+                with log_context(run_id=claimed.run.id, attempt_id=claimed.attempt.id,
+                                 organization_id=claimed.run.organization_id, worker_id=self.worker_id):
+                    self._start_claimed(claimed)
             except Exception as exc:
+                logger.exception("execution.child state=start_failed run_id=%s attempt_id=%s",
+                                 claimed.run.id, claimed.attempt.id)
                 with tenant_database_context(claimed.run.organization_id):
                     fail_attempt(
                         run_id=claimed.run.id,
@@ -736,7 +754,10 @@ class ExecutionCoordinator:
             )
             self._next_maintenance_at = now + 5
         for attempt_id, active in list(self._active.items()):
-            with tenant_database_context(active.claimed.run.organization_id):
+            with tenant_database_context(active.claimed.run.organization_id), log_context(
+                run_id=active.claimed.run.id, attempt_id=attempt_id,
+                organization_id=active.claimed.run.organization_id, worker_id=self.worker_id,
+            ):
                 self._service_child(attempt_id, active)
         if allow_claim:
             self._claim_available()
@@ -755,6 +776,8 @@ class ExecutionCoordinator:
     def stop(self):
         self._stopping = True
         active_items = list(self._active.items())
+        logger.info("worker.pool state=stopping worker_id=%s pool=%s active_children=%s",
+                    self.worker_id, self.worker_pool, len(active_items))
         for _attempt_id, active in active_items:
             active.cancel_event.set()
         for attempt_id, active in active_items:

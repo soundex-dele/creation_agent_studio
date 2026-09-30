@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.observability import log_operation
+
 from collections import defaultdict
 from datetime import date, timedelta
 from statistics import quantiles
@@ -34,6 +36,7 @@ def _snapshot_payload(snapshot):
     }
 
 
+@log_operation
 def build_analytics(workspace, *, start: date | None = None, end: date | None = None,
                     platform: str = ""):
     publications = Publication.objects.filter(workspace=workspace).select_related(

@@ -1,6 +1,8 @@
 """Backend-neutral facade used by the durable Agent Run adapter."""
 from __future__ import annotations
 
+from core.observability import log_operation
+
 import logging
 
 from .adapters import AgentAdapter, get_agent_adapter
@@ -32,11 +34,11 @@ class AgentEngine:
             model=model,
         )
         logger.info(
-            "AgentEngine initialized adapter=%s config=%r",
+            "AgentEngine initialized adapter=%s",
             self._adapter.name,
-            config,
         )
 
+    @log_operation
     def complete(self, messages: list[dict], **options) -> LLMResponse:
         logger.info("AgentEngine.complete called, messages=%d", len(messages))
         response = self._adapter.complete(
@@ -44,12 +46,12 @@ class AgentEngine:
             working_directory=self._working_directory,
             **options,
         )
-        logger.info(
-            "AgentEngine.complete finished adapter=%s success=%s tokens=%s error=%r",
+        logger.log(
+            logging.INFO if response.success else logging.ERROR,
+            "AgentEngine.complete finished adapter=%s success=%s tokens=%s",
             self._adapter.name,
             response.success,
             response.usage.total_tokens,
-            response.error,
         )
         return response
 

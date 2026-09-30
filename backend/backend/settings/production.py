@@ -64,26 +64,5 @@ sentry_sdk.init(
     before_send_transaction=lambda event, hint: None if '/api/v1/remote/' in event.get('request', {}).get('url', '') else event,
 )
 
-# Logging
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        # Containers write structured lifecycle logs to stdout; the runtime's
-        # logging driver is responsible for rotation and retention.
-        'handlers': ['console'],
-        'level': 'WARNING',
-    },
-}
+# Keep base processing logs at INFO (or LOG_LEVEL). The container logging driver
+# owns rotation/retention; do not suppress successful worker stages in production.

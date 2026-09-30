@@ -1,4 +1,6 @@
 """Product adapter that executes an Agent through the durable Run protocol."""
+
+from core.observability import log_operation
 import logging
 import time
 
@@ -49,6 +51,7 @@ def _resume_answer_message(command_payload, input_request):
     return str(answer or "")
 
 
+@log_operation
 def execute_agent_completion(run_payload, sink):
     started = time.perf_counter()
     run_id = run_payload.get("run_id", "unknown")

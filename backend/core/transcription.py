@@ -1,14 +1,18 @@
 """Shared, lazy-loaded Whisper transcription with stable segment timestamps."""
+
+from core.observability import log_operation
 import os
 from functools import lru_cache
 
 
 @lru_cache(maxsize=2)
+@log_operation
 def whisper_model(model_name):
     from faster_whisper import WhisperModel
     return WhisperModel(model_name, device="cpu", compute_type="int8")
 
 
+@log_operation
 def transcribe_segments(path, language="zh", *, cancelled=lambda: False, progress=lambda value: None):
     model = whisper_model(os.environ.get("CREATION_TOOLBOX_WHISPER_MODEL", "tiny"))
     language = None if language == "auto" else (language or "zh").split("-", 1)[0]
@@ -26,5 +30,6 @@ def transcribe_segments(path, language="zh", *, cancelled=lambda: False, progres
     return {"segments": result, "text": "".join(raw_text).strip(), "duration": float(info.duration), "language": info.language}
 
 
+@log_operation
 def transcribe_audio(path, language):
     return transcribe_segments(path, language)["text"]

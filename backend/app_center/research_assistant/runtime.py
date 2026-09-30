@@ -1,4 +1,6 @@
 """Read every selected chunk, then synthesize a strictly cited, structured result."""
+
+from core.observability import log_operation
 import json
 import requests
 
@@ -16,6 +18,7 @@ class ResearchCancelled(Exception):
     pass
 
 
+@log_operation
 def call_model(project, instruction, data, config):
     enforce_member_token_quota(project.organization, project.owner)
     try:
@@ -58,6 +61,7 @@ def batches(chunks, limit=18000):
         yield batch
 
 
+@log_operation
 def execute(payload, sink):
     run = Run.objects.select_related("owner").get(pk=payload["run_id"], organization_id=payload["organization_id"])
     data = payload["input"]

@@ -1,4 +1,6 @@
 """Two durable operations: build an HTML preview, or render an immutable version."""
+
+from core.observability import log_operation
 import io
 import json
 import logging
@@ -114,6 +116,7 @@ def stop_process(process):
     process.wait(timeout=15)
 
 
+@log_operation
 def run_process(arguments, workspace, sink, timeout=300):
     check_cancel(sink)
     # Log to disk rather than PIPE, so large compiler output cannot deadlock cancellation.
@@ -191,6 +194,7 @@ def decode_result(text):
             "storyboard": str(result.get("storyboard", ""))[:16000]}
 
 
+@log_operation
 def execute(payload, sink):
     try:
         return _execute(payload, sink)
@@ -304,6 +308,7 @@ def _execute(payload, sink):
         return {"title": result["title"], "preview_ready": True, **config}
 
 
+@log_operation
 def export_video(workspace, node, sink, source_id):
     config = json.loads((workspace / "composition.json").read_text("utf-8"))
     sink.emit("progress.updated", {"stage": "rendering"})
