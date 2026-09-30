@@ -162,7 +162,7 @@ def command(args, timeout=90):
 
 
 @log_operation
-def probe(path):
+def probe(path, *, require_audio=False):
     raw = command(["ffprobe", "-v", "error", "-protocol_whitelist", "file,pipe", "-show_format", "-show_streams", "-of", "json", str(path)])
     try:
         info = json.loads(raw)
@@ -173,6 +173,8 @@ def probe(path):
             raise ValueError()
     except (KeyError, ValueError, TypeError):
         raise ValueError("请选择包含画面且时长不超过10分钟的视频。") from None
+    if require_audio and not any(s.get("codec_type") == "audio" for s in info["streams"]):
+        raise ValueError("视频没有音轨，请补传包含口播音轨的原视频后重新转写。")
     return duration
 
 
@@ -182,13 +184,20 @@ def frame_times(duration):
 
 
 @log_operation
-def extract(path, prefix, check):
-    duration = probe(path)
+def extract_audio(path, prefix, check):
+    duration = probe(path, require_audio=True)
     directory = path_for(prefix)
     directory.mkdir(parents=True, exist_ok=True)
     audio = directory / "audio.wav"
     check()
     command(["ffmpeg", "-v", "error", "-y", "-protocol_whitelist", "file,pipe", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(audio)])
+    check()
+    return audio, duration
+
+
+def extract(path, prefix, check):
+    audio, duration = extract_audio(path, prefix, check)
+    directory = path_for(prefix)
     frames = []
     for index, at in enumerate(frame_times(duration)):
         check()

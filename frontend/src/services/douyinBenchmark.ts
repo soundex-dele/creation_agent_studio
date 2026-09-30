@@ -20,11 +20,15 @@ export const productionFormats = {
 } as const;
 export type ProductionFormat = keyof typeof productionFormats;
 export interface Script { production_format?: ProductionFormat; title: string; cover: string; narration: string; scenes: { time: string; visual: string; spoken: string }[]; checklist: string[] }
-export type Kind = 'collect' | 'account' | 'breakdown' | 'topics' | 'script';
+export type Kind = 'collect' | 'account' | 'breakdown' | 'topics' | 'script' | 'transcribe' | 'rewrite';
+export interface RewriteContent { text: string }
+export interface RewriteVersion { id: string; revision: number; content: RewriteContent; created_at: string }
 export interface DouyinTask {
   id: string; kind: Kind; work_id: string | null; run_id: string; status: string; stage: string; error: string; created_at: string;
   progress: { current?: number; total?: number }; sources: (DouyinWork & { id: string })[];
+  copy_context?: { work_title: string; source_task_id: string; source_text: string; rewrite_requirements: string } | null;
   output: Partial<Script> & {
+    text?: string;
     claims?: Claim[]; actual?: number; requested?: number; complete?: boolean; warning?: string; captured_at?: string;
     segments?: { id: string; start: number; end: number; text: string }[]; frames?: { id: string; time: number }[];
     visual_status?: string; visual_note?: string; transcript_note?: string;
@@ -35,7 +39,7 @@ export interface DouyinTask {
 export interface WorkResult { items: DouyinWork[]; sample_size: number; median_likes: number | null; explanation: string; batch: DouyinTask | null }
 export interface ScriptVersion { id: string; revision: number; content: Script; created_at: string }
 export interface Brief { production_format: ProductionFormat; positioning: string; audience: string; theme: string; duration: number; conditions: string; brand_profile_id?: string | null }
-export const kindLabels: Record<Kind, string> = { collect: '采集', account: '账号分析', breakdown: '视频拆解', topics: '选题', script: '脚本' };
+export const kindLabels: Record<Kind, string> = { collect: '采集', account: '账号分析', breakdown: '视频拆解', topics: '选题', script: '脚本', transcribe: '文案转写', rewrite: '文案复刻' };
 export const isActive = (task: DouyinTask) => !['succeeded', 'failed', 'cancelled'].includes(task.status);
 export const metric = (value: number | null | undefined) => value == null ? '未获取' : value.toLocaleString('zh-CN');
 const key = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } });
@@ -62,6 +66,8 @@ export function douyinApi(base: string) {
     upload: (id: string, workId: string, file: File) => { const form = new FormData(); form.append('video', file); return api.post(`${account(id)}/works/${workId}/upload`, form, { timeout: 120000 }); },
     frame: (id: string, taskId: string, frameId: string) => api.get<Blob>(`${task(id, taskId)}/frames/${frameId}`, undefined, { responseType: 'blob' }),
     versions: (id: string, taskId: string) => api.get<ScriptVersion[]>(`${task(id, taskId)}/versions`),
+    rewriteVersions: (id: string, taskId: string) => api.get<RewriteVersion[]>(`${task(id, taskId)}/versions`),
+    saveRewrite: (id: string, taskId: string, revision: number, content: RewriteContent) => api.post<RewriteVersion>(`${task(id, taskId)}/versions`, { revision, content }),
     saveScript: (id: string, taskId: string, revision: number, content: Script) => api.post<ScriptVersion>(`${task(id, taskId)}/versions`, { revision, content }),
     download: (id: string, taskId: string, versionId: string) => api.get<Blob>(`${task(id, taskId)}/versions/${versionId}/download`, undefined, { responseType: 'blob' }),
   };

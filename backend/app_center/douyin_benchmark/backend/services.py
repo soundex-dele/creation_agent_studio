@@ -35,11 +35,29 @@ def frozen_input(account, values):
         # Only completed breakdowns may add deeper observations to this frozen input.
         data["breakdowns"] = [{"id": str(t.pk), "work_id": str(t.work_id), "claims": t.output.get("claims", [])}
             for t in account.tasks.filter(kind="breakdown", run__status="succeeded").order_by("-created_at")[:20]]
-    if kind == "breakdown":
+    if kind in ("breakdown", "transcribe", "rewrite"):
         if not values.get("work_id"):
             raise ValidationError("请选择作品。")
         work = get_object_or_404(account.works, pk=values["work_id"])
+        if kind in ("transcribe", "rewrite") and work.metadata.get("kind") != "video":
+            raise ValidationError("爆款复刻暂只支持视频作品。")
         data.update({"metadata": work.metadata, "media_key": work.media_key, "media_urls": list(work.media_urls)})
+        data["work_title"] = work.metadata.get("title", "")
+    if kind == "transcribe" and not values.get("force"):
+        from .analysis import transcript_text
+        for source in account.tasks.filter(work=work, kind__in=["breakdown", "transcribe"], run__status="succeeded").iterator():
+            # A replacement upload must not silently reuse the old video's transcript.
+            if source.input.get("media_key", "") == work.media_key and transcript_text(source.output):
+                data["reused_transcript"] = {"text": transcript_text(source.output),
+                    "segments": source.output.get("segments", []), "duration": source.output.get("duration")}
+                data["source_task_id"] = str(source.pk)
+                break
+    if kind == "rewrite":
+        source = get_object_or_404(account.tasks, pk=values["source_task_id"], work=work,
+                                  kind__in=["transcribe", "breakdown"], run__status="succeeded")
+        data["source_task_id"] = str(source.pk)
+        # The corrected text is a private immutable snapshot, not an edit to ASR output.
+        data["source_text"] = values["source_text"]
     if kind in ("topics", "script"):
         if not values.get("source_task_id"):
             raise ValidationError("请选择已完成的拆解或选题任务。")

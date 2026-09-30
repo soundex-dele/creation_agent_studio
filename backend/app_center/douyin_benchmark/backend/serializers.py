@@ -34,7 +34,10 @@ class TaskInput(serializers.Serializer):
     class Meta:
         ref_name = "DouyinTaskInput"
 
-    kind = serializers.ChoiceField(choices=["collect", "account", "breakdown", "topics", "script"])
+    kind = serializers.ChoiceField(choices=["collect", "account", "breakdown", "topics", "script", "transcribe", "rewrite"])
+    force = serializers.BooleanField(required=False)
+    source_text = serializers.CharField(max_length=20000, required=False)
+    rewrite_requirements = serializers.CharField(max_length=3000, allow_blank=True, required=False)
     count = serializers.ChoiceField(choices=[20, 50, 100], default=50)
     work_id = serializers.UUIDField(required=False)
     batch_id = serializers.UUIDField(required=False)
@@ -49,12 +52,22 @@ class TaskInput(serializers.Serializer):
     brand_profile_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
+        if attrs["kind"] == "transcribe":
+            attrs.setdefault("force", False)
+        if attrs["kind"] in ("transcribe", "rewrite") and not attrs.get("work_id"):
+            raise serializers.ValidationError({"work_id": "请选择视频作品。"})
+        if attrs["kind"] == "rewrite":
+            attrs.setdefault("rewrite_requirements", "")
+            for field in ("source_task_id", "source_text"):
+                if not attrs.get(field):
+                    raise serializers.ValidationError({field: "请先获取并校正原文。"})
         if attrs["kind"] == "topics" and attrs["production_format"] == "animation" and attrs["duration"] > 120:
             raise serializers.ValidationError({"duration": "动画演示最长支持120秒，请调整目标时长。"})
         return attrs
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    copy_context = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     work_id = serializers.UUIDField(read_only=True, allow_null=True)
     run_id = serializers.UUIDField(read_only=True, allow_null=True)
@@ -64,10 +77,17 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         ref_name = "DouyinTask"
-        fields = ["id", "kind", "work_id", "run_id", "status", "stage", "error", "progress", "output", "sources", "created_at"]
+        fields = ["id", "kind", "work_id", "run_id", "status", "stage", "error", "progress", "output", "sources", "copy_context", "created_at"]
 
     def get_status(self, obj) -> str:
         return obj.run.status if obj.run else "failed"
+
+    @swagger_serializer_method(serializer_or_field=serializers.JSONField())
+    def get_copy_context(self, obj):
+        if obj.kind not in ("transcribe", "rewrite"):
+            return None
+        return {key: obj.input.get(key, "") for key in
+                ("work_title", "source_task_id", "source_text", "rewrite_requirements")}
 
     @swagger_serializer_method(serializer_or_field=serializers.JSONField())
     def get_output(self, obj):
@@ -96,9 +116,9 @@ class ScriptEdit(serializers.Serializer):
     content = serializers.JSONField()
 
     def validate_content(self, value):
-        from .analysis import validate_script
+        from .analysis import validate_script, validate_rewrite
         try:
-            return validate_script(value)
+            return (validate_rewrite if self.context.get("kind") == "rewrite" else validate_script)(value)
         except (ValueError, AttributeError) as exc:
             raise serializers.ValidationError(str(exc))
 

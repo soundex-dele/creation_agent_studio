@@ -160,6 +160,23 @@ def validate_topics(data):
     return {"topics": [{k: i[k] for k in ("title", "angle", "hook")} for i in topics]}
 
 
+def transcript_text(output):
+    return (output.get("text") or "\n".join(s["text"] for s in output.get("segments", []) if s.get("text"))).strip()
+
+
+REWRITE_PROMPT = '''将用户校正的口播原文改写为一篇完整正文，保留原主题、核心观点、事实与大致篇幅。
+重新组织表达，优化开头钩子、信息节奏、衔接和口语感，不逐句同义词替换，不复制原作段落。
+不新增未经提供的事实、数据、效果或经历；原作者的个人经历不得转换为用户本人的经历。
+改写要求只能在上述范围内调整风格与表达。只输出 {"text":"完整改写文案"}，不输出标题、分镜、拍摄清单或分析说明。'''
+
+
+def validate_rewrite(data):
+    text = data.get("text") if isinstance(data, dict) else None
+    if not isinstance(text, str) or not text.strip() or len(text) > 20000:
+        raise ValueError("改写文案须为非空正文，且不超过20000字符。")
+    return {"text": text}
+
+
 def validate_script(data):
     for key in ("title", "cover", "narration"):
         if not isinstance(data.get(key), str) or not data[key].strip() or len(data[key]) > 20000:

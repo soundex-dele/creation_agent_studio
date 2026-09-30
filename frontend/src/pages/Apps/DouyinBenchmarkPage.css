@@ -87,6 +87,10 @@
 .douyin-form .ant-select { width: 100%; }
 .douyin-form textarea { line-height: 1.8; }
 .douyin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.douyin-rewrite { margin-top: 20px; }
+.douyin-rewrite-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; min-width: 0; }
+.douyin-rewrite-columns > section { min-width: 0; }
+.douyin-rewrite h3 { margin: 0; }
 .douyin-work-list { display: grid; gap: 14px; margin-top: 24px; }
 .douyin-work { display: flex; gap: 22px; align-items: center; border: 1px solid var(--color-border); padding: 20px; border-radius: 14px; min-width: 0; }
 .douyin-work > img, .douyin-cover-placeholder { width: 96px; height: 128px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
@@ -154,7 +158,7 @@
   .douyin-process h3 { display: inline; }
   .douyin-process p { margin-top: 6px; }
   .douyin-panel { padding: 20px 14px; border-radius: 16px; }
-  .douyin-account-grid, .douyin-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .douyin-account-grid, .douyin-form-grid, .douyin-rewrite-columns { grid-template-columns: minmax(0, 1fr); }
   .douyin-account-card { padding: 20px; }
   .douyin-card-description { min-height: 0; }
   .douyin-toolbar { align-items: stretch; }

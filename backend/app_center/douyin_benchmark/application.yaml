@@ -4,11 +4,11 @@ metadata:
   id: douyin-benchmark
   version: 1.0.0
   name: 抖音对标助手
-  description: 采集对标账号，拆解突出作品，创作有依据的口播与拍摄脚本。
+  description: 采集对标账号，拆解突出作品，复刻改写爆款文案，创作有依据的口播与拍摄脚本。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
   icon: "标"
   color: "#2563EB"
-  tags: [抖音, 对标分析, 视频拆解, 口播脚本]
+  tags: [抖音, 对标分析, 视频拆解, 爆款复刻, 口播脚本]
   developer: Agent Studio
 spec:
   application_kind: custom

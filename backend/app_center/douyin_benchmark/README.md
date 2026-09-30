@@ -1,6 +1,14 @@
 # 抖音对标助手
 
-独立应用 `douyin-benchmark`：个人对标账号 → 采集批次与作品快照 → 账号分析／视频转写与关键帧 → 3个新选题 → 可编辑脚本版本与 Markdown。首版不定时采集、不发布、不制作成片、不采集评论。
+独立应用 `douyin-benchmark`：个人对标账号 → 采集批次与作品快照 → 账号分析／视频转写与关键帧 → 3个新选题 → 可编辑脚本版本与 Markdown。作品库同时支持“爆款复刻”：转写并校正原文 → 同主题文案改写 → 编辑、复制、版本保存与 Markdown 导出。不定时采集、不发布、不制作成片、不采集评论。
+
+## 爆款文案复刻
+
+所有视频作品均可点击“爆款复刻”，无需达到表现突出指标。自动复用该作品最近一次成功、非空的转写或拆解原文（补传视频变更后不复用旧素材的转写）；没有可用原文时仅提取音频并调用本地 Whisper，不提取关键帧或分析画面。“重新转写”强制创建新转写任务。空转写允许手工补全；下载、无音轨及模型错误保留任务和明确重试入口。
+
+校正原文后填写可选改写要求，生成一篇同主题完整正文，保留核心观点、事实和大致篇幅，优化开头、衔接与口语表达，不把原作者经历写成用户经历。模型提示词约束不能代替人工核实。此流程不生成标题、分镜、清单或成片。改写任务冻结校正原文及要求，不覆盖原始识别内容，历史记录可恢复该快照。结果编辑后保存为新版本，旧版本保留，并使用 revision 检测并发冲突；未保存内容可复制，导出须先保存。
+
+复用原有私有 Task／ScriptVersion JSON 存储，无新增迁移；部署时更新前端并重启 Web、coordinator 和 media worker。
 
 ## 采集运行方式与验收边界
 
@@ -92,8 +100,9 @@ HTTP(S) 媒体地址均按 DTK 返回值处理，仅允许平台 CDN 域名和�
 - `GET /connection`、`GET /brands`：本地配置检查、可引用私有品牌（仅定位与语气）。
 - `GET/POST /accounts`；`GET/PATCH/DELETE /accounts/{id}`：添加时创建采集任务，支持备注与分组。
 - `GET /accounts/{id}/works`：`batch_id/search/sort/outstanding`；`POST .../works/{work_id}/upload` 接收 multipart `video`。
-- `GET/POST /accounts/{id}/tasks`：操作 `collect/account/breakdown/topics/script`；`GET .../tasks/{task_id}`、`POST .../cancel`、`GET .../frames/{frame_id}`。
-- `GET/POST .../tasks/{task_id}/versions`：读取或保存脚本；`GET .../versions/{version_id}/download`：Markdown。
+- `GET/POST /accounts/{id}/tasks`：操作 `collect/account/breakdown/topics/script/transcribe/rewrite`；`GET .../tasks/{task_id}`、`POST .../cancel`、`GET .../frames/{frame_id}`。
+- `transcribe` 输入 `work_id` 与可选 `force`（默认 false），输出 `text/segments/duration`。`rewrite` 输入 `work_id/source_task_id/source_text` 及可选 `rewrite_requirements`（默认空），来源必须为同作品成功的转写或拆解。原文最多20,000字符，要求最多3,000字符，结果为非空且最多20,000字符的 `{text}`。私有任务详情 `copy_context` 返回来源作品标题、来源任务ID、校正原文及要求，便于历史恢复。
+- `GET/POST .../tasks/{task_id}/versions`：读取或保存脚本／改写正文；按任务类型校验内容。`GET .../versions/{version_id}/download`：Markdown，改写任务仅导出正文。
 - 创建账号、任务要求 `Idempotency-Key`。同键同参重放，同键异参409；脚本保存必须携带读到的最新 `revision`。
 
 ## 检查

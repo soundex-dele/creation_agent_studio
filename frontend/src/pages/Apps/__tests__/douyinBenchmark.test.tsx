@@ -10,6 +10,7 @@ import { DouyinHome } from '../DouyinBenchmarkPage';
 import { DouyinWorkspace } from '../douyin/DouyinWorkspace';
 import { AnalysisResult } from '../douyin/AnalysisResult';
 import { ScriptEditor } from '../douyin/ScriptEditor';
+import { RewritePanel } from '../douyin/RewritePanel';
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const account = { id: 'a1', source_url: 'https://www.douyin.com/user/test', name: '知识账号', group: '', notes: '', profile: {}, updated_at: '2026-09-29' };
 const work = { id: 'w1', title: '如何读书', likes: 0, comments: null, collects: null, shares: null, ratio: null, published_at: null, duration: 60, url: 'https://www.douyin.com/video/7536599534051626299', video_url: 'https://v3.douyinvod.com/real-file.mp4', cover: '', kind: 'video' };
@@ -51,6 +52,38 @@ async function setText(label: string, value: string) {
 }
 
 describe('Douyin benchmark workflow', () => {
+  it('starts text-only replication from a library video', async () => {
+    const transcript = { ...task, id: 'transcript-1', kind: 'transcribe', output: { text: '原始文案。' }, copy_context: { work_title: '如何读书' } };
+    vi.mocked(api.post).mockResolvedValue(transcript);
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/tasks/transcript-1') ? Promise.resolve(transcript) : original(url, ...args));
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    await click('作品库');
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '爆款复刻')!.click());
+    expect(api.post).toHaveBeenCalledWith('/dy/accounts/a1/tasks', { kind: 'transcribe', work_id: 'w1' }, expect.anything());
+    expect((container.querySelector('[aria-label="口播原文"]') as HTMLTextAreaElement).value).toBe('原始文案。');
+    expect(container.textContent).toContain('来源作品：如何读书');
+  });
+  it('shows transcription progress, cancels, and offers explicit retry without rewriting', async () => {
+    let transcript: DouyinTask = { ...task, id: 'transcript-1', kind: 'transcribe', status: 'running', stage: '转写口播', progress: { current: 2, total: 10 }, output: {} };
+    vi.mocked(api.post).mockImplementation(async url => {
+      if (url.endsWith('/cancel')) transcript = { ...transcript, status: 'cancelled' };
+      return transcript;
+    });
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/tasks/transcript-1') ? Promise.resolve(transcript) : original(url, ...args));
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    await click('作品库');
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '爆款复刻')!.click());
+    expect(container.textContent).toContain('转写口播');
+    expect(container.querySelector('[aria-label="口播原文"]')).toBeNull();
+    await click('取消任务');
+    expect(api.post).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks/transcript-1/cancel');
+    expect(container.textContent).toContain('任务已取消');
+    await click('重试转写');
+    expect(api.post).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks', { kind: 'transcribe', work_id: 'w1', force: true }, expect.anything());
+    expect(vi.mocked(api.post).mock.calls.some(([, body]) => (body as { kind?: string })?.kind === 'rewrite')).toBe(false);
+  });
   it.each(['talking_head', 'screencast', 'animation', 'live_action', 'mixed'])('passes the selected %s format to topic generation', async format => {
     await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
     await click('作品库'); await click('转写并拆解'); await click('用这份拆解创作');
@@ -110,6 +143,71 @@ describe('Douyin benchmark workflow', () => {
   });
 });
 
+
+describe('text replication editor', () => {
+  const context = { work_title: '如何读书', source_task_id: 'transcript-1', source_text: '已校正的原文', rewrite_requirements: '简洁自然' };
+  const rewrite: DouyinTask = { ...task, id: 'rewrite-1', kind: 'rewrite', output: { text: '改写结果' }, copy_context: context };
+
+  function versions() {
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/versions') ? Promise.resolve([{ id: 'copy-v1', revision: 1, content: { text: '改写结果' }, created_at: '2026-09-30' }]) : original(url, ...args));
+  }
+
+  it('requires corrected nonempty text and submits optional instructions without scenes', async () => {
+    const onRun = vi.fn().mockResolvedValue(undefined);
+    await render(<RewritePanel client={douyinApi('/dy')} accountId="a1" task={{ ...task, kind: 'transcribe', output: { text: '', transcript_note: '未识别到口播，请手工补全原文。' } }} busy={false} onRun={onRun} />);
+    expect([...container.querySelectorAll('button')].find(b => b.textContent === '生成改写文案')?.disabled).toBe(true);
+    await setText('口播原文', '校正后的文案'); await setText('改写要求', '开头更直接'); await click('生成改写文案');
+    expect(onRun).toHaveBeenLastCalledWith({ kind: 'rewrite', work_id: 'w1', source_task_id: 't1', source_text: '校正后的文案', rewrite_requirements: '开头更直接' });
+    await click('重新转写');
+    expect(onRun).toHaveBeenLastCalledWith({ kind: 'transcribe', work_id: 'w1', force: true });
+    expect(container.textContent).not.toContain('分镜与拍摄');
+  });
+
+  it('restores frozen source and edits, copies, saves and exports a new text version', async () => {
+    versions();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    vi.mocked(api.post).mockResolvedValue({ id: 'copy-v2', revision: 2, content: { text: '手工修改的结果' }, created_at: '2026-09-30' });
+    await render(<RewritePanel client={douyinApi('/dy')} accountId="a1" task={rewrite} busy={false} onRun={vi.fn()} />);
+    expect((container.querySelector('[aria-label="口播原文"]') as HTMLTextAreaElement).value).toBe(context.source_text);
+    expect((container.querySelector('[aria-label="改写要求"]') as HTMLTextAreaElement).value).toBe(context.rewrite_requirements);
+    await setText('改写正文', '手工修改的结果'); await click('复制文案');
+    expect(writeText).toHaveBeenCalledWith('手工修改的结果');
+    expect([...container.querySelectorAll('button')].find(b => b.textContent === '导出文案 Markdown')?.disabled).toBe(true);
+    await click('保存文案新版本');
+    expect(api.post).toHaveBeenCalledWith('/dy/accounts/a1/tasks/rewrite-1/versions', { revision: 1, content: { text: '手工修改的结果' } });
+    expect(container.textContent).toContain('已保存新版本');
+    const createUrl = vi.fn().mockReturnValue('blob:copy');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createUrl });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.mocked(api.get).mockResolvedValue(new Blob(['手工修改的结果']));
+    await click('导出文案 Markdown');
+    expect(api.get).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks/rewrite-1/versions/copy-v2/download', undefined, { responseType: 'blob' });
+  });
+
+  it('retains unsaved text after version conflict and supports retry with frozen source', async () => {
+    versions();
+    vi.mocked(api.post).mockRejectedValue(new Error('脚本已被更新，请重新加载后保存。'));
+    await render(<RewritePanel client={douyinApi('/dy')} accountId="a1" task={rewrite} busy={false} onRun={vi.fn()} />);
+    await setText('改写正文', '保留我的修改'); await click('保存文案新版本');
+    expect((container.querySelector('[aria-label="改写正文"]') as HTMLTextAreaElement).value).toBe('保留我的修改');
+    expect(container.textContent).toContain('已被更新');
+    const onRun = vi.fn().mockResolvedValue(undefined);
+    await render(<RewritePanel key="failed" client={douyinApi('/dy')} accountId="a1" task={{ ...rewrite, status: 'failed' }} busy={false} onRun={onRun} />);
+    await click('重试改写');
+    expect(onRun).toHaveBeenCalledWith({ kind: 'rewrite', work_id: 'w1', source_task_id: 'transcript-1', source_text: context.source_text, rewrite_requirements: context.rewrite_requirements });
+  });
+
+  it('does not strand the editor in loading state after version fetch failure', async () => {
+    vi.mocked(api.get).mockRejectedValue(new Error('版本加载失败'));
+    await render(<RewritePanel client={douyinApi('/dy')} accountId="a1" task={rewrite} busy={false} onRun={vi.fn()} />);
+    expect(container.textContent).toContain('版本加载失败');
+    expect(container.textContent).toContain('重新加载文案');
+    expect(container.textContent).not.toContain('正在加载文案');
+  });
+});
 
 describe('personal collector settings', () => {
   it('keeps saved cookies blank and saves replacement credentials', async () => {

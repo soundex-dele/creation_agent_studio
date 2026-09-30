@@ -110,6 +110,40 @@ def execute(payload, sink):
             result = analysis.call_claims(task, "分析选题分布、发布频率、时长分布与表现差异。标题语义只能作为初步推测。",
                 {"works": evidence, "breakdowns": data["breakdowns"], "statistics": facts}, config, allowed, cancelled=lambda: sink.cancelled)
             save("completed", {**result, "statistics": facts})
+        elif kind == "transcribe":
+            if data.get("reused_transcript"):
+                save("completed", data["reused_transcript"])
+            else:
+                prefix = f"tasks/{task.pk}"
+                save("获取视频")
+                if data.get("media_key"):
+                    path = media.path_for(data["media_key"])
+                else:
+                    client = DTKClient(account=task.account, check=check)
+                    path = media.download_video(data.get("media_urls", []), client,
+                        data["metadata"]["platform_id"], f"{prefix}/source.mp4", check)
+                save("提取音频")
+                audio, duration = media.extract_audio(path, prefix, check)
+                def cancelled():
+                    check()
+                    return False
+                transcript = transcribe_segments(audio, "zh", cancelled=cancelled, stage=save,
+                    progress=lambda seconds: save("转写口播", progress={"current": round(seconds), "total": round(duration)}))
+                output = {"text": analysis.transcript_text(transcript), "segments": transcript["segments"], "duration": duration}
+                if not output["text"]:
+                    output["transcript_note"] = "未识别到口播，请手工补全原文后生成改写文案，或重新转写。"
+                save("completed", output)
+        elif kind == "rewrite":
+            save("改写文案")
+            result = analysis.call_model(task, analysis.REWRITE_PROMPT,
+                {"source_text": data["source_text"], "rewrite_requirements": data["rewrite_requirements"]},
+                config, cancelled=lambda: sink.cancelled)
+            output = analysis.validate_rewrite(result)
+            with current(payload, sink) as active:
+                ScriptVersion.objects.create(task=active, revision=1, content=output)
+                active.stage, active.output = "completed", output
+                active.save(update_fields=["stage", "output"])
+            sink.emit("progress.updated", {"stage": "completed"})
         elif kind == "breakdown":
             prefix = f"tasks/{task.pk}"
             # Checkpoints survive vision/text failure; retry is explicit and creates a fresh task.
@@ -155,7 +189,7 @@ def execute(payload, sink):
             result = analysis.call_model(task, '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。' + format_instruction(data["brief"]),
                 {"brief": data["brief"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
             save("completed", {**analysis.validate_topics(result), "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
-        else:
+        elif kind == "script":
             save("生成拍摄脚本")
             result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。' + format_instruction(data["brief"]),
                 {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
@@ -163,6 +197,8 @@ def execute(payload, sink):
             with current(payload, sink) as active:
                 ScriptVersion.objects.create(task=active, revision=1, content=output)
             save("completed", output)
+        else:
+            raise ValueError("不支持的抖音任务类型。")
         return {"task_id": str(task.pk)}
     except InterruptedError:
         raise

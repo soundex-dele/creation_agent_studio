@@ -252,9 +252,9 @@ class VersionsView(BaseView):
     @transaction.atomic
     def post(self, request, **kwargs):
         task = self.task(True)
-        if task.kind != "script" or not task.run or task.run.status != "succeeded":
-            raise ValidationError("请选择已完成的脚本。")
-        serializer = ScriptEdit(data=request.data)
+        if task.kind not in ("script", "rewrite") or not task.run or task.run.status != "succeeded":
+            raise ValidationError("请选择已完成的脚本或改写文案。")
+        serializer = ScriptEdit(data=request.data, context={"kind": task.kind})
         serializer.is_valid(raise_exception=True)
         latest = task.versions.first()
         if not latest or latest.revision != serializer.validated_data["revision"]:
@@ -267,8 +267,9 @@ class DownloadView(BaseView):
     def get(self, request, **kwargs):
         task = self.task()
         version = get_object_or_404(task.versions, pk=kwargs["version_id"])
-        response = HttpResponse(markdown(version.content), content_type="text/markdown; charset=utf-8")
-        response["Content-Disposition"] = f'attachment; filename="douyin-script-v{version.revision}.md"'
+        body = version.content["text"] if task.kind == "rewrite" else markdown(version.content)
+        response = HttpResponse(body, content_type="text/markdown; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="douyin-{task.kind}-v{version.revision}.md"'
         return response
 
 
