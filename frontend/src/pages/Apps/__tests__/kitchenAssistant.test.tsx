@@ -258,7 +258,7 @@ it("restores saved cooking progress and elapsed timers on mount", async () => {
   expect(container.textContent).toContain("计时结束");
   await click(button("继续制作"));
   expect(document.body.textContent).toContain("炒鸡蛋");
-  expect(button("启动本步计时").disabled).toBe(true);
+  expect(button("本步已添加计时").disabled).toBe(true);
 });
 const inputValue = async (selector: string, value: string) => {
   const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
@@ -402,13 +402,14 @@ it("pauses, extends and resumes a timer without resetting its remaining duration
     timers: { r1: Date.now() + 120000 },
   };
   await render();
-  await click(container.querySelector('[aria-label="番茄炒蛋暂停计时"]')!);
+  await click(container.querySelector('[aria-label="查看全部计时（1个）"]')!);
+  await click(document.querySelector('[aria-label="番茄炒蛋暂停计时"]')!);
   const remaining = snapshot.data.cooking!.pausedTimers!.r1;
   expect(remaining).toBeGreaterThan(115);
   expect(snapshot.data.cooking!.timers.r1).toBeUndefined();
-  await click(container.querySelector('[aria-label="番茄炒蛋增加一分钟"]')!);
+  await click(document.querySelector('[aria-label="番茄炒蛋增加一分钟"]')!);
   expect(snapshot.data.cooking!.pausedTimers!.r1).toBe(remaining + 60);
-  await click(container.querySelector('[aria-label="番茄炒蛋继续计时"]')!);
+  await click(document.querySelector('[aria-label="番茄炒蛋继续计时"]')!);
   expect(snapshot.data.cooking!.pausedTimers!.r1).toBeUndefined();
   expect(snapshot.data.cooking!.timers.r1).toBeGreaterThan(Date.now() + 170000);
 });
@@ -479,6 +480,85 @@ it("starts two step timers for the same dish and preserves preparation progress"
   await click(button("继续制作"));
   expect(snapshot.data.cooking!.recipeSnapshots![0].name).toBe("番茄炒蛋");
 });
+it("switches dishes independently and keeps grouped floating timers across tabs and reloads", async () => {
+  snapshot.data.selectedRecipeIds = ["r1", "r2"];
+  await render();
+  expect(container.querySelector('.kitchen-timer-fab')).toBeNull();
+  await tab("菜单");
+  await click(button("进入制作模式"));
+  await click(button("启动本步计时"));
+  const firstDeadline = Object.values(snapshot.data.cooking!.timers)[0];
+  await click(button("下一步"));
+  await click(container.querySelector('[aria-label="切换制作清炒上海青"]')!);
+  expect(snapshot.data.cooking!.steps.r1).toBe(1);
+  expect(snapshot.data.cooking!.completedIds).toEqual([]);
+  await click(button("启动本步计时"));
+  await click(container.querySelector('[aria-label="切换制作番茄炒蛋"]')!);
+  expect(container.querySelector('.kitchen-active-step h2')?.textContent).toBe("炒鸡蛋");
+  expect(Object.values(snapshot.data.cooking!.timers)[0]).toBe(firstDeadline);
+  await click(button("返回厨房"));
+  await tab("采购");
+  const floating = container.querySelector<HTMLButtonElement>('.kitchen-timer-fab')!;
+  expect(floating.getAttribute('aria-label')).toBe('查看全部计时（2个）');
+  expect(container.querySelector('.kitchen-page')!.contains(floating)).toBe(false);
+  expect(container.querySelector('.kitchen-timer-dock')!.nextElementSibling?.tagName).toBe('NAV');
+  await click(floating);
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain('各道菜的倒计时');
+  expect(dialog.querySelectorAll('.kitchen-timer-group')).toHaveLength(2);
+  expect(dialog.textContent).toContain('番茄炒蛋');
+  expect(dialog.textContent).toContain('清炒上海青');
+  await click(document.querySelector('[aria-label="番茄炒蛋 · 处理食材暂停计时"]')!);
+  expect(Object.keys(snapshot.data.cooking!.timers)).toHaveLength(1);
+  expect(Object.keys(snapshot.data.cooking!.pausedTimers!)).toHaveLength(1);
+  await click(document.querySelector('.ant-modal-close')!);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await render();
+  await click(container.querySelector('.kitchen-timer-fab')!);
+  expect(document.querySelectorAll('.kitchen-timer-group')).toHaveLength(2);
+  expect(document.querySelector('[aria-label="番茄炒蛋 · 处理食材继续计时"]')).not.toBeNull();
+  await click(document.querySelector('[aria-label="番茄炒蛋 · 处理食材清除计时"]')!);
+  expect(container.querySelector('.kitchen-timer-fab')!.getAttribute('aria-label')).toBe('查看全部计时（1个）');
+  expect(Object.keys(snapshot.data.cooking!.timers)).toHaveLength(1);
+  await click(document.querySelector('[aria-label="清炒上海青 · 清洗沥水清除计时"]')!);
+  expect(container.querySelector('.kitchen-timer-fab')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it("keeps expired and paused timers visible and lets an expired timer run again", async () => {
+  snapshot.data.selectedRecipeIds = ["r1", "r2"];
+  snapshot.data.cooking = {
+    startedAt: new Date().toISOString(), recipeIds: ["r1", "r2"], currentId: "r1",
+    steps: { r1: 0, r2: 0 }, completedIds: [],
+    timers: { r1: Date.now() - 5000 }, pausedTimers: { r2: 90 },
+  };
+  await render();
+  expect(container.querySelector('.kitchen-timer-fab')?.textContent).toContain('1 个计时已到');
+  await click(container.querySelector('.kitchen-timer-fab')!);
+  expect(document.querySelector('.kitchen-timer-item.is-finished')?.textContent).toContain('计时结束');
+  expect(document.querySelector('[aria-label="清炒上海青剩余时间"]')?.textContent).toBe('01:30');
+  expect(document.querySelector<HTMLButtonElement>('[aria-label="番茄炒蛋暂停计时"]')!.disabled).toBe(true);
+  await click(document.querySelector('[aria-label="番茄炒蛋增加一分钟"]')!);
+  expect(snapshot.data.cooking!.timers.r1).toBeGreaterThan(Date.now());
+  expect(snapshot.data.cooking!.pausedTimers!.r2).toBe(90);
+  expect(container.querySelector('.kitchen-timer-fab')!.classList.contains('is-finished')).toBe(false);
+});
+
+it("does not show a timer as started when saving fails", async () => {
+  snapshot.data.selectedRecipeIds = ["r1"];
+  await render();
+  await tab("菜单");
+  await click(button("进入制作模式"));
+  vi.mocked(api.patch).mockRejectedValueOnce(new Error("network"));
+  await click(button("启动本步计时"));
+  expect(container.querySelector('.kitchen-timer-fab')).toBeNull();
+  expect(container.textContent).toContain('操作已保留');
+  await click(button("重试原操作"));
+  expect(container.querySelector('.kitchen-timer-fab')).not.toBeNull();
+  expect(Object.keys(snapshot.data.cooking!.timers)).toHaveLength(1);
+});
+
 it("keeps the meal and date-range shopping checkboxes independent", async () => {
   snapshot.data.selectedRecipeIds = ["r1"];
   snapshot.data.weeklyMenu = [

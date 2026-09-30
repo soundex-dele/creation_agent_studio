@@ -336,18 +336,9 @@
   margin: 12px 0;
 }
 .kitchen-timers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 16px 0;
-}
-.kitchen-timers > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--color-border);
-  padding: 10px 14px;
-  border-radius: 12px;
+  display: grid;
+  gap: 24px;
+  margin: 20px 0;
 }
 .kitchen-timers strong {
   font-variant-numeric: tabular-nums;
@@ -513,9 +504,6 @@
 .kitchen-meal {
   margin-top: 16px;
 }
-.kitchen-timers > div {
-  flex-wrap: wrap;
-}
 @media (max-width: 767px) {
   .kitchen-form-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -550,8 +538,17 @@
   font-size: clamp(24px, 3vw, 32px);
 }
 .kitchen-cooking {
-  max-width: 900px;
-  margin-inline: auto;
+  width: 100%;
+  min-width: 0;
+}
+.kitchen-cooking-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--kitchen-line);
 }
 .kitchen-ai-answer {
   white-space: pre-wrap;
@@ -864,6 +861,129 @@
   .kitchen-bottom-navigation .kitchen-primary-tabs .ant-tabs-tab { min-height: 44px; padding-block: 4px; }
   .kitchen-primary-tabs .ant-tabs-tab-btn > span { flex-direction: row; }
   .kitchen-primary-tabs .ant-tabs-tab-btn svg { display: none; }
+}
+/* The floating control is anchored above the kitchen nav, within the shell's
+   available height. It never uses viewport offsets that collide with host nav. */
+.kitchen-page {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: 120px;
+}
+.kitchen-timer-dock {
+  position: relative;
+  flex-shrink: 0;
+  height: 0;
+  z-index: 5;
+}
+.kitchen-timer-fab {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  max-width: calc(100% - 40px);
+  padding: 12px 20px 12px 16px;
+  border: 1px solid var(--kitchen-accent);
+  border-radius: 22px;
+  background: var(--kitchen-accent);
+  color: var(--kitchen-paper);
+  box-shadow: 0 8px 24px #0003;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 160ms ease;
+}
+.kitchen-timer-fab:hover { box-shadow: 0 10px 30px #0005; }
+.kitchen-timer-fab:focus-visible { outline: 3px solid var(--kitchen-accent); outline-offset: 4px; }
+.kitchen-timer-fab:active { opacity: .85; }
+.kitchen-timer-fab > span:last-child { display: grid; gap: 2px; }
+.kitchen-timer-fab strong { font-size: 14px; }
+.kitchen-timer-fab > span > span { font-size: 12px; font-variant-numeric: tabular-nums; }
+.kitchen-timer-fab-icon { position: relative; display: flex; }
+.kitchen-timer-fab-icon small {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  min-width: 20px;
+  padding: 1px 4px;
+  border-radius: 12px;
+  background: var(--kitchen-paper);
+  color: var(--kitchen-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.kitchen-timer-fab.is-finished { background: var(--kitchen-warm); border-color: var(--kitchen-warm); }
+.kitchen-timer-modal .ant-modal { top: 0; }
+.kitchen-timer-modal .ant-modal-body {
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline: 4px;
+}
+.kitchen-timer-group { min-width: 0; }
+.kitchen-timer-group h3 { margin: 0 0 10px; font-size: 17px; color: var(--kitchen-ink); overflow-wrap: anywhere; }
+.kitchen-timer-item {
+  margin-top: 10px;
+  padding: 16px;
+  border: 1px solid var(--kitchen-line);
+  border-radius: 16px;
+  background: var(--kitchen-paper);
+}
+.kitchen-timer-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
+.kitchen-timer-state { color: var(--kitchen-muted); font-size: 13px; }
+.kitchen-timer-item > strong { display: block; margin: 8px 0 12px; color: var(--kitchen-accent); font-size: 32px; line-height: 1.3; }
+.kitchen-timer-item.is-finished { background: var(--kitchen-warm-soft); border-color: var(--kitchen-warm); }
+.kitchen-timer-item.is-finished > strong { color: var(--kitchen-warm); font-size: 24px; }
+.kitchen-timer-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kitchen-timer-controls .ant-btn { min-width: 0; padding-inline: 6px; }
+.kitchen-dish-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.kitchen-dish-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--kitchen-line);
+  border-radius: 18px;
+  background: var(--kitchen-surface);
+  color: var(--kitchen-ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.kitchen-dish-card[aria-pressed="true"] { border-color: var(--kitchen-accent); background: var(--kitchen-soft); box-shadow: inset 0 3px var(--kitchen-accent); }
+.kitchen-dish-card:hover:not(:disabled) { border-color: var(--kitchen-accent); }
+.kitchen-dish-card:disabled { cursor: wait; opacity: .65; }
+.kitchen-dish-card strong { font-size: 18px; }
+.kitchen-dish-card-top, .kitchen-dish-timing { display: flex; align-items: center; gap: 8px; color: var(--kitchen-accent); font-size: 12px; }
+.kitchen-dish-card-top svg, .kitchen-dish-timing svg { flex-shrink: 0; }
+.kitchen-dish-card-top > span { flex: 1; }
+.kitchen-dish-step { color: var(--kitchen-muted); font-size: 13px; }
+.kitchen-dish-timing { margin-top: auto; font-variant-numeric: tabular-nums; }
+.kitchen-active-step { background: var(--kitchen-surface); border: 1px solid var(--kitchen-line); border-radius: 24px; padding: 28px; overflow-wrap: anywhere; }
+.kitchen-cooking > .kitchen-section-heading h2 { font-size: 28px; margin: 8px 0; }
+.kitchen-cooking > details { border: 1px solid var(--kitchen-line); border-radius: 16px; padding: 16px 20px 0; background: var(--kitchen-soft); }
+.kitchen-cooking > details[open] { padding-bottom: 16px; }
+.kitchen-meal-selection h3 { display: flex; align-items: center; gap: 8px; }
+.kitchen-meal-dish { border-top: 1px solid var(--kitchen-line); padding-block: 12px; }
+.kitchen-meal-selection > .ant-btn-block { margin-top: 16px; }
+@media (max-width: 767px) {
+  .kitchen-dish-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kitchen-dish-card { padding: 14px; }
+  .kitchen-active-step { padding: 20px 16px; border-radius: 18px; }
+  .kitchen-active-step h2 { font-size: 26px; }
+  .kitchen-timer-fab { right: max(16px, env(safe-area-inset-right)); }
+}
+@media (max-width: 359px) {
+  .kitchen-dish-board { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 480px) {
+  .kitchen-timer-modal .ant-modal-body { max-height: calc(100dvh - 130px); }
+  .kitchen-timer-fab { min-height: 56px; padding-block: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .kitchen-workspace *,

@@ -55,7 +55,7 @@ import { useKitchenState } from "./kitchen/useKitchenState";
 import { ShoppingPanel } from "./kitchen/ShoppingPanel";
 import { WeekPlanner } from "./kitchen/WeekPlanner";
 import { RecordHistory } from "./kitchen/RecordHistory";
-import { TimerPanel } from "./kitchen/TimerPanel";
+import { FloatingTimers } from "./kitchen/FloatingTimers";
 import { useTimerAlerts } from "./kitchen/useTimerAlerts";
 import { CookingView } from "./kitchen/CookingView";
 import { PreferencesPanel } from "./kitchen/PreferencesPanel";
@@ -130,6 +130,7 @@ export function KitchenWorkspace({
   const state = snapshot?.data;
   const cooking = state?.cooking;
   const hasTimers = !!cooking && Object.keys(cooking.timers).length > 0;
+  const hasAnyTimers = hasTimers || !!Object.keys(cooking?.pausedTimers ?? {}).length;
   useEffect(() => {
     if (!hasTimers) return;
     setNow(Date.now());
@@ -386,15 +387,6 @@ export function KitchenWorkspace({
                 />
               ) : (
                 <>
-                  {cooking && (
-                    <TimerPanel
-                      state={state}
-                      now={now}
-                      busy={busy}
-                      commit={commit}
-                    />
-                  )}
-
                   {tab === "home" && (
                     <>
                       <section className="kitchen-hero">
@@ -703,7 +695,7 @@ export function KitchenWorkspace({
                       <div className="kitchen-section-heading">
                         <div>
                           <h2>这一餐的安排</h2>
-                          <p>选菜后查看采购缺口，再进入制作。</p>
+                          <p>多选几道菜一起做，步骤分别记录，计时互不打扰。</p>
                         </div>
                         <label className="kitchen-servings">
                           用餐人数
@@ -727,10 +719,10 @@ export function KitchenWorkspace({
                       </div>
                       {selected.length ? (
                         <div className="kitchen-plan-grid">
-                          <section className="kitchen-card">
+                          <section className="kitchen-card kitchen-meal-selection">
                             <h3>待制作 · {selected.length} 道</h3>
                             {selected.map((r) => (
-                              <div key={r.id}>
+                              <div className="kitchen-meal-dish" key={r.id}>
                                 <div className="kitchen-row">
                                   <button
                                     className="kitchen-link"
@@ -1281,6 +1273,7 @@ export function KitchenWorkspace({
         </Modal>
       )}
     </main>
+    {state && hasAnyTimers && <FloatingTimers state={state} now={now} busy={busy} commit={commit} />}
     {state && editor?.kind !== "recipe" && !(cookingOpen && cooking) && (
       <nav className="kitchen-bottom-navigation" aria-label="厨房助手导航">
         <Tabs
