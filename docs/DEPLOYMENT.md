@@ -1,5 +1,7 @@
 # 服务器部署指南
 
+已有服务器通过 `npm run dev` 运行、需要接入 Nginx 时，直接查看[非 Docker：Nginx 接入与正式部署](#非-dockernginx-接入与正式部署)。该章节同时覆盖保留开发服务和切换静态文件部署；下面编号 1–5 的章节适用于 Compose。
+
 非容器部署请先在仓库根目录安装依赖，再执行数据库迁移和启动步骤：
 
 ```bash
@@ -85,6 +87,252 @@ curl --fail https://studio.example.com/readyz/
 每次发布必须通过仓库 CI，从干净检出构建两个镜像，在恢复的生产数据库快照上执行迁移，并验证 `/readyz/`。不要将未经审核的 `docker compose up --build` 当作生产升级流程；应在 CI 中构建不可变镜像，并按镜像摘要部署。
 
 曾提交到 Git 的供应商密钥必须在供应商侧撤销。仅从当前代码中删除密钥既不会使其失效，也不会从 Git 历史中移除。
+
+## 非 Docker：Nginx 接入与正式部署
+
+以下示例面向 Linux，假设 Nginx、前端和后端运行在同一台服务器，项目位于 `/opt/creation_agent_studio`，域名为 `studio.example.com`。替换为实际路径和域名。项目默认前端端口为 **3030**，后端为 **8080**；如果启动时覆盖了端口，需要同步修改代理地址。
+
+两种方式共用后端代理路由：
+
+| 方式 | 页面请求 | API / WebSocket | 适用场景 |
+| --- | --- | --- | --- |
+| 保留开发服务 | Nginx → Vite 3030 | Nginx → Django 8080 | 开发联调，保留热更新 |
+| 正式部署 | Nginx → `frontend/dist` 静态文件 | Nginx → Daphne 8080 | 长期运行，不再启动 Vite |
+
+仓库的 `frontend/nginx.conf` 是容器配置，其中 `web:8080`、`/usr/share/nginx/html` 和 `/data/...` 都是容器内地址，不能直接用于本节的宿主机部署。
+
+### A. 保留 npm run dev，先接入 Nginx
+
+1. 将域名解析到服务器 IP，安装 Nginx，放行入口端口 80（启用 HTTPS 时还需 443）。前后端仅需供本机 Nginx 访问，无需对公网开放 3030、8080。
+2. 在 `frontend/vite.config.ts` 的现有 `server` 对象内增加 `allowedHosts: ['studio.example.com']`，保留原有 `port`、`fs`、`proxy`。不要用 `allowedHosts: true` 放开所有主机。
+3. 在 `backend/.env` 的现有 `ALLOWED_HOSTS` 中合并 `studio.example.com`，例如 `ALLOWED_HOSTS=studio.example.com,localhost,127.0.0.1`，值中不包含协议和端口。重启后端使其生效。
+4. 重启前端。手动启动时可在 `frontend/` 目录执行 `npm run dev -- --host 127.0.0.1 --port 3030 --strictPort`。这只启动前端；现有后端、执行 worker 和需要的连接器仍须运行。如果继续使用 `deploy.sh`，它会同时管理多项服务，注意避免重复启动和端口冲突，并通过防火墙限制开发端口的外部访问。
+
+前端默认 API 基地址为 `/api/v1`，与网页同源，无需另设跨域地址。如果曾设置 `VITE_API_BASE_URL` 指向 `http://服务器IP:8080`，删除该覆盖或改为 `/api/v1`，然后重启 Vite；正式部署时则需重新构建。
+
+创建 `/etc/nginx/conf.d/agent-studio.conf`，确保主配置在 `http {}` 中包含该目录。下面的 `map` 必须位于 `http` 上下文，不能放进 `server` 内：
+
+```nginx
+map $http_upgrade $studio_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    server_name studio.example.com;
+    server_tokens off;
+    client_max_body_size 1024m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Request-ID $request_id;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $studio_connection_upgrade;
+
+    # AI/SSE 流式响应、长任务和 WebSocket。
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+
+    # 远程文件使用分块上传，单请求保持 1 MiB 限制。
+    location ^~ /api/v1/remote/ {
+        client_max_body_size 1m;
+        proxy_max_temp_file_size 0;
+        gzip off;
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    # proxy_pass 不带 URI，完整保留 /api/、/ws/ 等原始路径。
+    location ~ ^/(api|ws|media|admin|static|healthz|readyz)(/|$) {
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    # 包括 Vite 页面和 HMR WebSocket。
+    location / {
+        proxy_pass http://127.0.0.1:3030;
+    }
+}
+```
+
+检查配置成功后再重载；首次安装尚未运行 Nginx 时先启动服务：
+
+```bash
+sudo nginx -t
+sudo systemctl enable --now nginx
+sudo systemctl reload nginx
+curl --fail http://studio.example.com/healthz/
+```
+
+此时访问 `http://studio.example.com`。这一方式仍是开发环境，添加 Nginx 不会自动把 Vite 或 Django 开发服务器切换为生产服务。若还需访问开发用的 `/swagger/`、`/redoc/` 或 `/swagger.json`，另行将这些路径代理到后端；上面的基础配置未包含 API 文档路由。
+
+### B. 正式部署：静态前端 + Daphne + HTTPS
+
+先完成依赖安装和域名配置，再按下述步骤准备生产后端、构建前端并切换 Nginx。保留现有数据库、媒体文件和 `SECRET_KEY`；不要用示例 `.env` 覆盖已有数据配置。
+
+**后端配置和初始化**
+
+以下命令从项目根目录执行，使用安装脚本默认创建的 `backend/.venv`；若服务器已有虚拟环境为 `backend/venv`，相应替换路径。
+
+```bash
+cd /opt/creation_agent_studio
+backend/.venv/bin/python -m pip install -r backend/requirements/production.txt
+```
+
+在 `backend/.env` 合并以下 HTTPS 配置：
+
+```dotenv
+ALLOWED_HOSTS=studio.example.com,localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=https://studio.example.com
+REST_FRAMEWORK_NUM_PROXIES=1
+SECURE_SSL_REDIRECT=True
+SESSION_COOKIE_SECURE=True
+CSRF_COOKIE_SECURE=True
+JWT_REFRESH_COOKIE_SECURE=True
+MEDIA_X_ACCEL_REDIRECT=False
+MY_DRIVE_X_ACCEL_REDIRECT=False
+```
+
+这里假设只有一层 Nginx 代理，且 TLS 直接在这层终止；如前面还有负载均衡或 CDN，需重新确定可信代理链、协议头处理和 `REST_FRAMEWORK_NUM_PROXIES`。同源部署通常不需要额外 CSRF 信任域配置。
+
+明确保留实际的 `DATABASE_ENGINE`、数据库路径/连接信息及 `REDIS_ENABLED`：开发设置未指定数据库时默认 SQLite，生产设置的默认值则是 PostgreSQL，不能依赖这两个默认值保持一致。生产设置要求 `SECRET_KEY` 至少 50 个字符；启用 Redis 时须配置 `REDIS_PASSWORD`。远程中继默认开启：无 Redis 时须显式设置 `REMOTE_RELAY_REDIS_URL=`、`REMOTE_RELAY_ALLOW_MEMORY=True`，并且只运行一个 Daphne 进程；不需要中继时可设置 `REMOTE_RELAY_ENABLED=False`。
+
+```bash
+cd /opt/creation_agent_studio/backend
+export DJANGO_SETTINGS_MODULE=backend.settings.production
+.venv/bin/python manage.py migrate --noinput
+.venv/bin/python manage.py sync_app_center
+.venv/bin/python manage.py collectstatic --noinput
+.venv/bin/python manage.py check --deploy
+# 仅首次安装且没有管理员时执行：
+# .venv/bin/python manage.py createsuperuser
+.venv/bin/python -m daphne -b 127.0.0.1 -p 8080 backend.asgi:application
+```
+
+逐条确认命令成功后再继续；先停止占用 8080 的旧后端。`manage.py` 和 `backend.asgi` 默认选择开发设置，所以必须在启动进程的环境中显式设置 `DJANGO_SETTINGS_MODULE=backend.settings.production`，仅在 `.env` 写 `DEBUG=False` 不足以切换。生产依赖包含 Sentry SDK，即使未配置 Sentry 上报也需要安装。
+
+**构建前端并切换页面路由**
+
+另开终端执行：
+
+```bash
+cd /opt/creation_agent_studio
+npm --prefix frontend ci
+npm --prefix frontend run build
+```
+
+构建成功后，在 A 节的 Nginx `server` 中删除原来转发到 3030 的 `location /`，替换为下列内容，保留其余后端代理配置。确保 Nginx 用户可以遍历父目录并读取 `frontend/dist`；不要把整个项目目录作为站点根目录。
+
+```nginx
+root /opt/creation_agent_studio/frontend/dist;
+index index.html;
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+location /assets/ {
+    try_files $uri =404;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+
+location = /index.html {
+    add_header Cache-Control "no-cache";
+}
+```
+
+`try_files` 保证直接访问或刷新前端内部路由时仍能加载应用。切换并验证后可以停止 Vite，以后更新前端需重新构建发布；修改源码不会直接更新已部署页面。
+
+**启用 HTTPS**
+
+准备覆盖该域名的有效证书及续期机制。将上述应用 `server` 的 `listen 80;` 替换为以下监听和证书配置（路径按实际证书位置修改）：
+
+```nginx
+listen 443 ssl;
+ssl_certificate /etc/letsencrypt/live/studio.example.com/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/studio.example.com/privkey.pem;
+ssl_protocols TLSv1.2 TLSv1.3;
+```
+
+在同一文件另加一个 HTTP 跳转块；若证书续期使用 HTTP-01 文件验证，按证书工具要求配置验证路径：
+
+```nginx
+server {
+    listen 80;
+    server_name studio.example.com;
+    return 301 https://studio.example.com$request_uri;
+}
+```
+
+保留应用块中的 `proxy_set_header X-Forwarded-Proto $scheme`，使后端识别 HTTPS，避免循环重定向。证书文件存在后执行 `sudo nginx -t`，成功再执行 `sudo systemctl reload nginx`。生产设置默认强制 HTTPS，因此不要把仅有 HTTP 的 A 节配置与这些生产设置组合后直接上线。
+
+**静态资源、媒体及后台进程**
+
+- `/static/` 继续代理到后端，由生产配置中的 WhiteNoise 提供 `collectstatic` 产物。前端的 `/assets/` 则由 Nginx 直接提供。
+- 生产媒体 URL 为 `/api/v1/media/`，经后端鉴权。上面的 `*_X_ACCEL_REDIRECT=False` 让后端直接发送文件，无需配置 Nginx 文件别名。不要把媒体或私人网盘目录设为公开 `alias`。如启用 X-Accel 加速，须参考 `frontend/nginx.conf` 添加 `/_protected_media/` 和 `/_protected_drive/` 的 **internal** location，分别映射到实际的 `MEDIA_ROOT`、`MY_DRIVE_ROOT`，并赋予 Nginx 读取权限。
+- AI 任务仍需执行 worker。在 `backend/` 中使用相同生产环境启动 `.venv/bin/python manage.py run_execution_coordinator --worker-pool all`。按已有业务需要另行保留 `run_remote_connector`、`run_wechat_connector`；Nginx 不会启动这些服务。纯中继部署不需要执行 worker。
+- 用 systemd 等进程管理器托管 Daphne、worker 和所需连接器，为每个服务配置相同的工作目录、生产设置和必要的环境变量。不要在生产切换后重新运行 `deploy.sh`，它会再次启动开发前后端。
+
+例如创建 `/etc/systemd/system/agent-studio-backend.service`，将 `User` 改为已有且拥有项目运行权限的服务账号（示例 `agentstudio` 需要事先创建），并确认它能读取 `backend/.env`、写入所需数据及日志目录：
+
+```ini
+[Unit]
+Description=Agent Studio ASGI backend
+After=network.target
+
+[Service]
+Type=simple
+User=agentstudio
+WorkingDirectory=/opt/creation_agent_studio/backend
+Environment=DJANGO_SETTINGS_MODULE=backend.settings.production
+ExecStart=/opt/creation_agent_studio/backend/.venv/bin/python -m daphne -b 127.0.0.1 -p 8080 backend.asgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+后端会读取项目的 `backend/.env`。若已有配置只存在于启动终端的环境变量中，需要迁入服务环境或该文件。停止前台测试用的 Daphne 后执行：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now agent-studio-backend
+sudo systemctl status agent-studio-backend
+```
+
+worker 可使用独立 unit，保持相同的 `User`、工作目录和环境，将 `ExecStart` 替换为 `/opt/creation_agent_studio/backend/.venv/bin/python manage.py run_execution_coordinator --worker-pool all`。服务账号还须具备各应用实际需要的工具、模型登录和数据目录权限。
+
+### C. 验证和常见问题
+
+```bash
+sudo nginx -t
+curl --fail https://studio.example.com/healthz/
+curl --fail https://studio.example.com/readyz/
+```
+
+上线时还需验证登录、刷新应用内部路由、一次 AI 流式任务，以及已启用的远程连接和文件上传下载。健康检查通过不代表这些业务流程均已验证。
+
+| 现象 | 检查项 |
+| --- | --- |
+| 502 Bad Gateway | 3030/8080 服务是否运行、监听地址是否与 `proxy_pass` 一致；切换静态模式后页面不应再依赖 3030 |
+| Vite 提示主机不允许 | `allowedHosts` 是否包含实际域名，修改后是否重启 Vite |
+| Django 返回 400 / DisallowedHost | `ALLOWED_HOSTS` 是否包含请求域名，后端是否重启 |
+| 页面能打开但 API 请求失败 | 浏览器是否仍请求旧的 `VITE_API_BASE_URL`，`/api/` 是否完整转发，前端是否重新构建 |
+| AI 回复积攒到最后才显示 | Nginx 及上游代理/CDN 是否关闭响应缓冲和缓存 |
+| 远程连接或热更新失败 | WebSocket 的 Upgrade/Connection 头、后端 ASGI 服务、HTTPS 对应的 `wss://` 连接 |
+| HTTPS 循环跳转或登录 Cookie 异常 | TLS 终止位置、`X-Forwarded-Proto`、生产设置和 Secure Cookie 是否匹配 |
+| 文件请求返回 413 | 是否命中预期 location；普通上传按业务调整上限，远程文件接口保持分块限制 |
+| 页面刷新 404 / 资源返回 HTML | SPA `try_files`、站点根目录，以及 `/assets/` 是否存在且可读取 |
+
+配置错误查看 `/var/log/nginx/error.log`；后端服务日志使用 `journalctl -u agent-studio-backend -n 100 --no-pager`。本节提供配置和验收步骤，实际证书、端口及业务连通性需在目标服务器上验证。
 
 ## Windows：一键启动本地环境
 
