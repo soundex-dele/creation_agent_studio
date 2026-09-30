@@ -3,11 +3,14 @@
 from core.observability import log_operation
 from contextlib import contextmanager
 from datetime import datetime
-from django.db import transaction
+import logging
+import traceback
+import time
+from django.db import OperationalError, connection, transaction
 from django.utils import timezone
 from modules.tenancy.database import tenant_database_context
 from modules.execution.models import Run, RunLease
-from core.transcription import transcribe_segments
+from .backend.transcription import transcribe_segments
 from .backend.models import Task, Work, Snapshot, ScriptVersion
 from .backend.access import account_for
 from .backend.provider import CollectionError
@@ -31,21 +34,40 @@ def current(payload, sink):
         yield task
 
 
+def save_task_progress(payload, sink, stage, output=None, error="", progress=None):
+    # A coordinator event/heartbeat can write between our SQLite read and update.
+    # Retry the entire fenced transaction with a fresh snapshot, never the media/LLM work.
+    for attempt in range(6):
+        try:
+            with current(payload, sink) as active:
+                active.stage, active.error = stage, error
+                if output is not None:
+                    active.output = output
+                if progress is not None:
+                    active.progress = progress
+                active.save(update_fields=["stage", "error", "output", "progress"])
+            break
+        except OperationalError as exc:
+            busy = connection.vendor == "sqlite" and any(word in str(exc).lower() for word in ("locked", "busy"))
+            if not busy:
+                raise
+            if attempt == 5:
+                raise ValueError("保存任务进度时数据库繁忙，请稍后重试。") from None
+            time.sleep(.02 * (2 ** attempt))
+    sink.emit("progress.updated", {"stage": stage, **(progress or {})})
+
+
 @log_operation
 def execute(payload, sink):
+    last_stage = "准备任务"
     def check():
         with current(payload, sink):
             pass
 
     def save(stage, output=None, error="", progress=None):
-        with current(payload, sink) as active:
-            active.stage, active.error = stage, error
-            if output is not None:
-                active.output = output
-            if progress is not None:
-                active.progress = progress
-            active.save(update_fields=["stage", "error", "output", "progress"])
-        sink.emit("progress.updated", {"stage": stage, **(progress or {})})
+        nonlocal last_stage
+        last_stage = stage
+        save_task_progress(payload, sink, stage, output, error, progress)
 
     try:
         with current(payload, sink) as task:
@@ -83,10 +105,10 @@ def execute(payload, sink):
             save("分析账号")
             evidence = data["evidence"]
             facts = account_statistics(evidence)
-            result = analysis.call_model(task, "分析选题分布、发布频率、时长分布与表现差异。标题语义只能作为初步推测。" + analysis.CLAIMS_PROMPT,
-                {"works": evidence, "breakdowns": data["breakdowns"], "statistics": facts}, config)
             allowed = {i["id"] for i in evidence} | {i["id"] for i in data["breakdowns"]}
-            save("completed", {**analysis.validate_claims(result, allowed), "statistics": facts})
+            result = analysis.call_claims(task, "分析选题分布、发布频率、时长分布与表现差异。标题语义只能作为初步推测。",
+                {"works": evidence, "breakdowns": data["breakdowns"], "statistics": facts}, config, allowed, cancelled=lambda: sink.cancelled)
+            save("completed", {**result, "statistics": facts})
         elif kind == "breakdown":
             prefix = f"tasks/{task.pk}"
             # Checkpoints survive vision/text failure; retry is explicit and creates a fresh task.
@@ -99,28 +121,27 @@ def execute(payload, sink):
                     data["metadata"]["platform_id"], f"{prefix}/source.mp4", check)
             save("提取关键帧")
             audio, frames, duration = media.extract(path, prefix, check)
-            save("转写口播")
             def cancelled():
                 check()
                 return False
-            transcript = transcribe_segments(audio, "zh", cancelled=cancelled,
+            transcript = transcribe_segments(audio, "zh", cancelled=cancelled, stage=save,
                 progress=lambda seconds: save("转写口播", progress={"current": round(seconds), "total": round(duration)}))
             segments = transcript["segments"]
             output = {"segments": segments, "frames": frames, "duration": duration, "claims": [],
                       "visual_status": "pending", "visual_note": "画面结论仅基于抽样关键帧。"}
             save("分析口播", output)
             if segments:
-                result = analysis.call_model(task, "分析开头钩子、选题、结构、论据、情绪推进和结尾。" + analysis.CLAIMS_PROMPT,
-                    {"segments": segments, "metadata": data["metadata"]}, config)
-                output["claims"] = analysis.validate_claims(result, {s["id"] for s in segments})["claims"]
+                result = analysis.call_claims(task, "分析开头钩子、选题、结构、论据、情绪推进和结尾。口播结论只引用 segments 中的段落 ID。",
+                    {"segments": segments, "metadata": data["metadata"]}, config, {s["id"] for s in segments}, cancelled=lambda: sink.cancelled)
+                output["claims"] = result["claims"]
             else:
                 output["transcript_note"] = "未识别到口播，不生成文案结论。"
             save("分析画面", output)
             if config.get("vision_model"):
                 try:
-                    result = analysis.call_model(task, "观察构图、开头呈现和可读字幕，并给出拍摄建议。" + analysis.CLAIMS_PROMPT,
-                        {"frames": [{"id": f["id"], "time": f["time"]} for f in frames]}, config, frames=frames)
-                    output["claims"] += analysis.validate_claims(result, {f["id"] for f in frames}, visual=True)["claims"]
+                    result = analysis.call_claims(task, "观察构图、开头呈现和可读字幕，并给出拍摄建议。",
+                        {"frames": [{"id": f["id"], "time": f["time"]} for f in frames]}, config, {f["id"] for f in frames}, frames=frames, cancelled=lambda: sink.cancelled)
+                    output["claims"] += result["claims"]
                     output["visual_status"] = "completed"
                 except ValueError as exc:
                     output["visual_status"] = "failed"
@@ -131,12 +152,12 @@ def execute(payload, sink):
         elif kind == "topics":
             save("生成选题")
             result = analysis.call_model(task, '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。',
-                {"brief": data["brief"], "reference": data["reference"]}, config)
+                {"brief": data["brief"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
             save("completed", analysis.validate_topics(result))
         else:
             save("生成拍摄脚本")
             result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"拍摄画面","spoken":"口播"}],"checklist":["拍摄准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。',
-                {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config)
+                {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
             output = analysis.validate_script(result)
             with current(payload, sink) as active:
                 ScriptVersion.objects.create(task=active, revision=1, content=output)
@@ -145,7 +166,12 @@ def execute(payload, sink):
     except InterruptedError:
         raise
     except Exception as exc:
-        message = str(exc) if isinstance(exc, (ValueError, CollectionError)) else "处理失败，请检查服务配置后重试。"
+        # Keep diagnostics useful without logging exception text, locals, URLs or credentials.
+        frames = traceback.extract_tb(exc.__traceback__)
+        logging.getLogger(__name__).error("Douyin task=%s stage=%s error=%s stack=%s",
+            payload.get("input", {}).get("task_id"), last_stage, type(exc).__name__,
+            " > ".join(f"{f.name}:{f.lineno}" for f in frames))
+        message = str(exc) if isinstance(exc, (ValueError, CollectionError)) else f"{last_stage}失败（{type(exc).__name__}），请检查执行服务日志后重试。"
         try:
             save("failed", error=message[:500])
         except (InterruptedError, PermissionError):

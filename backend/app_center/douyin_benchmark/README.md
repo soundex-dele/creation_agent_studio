@@ -28,11 +28,14 @@ uv pip install --python backend/.venv-dtk/bin/python -r backend/scripts/douyin_v
 | --- | --- |
 | `DOUYIN_DTK_PYTHON` | 可选，独立 Python 3.12/3.13 解释器路径；默认 `backend/.venv-dtk/bin/python` |
 | `DOUYIN_MEDIA_ROOT` | 私有素材目录，默认 `backend/private_media/douyin`；Web 与 worker 共享，不映射为公开媒体目录 |
-| `CREATION_TOOLBOX_WHISPER_MODEL` | 复用共享转写模型，默认 tiny |
+| `DOUYIN_WHISPER_ROOT` | 原版 Whisper 本地模型目录，默认 `~/.cache/whisper`（Windows 当前用户为 `C:\Users\admin\.cache\whisper`） |
+| `DOUYIN_WHISPER_MODEL` | 默认 `base`，加载目录内 `base.pt`；也可填写 `.pt` 文件的绝对路径 |
 
-应用 deployment `config_override` 可设置 `answer_provider`、`answer_model`、`vision_provider`、`vision_model`。文本模型默认采用组织路由；视觉模型必须明确设置 `vision_model`，支持 OpenAI-compatible 图片输入。每次请求执行成员用量检查并记录真实 usage。未配置或调用失败的视觉分析会标记待完成／失败，保留已取得转写与关键帧。
+应用 deployment `config_override` 可设置 `answer_provider`、`answer_model`、`vision_provider`、`vision_model`。文本模型优先采用组织路由；组织尚未创建提供方且未指定 `answer_provider` / `answer_model` 时，使用系统 `AGENT_ENGINE_ADAPTER` 对应的引擎（例如已登录的 Codex）及其默认模型，无需另填 API 提供方。显式 API 配置错误、已禁用的提供方或 API 请求失败不会切换引擎。系统引擎在临时目录中分析输入资料，支持取消；每次请求执行成员用量检查并记录真实 usage。
 
-依赖 FFmpeg、ffprobe 和项目已有 faster-whisper。转写使用本地 CPU。单视频最多500 MiB、10分钟；每条作品最多16帧（开头0/1/2/3秒及全片均匀采样）。关键帧不等同完整视听分析。单次采集选择20／50／100条，串行分页，异常保留已取得部分，不自动无限重试。
+视觉模型仍需明确设置 `vision_model`，支持 OpenAI-compatible 图片输入。未配置或调用失败的视觉分析会标记待完成／失败，保留已取得转写与关键帧。失败任务保留原记录，修复配置后重新发起分析；协调器为新任务启动独立子进程并加载当前运行时代码。
+
+依赖 FFmpeg、ffprobe 和 `openai-whisper`，与 creation_master 使用相同的原版 `.pt` 模型格式。默认复用执行 worker 用户的 `~/.cache/whisper/base.pt`，直接加载本地文件，不自动下载模型；文件缺失时提示配置错误。部署到其他机器或服务账号时需提前放置模型或配置上述路径。自动使用可用 CUDA，否则使用 CPU。页面区分加载模型和转写阶段；原版 Whisper 在整段识别完成后更新进度，识别调用期间不能即时中断，返回后会检查取消状态。单视频最多500 MiB、10分钟；每条作品最多16帧（开头0/1/2/3秒及全片均匀采样）。关键帧不等同完整视听分析。单次采集选择20／50／100条，串行分页，异常保留已取得部分，不自动无限重试。
 
 ## 应用安装
 
@@ -65,7 +68,7 @@ HTTP(S) 媒体地址均按 DTK 返回值处理，仅允许平台 CDN 域名和�
 - 每次采集保留独立批次及逐作品快照；刷新更新作品索引，不覆盖历史批次。分页重复游标终止并报告部分成功。
 - “完成”指本次请求数量满足或平台已到末页，不表示抓取了整个账号历史。字段缺失为 null，0 是有效值。
 - 同账号、同批次、发布满48小时且点赞有效的样本不少于10条，中位数大于0，才能计算点赞倍数；3倍及以上标记突出。新作品不参与；指标不表示因果或未来爆款概率。
-- 账号结论引用作品 ID 或已完成拆解 ID；视频结论引用转写段落或帧 ID。服务端校验引用存在，但这不是语义真伪证明；UI 支持核对出处。
+- 账号结论引用作品 ID 或已完成拆解 ID；视频口播结论只引用转写段落 ID，画面结论只引用帧 ID。每次分析向模型明确提供允许引用的 ID 清单；结构或引用校验失败时最多自动重新生成一次，每次调用照常检查额度并记录用量。网络、配置或额度错误不自动重试；再次校验失败时保留已取得的转写与关键帧。服务端校验引用存在，但这不是语义真伪证明；UI 支持核对出处。
 - 失败或取消不覆盖既有成果。重试通过再次刷新、分析或拆解创建新任务；脚本手动保存创建新版本，使用 revision 防止覆盖并发编辑。
 - 移除账号取消任务并删除关联数据。已导出的文件独立保留。定期运行 `cleanup_douyin_media` 清理删除账号、失效上传等产生的24小时以上孤立素材；运行失败返回非零状态。有效历史任务引用的素材保留。
 

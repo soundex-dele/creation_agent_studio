@@ -225,7 +225,7 @@
         "ffmpeg"
       ],
       "notes": [
-        "Whisper 模型首次转写时下载；需提供固定版本 DTK 源码及独立 Python 3.12/3.13 环境，在应用采集设置保存本人 User-Agent 与 Cookie。",
+        "使用 openai-whisper 读取本地 ~/.cache/whisper/base.pt，可通过 DOUYIN_WHISPER_ROOT / DOUYIN_WHISPER_MODEL 配置，不自动下载模型；需提供固定版本 DTK 源码及独立 Python 3.12/3.13 环境，在应用采集设置保存本人 User-Agent 与 Cookie。",
         "视觉拆解需配置支持图片输入的组织模型。"
       ]
     }

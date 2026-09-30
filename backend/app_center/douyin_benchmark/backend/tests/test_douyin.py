@@ -189,6 +189,26 @@ def test_failed_new_analysis_preserves_old(ctx, monkeypatch):
     task.refresh_from_db(); assert task.error == "模型失败"
 
 
+def test_account_analysis_uses_system_engine_without_org_provider(ctx, monkeypatch):
+    from .. import analysis
+    from core.agent_engine.models import LLMResponse, TokenUsage
+    from apps.enterprise.models import UsageRecord
+    work = add_work(ctx)
+    task = Task.objects.get(pk=post(ctx, {"kind": "account"}).data["id"])
+    engine = Mock(adapter_name="codex")
+    engine.complete.return_value = LLMResponse(
+        content='{"claims":[{"type":"observation","text":"样本包含知识口播","refs":["' + str(work.pk) + '"]}]}',
+        usage=TokenUsage(prompt_tokens=12, completion_tokens=8, total_tokens=20), model="test-model")
+    monkeypatch.setattr(analysis, "build_agent_engine", Mock(return_value=engine))
+    assert not ctx.org.providers.exists()
+    execute(*claim(task))
+    task.refresh_from_db()
+    assert task.stage == "completed" and task.error == ""
+    assert task.output["statistics"]["sample_count"] == 1
+    assert task.output["claims"][0]["refs"] == [str(work.pk)]
+    assert UsageRecord.objects.get(resource_type="douyin_analysis", resource_id=str(task.pk)).total_tokens == 20
+
+
 def test_script_versions_conflict_and_export(ctx):
     task = Task.objects.create(account=ctx.account, kind="script", request_key="script", request_hash="x", output=script())
     run = ctx.task.run; ctx.task.run = None; ctx.task.save()
