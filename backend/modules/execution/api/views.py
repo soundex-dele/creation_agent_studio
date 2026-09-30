@@ -77,11 +77,12 @@ def _run_serializer_context(request, runs):
         str(item["id"]): {
             "title": item["title"],
             "chat_application_id": item["chat_application_id"],
+            "scope": item["scope"],
         }
         for item in Conversation.objects.filter(
             id__in=conversation_ids,
             organization_id__in=organization_ids,
-        ).values("id", "title", "chat_application_id")
+        ).values("id", "title", "chat_application_id", "scope")
     }
     return {"request": request, "run_conversation_metadata": metadata}
 

@@ -128,6 +128,20 @@ describe('task center relationships', () => {
     });
   });
 
+  it.each(['conversation', 'supervisor'])('opens a CoWork %s task in its own application', (source_type) => {
+    const cowork = run({
+      source_type, conversation_id: 'cowork & 42', conversation_scope: 'cowork',
+      task_type: source_type === 'supervisor' ? 'delegate' : 'conversation',
+    });
+    expect(taskType(cowork)).toBe('conversation');
+    for (const requestedType of [undefined, 'conversation']) {
+      expect(taskDestination(cowork, requestedType)).toEqual({
+        path: '/apps/cowork?conversation=cowork%20%26%2042&entry=apps',
+        label: '打开 CoWork 对话', target: '_blank',
+      });
+    }
+  });
+
   it('shows only the direct parent with its workflow name', () => {
     const automationRun = run({
       id: 'automation-run',

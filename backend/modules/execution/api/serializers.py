@@ -24,6 +24,7 @@ class RunSerializer(serializers.ModelSerializer):
     workflow_id = serializers.SerializerMethodField()
     application_id = serializers.SerializerMethodField()
     conversation_id = serializers.SerializerMethodField()
+    conversation_scope = serializers.SerializerMethodField()
 
     class Meta:
         model = Run
@@ -64,6 +65,7 @@ class RunSerializer(serializers.ModelSerializer):
             "workflow_id",
             "application_id",
             "conversation_id",
+            "conversation_scope",
         )
 
     def get_can_delete(self, obj):
@@ -79,6 +81,8 @@ class RunSerializer(serializers.ModelSerializer):
     def get_task_type(self, obj):
         if self._automation_invocation(obj) is not None:
             return "automation"
+        if self.get_conversation_scope(obj) == "cowork":
+            return "conversation"
         if obj.source_type == "workflow_step":
             return "conversation" if self._conversation_id(obj) else "execution"
         return {
@@ -140,7 +144,7 @@ class RunSerializer(serializers.ModelSerializer):
             cache[conversation_id] = Conversation.objects.filter(
                 organization_id=obj.organization_id,
                 pk=conversation_id,
-            ).values("title", "chat_application_id").first()
+            ).values("title", "chat_application_id", "scope").first()
         return cache[conversation_id]
 
     def get_workflow_id(self, obj) -> str | None:
@@ -162,6 +166,10 @@ class RunSerializer(serializers.ModelSerializer):
 
     def get_conversation_id(self, obj) -> str | None:
         return self._conversation_id(obj)
+
+    def get_conversation_scope(self, obj) -> str | None:
+        conversation = self._conversation_metadata(obj)
+        return conversation.get("scope") if conversation else None
 
 
 class RunEventSerializer(serializers.ModelSerializer):

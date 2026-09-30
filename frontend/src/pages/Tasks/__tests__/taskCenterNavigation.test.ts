@@ -57,6 +57,38 @@ afterEach(async () => {
 });
 
 describe('task center activity links', () => {
+  it('shows CoWork in conversation tasks and opens the matching CoWork conversation', async () => {
+    const cowork: RunResource = {
+      ...run('cowork-run'), source_type: 'conversation', task_type: 'conversation',
+      task_title: '整理项目文件', conversation_id: '42', conversation_scope: 'cowork',
+    };
+    const normal: RunResource = {
+      ...run('normal-run'), source_type: 'conversation', task_type: 'conversation',
+      conversation_id: '43', conversation_scope: 'default',
+    };
+    vi.mocked(api.get).mockImplementation(async (url) => url.endsWith('/runs') ? [cowork, normal] : []);
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    await render('/tasks');
+    const conversationTab = [...container.querySelectorAll<HTMLElement>('[role="tab"]')]
+      .find(item => item.textContent?.includes('对话'))!;
+    expect(conversationTab.textContent).toContain('2');
+    await act(async () => conversationTab.click());
+    const row = container.querySelector<HTMLElement>('[data-row-key="cowork-run"]')!;
+    expect(row.textContent).toContain('CoWork 对话');
+    const openButton = [...row.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === '打开')!;
+    await act(async () => openButton.click());
+    expect(open).toHaveBeenCalledWith('/apps/cowork?conversation=42&entry=apps', '_blank', 'noopener,noreferrer');
+    await act(async () => row.querySelector<HTMLButtonElement>('.task-title-button')!.click());
+    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('打开 CoWork 对话');
+    const searchInput = container.querySelector<HTMLInputElement>('[aria-label="搜索任务或父级名称"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, 'cowork');
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(container.querySelector('[data-row-key="cowork-run"]')).not.toBeNull();
+    expect(container.querySelector('[data-row-key="normal-run"]')).toBeNull();
+  });
+
   it('opens the exact task and selects its table page', async () => {
     const runs = Array.from({ length: 25 }, (_, index) => run(`run-${index}`));
     vi.mocked(api.get).mockImplementation(async (url) => {

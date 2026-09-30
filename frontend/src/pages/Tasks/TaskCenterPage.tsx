@@ -67,6 +67,12 @@ const fallbackTypeMeta = {
   label: '任务', icon: <UnorderedListOutlined />, tone: 'neutral',
 };
 
+const taskMeta = (run: RunResource) => {
+  const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
+  return run.conversation_scope === 'cowork' && taskType(run) === 'conversation'
+    ? { ...meta, label: 'CoWork 对话' } : meta;
+};
+
 function TaskStatusBadge({ status }: { status: string }) {
   const meta = statusMeta[status] || { label: status, color: 'default', tone: 'neutral' };
   return <span className={`task-status task-status--${meta.tone}`}>
@@ -238,7 +244,7 @@ export default function TaskCenterPage() {
     if (!keyword) return true;
     const relationship = buildTaskRelation(run, relationSource)
       .map((node) => `${typeMeta[node.type]?.label || node.type} ${node.name}`).join(' ');
-    return `${taskTitle(run)} ${typeMeta[type]?.label || ''} ${relationship} ${run.status}`
+    return `${taskTitle(run)} ${taskMeta(run).label} ${relationship} ${run.status}`
       .toLowerCase().includes(keyword);
   }), [query, relationSource, statusFilter, taskRuns, typeFilter]);
 
@@ -296,7 +302,7 @@ export default function TaskCenterPage() {
   const columns: ColumnsType<RunResource> = [
     {
       title: '任务', dataIndex: 'task_title', render: (_, run) => {
-        const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
+        const meta = taskMeta(run);
         return <button type="button" className="task-title-button" onClick={() => setSelected(run)}>
           <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
           <span><strong>{taskTitle(run)}</strong><small>{meta.label} · {triggerLabel(run.trigger_type)}</small></span>
@@ -385,7 +391,7 @@ export default function TaskCenterPage() {
 
   const renderTreeNode = (node: TaskTreeNode, depth = 0): ReactNode => {
     const { run } = node;
-    const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
+    const meta = taskMeta(run);
     const destination = taskDestination(run);
     const hasChildren = node.children.length > 0;
     const expanded = hasChildren && !collapsedTreeNodes.has(run.id);
@@ -534,7 +540,7 @@ export default function TaskCenterPage() {
       />
       <div className="task-mobile-list">
         {visibleRuns.map((run) => {
-          const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
+          const meta = taskMeta(run);
           const destination = taskDestination(run);
           return <article className={`task-mobile-card${run.id === selected?.id ? ' task-row-selected' : ''}`} key={run.id}>
             <div className="task-mobile-card-main">
@@ -587,7 +593,7 @@ export default function TaskCenterPage() {
         <span className={`task-type-icon task-type-icon--${typeMeta[taskType(selected)]?.tone || 'neutral'}`} aria-hidden="true">
           {typeMeta[taskType(selected)]?.icon || fallbackTypeMeta.icon}
         </span>
-        <span><strong>{taskTitle(selected)}</strong><small>{typeMeta[taskType(selected)]?.label || '任务'} · {triggerLabel(selected.trigger_type)}</small></span>
+        <span><strong>{taskTitle(selected)}</strong><small>{taskMeta(selected).label} · {triggerLabel(selected.trigger_type)}</small></span>
       </div> : '任务详情'}
       width={760}
       open={detailLoading || Boolean(selected)}
@@ -609,7 +615,7 @@ export default function TaskCenterPage() {
         <section className="task-detail-card">
           <div className="task-section-heading"><h3>基本信息</h3><span>任务标识、类型与执行时间</span></div>
           <Descriptions size="small" column={1} items={[
-            { key: 'type', label: '任务类型', children: typeMeta[taskType(selected)]?.label || taskType(selected) },
+            { key: 'type', label: '任务类型', children: taskMeta(selected).label },
             { key: 'status', label: '状态', children: <TaskStatusBadge status={selected.status} /> },
             { key: 'trigger', label: '触发方式', children: triggerLabel(selected.trigger_type) },
             ...(selectedParent ? [{
@@ -630,7 +636,7 @@ export default function TaskCenterPage() {
         {children.length > 0 && <section className="task-detail-card"><div className="task-section-heading"><h3>下级任务</h3><span>{children.length} 个关联任务</span></div><div className="task-child-list">
           {children.map((child) => <button type="button" key={child.id} onClick={() => setSelected(child)}>
             <span className="task-child-icon" aria-hidden="true">{typeMeta[taskType(child)]?.icon || fallbackTypeMeta.icon}</span>
-            <span><strong>{taskTitle(child)}</strong><small>{typeMeta[taskType(child)]?.label || taskType(child)}</small></span>
+            <span><strong>{taskTitle(child)}</strong><small>{taskMeta(child).label}</small></span>
             <Tag color={statusMeta[child.status]?.color}>{statusMeta[child.status]?.label || child.status}</Tag>
           </button>)}
         </div></section>}

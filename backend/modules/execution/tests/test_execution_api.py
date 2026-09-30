@@ -350,12 +350,13 @@ def test_conversation_run_exposes_title_application_and_jump_identifiers(
     assert item["application_id"] == str(deployed_application.id)
 
 
-@pytest.fixture(params=["conversation", "supervisor", "workflow"])
+@pytest.fixture(params=["conversation", "cowork", "supervisor", "workflow"])
 def private_conversation_run(request, api_actor, api_organization):
     conversation = Conversation.objects.create(
         user=api_actor, organization=api_organization, title="Private discussion",
+        scope="cowork" if request.param == "cowork" else "default",
     )
-    source_type = request.param
+    source_type = "conversation" if request.param == "cowork" else request.param
     snapshot = {}
     if source_type == "supervisor":
         # Using a shared delegate must not share its users' conversations.
@@ -443,13 +444,15 @@ def test_conversation_run_history_is_private(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("scope", ["default", "cowork"])
 def test_task_run_list_collapses_message_turns_by_conversation(
-    authenticated_client, api_actor, api_organization,
+    authenticated_client, api_actor, api_organization, scope,
 ):
     conversation = Conversation.objects.create(
         user=api_actor,
         organization=api_organization,
         title="同一个会话",
+        scope=scope,
     )
     first_turn = create_run(
         organization=api_organization,
@@ -488,6 +491,14 @@ def test_task_run_list_collapses_message_turns_by_conversation(
     ]
     assert [item["id"] for item in conversation_tasks] == [str(latest_turn.id)]
     assert conversation_tasks[0]["status"] == Run.Status.QUEUED
+    assert conversation_tasks[0]["conversation_scope"] == scope
+    assert conversation_tasks[0]["task_type"] == "conversation"
+    assert conversation_tasks[0]["task_title"] == conversation.title
+    detail = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs/{latest_turn.id}",
+    )
+    assert detail.status_code == 200
+    assert detail.data["conversation_scope"] == scope
 
     Run.objects.filter(pk=latest_turn.pk).update(
         status=Run.Status.SUCCEEDED,

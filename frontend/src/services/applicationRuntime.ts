@@ -36,6 +36,7 @@ export interface RunResource {
   workflow_id?: string | null;
   application_id?: string | null;
   conversation_id?: string | null;
+  conversation_scope?: 'default' | 'cowork' | null;
 }
 
 export interface RunArtifact {

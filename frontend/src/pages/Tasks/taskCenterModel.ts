@@ -51,6 +51,7 @@ export const collapseConversationRuns = (runs: RunResource[]): RunResource[] => 
 
 export const taskType = (run: RunResource) => {
   const explicit = run.task_type;
+  if (run.conversation_scope === 'cowork' && taskConversationId(run) && explicit !== 'automation') return 'conversation';
   if (explicit && explicit !== 'application') return explicit;
   if (run.source_type === 'workflow_step') {
     return taskConversationId(run) ? 'conversation' : 'execution';
@@ -102,6 +103,9 @@ export const taskDestination = (
   }
   if (requestedType === 'conversation') {
     const conversationId = taskConversationId(run);
+    if (conversationId && run.conversation_scope === 'cowork') {
+      return { path: `/apps/cowork?conversation=${encodeURIComponent(conversationId)}&entry=apps`, label: '打开 CoWork 对话', target: '_blank' };
+    }
     return conversationId
       ? { path: `/chat?conversation=${encodeURIComponent(conversationId)}`, label: '打开对话', target: '_blank' }
       : null;
