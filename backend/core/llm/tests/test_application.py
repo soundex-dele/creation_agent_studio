@@ -72,3 +72,21 @@ def test_system_factory_does_not_resolve_organization_provider(monkeypatch, sett
         "adapter_name": "graphflow", "model": None,
         "working_directory": "/tmp/app-generation",
     }
+
+
+def test_application_stream_callback_reaches_engine_before_completion(monkeypatch):
+    events = []
+    def complete(messages, **kwargs):
+        callback = kwargs['on_event']
+        callback('output.delta', {'text': '{"answer":"实'})
+        callback('output.delta', {'text': '时"}'})
+        assert len(events) == 2
+        return LLMResponse(content='{"answer":"实时"}', model='system-default', usage=TokenUsage(total_tokens=4))
+    engine = Mock(adapter_name='codex'); engine.complete.side_effect = complete
+    monkeypatch.setattr(application, 'build_agent_engine', Mock(return_value=engine))
+    monkeypatch.setattr(application, 'enforce_member_token_quota', Mock())
+    usage = Mock(); monkeypatch.setattr(application, 'record_usage', usage)
+    result = application.generate_json(organization=object(), user=object(), resource_type='rental_generation',
+        resource_id='task', instruction='生成', content='{}', on_event=lambda kind, payload: events.append((kind, payload)))
+    assert result == {'answer': '实时'}
+    usage.assert_called_once()

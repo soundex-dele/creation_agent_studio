@@ -11,7 +11,7 @@ class UnsupportedImageInput(RuntimeError):
 
 
 def generate_json(*, organization, user, resource_type, resource_id,
-                  instruction, content, cancelled=None, image_paths=None):
+                  instruction, content, cancelled=None, image_paths=None, on_event=None):
     """Keep application generation independent of legacy organization API routes."""
     enforce_member_token_quota(organization, user)
     if cancelled and cancelled():
@@ -26,6 +26,8 @@ def generate_json(*, organization, user, resource_type, resource_id,
                            require_tool_approval=True, timeout_seconds=120)
             if image_paths:
                 options["image_paths"] = image_paths
+            if on_event is not None:
+                options["on_event"] = on_event
             response = engine.complete([
                 {"role": "system", "content": instruction + "\n仅分析提供的资料，直接返回 JSON，不调用工具、不读取文件、不联网。"},
                 {"role": "user", "content": content},

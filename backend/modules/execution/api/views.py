@@ -187,6 +187,9 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    if root.executor_key == "rental-growth-assistant":
+        from app_center.rental_growth_assistant.backend.access import can_access_run as rental_access
+        return rental_access(request.user, root)
     if root.executor_key == "research-assistant" or (root.input or {}).get("research_project_id"):
         from django.apps import apps
         if not apps.is_installed("app_center.research_assistant.backend"):
