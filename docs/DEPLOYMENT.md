@@ -215,6 +215,8 @@ export DJANGO_SETTINGS_MODULE=backend.settings.production
 .venv/bin/python -m daphne -b 127.0.0.1 -p 8080 backend.asgi:application
 ```
 
+`sync_app_center` 首次安装应用时设置组织可见并启用；后续同步更新应用包元数据和定义，保留已有应用的可见范围、账号授权、公开标记、启停状态及创建者。旧版本同步已经覆盖的权限不会自动恢复，需要管理员重新设置。
+
 逐条确认命令成功后再继续；先停止占用 8080 的旧后端。`manage.py` 和 `backend.asgi` 默认选择开发设置，所以必须在启动进程的环境中显式设置 `DJANGO_SETTINGS_MODULE=backend.settings.production`，仅在 `.env` 写 `DEBUG=False` 不足以切换。生产依赖包含 Sentry SDK，即使未配置 Sentry 上报也需要安装。
 
 **构建前端并切换页面路由**

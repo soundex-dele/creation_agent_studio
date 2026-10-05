@@ -60,21 +60,27 @@ def sync_package(package: DiscoveredPackage, organization: Organization) -> Sync
     )
 
     with transaction.atomic(), tenant_database_context(organization.id):
+        catalog_defaults = {
+            "category": category,
+            "name": metadata.name,
+            "description": metadata.description,
+            "icon": metadata.icon,
+            "color": metadata.color,
+            "tags": metadata.tags,
+            "developer": metadata.developer,
+            "kind": spec.application_kind,
+        }
         application, created = Application.objects.update_or_create(
             organization=organization,
             slug=metadata.id,
-            defaults={
-                "category": category,
-                "name": metadata.name,
-                "description": metadata.description,
-                "icon": metadata.icon,
-                "color": metadata.color,
-                "tags": metadata.tags,
-                "developer": metadata.developer,
+            defaults=catalog_defaults,
+            # Only initial installation chooses access, activation and ownership.
+            # Subsequent package updates must preserve administrator decisions.
+            create_defaults={
+                **catalog_defaults,
                 "is_public": True,
                 "is_active": True,
                 "visibility": Application.Visibility.ORGANIZATION,
-                "kind": spec.application_kind,
                 "created_by": organization.owner,
             },
         )

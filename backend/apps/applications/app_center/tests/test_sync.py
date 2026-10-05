@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -6,7 +7,10 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
 from apps.agents.models import Agent
-from apps.applications.models import Application, Skill
+from apps.applications.models import Application, ApplicationAccessGrant, Skill
+from apps.applications.app_center.discovery import discover_packages
+from apps.enterprise.models import Membership
+from core.resource_access import accessible_resources
 from modules.catalog.models import AgentDraft
 
 
@@ -65,6 +69,9 @@ def test_sync_installs_all_packages_and_activates_deployments():
     ):
         assert application.revisions.count() == 1
         assert application.deployments.count() == 1
+        assert application.visibility == Application.Visibility.ORGANIZATION
+        assert application.is_public and application.is_active
+        assert application.created_by == owner
 
     assert not applications.filter(slug="newmedia-workbench").exists()
     assert not applications.filter(slug="batch-transcribe").exists()
@@ -129,3 +136,61 @@ def test_sync_installs_all_packages_and_activates_deployments():
             "html-cover-designer-assistant",
         ),
     ).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("visibility", Application.Visibility.values)
+def test_sync_preserves_access_and_disabled_state_across_package_updates(monkeypatch, visibility):
+    owner = get_user_model().objects.create_user(username="sync-permissions-owner")
+    organization = owner.owned_organizations.get()
+    creator = get_user_model().objects.create_user(username="sync-permissions-creator")
+    member = get_user_model().objects.create_user(username="sync-permissions-member")
+    for user in (creator, member):
+        Membership.objects.create(organization=organization, user=user, role=Membership.Role.DEVELOPER)
+    packages, _ = discover_packages(settings.APP_CENTER_ROOT, strict=True)
+    package = deepcopy(next(p for p in packages if p.manifest.metadata.id == "kitchen-assistant"))
+    monkeypatch.setattr(
+        "apps.applications.management.commands.sync_app_center.discover_packages",
+        lambda *args, **kwargs: ([package], []),
+    )
+    call_command("sync_app_center", organization_id=str(organization.id))
+    application = Application.objects.get(organization=organization, slug="kitchen-assistant")
+    assert application.visibility == Application.Visibility.ORGANIZATION
+    assert application.is_active and application.is_public
+    assert application.created_by == owner
+    application.visibility = visibility
+    application.is_active = False
+    application.is_public = False
+    application.created_by = creator
+    application.name = "旧应用名称"
+    application.save()
+    grant = ApplicationAccessGrant.objects.create(
+        application=application, user=member, role=ApplicationAccessGrant.Role.VIEWER,
+    )
+    grants_before = list(application.access_grants.values())
+    access_before = {
+        (user.pk, operation): accessible_resources(
+            Application.objects.filter(pk=application.pk), user, operation=operation,
+        ).exists()
+        for user in (creator, member) for operation in ("discover", "run", "edit")
+    }
+    old_revision_id = application.deployments.get().revision_id
+    # Publish a changed definition, then repeat sync to cover both update paths.
+    package.manifest.spec.definition["default_config"]["sync_test_version"] = 2
+    for _ in range(2):
+        call_command("sync_app_center", organization_id=str(organization.id))
+        application.refresh_from_db()
+        assert application.visibility == visibility
+        assert not application.is_active and not application.is_public
+        assert application.created_by == creator
+        assert list(application.access_grants.values()) == grants_before
+        grant.refresh_from_db()
+        assert grant.role == ApplicationAccessGrant.Role.VIEWER
+        for (user_id, operation), expected in access_before.items():
+            user = creator if user_id == creator.pk else member
+            assert accessible_resources(
+                Application.objects.filter(pk=application.pk), user, operation=operation,
+            ).exists() == expected
+        assert application.name == package.manifest.metadata.name
+        assert application.draft.content == package.manifest.spec.definition
+        assert application.deployments.get().revision_id != old_revision_id
