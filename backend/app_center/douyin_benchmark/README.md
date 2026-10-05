@@ -89,9 +89,9 @@ uv pip install --python backend/.venv-dtk/bin/python -r backend/scripts/douyin_v
 | `DOUYIN_WHISPER_ROOT` | 原版 Whisper 本地模型目录，默认 `~/.cache/whisper`（Windows 当前用户为 `C:\Users\admin\.cache\whisper`） |
 | `DOUYIN_WHISPER_MODEL` | 默认 `base`，加载目录内 `base.pt`；也可填写 `.pt` 文件的绝对路径 |
 
-应用 deployment `config_override` 可设置 `answer_provider`、`answer_model`、`vision_provider`、`vision_model`。文本模型优先采用组织路由；组织尚未创建提供方且未指定 `answer_provider` / `answer_model` 时，使用系统 `AGENT_ENGINE_ADAPTER` 对应的引擎（例如已登录的 Codex）及其默认模型，无需另填 API 提供方。显式 API 配置错误、已禁用的提供方或 API 请求失败不会切换引擎。系统引擎在临时目录中分析输入资料，支持取消；每次请求执行成员用量检查并记录真实 usage。
+文本与关键帧分析统一使用系统 `AGENT_ENGINE_ADAPTER` 及其默认模型，无需组织提供方。旧的 `answer_provider`、`answer_model`、`vision_provider`、`vision_model` 不再参与应用生成路由。系统引擎在临时目录中分析输入资料，支持取消；每次请求执行成员用量检查并记录真实 usage。
 
-视觉模型仍需明确设置 `vision_model`，支持 OpenAI-compatible 图片输入。未配置或调用失败的视觉分析会标记待完成／失败，保留已取得转写与关键帧。失败任务保留原记录，修复配置后重新发起分析；协调器为新任务启动独立子进程并加载当前运行时代码。
+关键帧通过引擎的原生图片输入提交，目前支持 Codex app-server，无需另配视觉 API。引擎不支持图片输入或调用失败时，视觉分析标记失败，保留已取得的转写与关键帧；未提取到关键帧则标记待完成。失败任务保留原记录，修复系统引擎后重新发起分析；协调器为新任务启动独立子进程并加载当前运行时代码。
 
 依赖 FFmpeg、ffprobe 和 `openai-whisper`，与 creation_master 使用相同的原版 `.pt` 模型格式。默认复用执行 worker 用户的 `~/.cache/whisper/base.pt`，直接加载本地文件，不自动下载模型；文件缺失时提示配置错误。部署到其他机器或服务账号时需提前放置模型或配置上述路径。自动使用可用 CUDA，否则使用 CPU。页面区分加载模型和转写阶段；原版 Whisper 在整段识别完成后更新进度，识别调用期间不能即时中断，返回后会检查取消状态。单视频最多500 MiB、10分钟；每条作品最多16帧（开头0/1/2/3秒及全片均匀采样）。关键帧不等同完整视听分析。单次采集选择20／50／100条，串行分页，异常保留已取得部分，不自动无限重试。
 

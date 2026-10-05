@@ -199,7 +199,7 @@ def test_account_analysis_uses_system_engine_without_org_provider(ctx, monkeypat
     engine.complete.return_value = LLMResponse(
         content='{"claims":[{"type":"observation","text":"样本包含知识口播","refs":["' + str(work.pk) + '"]}]}',
         usage=TokenUsage(prompt_tokens=12, completion_tokens=8, total_tokens=20), model="test-model")
-    monkeypatch.setattr(analysis, "build_agent_engine", Mock(return_value=engine))
+    monkeypatch.setattr("core.llm.application.build_agent_engine", Mock(return_value=engine))
     assert not ctx.org.providers.exists()
     execute(*claim(task))
     task.refresh_from_db()
@@ -242,18 +242,23 @@ def test_breakdown_topics_script_pipeline(ctx, monkeypatch, production_format, l
     monkeypatch.setattr(runtime.media, "download", download)
     monkeypatch.setattr(runtime.media, "extract", lambda *args: (Path("/test/audio.wav"), [{"id": "f0", "time": 0, "key": "tasks/test/f0.jpg"}], 60))
     monkeypatch.setattr(runtime, "transcribe_segments", lambda *args, **kwargs: {"segments": [{"id": "s1", "start": 0, "end": 5, "text": "先问一个问题"}]})
-    model = Mock(return_value={"claims": [{"type": "observation", "text": "用问题开场", "refs": ["s1"]}]})
+    model = Mock(side_effect=[
+        {"claims": [{"type": "observation", "text": "用问题开场", "refs": ["s1"]}]},
+        {"claims": [{"type": "observation", "text": "关键帧观察", "refs": ["f0"]}]},
+    ])
     monkeypatch.setattr(runtime.analysis, "call_model", model)
     execute(*claim(task))
     task.refresh_from_db()
     assert download.call_args.kwargs["headers"] == {"User-Agent": "personal-UA", "Referer": "https://www.douyin.com/"}
-    assert task.output["visual_status"] == "pending"
+    assert task.output["visual_status"] == "completed"
+    assert task.output["claims"][-1]["refs"] == ["f0"]
     assert task.output["segments"][0]["id"] == "s1"
     task.run.status = "succeeded"; task.run.save()
     topics = [{"title": f"选题{i}", "angle": "换一个角度", "hook": "你有没有遇到过"} for i in range(3)]
     topic_response = post(ctx, {"kind": "topics", "source_task_id": str(task.pk), "positioning": "读书", "theme": "表达", "duration": 90, "production_format": production_format}, key="topics")
     assert topic_response.status_code == 201, topic_response.data
     topic_task = Task.objects.get(pk=topic_response.data["id"])
+    model.side_effect = None
     model.return_value = {"topics": topics}
     execute(*claim(topic_task))
     assert label in model.call_args.args[1]
@@ -327,19 +332,21 @@ def test_real_ffmpeg_extract_bounds(tmp_path, settings):
 
 def test_model_checks_quota_and_records_actual_usage(ctx, monkeypatch):
     from .. import analysis
+    from core.llm import application
+    from core.agent_engine.models import LLMResponse, TokenUsage
     quota = Mock(); usage = Mock()
-    monkeypatch.setattr(analysis, "enforce_member_token_quota", quota)
-    monkeypatch.setattr(analysis, "record_usage", usage)
-    provider = SimpleNamespace(base_url="https://model.example/v1", timeout_seconds=10, name="test-model")
-    monkeypatch.setattr(analysis, "_provider", lambda *args: (provider, "private-secret", "text-model"))
-    response = Mock(); response.json.return_value = {"choices": [{"message": {"content": '{"topics":[]}'}}], "usage": {"prompt_tokens": 42, "completion_tokens": 8}}
-    request = Mock(return_value=response); monkeypatch.setattr(analysis.requests, "post", request)
+    monkeypatch.setattr(application, "enforce_member_token_quota", quota)
+    monkeypatch.setattr(application, "record_usage", usage)
+    engine = Mock(adapter_name="codex")
+    engine.complete.return_value = LLMResponse(content='{"topics":[]}',
+        usage=TokenUsage(prompt_tokens=42, completion_tokens=8, total_tokens=50), model="system-model")
+    monkeypatch.setattr(application, "build_agent_engine", Mock(return_value=engine))
     assert analysis.call_model(ctx.task, "test", {"source": "test data"}, {}) == {"topics": []}
     quota.assert_called_once_with(ctx.org, ctx.owner)
-    assert usage.call_args.kwargs["usage"] == {"prompt_tokens": 42, "completion_tokens": 8}
+    assert usage.call_args.kwargs["usage"] == {"prompt_tokens": 42, "completion_tokens": 8, "total_tokens": 50}
     quota.side_effect = ValueError("quota exceeded")
     with pytest.raises(ValueError): analysis.call_model(ctx.task, "test", {}, {})
-    assert request.call_count == 1
+    assert engine.complete.call_count == 1
 
 
 def test_media_rejects_arbitrary_download_hosts():

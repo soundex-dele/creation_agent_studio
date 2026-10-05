@@ -201,7 +201,7 @@ def execute(payload, sink):
             else:
                 output["transcript_note"] = "未识别到口播，不生成文案结论。"
             save("分析画面", output)
-            if config.get("vision_model"):
+            if frames:
                 try:
                     result = analysis.call_claims(task, "观察构图、开头呈现和可读字幕，并给出拍摄建议。",
                         {"frames": [{"id": f["id"], "time": f["time"]} for f in frames]}, config, {f["id"] for f in frames}, frames=frames, cancelled=lambda: sink.cancelled)
@@ -211,7 +211,7 @@ def execute(payload, sink):
                     output["visual_status"] = "failed"
                     output["visual_note"] = str(exc)
             else:
-                output["visual_note"] = "未配置视觉模型，已保留转写和关键帧；配置后可重新拆解。"
+                output["visual_note"] = "未提取到可用关键帧，已保留转写；可重新拆解。"
             save("completed", output)
         elif kind == "topics":
             save("生成选题")

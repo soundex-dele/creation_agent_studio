@@ -3,9 +3,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-import requests
 
 from core.agent_engine.models import LLMResponse, TokenUsage
+from core.llm import application
 from .. import analysis
 
 
@@ -14,26 +14,24 @@ def context(monkeypatch):
     organization = SimpleNamespace(providers=Mock())
     organization.providers.exists.return_value = False
     task = SimpleNamespace(id="task", organization=organization, owner=object())
-    route = Mock(side_effect=analysis.ProviderUnavailable())
     engine = Mock(adapter_name="codex")
     engine.complete.return_value = LLMResponse(content='```json\n{"claims": []}\n```',
         usage=TokenUsage(prompt_tokens=42, completion_tokens=8, total_tokens=50), model="configured-model")
     factory = Mock(return_value=engine)
-    quota, usage, request = Mock(), Mock(), Mock()
-    for name, value in (("_provider", route), ("build_agent_engine", factory),
+    quota, usage = Mock(), Mock()
+    for name, value in (("build_agent_engine", factory),
                         ("enforce_member_token_quota", quota), ("record_usage", usage)):
-        monkeypatch.setattr(analysis, name, value)
-    monkeypatch.setattr(analysis.requests, "post", request)
-    return SimpleNamespace(task=task, route=route, engine=engine, factory=factory,
-                           quota=quota, usage=usage, request=request)
+        monkeypatch.setattr(application, name, value)
+    return SimpleNamespace(task=task, engine=engine, factory=factory,
+                           quota=quota, usage=usage)
 
 
 def test_unconfigured_text_uses_system_engine_and_records_usage(context):
     cancelled = Mock(return_value=False)
     assert analysis.call_model(context.task, "分析账号", {"works": []}, {}, cancelled=cancelled) == {"claims": []}
     context.quota.assert_called_once_with(context.task.organization, context.task.owner)
-    context.request.assert_not_called()
-    assert context.factory.call_args.args == (context.task.organization,)
+    assert context.factory.call_args.args == ()
+    assert "organization" not in context.factory.call_args.kwargs
     assert not Path(context.factory.call_args.kwargs["working_directory"]).exists()
     options = context.engine.complete.call_args.kwargs
     assert options["cancelled"] is cancelled and options["permission_mode"] == "default"
@@ -42,32 +40,31 @@ def test_unconfigured_text_uses_system_engine_and_records_usage(context):
     assert context.usage.call_args.kwargs["model"] == "configured-model"
 
 
-@pytest.mark.parametrize("config,frames,has_providers", [
-    ({"answer_provider": "missing"}, None, False),
-    ({"answer_model": "missing-model"}, None, False),
-    ({}, [], False),
-    ({}, None, True),
-])
-def test_explicit_api_routes_vision_and_disabled_providers_do_not_fallback(context, config, frames, has_providers):
+@pytest.mark.parametrize("config", [{}, {"answer_provider": "missing"}, {"answer_model": "legacy-model"}])
+@pytest.mark.parametrize("has_providers", [False, True])
+def test_legacy_organization_routes_do_not_affect_system_engine(context, config, has_providers):
     context.task.organization.providers.exists.return_value = has_providers
-    with pytest.raises(ValueError, match="组织设置"):
-        analysis.call_model(context.task, "test", {}, config, frames=frames)
-    context.factory.assert_not_called()
+    assert analysis.call_model(context.task, "test", {}, config) == {"claims": []}
+    assert context.factory.call_args.args == ()
+    assert set(context.factory.call_args.kwargs) == {"working_directory"}
+    assert not context.task.organization.providers.mock_calls
 
 
-def test_organization_provider_keeps_priority_and_request_failures_do_not_fallback(context):
-    context.route.side_effect = None
-    context.route.return_value = (SimpleNamespace(base_url="https://model.example/v1", name="org-model", timeout_seconds=30), "key", "text-model")
-    response = Mock()
-    response.json.return_value = {"choices": [{"message": {"content": '{"claims": []}'}}], "usage": {"total_tokens": 7}}
-    context.request.return_value = response
-    assert analysis.call_model(context.task, "test", {}, {}) == {"claims": []}
-    assert context.usage.call_args.kwargs["provider"] == "org-model"
-    context.request.side_effect = requests.RequestException("private upstream details")
-    with pytest.raises(ValueError, match="模型请求失败") as exc:
-        analysis.call_model(context.task, "test", {}, {})
-    assert "private" not in str(exc.value)
-    context.factory.assert_not_called()
+def test_vision_passes_native_images_with_frame_citations(context, monkeypatch, tmp_path):
+    frame = tmp_path / "frame.jpg"
+    frame.write_bytes(b"image")
+    monkeypatch.setattr(analysis, "path_for", lambda key: frame)
+    analysis.call_model(context.task, "test", {}, {}, frames=[{"id": "f0", "time": 2, "key": "frame.jpg"}])
+    assert context.engine.complete.call_args.kwargs["image_paths"] == [str(frame)]
+    assert '"id": "f0"' in context.engine.complete.call_args.args[0][1]["content"]
+
+
+def test_unsupported_vision_never_generates_without_images(context, monkeypatch, tmp_path):
+    context.engine.adapter_name = "graphflow"
+    monkeypatch.setattr(analysis, "path_for", lambda key: tmp_path / key)
+    with pytest.raises(ValueError, match="图片输入"):
+        analysis.call_model(context.task, "test", {}, {}, frames=[{"id": "f0", "time": 0, "key": "frame.jpg"}])
+    context.engine.complete.assert_not_called()
 
 
 @pytest.mark.parametrize("mode", ["exception", "failed", "input"])
@@ -107,7 +104,7 @@ def test_cancelled_job_does_not_generate_or_accept_results(context):
     with pytest.raises(InterruptedError):
         analysis.call_model(context.task, "test", {}, {}, cancelled=lambda: True)
     context.factory.assert_not_called()
-    cancelled = Mock(side_effect=[False, True])
+    cancelled = Mock(side_effect=[False, False, True])
     with pytest.raises(InterruptedError):
         analysis.call_model(context.task, "test", {}, {}, cancelled=cancelled)
     context.usage.assert_not_called()

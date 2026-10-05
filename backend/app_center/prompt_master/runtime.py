@@ -1,11 +1,9 @@
 """Prompt generation through platform runs; no execution of the generated prompts."""
 import json
-import requests
 
 from django.db import transaction
 from apps.applications.models import Application
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from apps.knowledge.providers import _provider, ProviderUnavailable
+from core.llm.application import generate_json
 from core.resource_access import accessible_resources
 from modules.execution.models import Run
 from .backend.models import PromptSession, PromptTask, PromptVersion
@@ -44,38 +42,13 @@ CHECK = """只体检 version 中的 standard 与 concise，不改写正文。检
 
 def call_model(task, config):
     session = task.session
-    enforce_member_token_quota(session.organization, session.owner)
-    try:
-        provider, key, model = _provider(session.organization, config.get("answer_provider", ""), config.get("answer_model", ""))
-    except ProviderUnavailable:
-        raise RuntimeError("请在组织设置中配置可用的模型提供方。") from None
-    if not model:
-        raise RuntimeError("请先配置组织生成模型。")
     instruction = {"analyze": ANALYZE, "check": CHECK}.get(task.kind, GENERATE)
-    try:
-        response = requests.post(f"{provider.base_url.rstrip('/')}/chat/completions",
-                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                                 json={"model": model, "temperature": 0.3, "messages": [
-                                     {"role": "system", "content": SYSTEM + instruction},
-                                     {"role": "user", "content": json.dumps(task.snapshot, ensure_ascii=False)}]},
-                                 timeout=min(provider.timeout_seconds, 120))
-        response.raise_for_status()
-        payload = response.json()
-    except (requests.RequestException, ValueError):
-        raise RuntimeError("模型请求失败或超时，请检查配置后重试。") from None
-    if not isinstance(payload, dict):
-        raise ValueError("模型返回格式无效，请重试。")
-    record_usage(organization=session.organization, user=session.owner, resource_type="prompt_generation",
-                 resource_id=task.pk, usage=payload.get("usage") or {}, provider=provider.name, model=model)
-    try:
-        content = payload["choices"][0]["message"]["content"].strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1].rsplit("```", 1)[0]
-        if len(content) > 200000:
-            raise ValueError()
-        return json.loads(content)
-    except (AttributeError, KeyError, TypeError, IndexError, ValueError):
-        raise ValueError("模型未返回有效 JSON，请重试。") from None
+    return generate_json(
+        organization=session.organization, user=session.owner,
+        resource_type="prompt_generation", resource_id=task.pk,
+        instruction=SYSTEM + instruction,
+        content=json.dumps(task.snapshot, ensure_ascii=False),
+    )
 
 
 def permitted(session):

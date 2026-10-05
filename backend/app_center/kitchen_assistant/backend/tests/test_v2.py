@@ -7,7 +7,9 @@ import pytest
 from django.core.management import call_command
 from rest_framework.exceptions import Throttled
 from modules.execution.models import Run
-from apps.knowledge.providers import ProviderUnavailable
+from core.llm import application
+from core.agent_engine.models import LLMResponse, TokenUsage
+from unittest.mock import Mock
 from app_center.kitchen_assistant import runtime
 from .. import ai
 from ..models import KitchenAITask, KitchenState
@@ -188,25 +190,20 @@ def test_menu_validation_locks_invalid_ids_and_current_preference_recheck(ai_con
 
 @pytest.mark.parametrize('mode',['missing','timeout','quota','invalid_json'])
 def test_provider_failures_are_explicit_and_do_not_retry(ai_context,monkeypatch,mode):
-    import requests
     task=create_task(ai_context)
-    calls=[]
-    def provider(*_):
-        if mode=='missing':raise ProviderUnavailable()
-        return SimpleNamespace(base_url='https://model.invalid/v1',timeout_seconds=1,name='test'),'key','model'
-    monkeypatch.setattr(runtime,'_provider',provider)
+    engine=Mock(adapter_name='codex')
+    engine.complete.return_value=LLMResponse(content='not json',usage=TokenUsage(),model='system-model')
+    factory=Mock(return_value=engine)
+    if mode=='missing':factory.side_effect=RuntimeError('engine unavailable')
+    if mode=='timeout':engine.complete.side_effect=TimeoutError()
+    monkeypatch.setattr(application,'build_agent_engine',factory)
     def quota(*_):
         if mode=='quota':raise Throttled()
-    monkeypatch.setattr(runtime,'enforce_member_token_quota',quota)
-    def post(*args,**kwargs):
-        calls.append(kwargs)
-        if mode=='timeout':raise requests.Timeout()
-        return SimpleNamespace(raise_for_status=lambda:None,json=lambda:{'choices':[{'message':{'content':'not json'}}],'usage':{}})
-    monkeypatch.setattr(runtime.requests,'post',post)
-    monkeypatch.setattr(runtime,'record_usage',lambda **_:None)
+    monkeypatch.setattr(application,'enforce_member_token_quota',quota)
+    monkeypatch.setattr(application,'record_usage',lambda **_:None)
     with pytest.raises(RuntimeError):execute(task)
     task.refresh_from_db();assert task.status=='failed'
-    assert len(calls)==(0 if mode in ['missing','quota'] else 1)
+    assert engine.complete.call_count==(0 if mode in ['missing','quota'] else 1)
 
 
 def test_real_platform_run_submission(context):

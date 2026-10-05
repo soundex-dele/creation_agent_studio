@@ -10,7 +10,7 @@
 
 ## 配置与执行
 
-复用组织的模型提供方（OpenAI-compatible chat/completions）和现有 durable worker。应用部署的 `config_override` 可设置 `answer_provider`、`answer_model`；未设置时使用组织默认路由模型。每次模型请求都执行成员用量检查并记录实际 usage，不需要额外 Agent 或 Skill 部署。
+复用系统 `AGENT_ENGINE_ADAPTER` 及其默认模型和现有 durable worker，无需组织提供方。旧的 `answer_provider` / `answer_model` 不再参与生成路由；可选的知识库向量检索配置保持独立。每次模型请求都执行成员用量检查并记录实际 usage，不需要额外 Agent 或 Skill 部署。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |

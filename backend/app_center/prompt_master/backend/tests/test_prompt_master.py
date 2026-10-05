@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-import requests
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from rest_framework.test import APIClient
@@ -13,7 +12,9 @@ from rest_framework.exceptions import Throttled
 from apps.applications.models import Application, ApplicationCategory
 from apps.applications.app_center.discovery import discover_packages
 from apps.enterprise.models import Membership
-from apps.knowledge.providers import ProviderUnavailable
+from core.llm import application
+from core.agent_engine.models import LLMResponse, TokenUsage
+from unittest.mock import Mock
 from modules.execution.models import Run
 from app_center.prompt_master import runtime
 from .. import views
@@ -256,46 +257,47 @@ def test_platform_failure_status_is_visible_and_retry_allowed(context):
 
 def test_model_adapter_tracks_usage_and_keeps_inputs_as_data(context, monkeypatch):
     t = task(context, create(context))
-    calls = []
     usage = []
-    provider = SimpleNamespace(base_url="https://example.invalid/v1", timeout_seconds=30, name="test")
-    monkeypatch.setattr(runtime, "_provider", lambda *_: (provider, "test-key", "test-model"))
-    monkeypatch.setattr(runtime, "enforce_member_token_quota", lambda *_: None)
-    monkeypatch.setattr(runtime, "record_usage", lambda **kw: usage.append(kw))
-
-    def post(*args, **kw):
-        calls.append(kw)
-        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"choices": [{"message": {"content": json.dumps(analysis())}}], "usage": {"total_tokens": 10}})
-
-    monkeypatch.setattr(runtime.requests, "post", post)
+    engine = Mock(adapter_name="codex")
+    engine.complete.return_value = LLMResponse(content=json.dumps(analysis()), usage=TokenUsage(total_tokens=10), model="system-model")
+    monkeypatch.setattr(application, "build_agent_engine", Mock(return_value=engine))
+    monkeypatch.setattr(application, "enforce_member_token_quota", lambda *_: None)
+    monkeypatch.setattr(application, "record_usage", lambda **kw: usage.append(kw))
     assert runtime.call_model(t, {})["questions"]
-    assert len(calls[0]["json"]["messages"]) == 2
-    assert json.loads(calls[0]["json"]["messages"][1]["content"])["topic"] == t.session.topic
+    messages = engine.complete.call_args.args[0]
+    assert len(messages) == 2
+    assert json.loads(messages[1]["content"])["topic"] == t.session.topic
     assert usage[0]["resource_type"] == "prompt_generation"
+    assert usage[0]["provider"] == "codex"
 
 
-@pytest.mark.parametrize("failure", ["provider", "quota", "timeout", "json"])
+@pytest.mark.parametrize("failure", ["engine", "quota", "timeout", "json", "input", "failed"])
 def test_model_failures_remain_retryable_without_fake_results(context, monkeypatch, failure):
     t = task(context, create(context))
-    provider = SimpleNamespace(base_url="https://example.invalid/v1", timeout_seconds=30, name="test")
-    monkeypatch.setattr(runtime, "_provider", lambda *_: (provider, "key", "model"))
-    monkeypatch.setattr(runtime, "enforce_member_token_quota", lambda *_: None)
-    monkeypatch.setattr(runtime, "record_usage", lambda **kw: None)
-
-    def fail(*args, **kwargs):
-        raise {"provider": ProviderUnavailable, "quota": Throttled, "timeout": requests.Timeout, "json": ValueError}[failure]()
-
-    target = {"provider": "_provider", "quota": "enforce_member_token_quota"}.get(failure)
-    if target:
-        monkeypatch.setattr(runtime, target, fail)
+    engine = Mock(adapter_name="codex")
+    engine.complete.return_value = LLMResponse(content=json.dumps(analysis()), usage=TokenUsage(), model="system-model")
+    factory = Mock(return_value=engine)
+    quota = Mock()
+    monkeypatch.setattr(application, "build_agent_engine", factory)
+    monkeypatch.setattr(application, "enforce_member_token_quota", quota)
+    monkeypatch.setattr(application, "record_usage", lambda **kw: None)
+    if failure == "engine":
+        factory.side_effect = RuntimeError("private engine details")
+    elif failure == "quota":
+        quota.side_effect = Throttled()
     elif failure == "timeout":
-        monkeypatch.setattr(runtime.requests, "post", fail)
+        engine.complete.side_effect = TimeoutError()
+    elif failure == "json":
+        engine.complete.return_value.content = "invalid JSON"
+    elif failure == "input":
+        engine.complete.return_value.input_request = {"question": "confirm"}
     else:
-        monkeypatch.setattr(runtime.requests, "post", lambda *args, **kwargs: SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"choices": [{"message": {"content": "invalid JSON"}}]}))
+        engine.complete.return_value.success = False
     with pytest.raises(RuntimeError):
         execute(t)
     t.refresh_from_db()
     assert t.status == "failed" and t.error
+    assert "private" not in t.error
     assert not PromptVersion.objects.exists()
 
 

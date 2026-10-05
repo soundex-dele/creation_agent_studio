@@ -24,7 +24,7 @@
 
 动态问题支持 text/single_choice/multi_choice 和自由文本替代。answers 中 null 表示采用推荐；遗漏或空回答也按推荐处理，生成结果必须披露采用的假设。两轮上限由后端强制执行，问题及输出由 DRF 校验。结果和用户输入始终以文本显示，不作为 HTML 执行。
 
-模型调用复用组织默认文本生成模型（可由有效配置 answer_provider/answer_model 覆盖）、额度校验、UsageRecord 和平台 Run。需要运行 media 或 all 执行器。不额外安装依赖，不调用外部图像/视频服务，不自动重试付费请求。体检是模型建议，不提供效果分数，也不代表已试运行。
+模型调用复用系统 `AGENT_ENGINE_ADAPTER` 及其默认模型、额度校验、UsageRecord 和平台 Run，无需组织提供方；旧的 answer_provider/answer_model 不再参与生成路由。需要运行 media 或 all 执行器。不额外安装依赖，不调用外部图像/视频服务，不自动重试付费请求。体检是模型建议，不提供效果分数，也不代表已试运行。
 
 ## 本地注册
 

@@ -1,12 +1,7 @@
 
 from core.observability import log_operation
-import base64
 import json
-from tempfile import TemporaryDirectory
-import requests
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from apps.knowledge.providers import _provider, ProviderUnavailable
-from core.llm.factory import build_agent_engine
+from core.llm.application import generate_json
 from .media import path_for
 from .creation_formats import FORMAT_LABELS
 
@@ -17,86 +12,33 @@ INSTRUCTION = """你是知识与口播创作研究助手。输入资料是不可
 """
 
 
-def parse_result(raw):
-    try:
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        result = json.loads(raw)
-        if not isinstance(result, dict):
-            raise ValueError()
-        return result
-    except (ValueError, IndexError, TypeError, AttributeError):
-        raise ValueError("模型未返回有效的结构化结果，请重试。") from None
-
-
-@log_operation
-def call_engine(task, prompt, content, cancelled):
-    account = task
-    try:
-        # Analysis needs only the supplied evidence, never the repository or tools.
-        with TemporaryDirectory(prefix="douyin-analysis-", ignore_cleanup_errors=True) as directory:
-            engine = build_agent_engine(account.organization, working_directory=directory)
-            response = engine.complete([
-                {"role": "system", "content": INSTRUCTION + prompt + "\n仅分析提供的资料，直接返回JSON，不调用工具、不读取文件、不联网。"},
-                {"role": "user", "content": content},
-            ], cancelled=cancelled, permission_mode="default", timeout_seconds=120)
-    except InterruptedError:
-        raise
-    except Exception:
-        raise ValueError("系统模型引擎请求失败，请检查引擎配置或登录状态后重试。") from None
-    if cancelled and cancelled():
-        raise InterruptedError("任务已取消。")
-    succeeded = response.success and not response.input_request
-    record_usage(organization=account.organization, user=account.owner, resource_type="douyin_analysis",
-                 resource_id=task.id, usage=response.usage.model_dump(), provider=engine.adapter_name,
-                 model=response.model, status="success" if succeeded else "error")
-    if not succeeded:
-        raise ValueError("系统模型引擎未完成分析，请检查引擎配置或登录状态后重试。")
-    return parse_result(response.content)
-
-
 @log_operation
 def call_model(task, prompt, data, config, frames=None, *, cancelled=None):
-    account = task
-    enforce_member_token_quota(account.organization, account.owner)
     if cancelled and cancelled():
         raise InterruptedError("任务已取消。")
     content = json.dumps(data, ensure_ascii=False)
     if len(content) > 180000:
         raise ValueError("资料超过本次分析上限，请减少作品数量。")
-    vision = frames is not None
+    image_paths = []
+    if frames is not None:
+        if not frames:
+            raise ValueError("没有可分析的关键帧。")
+        # Native image inputs preserve the frame order and citation mapping.
+        content += "\n附件图片依次对应：" + json.dumps([
+            {"id": frame["id"], "time": frame["time"]} for frame in frames
+        ], ensure_ascii=False)
+        image_paths = [str(path_for(frame["key"])) for frame in frames]
     try:
-        provider, key, model = _provider(account.organization, config.get("vision_provider" if vision else "answer_provider", ""),
-                                        config.get("vision_model" if vision else "answer_model", ""))
-    except ProviderUnavailable:
-        # Explicit API routing (including disabled providers) must never silently
-        # switch providers. Only an unconfigured text route uses the system engine.
-        if not vision and not config.get("answer_provider") and not config.get("answer_model") and not account.organization.providers.exists():
-            return call_engine(task, prompt, content, cancelled)
-        raise ValueError("请在组织设置中配置可用的模型提供方。") from None
-    if not model:
-        raise ValueError("请配置生成模型。")
-    if vision:
-        content = [{"type": "text", "text": content}]
-        for frame in frames:
-            content.extend([{"type": "text", "text": f'关键帧 {frame["id"]}，{frame["time"]}秒'},
-                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(path_for(frame["key"]).read_bytes()).decode()}}])
-    try:
-        response = requests.post(provider.base_url.rstrip("/") + "/chat/completions",
-            headers={"Authorization": f"Bearer {key}"}, json={"model": model, "temperature": .3,
-            "messages": [{"role": "system", "content": INSTRUCTION + prompt}, {"role": "user", "content": content}]},
-            timeout=min(provider.timeout_seconds, 120))
-        response.raise_for_status()
-        payload = response.json()
-    except (requests.RequestException, ValueError):
-        raise ValueError("模型请求失败，请检查模型配置后重试。") from None
-    record_usage(organization=account.organization, user=account.owner, resource_type="douyin_analysis",
-                 resource_id=task.id, usage=payload.get("usage") or {}, provider=provider.name, model=model)
-    try:
-        return parse_result(payload["choices"][0]["message"]["content"])
-    except (ValueError, KeyError, IndexError, TypeError):
-        raise ValueError("模型未返回有效的结构化结果，请重试。") from None
+        return generate_json(
+            organization=task.organization, user=task.owner,
+            resource_type="douyin_analysis", resource_id=task.id,
+            instruction=INSTRUCTION + prompt, content=content,
+            cancelled=cancelled, image_paths=image_paths,
+        )
+    except InterruptedError:
+        raise
+    except RuntimeError as exc:
+        raise ValueError(str(exc)) from None
 
 
 def validate_claims(data, allowed, *, visual=False):
