@@ -221,6 +221,35 @@ describe('mobile page scrolling', () => {
     }
   });
 
+  it.each([320, 375, 390, 767, 768, 844, 1023, 1024, 1440])('bounds the Douyin sidebar and content in normal and short viewports at %ipx', width => {
+    const source = readSource('../../pages/Apps/DouyinBenchmarkPage.tsx');
+    const css = readSource('../../pages/Apps/DouyinBenchmarkPage.css');
+    expect(source).toContain('className="douyin-app"');
+    expect(source).toContain('className="douyin-sidebar"');
+    expect(source).toContain('className="douyin-host app-scroll-page"');
+    for (const height of [320, 900]) {
+      const app = declarationsAt([css], ['.douyin-app'], width, height);
+      expect(app.height).toBe('100%');
+      expect(app['min-height']).toBe('0');
+      expect(app['min-width']).toBe('0');
+      expect(app.overflow).toBe('hidden');
+      expect(app['grid-template-columns']).toBe(width <= 1023 ? 'minmax(0, 1fr)' : '224px minmax(0, 1fr)');
+      expect(app['grid-template-rows']).toBe(width <= 1023 ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)');
+      const sidebar = declarationsAt([css], ['.douyin-sidebar'], width, height);
+      expect(sidebar.height).toBe('100%');
+      expect(sidebar['min-height']).toBe('0');
+      expect(sidebar['overflow-y']).toBe('auto');
+      expect(sidebar.display).toBe(width <= 1023 ? 'none' : undefined);
+      expect(declarationsAt([css], ['.douyin-mobile-bar'], width, height).display).toBe(width <= 1023 ? 'flex' : 'none');
+      const content = declarationsAt([globalStyles, css], ['.app-scroll-page', '.douyin-host'], width, height);
+      expect(content.height).toBe('100%');
+      expect(content['overflow-y']).toBe('auto');
+      expect(content.padding).toContain('safe-area-inset-bottom');
+    }
+    expect(declarationsAt([css], ['.douyin-navigation-drawer .ant-drawer-body'], width)['overflow-y']).toBe('auto');
+    expect(declarationsAt([css], ['.douyin-nav-link'], width)['min-height']).toBe('44px');
+  });
+
   it.each([320, 375, 390, 767, 768, 844, 1440])('reflows Douyin filters and work cards without changing the scroll owner at %ipx', width => {
     const css = readSource('../../pages/Apps/DouyinBenchmarkPage.css');
     const workspace = readSource('../../pages/Apps/douyin/DouyinWorkspace.tsx');

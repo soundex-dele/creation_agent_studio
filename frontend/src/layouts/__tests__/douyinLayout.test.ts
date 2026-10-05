@@ -31,8 +31,10 @@ describe('Douyin document workspace layout contract', () => {
       rule.walkDecls(decl => { tokens[decl.prop] = decl.value; });
       if (!tokens['--color-bg-card'] || !tokens['--color-text-sec']) return;
       const ratio = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
-      expect(ratio(tokens['--color-text'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(tokens['--color-text-sec'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(4.5);
+      for (const surface of ['--color-bg-card', '--color-bg-surface']) {
+        expect(ratio(tokens['--color-text'], tokens[surface])).toBeGreaterThanOrEqual(4.5);
+        expect(ratio(tokens['--color-text-sec'], tokens[surface])).toBeGreaterThanOrEqual(4.5);
+      }
       expect(ratio(tokens['--color-primary'], tokens['--color-bg-card'])).toBeGreaterThanOrEqual(3);
       themes++;
     });

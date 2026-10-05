@@ -102,6 +102,17 @@ describe('Douyin benchmark workflow', () => {
     await render(<DouyinHome base="/dy" />);
     expect(container.textContent).toContain('采集登录状态已失效'); expect(container.textContent).toContain('知识账号');
   });
+  it('keeps the account destination selected in its workspace and returns through the sidebar', async () => {
+    await render(<DouyinHome base="/dy" />);
+    await act(async () => container.querySelector<HTMLButtonElement>('.douyin-account-card')!.click());
+    expect(container.querySelector('h1')?.textContent).toBe('账号研究');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标账号');
+    await click('作品库');
+    expect(container.textContent).toContain('如何读书');
+    await act(async () => container.querySelector<HTMLAnchorElement>('.douyin-nav [aria-current="page"]')!.click());
+    expect(container.textContent).toContain('我的对标账号');
+    expect(container.querySelector('h1')?.textContent).toBe('对标账号');
+  });
   it('adds an account and sends an idempotency key', async () => {
     vi.mocked(api.post).mockResolvedValue({ ...account, task });
     await render(<DouyinHome base="/dy" />); await click('添加对标账号');

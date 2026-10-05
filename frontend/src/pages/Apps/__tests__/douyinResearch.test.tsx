@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 import { researchApi, type ResearchTask, type Trend } from '@/services/douyinResearch';
@@ -34,17 +34,50 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); });
-async function render(node: React.ReactNode) { await act(async () => root.render(<MemoryRouter>{node}</MemoryRouter>)); }
-async function click(label: string) { const button = [...document.querySelectorAll<HTMLElement>('button,[role="tab"]')].find(el => el.textContent === label); expect(button, label).toBeDefined(); await act(async () => button!.click()); }
+async function render(node: React.ReactNode, entry = '/') { await act(async () => root.render(<MemoryRouter initialEntries={[entry]}>{node}</MemoryRouter>)); }
+async function click(label: string) { const button = [...document.querySelectorAll<HTMLElement>('button,[role="tab"],a')].find(el => el.textContent === label); expect(button, label).toBeDefined(); await act(async () => button!.click()); }
+function RouteProbe() {
+  const location = useLocation(); const navigate = useNavigate();
+  return <><output data-testid="location">{location.search}</output><button onClick={() => navigate(-1)}>测试后退</button></>;
+}
 
 describe('Private Douyin research workflow', () => {
-  it('exposes all five sections without removing the account library', async () => {
+  it('exposes the sidebar destinations and keeps the account library selected on entry', async () => {
     await render(<DouyinHome base="/dy" />);
     expect(container.textContent).toContain('我的对标账号');
     for (const label of ['对标研究', '选题库', '创作中心', '作品复盘', '订阅通知']) expect(container.textContent).toContain(label);
-    await click('跨账号研究与选题雷达');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标账号');
+    expect(container.querySelector('.douyin-top-nav')).toBeNull();
+    await click('对标研究');
     expect(container.textContent).toContain('生成选题雷达');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标研究');
     expect(container.querySelector('main')?.className).toContain('app-scroll-page');
+  });
+  it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('preserves %s and task links across sidebar navigation and browser back', async query => {
+    await render(<><DouyinHome base="/dy" /><RouteProbe /></>, `/?${query}&view=ideas&task=r1`);
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('选题库');
+    await click('个人创作档案');
+    expect(container.querySelector('h1')?.textContent).toBe('个人创作档案');
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain(query);
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('task=r1');
+    expect(document.activeElement).toBe(container.querySelector('main'));
+    await click('测试后退');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('选题库');
+    await click('对标账号');
+    expect(container.textContent).toContain('我的对标账号');
+    expect(container.querySelector('[data-testid="location"]')?.textContent).not.toContain('view=');
+  });
+  it('closes the mobile drawer after choosing a destination', async () => {
+    await render(<DouyinHome base="/dy" />);
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="打开抖音对标助手导航"]')!;
+    await act(async () => trigger.click());
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const drawer = document.querySelector('.douyin-navigation-drawer')!;
+    const link = [...drawer.querySelectorAll<HTMLAnchorElement>('a')].find(el => el.textContent === '选题库')!;
+    await act(async () => link.click());
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('h1')?.textContent).toBe('选题库');
+    expect(container.textContent).toContain('灵感与选题库');
   });
   it.each([['ideas', '灵感与选题库'], ['create', '开头与标题实验室'], ['review', '自己的作品复盘'], ['subscriptions', '订阅与通知'], ['profiles', '个人创作档案']])('opens %s with its actions', async (section, title) => {
     await render(<ResearchHub base="/dy" section={section} onSection={vi.fn()} openAccount={vi.fn()} />);
