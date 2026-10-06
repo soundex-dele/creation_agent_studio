@@ -4,6 +4,13 @@
 - Prefer automated tests, type checks, linting, production builds, and non-browser inspection for verification.
 - Run all backend Python commands in the project virtual environment. On Windows, use `backend\venv\Scripts\python.exe` from the repository root or `.\venv\Scripts\python.exe` from `backend` for Django management commands, pytest, scripts, and package operations; do not use the system Python interpreter.
 
+## Browser compatibility: UUIDs and request identifiers
+
+- Phone access through a plain-HTTP LAN address may lack `crypto.randomUUID()`, even when desktop localhost works. Do not call it directly in application pages or services, or assume that an exposed method cannot throw. Reuse the shared compatibility helpers instead of implementing another fallback.
+- Check the API field contract before choosing a helper. For arbitrary string request/idempotency keys, use `createIdempotencyKey` from `frontend/src/lib/idempotencyKey.ts` (rental AI `request_key` is a string of at most 160 characters). For fields requiring a valid UUID, use `createUuid` from `frontend/src/lib/uuid.ts`, which falls back to `crypto.getRandomValues`; never put a prefixed timestamp key into a UUID field. Neither helper is a replacement for authentication tokens or secrets.
+- Keep a request key stable when retrying the same payload after a network failure. Generate a new key when the payload changes or after a successful submission. All rental AI task types share `RentalGrowthWorkspace.startTask`; preserve that common path.
+- Add workflow regression coverage with `crypto.randomUUID` missing, throwing, and `crypto` absent where the string-key helper supports it. Assert that the request reaches the API, retries reuse the key, and a new submission gets a different key. Restore mocked globals after each test. A normal jsdom/localhost run alone does not establish phone HTTP compatibility; report simulated checks separately from real-device verification.
+
 ## Application integration: scrolling and mobile layout
 
 - Before integrating or changing an application page, trace its actual route through `ApplicationShell` / `MainLayout` and identify which element owns scrolling. In `frontend/src/styles/global.css`, `body`, `#root`, and `.app-main` intentionally use `overflow: hidden`; the root/layout are viewport-height containers. Only `.app-main--padded` provides shell-owned vertical scrolling. `fullBleed` removes that behavior as well as padding; embedded views also use this behavior.

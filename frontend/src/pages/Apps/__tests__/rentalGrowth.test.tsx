@@ -68,15 +68,30 @@ it('retains a failed property form and serializes the photo checklist without up
   expect(api.post).toHaveBeenLastCalledWith(`${base}/properties`, expect.objectContaining({ title: '新公寓', data: expect.objectContaining({ photos: [{ label: '卧室', note: '靠窗' }, { label: '卧室', note: '衣柜' }] }) }));
 });
 
-it('starts a durable copy task using selected property and reuses a request key after network failure', async () => {
+it.each(['native', 'missing', 'throws', 'no crypto'])('submits copy tasks and preserves retry keys when randomUUID is %s', async mode => {
+  if (mode !== 'native') {
+    vi.stubGlobal('crypto', mode === 'no crypto' ? undefined : {
+      randomUUID: mode === 'missing' ? undefined : () => { throw new Error('Secure context required'); },
+    });
+  }
   await render(); await click('房源'); await click('用这套房创作');
   vi.mocked(api.post).mockRejectedValueOnce(new Error('response lost'));
   await click('生成发布文案');
+  expect(api.post).toHaveBeenCalledTimes(1);
   const first = vi.mocked(api.post).mock.calls[vi.mocked(api.post).mock.calls.length - 1]?.[1] as Record<string, unknown>;
   expect(first).toMatchObject({ kind: 'copy', platform: 'xiaohongshu', property_ids: ['p1'] });
+  expect(first.request_key).toEqual(expect.any(String));
+  expect((first.request_key as string).length).toBeGreaterThan(0);
+  expect((first.request_key as string).length).toBeLessThanOrEqual(160);
   vi.mocked(api.post).mockResolvedValueOnce({ id: 'task1', kind: 'copy', status: 'failed', result: {}, request: first, created_at: '2026-10-05' });
   await click('生成发布文案');
+  expect(api.post).toHaveBeenCalledTimes(2);
   expect((vi.mocked(api.post).mock.calls[vi.mocked(api.post).mock.calls.length - 1]?.[1] as Record<string, unknown>).request_key).toBe(first.request_key);
+  expect(container.textContent).toContain('任务已提交');
+  vi.mocked(api.post).mockResolvedValueOnce({ id: 'task2', kind: 'copy', status: 'failed', result: {}, request: {}, created_at: '2026-10-05' });
+  await click('生成发布文案');
+  expect(api.post).toHaveBeenCalledTimes(3);
+  expect((vi.mocked(api.post).mock.calls[2][1] as Record<string, unknown>).request_key).not.toBe(first.request_key);
 });
 
 it('initializes built-in personas before listing and uses a selected persona in copy creation', async () => {

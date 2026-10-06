@@ -6,6 +6,7 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
+import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import { activeTask, dayInZone, emptyLibrary, rentalApi, rentalError, resources, string, type Data, type Event, type Library, type Overview, type Preferences, type RentalRecord, type Report, type Resource, type Task } from '@/services/rentalGrowth';
 import { RecordEditor, CopyEditor, type EditorState } from './rental/Editors';
 import { Creator, LeadDesk, ReportPanel, TaskHistory } from './rental/Panels';
@@ -125,7 +126,7 @@ export function RentalGrowthWorkspace({ base, showHeader = true }: { base: strin
   async function startTask(value: Data) {
     await action(async () => {
       const hash = JSON.stringify(value);
-      if (requestRef.current?.hash !== hash) requestRef.current = { hash, key: crypto.randomUUID() };
+      if (requestRef.current?.hash !== hash) requestRef.current = { hash, key: createIdempotencyKey('rental') };
       const task = await api.start({ ...value, request_key: requestRef.current!.key });
       requestRef.current = null; setTasks(old => [task, ...old.filter(t => t.id !== task.id)]); setNotice('任务已提交，结果会保存在生成记录中。');
     });
