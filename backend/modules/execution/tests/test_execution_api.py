@@ -190,7 +190,7 @@ def test_workflow_run_opens_its_shared_workspace(
         input_data={},
     )
     expected = (
-        tmp_path / "organizations" / str(api_organization.id)
+        tmp_path / "users" / str(api_actor.id)
         / "workflows" / ("original-run" if stored_workspace else str(run.id))
     ).resolve()
     if stored_workspace:

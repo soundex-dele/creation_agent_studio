@@ -55,6 +55,7 @@ class Conversation(models.Model):
     agent_thread_id = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    messages_cleared_at = models.DateTimeField(null=True, blank=True)
 
     objects = TenantOwnedQuerySet.as_manager()
 
@@ -76,7 +77,9 @@ class Conversation(models.Model):
     def workspace_locked(self):
         return bool(
             self.chat_application_id or self.process_id or self.agent_locked
-            or (self.scope == 'cowork' and self.messages.filter(role='user').exists())
+            or (self.scope == 'cowork' and (
+                self.messages_cleared_at or self.messages.filter(role='user').exists()
+            ))
             or hasattr(self, 'document_session')
             or (self.project_id and (
                 self.project.application_id or self.project.workflow_id

@@ -7,8 +7,8 @@ import {
 describe('application renderer registry', () => {
   it('opens CoWork with independent navigation from both entry points', () => {
     const app = { id: 'cowork', applicationId: 99, kind: 'custom' as const, rendererKey: 'cowork' };
-    expect(applicationPath(app)).toBe('/apps/cowork?entry=apps');
-    expect(applicationPath(app, 'home')).toBe('/apps/cowork?entry=home');
+    expect(applicationPath(app)).toBe('/chat?entry=apps');
+    expect(applicationPath(app, 'home')).toBe('/chat?entry=home');
   });
   it('opens Pocket Salvager from the home and applications catalog', () => {
     const app = { id: 'pocket-salvager', applicationId: 43, kind: 'custom' as const, rendererKey: 'pocket-salvager' };

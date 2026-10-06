@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
+
+from apps.applications.runtime_paths import resolve_runtime_path
+from core.user_directories import user_directory
 
 
 def _managed_root() -> Path:
@@ -14,19 +18,19 @@ def _managed_root() -> Path:
 
 
 def _scope_root(user, organization=None) -> Path:
-    root = _managed_root()
-    if organization is not None:
-        target = root / 'organizations' / str(organization.id)
-    else:
-        target = root / 'users' / str(user.id)
-    return _create_managed(target)
+    # Organization membership never grants access to another user's files.
+    return user_directory(user)
 
 
-def _create_managed(target: Path) -> Path:
+def _create_managed(target: Path, user) -> Path:
     root = _managed_root()
     resolved = target.expanduser().resolve()
     if resolved != root and root not in resolved.parents:
         raise RuntimeError('Working directory escaped AGENT_WORKSPACE_ROOT.')
+    try:
+        resolve_runtime_path(str(resolved), user)
+    except PermissionError as exc:
+        raise PermissionDenied(str(exc)) from exc
     resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
@@ -41,7 +45,7 @@ def system_working_directory(
         if conversation_id is not None
         else scope / 'system'
     )
-    return str(_create_managed(target))
+    return str(_create_managed(target, user))
 
 
 def application_working_directory(project) -> str:
@@ -49,18 +53,18 @@ def application_working_directory(project) -> str:
     if project.scope == 'cowork' and project.directory_source == 'explicit':
         from rest_framework.exceptions import ValidationError
         try:
-            return validate_system_working_directory(project.working_directory)
+            return validate_system_working_directory(project.working_directory, project.user)
         except (ValueError, OSError, RuntimeError) as exc:
             raise ValidationError({'working_directory': str(exc)}) from exc
     if project.working_directory:
-        return str(_create_managed(Path(project.working_directory)))
+        return str(_create_managed(Path(project.working_directory), project.user))
     scope = _scope_root(project.user, project.organization)
     if project.application_id:
         target = (scope / 'applications' / project.application.slug
                   / str(project.id))
     else:
         target = scope / 'projects' / str(project.id)
-    project.working_directory = str(_create_managed(target))
+    project.working_directory = str(_create_managed(target, project.user))
     project.save(update_fields=['working_directory'])
     return project.working_directory
 
@@ -77,24 +81,12 @@ def workflow_working_directory(
         target = Path(working_directory).expanduser().resolve()
         if scope not in target.parents:
             raise RuntimeError('Working directory escaped the workflow scope.')
-    return str(_create_managed(target))
+    return str(_create_managed(target, user))
 
 
-def validate_system_working_directory(raw_path: str) -> str:
-    """Validate that a user-selected server directory exists and is accessible."""
-    target = Path(raw_path).expanduser().resolve(strict=False)
-    if getattr(settings, 'APPLICATION_RUNTIME_ALLOW_ALL_PATHS', True):
-        if not target.is_dir():
-            raise ValueError('所选系统工作目录不存在。')
-        return str(target)
-    roots = [
-        Path(root).expanduser().resolve(strict=False)
-        for root in settings.APPLICATION_RUNTIME_ALLOWED_ROOTS
-    ]
-    if not roots:
-        raise ValueError('系统目录选择未启用。')
-    if not any(target == root or root in target.parents for root in roots):
-        raise ValueError('目录不在允许的系统工作区范围内。')
+def validate_system_working_directory(raw_path: str, user) -> str:
+    """Validate a selected directory against the authenticated user's scope."""
+    target = resolve_runtime_path(raw_path, user)
     if not target.is_dir():
         raise ValueError('所选系统工作目录不存在。')
     return str(target)
@@ -115,7 +107,7 @@ def conversation_working_directory(conversation) -> str:
     # again so a directory removed on disk is safely recreated before a run.
     if (conversation.working_directory
             and str(conversation.process_id or '').startswith('workflow:')):
-        return str(_create_managed(Path(conversation.working_directory)))
+        return str(_create_managed(Path(conversation.working_directory), conversation.user))
     if (conversation.working_directory
             and not conversation.project_id
             and not conversation.application_id):
@@ -124,8 +116,14 @@ def conversation_working_directory(conversation) -> str:
         legacy_default = (
             _scope_root(conversation.user, conversation.organization) / 'system'
         ).resolve(strict=False)
-        if current != legacy_default:
-            return conversation.working_directory
+        legacy_organization_default = (
+            _managed_root() / 'organizations' / str(conversation.organization_id) / 'system'
+        )
+        if current not in (legacy_default, legacy_organization_default):
+            try:
+                return validate_system_working_directory(str(current), conversation.user)
+            except PermissionError as exc:
+                raise PermissionDenied(str(exc)) from exc
     if conversation.project_id:
         project = conversation.project
         if (
@@ -141,7 +139,7 @@ def conversation_working_directory(conversation) -> str:
         scope = _scope_root(conversation.user, conversation.organization)
         path = str(_create_managed(
             scope / 'applications' / conversation.application.slug
-            / 'conversations' / str(conversation.id)))
+            / 'conversations' / str(conversation.id), conversation.user))
     else:
         path = system_working_directory(
             conversation.user,

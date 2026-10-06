@@ -38,7 +38,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const embedded = searchParams.get('embedded') === '1';
   const standalone = searchParams.get('standalone') === '1';
   const openedFromApps = searchParams.get('entry') === 'apps';
-  const isConversationPage = location.pathname === '/chat';
+  const isConversationPage = Boolean(matchPath('/chat', location.pathname));
   const isRemoteConversationPage = Boolean(matchPath(
     '/apps/my-computer/:deviceId/conversations/:conversationId', location.pathname,
   ));
@@ -51,7 +51,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     layoutMode,
   });
   const shouldHideSidebar = Boolean(
-    hideSidebar || embedded || (standalone && !isConversationPage) || homeAppsInContent
+    hideSidebar || isConversationPage || embedded || (standalone && !isConversationPage) || homeAppsInContent
     || !hasSidebarContent(location.pathname),
   );
   const shouldHideHeader = Boolean(
@@ -59,7 +59,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   );
   // Chat page needs full-height content without padding
   const ownsPageSpacing = location.pathname === '/' || location.pathname === ''
-    || location.pathname === '/chat';
+    || isConversationPage;
   const shouldUseFullBleed = Boolean(ownsPageSpacing || fullBleed || embedded);
   const hasContextSidebar = !shouldHideSidebar && hasSidebarContent(location.pathname);
   const showContextToolbar = shouldHideHeader && hasContextSidebar && isMobile;

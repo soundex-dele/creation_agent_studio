@@ -166,7 +166,8 @@ def test_actual_editor_json_round_trip(ctx):
     assert "第一项" in saved.data["plain_text"]
 
 
-def test_ai_context_private_sessions_and_run_permissions(ctx):
+@pytest.mark.parametrize('scope', ['default', 'unified'])
+def test_ai_context_private_sessions_and_run_permissions(ctx, scope):
     deploy_agent(ctx)
     client, url = ctx["client"], ctx["url"]
     own = client.post(url + "/conversation").data["id"]
@@ -190,13 +191,13 @@ def test_ai_context_private_sessions_and_run_permissions(ctx):
     theirs = client.post(url + "/conversation").data["id"]
     assert theirs != own
     assert client.get(url + "/conversation").data["messages"] == []
-    general_history = client.get("/api/v1/conversations/", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id))
+    general_history = client.get(f"/api/v1/conversations/?scope={scope}", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id))
     assert general_history.status_code == 200
     history_items = general_history.data.get("results", []) if isinstance(general_history.data, dict) else general_history.data
     assert theirs not in {str(item["id"]) for item in history_items}
     assert client.get(run_root).status_code == 404
     assert client.get(run_root + "/events").status_code == 404
-    assert client.get(f"/api/v1/conversations/{own}/", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id)).status_code == 404
+    assert client.get(f"/api/v1/conversations/{own}/?scope={scope}", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id)).status_code == 404
     read_run = send(ctx)
     assert read_run.status_code == 202, read_run.data
     assert client.post(url + f"/runs/{read_run.data['id']}/commands", {"type": "cancel", "idempotency_key": "cancel-doc", "payload": {}}, format="json").status_code == 202
@@ -206,12 +207,14 @@ def test_ai_context_private_sessions_and_run_permissions(ctx):
     assert send(ctx).status_code == 404
     assert client.get(url + "/conversation").status_code == 404
     assert client.get(run_root.replace(str(run.id), read_run.data['id'])).status_code == 404
+    assert client.get(f"/api/v1/conversations/{theirs}/?scope={scope}", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id)).status_code == 404
 
 
-def test_ai_rejects_generic_bypass_and_oversize_context(ctx):
+@pytest.mark.parametrize('scope', ['default', 'unified'])
+def test_ai_rejects_generic_bypass_and_oversize_context(ctx, scope):
     deploy_agent(ctx)
     conversation_id = ctx["client"].post(ctx["url"] + "/conversation").data["id"]
-    generic = ctx["client"].post(f"/api/v1/conversations/{conversation_id}/send_message/", {"content": "绕过"}, format="json", HTTP_IDEMPOTENCY_KEY="bypass", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id))
+    generic = ctx["client"].post(f"/api/v1/conversations/{conversation_id}/send_message/?scope={scope}", {"content": "绕过"}, format="json", HTTP_IDEMPOTENCY_KEY="bypass", HTTP_X_ORGANIZATION_ID=str(ctx["org"].id))
     assert generic.status_code == 400, generic.data
     Document.objects.filter(pk=ctx["id"]).update(plain_text="文" * 60001)
     assert send(ctx).status_code == 400

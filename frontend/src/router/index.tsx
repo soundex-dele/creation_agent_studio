@@ -93,7 +93,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/apps/cowork',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<CoWorkPage />)}</ApplicationShell></ProtectedRoute>,
+    element: <ProtectedRoute>{page(<CoWorkPage />)}</ProtectedRoute>,
   },
   ...['/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId',
     '/apps/my-computer/:deviceId/terminals', '/apps/my-computer/:deviceId/terminals/:sessionId', '/apps/my-computer/:deviceId/files'].map(path => ({
@@ -143,9 +143,9 @@ const router = createBrowserRouter([
     path: '/chat',
     element: (
       <ProtectedRoute>
-        <MainLayout>
+        <ApplicationShell fullBleed>
           {page(<ChatPage />)}
-        </MainLayout>
+        </ApplicationShell>
       </ProtectedRoute>
     ),
   },

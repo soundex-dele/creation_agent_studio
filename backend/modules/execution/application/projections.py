@@ -242,11 +242,14 @@ def _conversation_for_run(run, Conversation):
     conversation_id = _conversation_id_for_run(run)
     if not conversation_id:
         return None
-    return Conversation.objects.select_for_update().filter(
+    conversation = Conversation.objects.select_for_update().filter(
         pk=conversation_id,
         organization_id=run.organization_id,
         user_id=run.owner_id,
     ).first()
+    if conversation and conversation.messages_cleared_at and run.created_at <= conversation.messages_cleared_at:
+        return None
+    return conversation
 
 
 def project_input_required(run_id, event):
@@ -483,6 +486,8 @@ def repair_conversation_messages(conversation):
         ),
         owner_id=conversation.user_id,
     ).order_by("created_at")
+    if conversation.messages_cleared_at:
+        runs = runs.filter(created_at__gt=conversation.messages_cleared_at)
     for run in runs:
         projected_sequences = set(Message.objects.filter(
             conversation=conversation,

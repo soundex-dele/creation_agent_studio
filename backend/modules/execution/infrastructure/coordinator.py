@@ -130,6 +130,9 @@ class ExecutionCoordinator:
         return len(self._active)
 
     def _payload(self, claimed):
+        from apps.applications.runtime_paths import allow_all_runtime_paths, runtime_roots
+
+        user = claimed.run.owner
         checkpoint = claimed.attempt.checkpoint_artifact
         resume_command = claimed.resume_command
         return {
@@ -143,12 +146,8 @@ class ExecutionCoordinator:
                 "effective_config", {}
             ),
             "input": claimed.run.input,
-            "allowed_roots": list(
-                getattr(settings, "APPLICATION_RUNTIME_ALLOWED_ROOTS", [])
-            ),
-            "allow_all_paths": bool(
-                getattr(settings, "APPLICATION_RUNTIME_ALLOW_ALL_PATHS", True)
-            ),
+            "allowed_roots": [str(root) for root in runtime_roots(user)],
+            "allow_all_paths": allow_all_runtime_paths(user),
             "checkpoint": (
                 {
                     "artifact_id": str(checkpoint.id),

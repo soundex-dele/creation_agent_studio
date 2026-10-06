@@ -46,6 +46,12 @@
 .cowork-project-name span, .cowork-header > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cowork-project-chats { margin-left: 28px; }
 .cowork-conversation { display: block; width: 100%; padding: 9px 12px; min-height: 38px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.cowork-conversation-row { display: flex; align-items: center; min-width: 0; }
+.cowork-conversation-row .cowork-conversation { flex: 1; min-width: 0; }
+.cowork-conversation-row:not(:focus-within) .cowork-conversation-action:not(.ant-dropdown-open) {
+  opacity: 0;
+  pointer-events: none;
+}
 .cowork-more { display: block; padding: 10px 12px; color: var(--color-text-sec); }
 .cowork-list-state { padding: 8px 12px; color: var(--color-text-sec); font-size: 13px; overflow-wrap: anywhere; }
 .cowork-icon:hover, .cowork-new-chat:hover, .cowork-conversation:hover, .cowork-project-row:hover, .cowork-more:hover,

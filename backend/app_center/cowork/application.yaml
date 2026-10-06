@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: cowork
-  version: 1.0.0
-  name: CoWork
-  description: 围绕文件夹组织项目，与 AI 协作完成任务，在最近对话中继续工作。
+  version: 1.1.0
+  name: 对话
+  description: 通过持续对话处理日常需求，围绕文件夹组织项目，与 AI 协作完成任务。
   category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
   icon: folder
   color: "#64748b"

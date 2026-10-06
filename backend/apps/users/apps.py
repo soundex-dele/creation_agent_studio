@@ -16,6 +16,4 @@ class UsersConfig(AppConfig):
         """
         Import signal handlers when the app is ready.
         """
-        # Import signal handlers here when needed
-        # Example: import apps.users.signals
-        pass
+        from . import signals  # noqa: F401

@@ -16,6 +16,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import type { AppItem } from '@/types';
+import { CONVERSATION_APP, CONVERSATION_APP_ID, isCoworkApplication, mergeConversationHomePreferences } from '@/lib/conversationApplication';
 
 interface HomeApplicationPreferences {
   order: string[];
@@ -23,16 +24,6 @@ interface HomeApplicationPreferences {
 }
 
 const EMPTY_PREFERENCES: HomeApplicationPreferences = { order: [], hidden: [] };
-const CONVERSATION_APP_ID = 'platform-conversation';
-const CONVERSATION_APP: AppItem = {
-  id: CONVERSATION_APP_ID,
-  name: '对话',
-  description: '通过持续对话处理日常需求',
-  category: 'chat',
-  icon: '💬',
-  color: '#6d5dfc',
-  tags: ['AI 助手', '多轮对话'],
-};
 
 interface HomeApplicationsSidebarProps {
   horizontalWheelScroll?: boolean;
@@ -62,16 +53,18 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
     try {
       const saved = window.localStorage.getItem(storageKey);
       const parsed = saved ? JSON.parse(saved) as Partial<HomeApplicationPreferences> : null;
-      setPreferences({
+      const merged = mergeConversationHomePreferences({
         order: Array.isArray(parsed?.order) ? parsed.order.filter((id): id is string => typeof id === 'string') : [],
         hidden: Array.isArray(parsed?.hidden) ? parsed.hidden.filter((id): id is string => typeof id === 'string') : [],
       });
+      setPreferences(merged);
+      if (saved && JSON.stringify(merged) !== saved) window.localStorage.setItem(storageKey, JSON.stringify(merged));
     } catch {
       setPreferences(EMPTY_PREFERENCES);
     }
   }, [storageKey]);
 
-  const allApps = useMemo(() => [CONVERSATION_APP, ...apps], [apps]);
+  const allApps = useMemo(() => [CONVERSATION_APP, ...apps.filter(app => !isCoworkApplication(app))], [apps]);
 
   const orderedApps = useMemo(() => {
     const positions = new Map(preferences.order.map((id, index) => [id, index]));

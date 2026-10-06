@@ -104,7 +104,7 @@ export const taskDestination = (
   if (requestedType === 'conversation') {
     const conversationId = taskConversationId(run);
     if (conversationId && run.conversation_scope === 'cowork') {
-      return { path: `/apps/cowork?conversation=${encodeURIComponent(conversationId)}&entry=apps`, label: '打开 CoWork 对话', target: '_blank' };
+      return { path: `/chat?conversation=${encodeURIComponent(conversationId)}&entry=apps`, label: '打开对话', target: '_blank' };
     }
     return conversationId
       ? { path: `/chat?conversation=${encodeURIComponent(conversationId)}`, label: '打开对话', target: '_blank' }

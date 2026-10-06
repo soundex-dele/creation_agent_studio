@@ -27,7 +27,7 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'rental-growth-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/rental-growth-assistant`, entry),
   'ideas-todos': (app, entry) => withEntry(`/applications/${app.applicationId}/ideas-todos`, entry),
   'my-computer': (_app, entry) => withEntry('/apps/my-computer', entry),
-  cowork: (_app, entry) => withEntry('/apps/cowork', entry),
+  cowork: (_app, entry) => withEntry('/chat', entry),
   'case-library': (_app, entry) => withEntry('/apps/case-library', entry),
   'study-with-method': (app, entry) => withEntry(
     `/applications/${app.applicationId}/study-with-method`, entry,

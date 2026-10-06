@@ -9,16 +9,16 @@ from apps.projects.models import Project
 from .workspace_paths import validate_system_working_directory
 
 
-def resource_scope(request):
+def resource_scope(request, *, allow_unified=False):
     scope = request.query_params.get('scope', 'default')
-    if scope not in ('default', 'cowork'):
+    if scope not in (('default', 'cowork', 'unified') if allow_unified else ('default', 'cowork')):
         raise ValidationError({'scope': '未知的工作空间范围。'})
     return scope
 
 
 def bind_directory(user, organization, directory, title=''):
     try:
-        path = validate_system_working_directory(directory)
+        path = validate_system_working_directory(directory, user)
     except (ValueError, OSError, RuntimeError) as exc:
         raise ValidationError({'working_directory': str(exc)}) from exc
     key = hashlib.sha256(os.path.normcase(path).encode('utf-8')).hexdigest()

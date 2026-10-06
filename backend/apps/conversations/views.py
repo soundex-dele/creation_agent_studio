@@ -4,6 +4,7 @@ import time
 from django.conf import settings
 from django.db import OperationalError, transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -68,8 +69,12 @@ class ConversationViewSet(viewsets.ViewSet):
 
     def get_conversation(self, request, pk):
         organization = resolve_organization(request)
+        scope = resource_scope(request, allow_unified=True)
         conversation = get_object_or_404(
-            Conversation.objects.filter(organization=organization, scope=resource_scope(request)),
+            Conversation.objects.filter(
+                organization=organization,
+                scope__in=('default', 'cowork') if scope == 'unified' else (scope,),
+            ),
             pk=pk,
             user=request.user,
         )
@@ -93,8 +98,11 @@ class ConversationViewSet(viewsets.ViewSet):
 
     def list(self, request):
         organization = resolve_organization(request)
-        scope = resource_scope(request)
-        queryset = request.user.conversations.filter(organization=organization, scope=scope)
+        scope = resource_scope(request, allow_unified=True)
+        queryset = request.user.conversations.filter(
+            organization=organization,
+            scope__in=('default', 'cowork') if scope == 'unified' else (scope,),
+        )
         from django.apps import apps
         if apps.is_installed("app_center.documents.backend"):
             # Document sessions are accessed through document permissions, not
@@ -127,7 +135,12 @@ class ConversationViewSet(viewsets.ViewSet):
             if process_id:
                 queryset = queryset.filter(process_id=process_id)
         elif scope != 'cowork' and not application_id and not getattr(request, 'remote_connector', False):
-            queryset = queryset.filter(project__isnull=True)
+            queryset = queryset.filter(
+                Q(project__isnull=True) | Q(scope='cowork')
+                if scope == 'unified' else Q(project__isnull=True)
+            )
+        if scope == 'unified':
+            queryset = queryset.order_by('-updated_at', '-id')
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(title__icontains=search)
@@ -141,7 +154,7 @@ class ConversationViewSet(viewsets.ViewSet):
 
     @idempotent_creation
     def create(self, request):
-        serializer = CreateConversationSerializer(data=request.data)
+        serializer = CreateConversationSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         organization = resolve_organization(request)
@@ -310,7 +323,7 @@ class ConversationViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["post"])
     def workspace(self, request, pk=None):
         conversation = self.get_conversation(request, pk)
-        serializer = UpdateWorkspaceSerializer(data=request.data)
+        serializer = UpdateWorkspaceSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         with transaction.atomic():
@@ -457,11 +470,14 @@ class ConversationViewSet(viewsets.ViewSet):
                 organization_id=conversation.organization_id,
                 user_id=conversation.user_id,
             )
+            if ConversationDetailSerializer().get_active_run(conversation):
+                return Response({'detail': '当前对话仍在执行，请先停止任务。'}, status=409)
             conversation.messages.all().delete()
+            conversation.messages_cleared_at = timezone.now()
             conversation.agent_thread_provider = ''
             conversation.agent_thread_id = ''
             conversation.save(update_fields=(
-                'agent_thread_provider', 'agent_thread_id', 'updated_at',
+                'agent_thread_provider', 'agent_thread_id', 'updated_at', 'messages_cleared_at',
             ))
         return Response({"detail": "对话已清空"})
 

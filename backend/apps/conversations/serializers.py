@@ -150,7 +150,10 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         return RunSerializer(run).data if run else None
 
     def get_latest_run(self, obj):
-        run = self._related_runs(obj).first()
+        runs = self._related_runs(obj)
+        if obj.messages_cleared_at:
+            runs = runs.filter(created_at__gt=obj.messages_cleared_at)
+        run = runs.first()
         return RunSerializer(run).data if run else None
 
 
@@ -178,8 +181,8 @@ class CreateConversationSerializer(serializers.Serializer):
         if not value.strip():
             return ''
         try:
-            return validate_system_working_directory(value)
-        except ValueError as exc:
+            return validate_system_working_directory(value, self.context['request'].user)
+        except (ValueError, OSError, RuntimeError) as exc:
             raise serializers.ValidationError(str(exc)) from exc
 
 

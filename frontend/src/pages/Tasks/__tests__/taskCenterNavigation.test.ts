@@ -77,9 +77,9 @@ describe('task center activity links', () => {
     expect(row.textContent).toContain('CoWork 对话');
     const openButton = [...row.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === '打开')!;
     await act(async () => openButton.click());
-    expect(open).toHaveBeenCalledWith('/apps/cowork?conversation=42&entry=apps', '_blank', 'noopener,noreferrer');
+    expect(open).toHaveBeenCalledWith('/chat?conversation=42&entry=apps', '_blank', 'noopener,noreferrer');
     await act(async () => row.querySelector<HTMLButtonElement>('.task-title-button')!.click());
-    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('打开 CoWork 对话');
+    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('打开对话');
     const searchInput = container.querySelector<HTMLInputElement>('[aria-label="搜索任务或父级名称"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, 'cowork');

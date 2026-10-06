@@ -84,6 +84,8 @@ class DurableConversationRunTest(TestCase):
 
     @override_settings(AGENT_ENGINE_ADAPTER="codex")
     def test_execution_settings_persist_and_participate_in_idempotency(self):
+        self.user.role = 'admin'
+        self.user.save(update_fields=['role'])
         from apps.enterprise.models import GovernancePolicy
         GovernancePolicy.objects.update_or_create(
             organization=self.organization, defaults={"require_tool_approval": False})
@@ -101,6 +103,19 @@ class DurableConversationRunTest(TestCase):
             changed = self.client.post(url, {**body, field: value}, format="json",
                                        HTTP_IDEMPOTENCY_KEY="modes", **self.headers)
             self.assertEqual(changed.status_code, 409, changed.data)
+
+    @override_settings(AGENT_ENGINE_ADAPTER="codex", APPLICATION_RUNTIME_ALLOW_ALL_PATHS=True)
+    def test_member_cannot_request_full_filesystem_control(self):
+        from apps.enterprise.models import GovernancePolicy
+        GovernancePolicy.objects.update_or_create(
+            organization=self.organization, defaults={"require_tool_approval": False})
+        response = self.client.post(
+            f"/api/v1/conversations/{self.conversation.id}/send_message/",
+            {"content": "hello", "permission_mode": "allow_all"}, format="json",
+            HTTP_IDEMPOTENCY_KEY="member-full-control", **self.headers)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("permission_mode", response.data)
+        self.assertFalse(self.conversation.messages.exists())
 
     def test_invalid_execution_settings_create_no_messages(self):
         for field in ("permission_mode", "collaboration_mode"):

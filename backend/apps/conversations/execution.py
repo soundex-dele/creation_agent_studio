@@ -221,6 +221,10 @@ def _create_run_once(
         user_id=actor.id,
     )
     organization = conversation.organization
+    if permission_mode == "allow_all":
+        from apps.applications.runtime_paths import allow_all_runtime_paths
+        if not allow_all_runtime_paths(actor):
+            raise ValidationError({"permission_mode": "只有具备全路径权限的管理员可以开启完全控制。"})
     original_message = message
     from django.apps import apps
     if apps.is_installed("app_center.documents.backend"):

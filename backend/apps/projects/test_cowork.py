@@ -25,14 +25,15 @@ class CoworkTest(TestCase):
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.folder = Path(self.temp.name) / 'explicit'
-        self.folder.mkdir()
         self.settings_override = override_settings(
             AGENT_WORKSPACE_ROOT=str(Path(self.temp.name) / 'managed'),
             APPLICATION_RUNTIME_ALLOW_ALL_PATHS=True)
         self.settings_override.enable()
         self.addCleanup(self.settings_override.disable)
         self.user = User.objects.create_user('cowork-owner')
+        from core.user_directories import user_directory
+        self.folder = user_directory(self.user) / 'explicit'
+        self.folder.mkdir()
         self.organization = self.user.owned_organizations.get()
         self.client = APIClient()
         self.client.force_authenticate(self.user)
@@ -128,7 +129,7 @@ class CoworkTest(TestCase):
                 self.assertFalse(self.client.get(endpoint).data['workspace_locked'])
                 Message.objects.create(conversation_id=conversation['id'], role='user', content='Start work')
                 self.assertTrue(self.client.get(endpoint).data['workspace_locked'])
-                another = Path(self.temp.name) / 'another'
+                another = self.folder.parent / 'another'
                 another.mkdir(exist_ok=True)
                 for payload in ({'project_id': project['id']},
                                 {'project_id': None, 'working_directory': ''},
@@ -190,7 +191,7 @@ class CoworkTest(TestCase):
         Run.objects.create(organization=self.organization, owner=self.user,
             executor_kind='agent', executor_key='general', source_type='conversation',
             source_id=str(conversation['id']), status='running')
-        another = Path(self.temp.name) / 'another'
+        another = self.folder.parent / 'another'
         another.mkdir()
         response = self.workspace(conversation, {'working_directory': str(another)})
         self.assertEqual(response.status_code, 409, response.data)
@@ -214,7 +215,10 @@ class CoworkTest(TestCase):
         self.client.force_authenticate(other)
         response = self.client.patch(f"/api/v1/projects/{project['id']}/?scope=cowork", {'title': 'Stolen'}, format='json')
         self.assertEqual(response.status_code, 404)
-        self.assertNotEqual(self.project()['id'], project['id'])
+        response = self.client.post('/api/v1/projects/?scope=cowork', {
+            'scope': 'cowork', 'working_directory': str(self.folder),
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
 
     def test_organization_boundary(self):
         project = self.project()
@@ -234,7 +238,7 @@ class CoworkTest(TestCase):
 
     def test_directory_policy_and_pagination(self):
         with override_settings(APPLICATION_RUNTIME_ALLOW_ALL_PATHS=False, APPLICATION_RUNTIME_ALLOWED_ROOTS=[]):
-            response = self.client.post('/api/v1/projects/', {'scope': 'cowork', 'working_directory': str(self.folder)}, format='json')
+            response = self.client.post('/api/v1/projects/', {'scope': 'cowork', 'working_directory': self.temp.name}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         for number in range(21):
             Conversation.objects.create(user=self.user, organization=self.organization, scope='cowork', title=str(number))

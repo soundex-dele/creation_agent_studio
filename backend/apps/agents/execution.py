@@ -56,6 +56,9 @@ def execute_agent_completion(run_payload, sink):
     started = time.perf_counter()
     run_id = run_payload.get("run_id", "unknown")
     logger.info("chat_latency stage=agent_entered run_id=%s", run_id)
+    if ((run_payload.get("input") or {}).get("permission_mode") == "allow_all"
+            and not run_payload.get("allow_all_paths", False)):
+        raise PermissionError("只有具备全路径权限的管理员可以开启完全控制。")
     snapshot = dict(run_payload.get("definition_snapshot") or {})
     definition = dict(snapshot.get("agent_definition") or {})
     model_config = dict(definition.get("model_config") or {})

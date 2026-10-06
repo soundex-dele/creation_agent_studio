@@ -3,6 +3,7 @@ import queue
 import threading
 import hashlib
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -16,6 +17,36 @@ from modules.execution.application.runs import LeaseFence, create_run, finish_at
 from modules.execution.infrastructure.claim import claim_next_run
 from modules.execution.models import Run, RunCommand
 from modules.execution.runtime.child import execute_child
+
+
+@pytest.mark.parametrize('administrator', [False, True])
+@pytest.mark.parametrize('allow_all', [False, True])
+def test_child_payload_uses_run_owner_for_directory_permissions(settings, tmp_path, administrator, allow_all):
+    settings.AGENT_WORKSPACE_ROOT = str(tmp_path / 'workspaces')
+    settings.APPLICATION_RUNTIME_ALLOWED_ROOTS = [str(tmp_path / 'shared')]
+    settings.APPLICATION_RUNTIME_ALLOW_ALL_PATHS = allow_all
+    # Use the real models: Run has owner, while RunCommand has created_by.
+    owner = get_user_model()(pk=101, username='run-owner', is_superuser=administrator)
+    run = Run(owner=owner, organization_id=uuid4(), executor_key='agent-completion',
+        definition_snapshot={}, input={'message': 'Hello'})
+    claimed = SimpleNamespace(run=run, attempt=SimpleNamespace(id=uuid4(), checkpoint_artifact=None),
+        resume_command=None)
+    coordinator = ExecutionCoordinator(worker_id='owner-policy-test', worker_pool='agent')
+
+    payload = coordinator._payload(claimed)
+
+    own_root = (tmp_path / 'workspaces' / 'users' / str(owner.pk)).resolve()
+    assert own_root.is_dir()
+    assert payload['run_id'] == str(run.pk)
+    assert payload['input'] == {'message': 'Hello'}
+    assert payload['allow_all_paths'] is (administrator and allow_all)
+    if administrator and allow_all:
+        assert str(tmp_path.anchor) in payload['allowed_roots']
+    else:
+        expected_roots = [str(own_root)]
+        if administrator:
+            expected_roots.append(str((tmp_path / 'shared').resolve()))
+        assert payload['allowed_roots'] == expected_roots
 
 
 def _suspending_adapter(_payload, sink):

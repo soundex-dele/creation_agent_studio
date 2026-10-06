@@ -14,13 +14,14 @@ import { applicationPath } from '@/lib/applicationCatalog';
 import { applicationWindowPath } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
+import { CONVERSATION_APP, CONVERSATION_APP_ID, conversationApplicationId, isCoworkApplication } from '@/lib/conversationApplication';
 import './AppsPage.css';
 
 const { Search } = Input;
 type AppView = 'all' | 'favorites';
 type AppSort = 'recommended' | 'recent' | 'popular' | 'name';
 
-const CONVERSATION_ID = 'platform-conversation';
+const CONVERSATION_ID = CONVERSATION_APP_ID;
 
 interface ApplicationPreferences {
   favorites: string[];
@@ -59,14 +60,20 @@ const AppsPage: React.FC = () => {
     try {
       const saved = window.localStorage.getItem(storageKey);
       const parsed = saved ? JSON.parse(saved) as Partial<ApplicationPreferences> : null;
-      setPreferences({
+      const merged = {
         favorites: Array.isArray(parsed?.favorites)
-          ? parsed.favorites.filter((id): id is string => typeof id === 'string')
+          ? [...new Set(parsed.favorites.filter((id): id is string => typeof id === 'string').map(conversationApplicationId))]
           : [],
         recent: parsed?.recent && typeof parsed.recent === 'object'
-          ? parsed.recent as Record<string, number>
+          ? { ...parsed.recent } as Record<string, number>
           : {},
-      });
+      };
+      if (merged.recent.cowork !== undefined && merged.recent[CONVERSATION_ID] === undefined) {
+        merged.recent[CONVERSATION_ID] = merged.recent.cowork;
+      }
+      delete merged.recent.cowork;
+      setPreferences(merged);
+      if (saved && JSON.stringify(merged) !== saved) window.localStorage.setItem(storageKey, JSON.stringify(merged));
     } catch {
       setPreferences(EMPTY_PREFERENCES);
     }
@@ -89,8 +96,8 @@ const AppsPage: React.FC = () => {
   const categoryName = (slug: string) =>
     categories.find((c) => c.slug === slug)?.name ?? slug;
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-  const showConversationCard = (!selectedCategory || selectedCategory === 'chat')
-    && (!normalizedQuery || ['对话', '沟通', '智能助手', 'chat']
+  const showConversationCard = (!selectedCategory || selectedCategory === 'chat' || apps.some(isCoworkApplication))
+    && (!normalizedQuery || [CONVERSATION_APP.name, CONVERSATION_APP.description, ...CONVERSATION_APP.tags, '沟通', '智能助手', 'chat', 'cowork']
       .some((value) => value.includes(normalizedQuery)));
 
   const savePreferences = (next: ApplicationPreferences) => {
@@ -114,7 +121,7 @@ const AppsPage: React.FC = () => {
   };
 
   const visibleApps = useMemo(() => {
-    let result = apps;
+    let result = apps.filter(app => !isCoworkApplication(app));
     if (view === 'favorites') {
       result = result.filter((app) => preferences.favorites.includes(app.id));
     }
@@ -301,7 +308,7 @@ const AppsPage: React.FC = () => {
                 </div>
                 <div className="app-card-content">
                   <h2 className="app-card-name">对话</h2>
-                  <p className="app-card-desc">通过持续对话处理日常需求，并在同一会话中保留上下文和任务文件。</p>
+                  <p className="app-card-desc">{CONVERSATION_APP.description}</p>
                   <div className="app-card-tags" aria-label="对话标签">
                     <span className="app-card-tag">AI 助手</span>
                     <span className="app-card-tag">多轮对话</span>

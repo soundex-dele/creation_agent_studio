@@ -47,11 +47,12 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('bounds CoWork navigation and chat panes at %ipx, including short screens', width => {
-    const page = readSource('../../pages/Apps/CoWorkPage.tsx');
-    const styles = [readSource('../../pages/Apps/CoWorkPage.css'), readSource('../../components/Chat/ChatContainer.css')];
+    const page = readSource('../../pages/Chat/ChatPage.tsx');
+    const styles = [readSource('../../pages/Chat/ChatPage.css'), readSource('../../components/Chat/ChatContainer.css')];
     const route = readSource('../../router/index.tsx');
     expect(route).toContain("path: '/apps/cowork'");
-    expect(route).toContain('<ApplicationShell fullBleed>{page(<CoWorkPage />)}</ApplicationShell>');
+    expect(route).toMatch(/<ApplicationShell fullBleed>\s*\{page\(<ChatPage \/>\)\}\s*<\/ApplicationShell>/);
+    expect(readSource('../MainLayout.tsx')).toContain('hideSidebar || isConversationPage || embedded');
     expect(page).toContain('className="cowork-page"');
     expect(page).toContain('className="cowork-sidebar-scroll"');
     expect(page).toContain('className="cowork-chat"');

@@ -39,7 +39,7 @@ class CreateConversationTest(TestCase):
         conversation = self.user.conversations.get(id=response.data['id'])
         self.assertIsNone(conversation.agent_id)
         expected = (
-            Path(directory) / 'organizations' / str(conversation.organization_id)
+            Path(directory) / 'users' / str(self.user.id)
             / 'conversations' / str(conversation.id)
         ).resolve()
         self.assertEqual(Path(response.data['working_directory']), expected)
@@ -80,7 +80,7 @@ class CreateConversationTest(TestCase):
             conversation.refresh_from_db()
 
         expected = (
-            Path(directory) / 'organizations' / str(conversation.organization_id)
+            Path(directory) / 'users' / str(self.user.id)
             / 'conversations' / str(conversation.id)
         ).resolve()
         self.assertEqual(listing.status_code, 200, listing.data)
@@ -156,9 +156,9 @@ class CreateConversationTest(TestCase):
 
     def test_create_can_use_an_allowed_system_directory(self):
         with TemporaryDirectory() as directory:
-            selected = Path(directory) / 'selected'
-            selected.mkdir()
-            with override_settings(APPLICATION_RUNTIME_ALLOWED_ROOTS=[directory]):
+            selected = Path(directory) / 'users' / str(self.user.id) / 'selected'
+            selected.mkdir(parents=True)
+            with override_settings(AGENT_WORKSPACE_ROOT=directory):
                 response = self.client.post(
                     '/api/v1/conversations/',
                     {'working_directory': str(selected)},

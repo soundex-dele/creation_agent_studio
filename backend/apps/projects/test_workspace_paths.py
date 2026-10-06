@@ -36,7 +36,7 @@ class ApplicationWorkspaceTest(TestCase):
             self.assertEqual(response.status_code, 201, response.data)
             project = Project.objects.get(id=response.data['id'])
             expected = (
-                Path(directory) / 'organizations' / str(project.organization_id)
+                Path(directory) / 'users' / str(self.user.id)
                 / 'applications'
                 / self.application.slug / str(project.id)
             ).resolve()

@@ -1,16 +1,14 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import AgentCategoriesSidebar from './AgentCategoriesSidebar';
 import TemplateHistorySidebar from './TemplateHistorySidebar';
 import AppHistorySidebar from './AppHistorySidebar';
 import ProjectListSidebar from './ProjectListSidebar';
-import ConversationHistory from '../ConversationHistory/ConversationHistory';
 import HomeApplicationsSidebar from './HomeApplicationsSidebar';
 import './Sidebar.css';
 
 export const hasSidebarContent = (path: string) => (
   path === '/'
   || path === ''
-  || path.startsWith('/chat')
   || path.startsWith('/agents')
   || path.startsWith('/applications')
   || path.startsWith('/apps')
@@ -20,26 +18,11 @@ export const hasSidebarContent = (path: string) => (
 
 const Sidebar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const path = location.pathname;
 
   const renderSidebar = () => {
     if (path === '/' || path === '') {
       return <HomeApplicationsSidebar />;
-    }
-    if (path.startsWith('/chat')) {
-      return (
-        <ConversationHistory
-          activeConversationId={new URLSearchParams(location.search).get('conversation')}
-          onConversationSelect={(id: string) => {
-            const params = new URLSearchParams(location.search);
-            if (id) params.set('conversation', id);
-            else params.delete('conversation');
-            const query = params.toString();
-            navigate(query ? `/chat?${query}` : '/chat');
-          }}
-        />
-      );
     }
     if (path.startsWith('/agents')) {
       return <AgentCategoriesSidebar />;

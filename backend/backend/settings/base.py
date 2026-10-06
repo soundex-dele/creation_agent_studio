@@ -575,14 +575,15 @@ CODEX_WORKING_DIRECTORY = config(
 AGENT_WORKSPACE_ROOT = Path(config(
     'AGENT_WORKSPACE_ROOT', default=str(BASE_DIR / 'agent_workspaces')))
 
-# Optional roots used when unrestricted server filesystem access is disabled.
+# Additional administrator roots when unrestricted filesystem access is disabled.
 APPLICATION_RUNTIME_ALLOWED_ROOTS = [
     item.strip() for item in config(
         'APPLICATION_RUNTIME_ALLOWED_ROOTS', default='').split(',')
     if item.strip()
 ]
-# Local filesystem applications can browse and process any server directory.
-# Set this to False to restore APPLICATION_RUNTIME_ALLOWED_ROOTS enforcement.
+# Only platform administrators may browse/process arbitrary server directories.
+# Ordinary users are always confined to AGENT_WORKSPACE_ROOT/users/<user id>.
+# Set False to restrict administrators to APPLICATION_RUNTIME_ALLOWED_ROOTS.
 APPLICATION_RUNTIME_ALLOW_ALL_PATHS = config(
     'APPLICATION_RUNTIME_ALLOW_ALL_PATHS', default=True, cast=bool)
 CREATION_MASTER_ALLOW_ALL_PATHS = config(

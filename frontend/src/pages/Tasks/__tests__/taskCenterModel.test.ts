@@ -136,8 +136,8 @@ describe('task center relationships', () => {
     expect(taskType(cowork)).toBe('conversation');
     for (const requestedType of [undefined, 'conversation']) {
       expect(taskDestination(cowork, requestedType)).toEqual({
-        path: '/apps/cowork?conversation=cowork%20%26%2042&entry=apps',
-        label: '打开 CoWork 对话', target: '_blank',
+        path: '/chat?conversation=cowork%20%26%2042&entry=apps',
+        label: '打开对话', target: '_blank',
       });
     }
   });
