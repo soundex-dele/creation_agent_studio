@@ -1,6 +1,9 @@
 """Structured application completions through the configured system agent engine."""
 import json
+import logging
 from tempfile import TemporaryDirectory
+
+from django.conf import settings
 
 from apps.enterprise.services import enforce_member_token_quota, record_usage
 from core.llm.factory import build_agent_engine
@@ -16,6 +19,7 @@ def generate_json(*, organization, user, resource_type, resource_id,
     enforce_member_token_quota(organization, user)
     if cancelled and cancelled():
         raise InterruptedError("任务已取消。")
+    timeout_seconds = settings.APPLICATION_GENERATION_TIMEOUT_SECONDS
     try:
         with TemporaryDirectory(prefix="app-generation-", ignore_cleanup_errors=True) as directory:
             # Organization remains the quota/accounting boundary, not a model route.
@@ -23,7 +27,7 @@ def generate_json(*, organization, user, resource_type, resource_id,
             if image_paths and engine.adapter_name != "codex":
                 raise UnsupportedImageInput("当前系统 AI 引擎不支持关键帧图片输入，请使用支持图片输入的系统引擎。")
             options = dict(cancelled=cancelled, permission_mode="default",
-                           require_tool_approval=True, timeout_seconds=120)
+                           require_tool_approval=True, timeout_seconds=timeout_seconds)
             if image_paths:
                 options["image_paths"] = image_paths
             if on_event is not None:
@@ -34,6 +38,12 @@ def generate_json(*, organization, user, resource_type, resource_id,
             ], **options)
     except (InterruptedError, UnsupportedImageInput):
         raise
+    except TimeoutError:
+        logging.getLogger(__name__).warning(
+            "application.generation state=timed_out timeout_seconds=%s", timeout_seconds)
+        raise RuntimeError(
+            f"系统模型生成超时（本次时限 {timeout_seconds} 秒），请减少本次分析资料或稍后重试。"
+        ) from None
     except Exception:
         message = "系统模型引擎请求失败，请检查引擎配置或登录状态后重试。"
         if image_paths:

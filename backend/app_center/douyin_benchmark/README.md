@@ -97,6 +97,8 @@ uv pip install --python backend/.venv-dtk/bin/python -r backend/scripts/douyin_v
 
 关键帧通过引擎的原生图片输入提交，目前支持 Codex app-server，无需另配视觉 API。引擎不支持图片输入或调用失败时，视觉分析标记失败，保留已取得的转写与关键帧；未提取到关键帧则标记待完成。失败任务保留原记录，修复系统引擎后重新发起分析；协调器为新任务启动独立子进程并加载当前运行时代码。
 
+结构化模型生成的时限由 `APPLICATION_GENERATION_TIMEOUT_SECONDS` 控制，默认 300 秒，覆盖账号分析、文案与关键帧分析等调用。服务器处理较多资料时可在 `backend/.env` 设置为 `600` 等正整数，并重启执行服务。它与 `CODEX_REQUEST_TIMEOUT_SECONDS`（单次 app-server RPC 回复等待时间）不同。达到生成时限会尝试中断当前 Codex turn，页面明确提示生成超时，不自动重复模型请求；延长时限不能代替排查模型服务停滞或网络故障。
+
 依赖 FFmpeg、ffprobe 和 `openai-whisper`，与 creation_master 使用相同的原版 `.pt` 模型格式。默认复用执行 worker 用户的 `~/.cache/whisper/base.pt`，直接加载本地文件，不自动下载模型；文件缺失时提示配置错误。部署到其他机器或服务账号时需提前放置模型或配置上述路径。自动使用可用 CUDA，否则使用 CPU。页面区分加载模型和转写阶段；原版 Whisper 在整段识别完成后更新进度，识别调用期间不能即时中断，返回后会检查取消状态。单视频最多500 MiB、10分钟；每条作品最多16帧（开头0/1/2/3秒及全片均匀采样）。关键帧不等同完整视听分析。单次采集选择20／50／100条，串行分页，异常保留已取得部分，不自动无限重试。
 
 ## 应用安装

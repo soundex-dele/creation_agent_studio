@@ -108,3 +108,22 @@ def test_cancelled_job_does_not_generate_or_accept_results(context):
     with pytest.raises(InterruptedError):
         analysis.call_model(context.task, "test", {}, {}, cancelled=cancelled)
     context.usage.assert_not_called()
+
+
+@pytest.mark.parametrize('seconds', [300, 600])
+def test_analysis_uses_configured_generation_deadline(context, settings, seconds):
+    settings.APPLICATION_GENERATION_TIMEOUT_SECONDS = seconds
+    analysis.call_model(context.task, '分析账号', {'works': []}, {})
+    assert context.engine.complete.call_args.kwargs['timeout_seconds'] == seconds
+
+
+def test_analysis_timeout_is_explicit_and_not_retried(context, settings):
+    settings.APPLICATION_GENERATION_TIMEOUT_SECONDS = 300
+    context.engine.complete.side_effect = TimeoutError('private provider details')
+    with pytest.raises(ValueError, match='生成超时') as caught:
+        analysis.call_claims(context.task, '分析账号', {'works': []}, {}, {'work-1'})
+    assert '300' in str(caught.value)
+    assert '登录' not in str(caught.value) and 'private' not in str(caught.value)
+    context.engine.complete.assert_called_once()
+    context.usage.assert_not_called()
+    assert not Path(context.factory.call_args.kwargs['working_directory']).exists()

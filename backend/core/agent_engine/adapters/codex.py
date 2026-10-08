@@ -311,6 +311,12 @@ def _consume_codex_turn(
                     on_event("agent.item", {"id": raw.get("itemId", ""), "type": "reasoning", "summary_delta": raw.get("delta", ""), "summary_index": raw.get("summaryIndex", 0)})
                 elif method in {"warning", "configWarning", "guardianWarning", "deprecationNotice", "error", "model/rerouted", "model/verification", "model/safetyBuffering/updated", "mcpServer/startupStatus/updated"}:
                     on_event("agent.warning", {"method": method, **raw})
+    except TimeoutError:
+        try:
+            turn.interrupt()
+        except Exception as exc:
+            logger.warning("Codex timed-out turn interrupt failed error_type=%s", type(exc).__name__)
+        raise
     finally:
         stop_watcher.set()
         if watcher is not None:
@@ -672,7 +678,7 @@ class _AppServerTurn:
                                 self.on_event("agent.warning", {"method": "steer.failed", "message": str(exc), "command_id": command.get("id")})
             remaining = None if self.deadline is None else self.deadline - time.monotonic()
             if remaining is not None and remaining <= 0:
-                raise TimeoutError("Codex 图像生成超时，请稍后重试。")
+                raise TimeoutError("Codex 生成超时，请稍后重试。")
             try:
                 wait = min(remaining, 0.1) if remaining is not None else 0.1
                 message = (self._transport.next_notification(timeout=wait)

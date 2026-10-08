@@ -168,3 +168,53 @@ def test_activity_snapshot_preserves_structured_values():
     projection = apply_projection_event(projection, SimpleNamespace(run_id='run-1', type='input.resolved', payload={}, sequence=5))
     assert projection['activity'] == {'session': {'can_steer': True}}
     assert projection['status'] == 'running'
+
+
+@pytest.mark.parametrize('interrupt_fails', [False, True])
+def test_expired_turn_is_interrupted_and_preserves_timeout(monkeypatch, caplog, interrupt_fails):
+    from core.agent_engine.adapters import codex
+    now = [0.0]
+    monkeypatch.setattr(codex.time, 'monotonic', lambda: now[0])
+    server = transport()
+
+    def rpc(method, params):
+        if method == 'turn/interrupt' and interrupt_fails:
+            raise RuntimeError('private upstream details')
+        return {'turn': {'id': 'turn-1'}}
+
+    def wait_for_notification(timeout=None):
+        now[0] = 301.0
+        raise queue.Empty
+
+    server.request.side_effect = rpc
+    server.next_notification = MagicMock(side_effect=wait_for_notification)
+    with pytest.raises(TimeoutError, match='生成超时') as caught:
+        _consume_codex_turn(_AppServerThread(transport=server, thread_id='thread-1'),
+            'private prompt', timeout_seconds=300)
+    assert '图像' not in str(caught.value)
+    assert [call.args[0] for call in server.request.call_args_list] == ['turn/start', 'turn/interrupt']
+    assert server.request.call_args.args[1] == {'threadId': 'thread-1', 'turnId': 'turn-1'}
+    assert 'private' not in caplog.text
+
+
+def test_turn_can_finish_after_old_120_second_limit(monkeypatch):
+    from core.agent_engine.adapters import codex
+    now = [0.0]
+    monkeypatch.setattr(codex.time, 'monotonic', lambda: now[0])
+    server = transport()
+    notifications = iter([
+        {'method': 'item/completed', 'params': {'item': {
+            'id': 'answer', 'type': 'agentMessage', 'text': '{"claims": []}'}}},
+        {'method': 'turn/completed', 'params': {'turn': {'id': 'turn-1', 'status': 'completed'}}},
+    ])
+
+    def wait_for_notification(timeout=None):
+        now[0] = 180.0
+        return next(notifications)
+
+    server.next_notification = MagicMock(side_effect=wait_for_notification)
+    result = _consume_codex_turn(_AppServerThread(transport=server, thread_id='thread-1'),
+        'analyze', timeout_seconds=300)
+    assert result.status == 'completed'
+    assert result.final_response == '{"claims": []}'
+    assert server.request.call_count == 1

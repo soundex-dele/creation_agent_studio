@@ -524,6 +524,9 @@ DEEPSEEK_BASE_URL = config('DEEPSEEK_BASE_URL', default='https://api.deepseek.co
 # Agent adapter selection. Individual deployed Agent definitions may override
 # this with {"adapter": "codex", "model": "..."}.
 AGENT_ENGINE_ADAPTER = config('AGENT_ENGINE_ADAPTER', default='codex')
+# Full structured application generation, separate from app-server RPC replies.
+APPLICATION_GENERATION_TIMEOUT_SECONDS = config(
+    'APPLICATION_GENERATION_TIMEOUT_SECONDS', default=300, cast=int)
 
 # Optional GraphFlow Agent Engine checkout next to this repository.
 _GRAPHFLOW_ROOT = BASE_DIR.parent.parent / 'agent-engine'
