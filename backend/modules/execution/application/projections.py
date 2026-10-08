@@ -2,7 +2,7 @@
 import json
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 
 from modules.execution.models import Run
 from .agent_activity import project_activity
@@ -472,7 +472,16 @@ def repair_conversation_messages(conversation):
     """Idempotently rebuild missing chat messages from durable Run history."""
 
     from apps.conversations.models import Message
-    from modules.execution.models import RunCommand
+    from modules.execution.models import RunCommand, RunEvent
+
+    # Detail reads run on every history selection. Batch the repair checks and
+    # avoid loading payloads for interaction events that already have messages.
+    projected_messages = Message.objects.filter(conversation=conversation)
+    missing_interactions = RunEvent.objects.filter(
+        type__in=("input.required", "input.accepted", "input.steered"),
+    ).filter(~Exists(projected_messages.filter(
+        run_id=OuterRef("run_id"), run_event_sequence=OuterRef("sequence"),
+    ))).order_by("sequence")
 
     runs = Run.objects.for_organization(conversation.organization_id).filter(
         Q(source_type="conversation", source_id=str(conversation.id))
@@ -485,20 +494,22 @@ def repair_conversation_messages(conversation):
             definition_snapshot__conversation_id=str(conversation.id),
         ),
         owner_id=conversation.user_id,
-    ).order_by("created_at")
+    ).order_by("created_at").prefetch_related(
+        Prefetch(
+            "projected_messages",
+            queryset=projected_messages.only("id", "run_id", "run_event_sequence", "role"),
+            to_attr="repair_messages",
+        ),
+        Prefetch("events", queryset=missing_interactions, to_attr="repair_events"),
+    )
     if conversation.messages_cleared_at:
         runs = runs.filter(created_at__gt=conversation.messages_cleared_at)
     for run in runs:
-        projected_sequences = set(Message.objects.filter(
-            conversation=conversation,
-            run=run,
-            run_event_sequence__isnull=False,
-        ).values_list("run_event_sequence", flat=True))
-        for event in run.events.filter(
-            type__in=("input.required", "input.accepted", "input.steered"),
-        ).order_by("sequence"):
-            if event.sequence in projected_sequences:
-                continue
+        projected_sequences = {
+            message.run_event_sequence for message in run.repair_messages
+            if message.run_event_sequence is not None
+        }
+        for event in run.repair_events:
             if event.type == "input.required":
                 project_input_required(run.id, event)
                 continue
@@ -515,12 +526,10 @@ def repair_conversation_messages(conversation):
             terminal_missing = run.next_event_sequence not in projected_sequences
             automated_user_missing = (
                 run.source_type in {"workflow_step", "supervisor_task"}
-                and not Message.objects.filter(
-                    conversation=conversation,
-                    run=run,
-                    role="user",
-                    run_event_sequence__isnull=True,
-                ).exists()
+                and not any(
+                    message.role == "user" and message.run_event_sequence is None
+                    for message in run.repair_messages
+                )
             )
             if terminal_missing or automated_user_missing:
                 project_terminal_run(run.id, run.output_summary or {})

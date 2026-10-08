@@ -1,8 +1,10 @@
+from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.db import OperationalError
@@ -1155,3 +1157,43 @@ class DurableConversationRunTest(TestCase):
         )
 
         self.assertEqual(detail.status_code, 200, detail.data)
+
+    def test_history_repair_query_count_does_not_grow_with_projected_runs(self):
+        # Switching a long history must not query messages/events per Run.
+        for index in range(20):
+            run = Run.objects.create(
+                organization=self.organization, owner=self.user,
+                executor_kind=Run.ExecutorKind.AGENT,
+                source_type="conversation", source_id=str(self.conversation.id),
+                status=Run.Status.SUCCEEDED, next_event_sequence=2,
+                output_summary={"result": f"Answer {index}"},
+            )
+            RunEvent.objects.create(
+                organization=self.organization, run=run, sequence=1,
+                type="input.required", payload={"question": "Already projected"},
+            )
+            for sequence in (1, 2):
+                Message.objects.create(
+                    conversation=self.conversation, run=run,
+                    run_event_sequence=sequence, role="assistant", content="Saved",
+                )
+            with self.assertNumQueries(3):
+                repair_conversation_messages(self.conversation)
+
+    def test_batched_history_repair_still_restores_missing_questions(self):
+        run = Run.objects.create(
+            organization=self.organization, owner=self.user,
+            executor_kind=Run.ExecutorKind.AGENT,
+            source_type="conversation", source_id=str(self.conversation.id),
+            status=Run.Status.WAITING_INPUT, next_event_sequence=1,
+            pending_input_request_id=uuid4(), pending_input_kind=Run.InputKind.ANSWER,
+            pending_input_expires_at=timezone.now() + timedelta(hours=1),
+        )
+        RunEvent.objects.create(
+            organization=self.organization, run=run, sequence=1,
+            type="input.required", payload={"question": "Missing question"},
+        )
+        repair_conversation_messages(self.conversation)
+        self.assertEqual(Message.objects.get(run=run).content, "Missing question")
+        with self.assertNumQueries(3):
+            repair_conversation_messages(self.conversation)

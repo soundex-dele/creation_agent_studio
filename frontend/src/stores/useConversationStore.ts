@@ -81,6 +81,23 @@ class InvalidConversationDetailError extends Error {
   }
 }
 
+function isTransientDetailError(error: unknown): boolean {
+  const failure = error as { code?: string; response?: { status?: number } };
+  if (failure.response) return [502, 503, 504].includes(failure.response.status ?? 0);
+  return ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(failure.code ?? '');
+}
+
+function conversationDetailError(error: unknown): string {
+  if (error instanceof InvalidConversationDetailError) return error.message;
+  const failure = error as { code?: string; response?: { status?: number; data?: unknown } };
+  const fallback = ['ECONNABORTED', 'ETIMEDOUT'].includes(failure.code ?? '')
+    ? '加载对话超时，返回页面或网络恢复后将自动重试。'
+    : failure.code === 'ERR_NETWORK'
+      ? '网络连接失败，返回页面或网络恢复后将自动重试。'
+      : '获取对话详情失败';
+  return conversationRequestError(failure.response?.data, fallback);
+}
+
 function parseConversationDetail(response: unknown, expectedId: string): ConversationDetail {
   if (!response || typeof response !== 'object' || Array.isArray(response)) {
     throw new InvalidConversationDetailError();
@@ -293,6 +310,30 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
   let idleRefreshRequest: object | null = null;
   let restoredConversationRunStream: RunStreamHandle | null = null;
   let activeController: AbortController | null = null;
+  let detailController: AbortController | null = null;
+  let failedDetailId: string | null = null;
+
+  const loadConversationDetail = async (id: string, signal: AbortSignal) => {
+    for (let attempt = 0; ; attempt += 1) {
+      signal.throwIfAborted();
+      try {
+        return await api.get<unknown>(`/conversations/${id}/`, undefined, {
+          timeout: 30000, signal,
+        });
+      } catch (error) {
+        if (signal.aborted || attempt >= 1 || !isTransientDetailError(error)) throw error;
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            clearTimeout(timer);
+            signal.removeEventListener('abort', finish);
+            resolve();
+          };
+          const timer = setTimeout(finish, 500);
+          signal.addEventListener('abort', finish, { once: true });
+        });
+      }
+    }
+  };
   return create<ConversationState>()(
   persist(
     (set, get) => {
@@ -534,6 +575,9 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         disconnect: () => {
           streamUpdates.flush();
           latestConversationDetailRequest += 1;
+          detailController?.abort();
+          detailController = null;
+          failedDetailId = null;
           idleRefreshRequest = null;
           restoredConversationRunStream?.abort();
           restoredConversationRunStream = null;
@@ -552,6 +596,11 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         },
         refreshIfIdle: async (id) => {
           const current = get();
+          if (failedDetailId === id && !current.isLoading
+            && !current.streamingMessageId && !current.activeRun) {
+            await get().fetchConversationDetail(id);
+            return;
+          }
           if (current.currentConversation?.id !== id || idleRefreshRequest
             || current.isLoading || current.streamingMessageId || current.activeRun || current.error) return;
           const version = latestConversationDetailRequest;
@@ -597,13 +646,15 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
         fetchConversationDetail: async (id) => {
           get().disconnect();
           const requestId = latestConversationDetailRequest;
+          const controller = new AbortController();
+          detailController = controller;
           if (get().currentConversation?.id !== id) {
             revokeOptimisticImageUrls(get().currentConversation?.messages);
             set({ currentConversation: null });
           }
           set({ isLoading: true, error: null });
           try {
-            const response = await api.get<unknown>(`/conversations/${id}/`);
+            const response = await loadConversationDetail(id, controller.signal);
             if (requestId === latestConversationDetailRequest) {
               const detail = parseConversationDetail(response, id);
               revokeOptimisticImageUrls(get().currentConversation?.messages);
@@ -614,14 +665,17 @@ export const createConversationStore = (connection?: RemoteConnection, apiOverri
               restoreConversationRun(detail.id, detail.active_run);
             }
           } catch (error: any) {
+            if (requestId !== latestConversationDetailRequest || controller.signal.aborted) return;
             if (requestId === latestConversationDetailRequest) {
+              failedDetailId = isTransientDetailError(error) ? id : null;
               set({
-                error: error instanceof InvalidConversationDetailError
-                  ? error.message : error.response?.data?.detail || '获取对话详情失败',
+                error: conversationDetailError(error),
                 isLoading: false,
               });
             }
             throw error;
+          } finally {
+            if (detailController === controller) detailController = null;
           }
         },
 
