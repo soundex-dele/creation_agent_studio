@@ -13,6 +13,25 @@ from ...runtime import execute
 from .test_douyin import ctx, claim, add_work, content, script  # noqa: F401
 
 
+@pytest.fixture(params=['organization', 'single-tenant'])
+def workspace_ctx(ctx, settings, request):
+    if request.param == 'single-tenant':
+        settings.SINGLE_TENANT_MODE = True
+        settings.SINGLE_TENANT_ORGANIZATION_ID = str(ctx.org.pk)
+        ctx.root = f'/api/v1/applications/{ctx.app.pk}/douyin-benchmark'
+    return ctx
+
+
+@pytest.mark.parametrize('resource', [
+    'creator-profiles', 'inspirations', 'ideas', 'publications',
+    'subscriptions', 'notifications', 'digests',
+])
+def test_workspace_record_lists(workspace_ctx, resource):
+    response = workspace_ctx.client.get(workspace_ctx.root + '/' + resource)
+    assert response.status_code == 200, response.data
+    assert response.data == {'count': 0, 'results': []}
+
+
 def start(ctx, values, key='research-1'):
     return ctx.client.post(ctx.root + '/tasks', values, format='json', HTTP_IDEMPOTENCY_KEY=key)
 
@@ -26,7 +45,8 @@ def other_account(ctx, owner=None):
     return m.Account.objects.create(organization=ctx.org, application=ctx.app, owner=owner or ctx.owner, source_url='https://www.douyin.com/user/other', name='其他账号')
 
 
-def test_workspace_record_isolation_and_revision(ctx):
+def test_workspace_record_isolation_and_revision(workspace_ctx):
+    ctx = workspace_ctx
     response = ctx.client.post(ctx.root + '/ideas', {'title': '新主题', 'tags': ['知识']}, format='json')
     assert response.status_code == 201, response.data
     idea = response.data
@@ -47,7 +67,8 @@ def test_private_relations_cannot_cross_owners(ctx):
     assert start(ctx, {'kind': 'radar', 'account_ids': [str(foreign.pk)]}).status_code == 400
 
 
-def test_default_profile_atomic_and_frozen_brief(ctx):
+def test_default_profile_atomic_and_frozen_brief(workspace_ctx):
+    ctx = workspace_ctx
     a = ctx.client.post(ctx.root + '/creator-profiles', {'name': 'A', 'positioning': '科普', 'experiences': '亲身实验', 'is_default': True}, format='json')
     assert a.status_code == 201, a.data
     b = ctx.client.post(ctx.root + '/creator-profiles', {'name': 'B', 'positioning': '美食', 'is_default': True}, format='json')

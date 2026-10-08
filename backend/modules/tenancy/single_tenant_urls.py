@@ -38,6 +38,7 @@ urlpatterns = [
     path(
         str(pattern.pattern),
         _single_tenant_view(pattern.callback),
+        kwargs=pattern.default_args,
         name=f'single-tenant-{index}-{pattern.name}',
     )
     for index, pattern in enumerate([
