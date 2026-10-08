@@ -1,4 +1,5 @@
 import { api } from './api';
+import { createDouyinSubmitter } from './douyinRequests';
 import type { AnimationDestination } from './douyinAnimation';
 
 export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; screen: string; language: string; timezone: string; updated_at: string | null }
@@ -42,8 +43,8 @@ export interface Brief { production_format: ProductionFormat; positioning: strin
 export const kindLabels: Record<Kind, string> = { collect: '采集', account: '账号分析', breakdown: '视频拆解', topics: '选题', script: '脚本', transcribe: '文案转写', rewrite: '文案复刻' };
 export const isActive = (task: { status: string }) => !['succeeded', 'failed', 'cancelled'].includes(task.status);
 export const metric = (value: number | null | undefined) => value == null ? '未获取' : value.toLocaleString('zh-CN');
-const key = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } });
 export function douyinApi(base: string) {
+  const submit = createDouyinSubmitter();
   const account = (id: string) => `${base}/accounts/${id}`;
   const task = (id: string, taskId: string) => `${account(id)}/tasks/${taskId}`;
   return {
@@ -55,14 +56,14 @@ export function douyinApi(base: string) {
     connection: () => api.get<{ connected: boolean; message: string }>(`${base}/connection`),
     brands: () => api.get<{ id: string; name: string }[]>(`${base}/brands`),
     accounts: (page = 1) => api.get<{ count: number; results: DouyinAccount[] }>(`${base}/accounts`, { page }),
-    create: (body: { source: string; count: number; group: string; notes: string }) => api.post<DouyinAccount & { task: DouyinTask }>(`${base}/accounts`, body, key()),
+    create: (body: { source: string; count: number; group: string; notes: string }) => submit<DouyinAccount & { task: DouyinTask }>(`${base}/accounts`, body),
     account: (id: string) => api.get<DouyinAccount>(account(id)),
     save: (id: string, body: { group: string; notes: string }) => api.patch<DouyinAccount>(account(id), body),
     remove: (id: string) => api.delete(account(id)),
     works: (id: string, params: { batch_id?: string; search: string; sort: string; outstanding: boolean }) => api.get<WorkResult>(`${account(id)}/works`, params),
     tasks: (id: string, page = 1) => api.get<{ count: number; results: DouyinTask[] }>(`${account(id)}/tasks`, { page }),
     task: (id: string, taskId: string) => api.get<DouyinTask>(task(id, taskId)),
-    start: (id: string, body: { kind: Kind; [key: string]: unknown }) => api.post<DouyinTask>(`${account(id)}/tasks`, body, key()),
+    start: (id: string, body: { kind: Kind; [key: string]: unknown }) => submit<DouyinTask>(`${account(id)}/tasks`, body),
     cancel: (id: string, taskId: string) => api.post<DouyinTask>(`${task(id, taskId)}/cancel`),
     upload: (id: string, workId: string, file: File) => { const form = new FormData(); form.append('video', file); return api.post(`${account(id)}/works/${workId}/upload`, form, { timeout: 120000 }); },
     frame: (id: string, taskId: string, frameId: string) => api.get<Blob>(`${task(id, taskId)}/frames/${frameId}`, undefined, { responseType: 'blob' }),

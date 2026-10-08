@@ -37,7 +37,7 @@ beforeEach(() => {
   vi.mocked(api.post).mockResolvedValue(task);
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function render(node: React.ReactNode) { await act(async () => root.render(<MemoryRouter>{node}</MemoryRouter>)); }
 async function click(text: string) {
   const candidates = [...document.querySelectorAll<HTMLElement>('button,[role="tab"]')];
@@ -118,6 +118,26 @@ describe('Douyin benchmark workflow', () => {
     await render(<DouyinHome base="/dy" />); await click('添加对标账号');
     await setText('主页链接或分享文本', account.source_url); await click('添加并采集');
     expect(api.post).toHaveBeenCalledWith('/dy/accounts', expect.objectContaining({ source: account.source_url, count: 50 }), expect.objectContaining({ headers: { 'Idempotency-Key': expect.any(String) } }));
+  });
+  it.each(['missing', 'throwing', 'absent'])('adds and retries an account when crypto is %s', async (mode) => {
+    vi.stubGlobal('crypto', mode === 'absent' ? undefined : mode === 'missing' ? {} : {
+      randomUUID: () => { throw new Error('Insecure context'); },
+    });
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('网络连接中断')).mockResolvedValue({ ...account, task });
+    await render(<DouyinHome base="/dy" />);
+    await click('添加对标账号');
+    await setText('主页链接或分享文本', account.source_url);
+    await click('添加并采集');
+    expect(document.body.textContent).toContain('网络连接中断');
+    const first = vi.mocked(api.post).mock.calls[0][2]?.headers?.['Idempotency-Key'];
+    expect(first).toEqual(expect.any(String));
+    await click('添加并采集');
+    expect(api.post).toHaveBeenNthCalledWith(2, '/dy/accounts', expect.objectContaining({ source: account.source_url }), { headers: { 'Idempotency-Key': first } });
+    expect(container.querySelector('h1')?.textContent).toBe('账号研究');
+    await click('添加对标账号');
+    await setText('主页链接或分享文本', account.source_url);
+    await click('添加并采集');
+    expect(vi.mocked(api.post).mock.calls[2][2]?.headers?.['Idempotency-Key']).not.toBe(first);
   });
   it('renders missing counts and launches video breakdown from the work list', async () => {
     await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);

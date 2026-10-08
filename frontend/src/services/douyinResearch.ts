@@ -1,4 +1,5 @@
 import { api } from './api';
+import { createDouyinSubmitter } from './douyinRequests';
 import { douyinApi, type DouyinTask, type DouyinWork, type Script, type ScriptVersion, type Claim } from './douyinBenchmark';
 
 export interface Page<T> { count: number; results: T[] }
@@ -30,14 +31,14 @@ export interface ResearchTask extends Omit<DouyinTask, 'kind' | 'output'> { acco
   segments?: { id: string; start: number; end: number; text: string }[]; frames?: { id: string; time: number }[];
 } }
 export interface ResearchVersion extends RecordBase { content: Partial<Script> & { text?: string; hooks?: Variant[]; titles?: Variant[]; covers?: Variant[] } }
-const key = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } });
 export function researchApi(base: string) {
+  const submit = createDouyinSubmitter();
   return {
     list: <T>(resource: string, params: Record<string, unknown> = {}) => api.get<Page<T>>(`${base}/${resource}`, params),
     create: <T>(resource: string, body: unknown) => api.post<T>(`${base}/${resource}`, body),
     update: <T>(resource: string, id: string, body: unknown) => api.patch<T>(`${base}/${resource}/${id}`, body),
     remove: (resource: string, id: string) => api.delete(`${base}/${resource}/${id}`),
-    start: (body: Record<string, unknown>) => api.post<ResearchTask>(`${base}/tasks`, body, key()),
+    start: (body: Record<string, unknown>) => submit<ResearchTask>(`${base}/tasks`, body),
     task: (id: string) => api.get<ResearchTask>(`${base}/tasks/${id}`),
     cancel: (id: string) => api.post<ResearchTask>(`${base}/tasks/${id}/cancel`),
     compare: (account_ids: string[], days: number) => api.post<Comparison>(`${base}/comparisons`, { account_ids, days }),
@@ -47,7 +48,7 @@ export function researchApi(base: string) {
     versions: (id: string) => api.get<ResearchVersion[]>(`${base}/tasks/${id}/versions`),
     saveVersion: (id: string, revision: number, content: ResearchVersion['content']) => api.post<ResearchVersion>(`${base}/tasks/${id}/versions`, { revision, content }),
     apply: (id: string, body: unknown) => api.post<ResearchVersion>(`${base}/tasks/${id}/apply`, body),
-    refresh: (id: string) => api.post<ResearchTask>(`${base}/subscriptions/${id}/refresh`, {}, key()),
+    refresh: (id: string) => submit<ResearchTask>(`${base}/subscriptions/${id}/refresh`, {}),
     frame: (taskId: string, ref: string) => api.get<Blob>(`${base}/tasks/${taskId}/frames/${ref}`, undefined, { responseType: 'blob' }),
     editor: {
       ...douyinApi(base),
