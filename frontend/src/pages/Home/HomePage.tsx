@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApartmentOutlined, AppstoreOutlined, ArrowRightOutlined, ClockCircleOutlined,
   CloseCircleOutlined, DatabaseOutlined, ReloadOutlined, WarningOutlined,
@@ -55,30 +55,40 @@ export default function HomePage() {
   const showInlineApps = layoutMode === 'left-right' && !isMobile
     && new URLSearchParams(location.search).get('embedded') !== '1';
   const username = useAuthStore((state) => state.user?.username);
+  const userId = useAuthStore((state) => state.user?.id);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const loadOrganizations = useOrganizationStore((state) => state.loadOrganizations);
   const [runs, setRuns] = useState<RunResource[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => { void loadOrganizations(); }, [loadOrganizations]);
 
   const loadRuns = useCallback(async () => {
-    if (!organizationId) return;
+    const version = ++requestVersion.current;
+    setRuns([]);
+    if (!organizationId || !userId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await api.get<RunResource[]>(
         `${tenantApiRoot(organizationId)}/runs`,
-        { collapse_conversations: true },
+        { collapse_conversations: true, scope: 'mine' },
       );
-      setRuns(collapseConversationRuns(response));
+      if (version === requestVersion.current) setRuns(collapseConversationRuns(response));
     } catch {
-      setRuns([]);
+      if (version === requestVersion.current) setRuns([]);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, userId]);
 
-  useEffect(() => { void loadRuns(); }, [loadRuns]);
+  useEffect(() => {
+    void loadRuns();
+    return () => { requestVersion.current += 1; };
+  }, [loadRuns]);
 
   const summary = useMemo(() => ({
     active: runs.filter((run) => ACTIVE_STATUSES.has(run.status)).length,

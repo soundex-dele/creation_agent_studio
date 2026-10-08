@@ -187,6 +187,10 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    # These applications keep their sessions/state private to the initiating
+    # user. Generic Run endpoints must preserve that boundary for the tree.
+    if root.executor_key in {"kitchen-assistant", "prompt-master"}:
+        return root.owner_id == request.user.id
     if root.executor_key == "rental-growth-assistant":
         from app_center.rental_growth_assistant.backend.access import can_access_run as rental_access
         return rental_access(request.user, root)
@@ -481,6 +485,19 @@ class OrganizationRunsView(ProblemDetailsAPIView):
         runs = Run.objects.for_organization(organization_id).select_related(
             "current_attempt", "automation_invocation__automation",
         ).order_by("-created_at")
+        scope = request.query_params.get("scope", "visible")
+        if scope not in {"visible", "mine"}:
+            return _problem(
+                request,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="invalid_run_scope",
+                title="Invalid Run scope",
+                detail="scope must be visible or mine.",
+            )
+        if scope == "mine":
+            # Filter before limiting/collapsing so other users' recent runs
+            # cannot crowd the current user's history out of the result.
+            runs = runs.filter(owner=request.user)
         source_type = request.query_params.get("source_type")
         if source_type:
             if source_type not in self.allowed_source_types:

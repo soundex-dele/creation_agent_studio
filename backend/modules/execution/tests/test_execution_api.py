@@ -270,6 +270,63 @@ def test_run_list_uses_canonical_history_and_source_filter(
     assert invalid.status_code == 400
 
 
+@pytest.mark.parametrize("single_tenant", [False, True])
+def test_run_list_mine_scope_uses_authenticated_owner(
+    authenticated_client, api_actor, api_organization, api_run, settings, single_tenant,
+):
+    other_user = get_user_model().objects.create_user(username="other-activity-owner")
+    Membership.objects.create(
+        organization=api_organization, user=other_user, role=Membership.Role.DEVELOPER,
+    )
+    other_run = create_run(
+        organization=api_organization, owner=other_user,
+        executor_kind=Run.ExecutorKind.MEDIA, source_type="application",
+        source_id="batch-transcribe", definition_snapshot={}, input_data={},
+    )
+    settings.SINGLE_TENANT_MODE = single_tenant
+    settings.SINGLE_TENANT_ORGANIZATION_ID = str(api_organization.id)
+    url = "/api/v1/runs" if single_tenant else f"/api/v1/organizations/{api_organization.id}/runs"
+    # Shared task history keeps its existing semantics; personal activity is explicit.
+    for query in ({}, {"scope": "visible"}):
+        response = authenticated_client.get(url, query)
+        assert response.status_code == 200
+        assert {item["id"] for item in response.data} == {str(api_run.id), str(other_run.id)}
+
+    for actor, own_run, spoofed_owner in (
+        (api_actor, api_run, other_user), (other_user, other_run, api_actor),
+    ):
+        authenticated_client.force_authenticate(actor)
+        response = authenticated_client.get(url, {
+            "scope": "mine", "source_type": "application", "collapse_conversations": "true",
+            "owner_id": str(spoofed_owner.id),
+        })
+        assert response.status_code == 200
+        assert [item["id"] for item in response.data] == [str(own_run.id)]
+
+    response = authenticated_client.get(url, {"scope": "someone-else"})
+    assert response.status_code == 400
+    assert response.data["code"] == "invalid_run_scope"
+
+
+@pytest.mark.parametrize("collapse,other_count", [("false", 201), ("true", 2001)])
+def test_mine_scope_filters_before_scan_limit(
+    authenticated_client, api_organization, api_run, collapse, other_count,
+):
+    other_user = get_user_model().objects.create_user(username="busy-activity-owner")
+    Run.objects.bulk_create([
+        Run(
+            organization=api_organization, owner=other_user,
+            executor_kind=Run.ExecutorKind.MEDIA, source_type="application",
+        ) for _ in range(other_count)
+    ])
+    response = authenticated_client.get(
+        f"/api/v1/organizations/{api_organization.id}/runs",
+        {"scope": "mine", "collapse_conversations": collapse},
+    )
+    assert response.status_code == 200
+    assert [item["id"] for item in response.data] == [str(api_run.id)]
+
+
 @pytest.mark.django_db
 def test_workflow_run_detail_exposes_child_conversations(
     authenticated_client, api_actor, api_organization,
@@ -350,8 +407,25 @@ def test_conversation_run_exposes_title_application_and_jump_identifiers(
     assert item["application_id"] == str(deployed_application.id)
 
 
-@pytest.fixture(params=["conversation", "cowork", "supervisor", "workflow"])
-def private_conversation_run(request, api_actor, api_organization):
+@pytest.fixture(params=[
+    "conversation", "cowork", "supervisor", "workflow",
+    "kitchen-assistant", "prompt-master",
+])
+def private_run_tree(request, api_actor, api_organization):
+    if request.param in {"kitchen-assistant", "prompt-master"}:
+        root = create_run(
+            organization=api_organization, owner=api_actor,
+            executor_kind=Run.ExecutorKind.AGENT, executor_key=request.param,
+            source_type="application", source_id=str(uuid.uuid4()),
+            definition_snapshot={}, input_data={"task_id": str(uuid.uuid4())},
+        )
+        child = create_run(
+            organization=api_organization, owner=api_actor, parent=root,
+            executor_kind=Run.ExecutorKind.AGENT, executor_key="agent-completion",
+            source_type="application_step", source_id="writer", node_key="writer",
+            definition_snapshot={}, input_data={"message": "Private child input"},
+        )
+        return root, child
     conversation = Conversation.objects.create(
         user=api_actor, organization=api_organization, title="Private discussion",
         scope="cowork" if request.param == "cowork" else "default",
@@ -390,10 +464,10 @@ def private_conversation_run(request, api_actor, api_organization):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("role", ["developer", "admin", "superuser"])
-def test_conversation_run_history_is_private(
-    authenticated_client, api_organization, private_conversation_run, role,
+def test_personal_run_history_is_private(
+    authenticated_client, api_organization, private_run_tree, role,
 ):
-    root, child = private_conversation_run
+    root, child = private_run_tree
     outsider = get_user_model().objects.create_user(
         username="other-run-user", is_superuser=role == "superuser",
     )
@@ -411,7 +485,10 @@ def test_conversation_run_history_is_private(
     assert authenticated_client.get(f"{url}/{root.id}/children").data[0]["id"] == str(child.id)
 
     authenticated_client.force_authenticate(outsider)
-    for query in ({}, {"collapse_conversations": "true"}, {"source_type": root.source_type}):
+    for query in (
+        {}, {"scope": "mine"}, {"collapse_conversations": "true"},
+        {"source_type": root.source_type},
+    ):
         response = authenticated_client.get(url, query)
         assert response.status_code == 200
         assert response.data == []
