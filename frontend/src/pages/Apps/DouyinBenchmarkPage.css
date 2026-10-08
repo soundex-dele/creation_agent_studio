@@ -57,6 +57,10 @@
 .douyin-section-title h2, .douyin-section-title h3 { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .douyin-section-title h2 { font-size: 19px; }
 .douyin-section-title h3 { font-size: 16px; }
+.douyin-task > .douyin-section-title { flex-wrap: wrap; }
+.douyin-analysis-export { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 100%; min-width: 0; }
+.douyin-analysis-export .ant-btn { min-height: 44px; }
+.douyin-analysis-export .ant-alert { min-width: 0; overflow-wrap: anywhere; }
 .douyin-section-title p, .douyin-hint { color: var(--color-text-sec); line-height: 1.8; overflow-wrap: anywhere; }
 .douyin-section-title p { font-size: 13px; margin: 8px 0 12px; }
 .douyin-count { display: inline-grid; place-items: center; vertical-align: middle; min-width: 26px; min-height: 24px; padding: 2px 7px; margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--color-text-sec); background: var(--color-bg-elevated); border-radius: 7px; }

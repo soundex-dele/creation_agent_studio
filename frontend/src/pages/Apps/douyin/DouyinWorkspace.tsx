@@ -4,6 +4,7 @@ import { ArrowUpRight, ChartNoAxesCombined, Clapperboard, Clock3, Film, FolderOp
 import { type Brief, type DouyinAccount, type DouyinClient, type DouyinTask, type WorkResult, type Kind, type ProductionFormat, productionFormats, kindLabels, isActive, metric } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
 import { AnalysisResult } from './AnalysisResult';
+import { AccountAnalysisExport } from './AccountAnalysisExport';
 import { ScriptEditor } from './ScriptEditor';
 import { RewritePanel } from './RewritePanel';
 
@@ -105,7 +106,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
         <Button type="primary" loading={busy} disabled={!source || !brief.positioning.trim() || !brief.theme.trim() || (brief.production_format === 'animation' && brief.duration > 120)} onClick={() => void run({ kind: 'topics', source_task_id: source, ...brief })}>生成 3 个选题方向</Button>
       </div>}
       <div className="douyin-history"><h3>历史{tab === 'rewrite' ? '文案转写与复刻' : tab === 'create' ? '选题与脚本' : tab === 'works' ? '采集任务' : tab === 'account' ? '账号分析' : '视频拆解'}</h3><Select aria-label="历史任务" placeholder="选择历史任务" value={visibleTask?.id} options={taskOptions.map((t) => ({ value: t.id, label: `${kindLabels[t.kind]} · ${new Date(t.created_at).toLocaleString('zh-CN')} · ${t.stage}` }))} onChange={setSelectedId} />{tasks.length < taskCount && <Button onClick={() => { void client.tasks(accountId, taskPage + 1).then((data) => { setTasks((old) => [...old, ...data.results.filter((t) => !old.some((v) => v.id === t.id))]); setTaskPage((p) => p + 1); }).catch((e) => setError(documentError(e))); }}>加载更早记录</Button>}</div>
-      {visibleTask && <section className="douyin-task"><div className="douyin-section-title"><h3>{kindLabels[visibleTask.kind]} · {visibleTask.stage}</h3>{isActive(visibleTask) && <Button onClick={() => { void client.cancel(accountId, visibleTask.id).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))); }}>取消任务</Button>}</div>
+      {visibleTask && <section className="douyin-task"><div className="douyin-section-title"><h3>{kindLabels[visibleTask.kind]} · {visibleTask.stage}</h3>{visibleTask.kind === 'account' && <AccountAnalysisExport key={visibleTask.id} client={client} account={account} task={visibleTask} />}{isActive(visibleTask) && <Button onClick={() => { void client.cancel(accountId, visibleTask.id).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))); }}>取消任务</Button>}</div>
         {visibleTask.kind === 'transcribe' && visibleTask.status !== 'succeeded' && <p>来源作品：{visibleTask.copy_context?.work_title || '未命名作品'}</p>}
         <div role="status" aria-live="polite">{isActive(visibleTask) && <><Spin size="small" /> 正在处理，可离开页面后回来查看</>}{visibleTask.status === 'cancelled' && '任务已取消，之前的成果仍保留。'}</div>
         {visibleTask.progress.total != null && visibleTask.progress.total > 0 && <Progress percent={Math.min(100, Math.round((visibleTask.progress.current || 0) / visibleTask.progress.total * 100))} />}

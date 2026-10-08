@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.http import FileResponse, HttpResponse
+from django.utils.http import content_disposition_header
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator
 from rest_framework.views import APIView
@@ -22,6 +23,7 @@ from django.views.decorators.debug import sensitive_variables
 from .scoring import rank
 from .media import store_upload, path_for
 from .analysis import markdown
+from .account_export import account_analysis_markdown, account_report_filename
 
 
 IDEMPOTENCY = openapi.Parameter("Idempotency-Key", openapi.IN_HEADER, type=openapi.TYPE_STRING, required=True, description="同键同参重放；同键异参返回409。")
@@ -242,6 +244,19 @@ class TaskView(BaseView):
     @swagger_auto_schema(responses={200: TaskSerializer})
     def get(self, request, **kwargs):
         return Response(TaskSerializer(self.task()).data)
+
+
+class AccountAnalysisDownloadView(BaseView):
+    @swagger_auto_schema(responses={200: openapi.Response("账号分析 Markdown 附件", schema=openapi.Schema(type=openapi.TYPE_FILE)), 400: "请选择已完成且有分析结论的账号分析。"})
+    def get(self, request, **kwargs):
+        task = self.task()
+        if task.kind != "account" or not task.run or task.run.status != "succeeded" or not task.output.get("claims"):
+            raise ValidationError("请选择已完成且有分析结论的账号分析。")
+        response = HttpResponse(account_analysis_markdown(task.account, task), content_type="text/markdown; charset=utf-8")
+        response["Content-Disposition"] = content_disposition_header(True, account_report_filename(task.account, task))
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class CancelView(BaseView):

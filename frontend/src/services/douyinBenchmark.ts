@@ -63,6 +63,7 @@ export function douyinApi(base: string) {
     works: (id: string, params: { batch_id?: string; search: string; sort: string; outstanding: boolean }) => api.get<WorkResult>(`${account(id)}/works`, params),
     tasks: (id: string, page = 1) => api.get<{ count: number; results: DouyinTask[] }>(`${account(id)}/tasks`, { page }),
     task: (id: string, taskId: string) => api.get<DouyinTask>(task(id, taskId)),
+    downloadAccountAnalysis: (id: string, taskId: string) => api.get<Blob>(`${task(id, taskId)}/download`, undefined, { responseType: 'blob' }),
     start: (id: string, body: { kind: Kind; [key: string]: unknown }) => submit<DouyinTask>(`${account(id)}/tasks`, body),
     cancel: (id: string, taskId: string) => api.post<DouyinTask>(`${task(id, taskId)}/cancel`),
     upload: (id: string, workId: string, file: File) => { const form = new FormData(); form.append('video', file); return api.post(`${account(id)}/works/${workId}/upload`, form, { timeout: 120000 }); },

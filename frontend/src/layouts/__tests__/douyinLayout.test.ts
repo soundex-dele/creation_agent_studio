@@ -4,6 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 describe('Douyin document workspace layout contract', () => {
+  it('lets the account report action wrap without changing the document scroll owner', () => {
+    const source = read('../../pages/Apps/DouyinBenchmarkPage.css');
+    expect(source).toContain('.douyin-task > .douyin-section-title { flex-wrap: wrap; }');
+    expect(source).toContain('.douyin-analysis-export { display: flex; flex-wrap: wrap;');
+    expect(source).toContain('.douyin-analysis-export .ant-btn { min-height: 44px; }');
+    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+  });
   it.each([320, 375, 390, 767, 768, 1280])('reflows research columns at %spx without changing scroll ownership', width => {
     const css = postcss.parse(read('../../pages/Apps/douyin/ResearchHub.css'));
     const columns: Record<string, string> = {};

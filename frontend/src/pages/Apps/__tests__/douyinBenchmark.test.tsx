@@ -52,6 +52,29 @@ async function setText(label: string, value: string) {
 }
 
 describe('Douyin benchmark workflow', () => {
+  it('exports the selected historical account analysis rather than the latest task', async () => {
+    const old: DouyinTask = { ...task, id: 'historical-account', kind: 'account', created_at: '2026-09-20T08:00:00Z' };
+    const latest = { ...old, id: 'latest-account', created_at: '2026-10-08T08:00:00Z' };
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => {
+      if (url.endsWith('/tasks')) return Promise.resolve({ count: 2, results: [latest, old] });
+      if (url.endsWith('/tasks/historical-account')) return Promise.resolve(old);
+      if (url.endsWith('/download')) return Promise.resolve(new Blob(['历史分析']));
+      return original(url, ...args);
+    });
+    const createUrl = vi.fn().mockReturnValue('blob:account');
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL: createUrl, revokeObjectURL: vi.fn() }));
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    expect(container.textContent).not.toContain('导出 Markdown');
+    await act(async () => container.querySelector('.douyin-history .ant-select-selector')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    const option = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].find(el => el.textContent?.includes(new Date(old.created_at).toLocaleString('zh-CN')));
+    expect(option).toBeDefined();
+    await act(async () => option!.click());
+    await click('导出 Markdown');
+    expect(api.get).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks/historical-account/download', undefined, { responseType: 'blob' });
+    expect(createUrl).toHaveBeenCalledTimes(1);
+  });
   it('starts text-only replication from a library video', async () => {
     const transcript = { ...task, id: 'transcript-1', kind: 'transcribe', output: { text: '原始文案。' }, copy_context: { work_title: '如何读书' } };
     vi.mocked(api.post).mockResolvedValue(transcript);
