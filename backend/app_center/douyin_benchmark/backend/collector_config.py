@@ -4,6 +4,7 @@ from core.observability import log_operation
 import base64
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -76,10 +77,17 @@ def invoke(operation, config, params=None, check=lambda: None):
         if not isinstance(result, dict):
             raise CollectionError("invalid")
         if result.get("error"):
-            raise CollectionError(result["error"] if result["error"] in {
+            raise CollectionError(result["error"] if isinstance(result["error"], str) and result["error"] in {
                 "credentials", "auth", "limited", "timeout", "invalid", "unavailable",
                 "content_unavailable", "signature", "challenge", "empty_response", "risk_control"} else "unavailable", diagnostic=result.get("diagnostic"))
         return result.get("data")
+    except CollectionError as exc:
+        diagnostic = exc.diagnostic
+        logging.getLogger(__name__).warning(
+            "collector.failed code=%s stage=%s endpoint=%s http_status=%s upstream_error_type=%s",
+            exc.code, diagnostic.get("stage", "-"), diagnostic.get("endpoint", "-"),
+            diagnostic.get("http_status", "-"), diagnostic.get("error_type", "-"))
+        raise
     finally:
         if process.poll() is None:
             process.kill()

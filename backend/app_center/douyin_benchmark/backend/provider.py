@@ -13,6 +13,29 @@ from django.conf import settings
 from core.douyin_media_urls import prioritize_video_urls, DOUYIN_MEDIA_DOMAINS
 
 
+def safe_collection_diagnostic(value):
+    """Only fixed diagnostic vocabulary may leave the credential subprocess."""
+    if not isinstance(value, dict):
+        return {}
+    allowed = {
+        "endpoint": {"douyin.content_detail", "douyin.author_profile", "douyin.author_posts",
+            "douyin.comments", "douyin.comment_replies"},
+        "stage": {"resolve_url", "sign", "transport", "response", "parse"},
+        "error_type": {"TransportFailure", "TimeoutError", "ConnectTimeout", "ReadTimeout",
+            "WriteTimeout", "PoolTimeout", "ConnectError", "ReadError", "WriteError",
+            "RemoteProtocolError", "ProxyError", "ValueError", "TypeError", "AttributeError",
+            "KeyError", "RuntimeError", "OSError", "VideoUrlError", "DtkError", "InvalidUrl",
+            "InvalidParam", "UnsupportedContent", "Unauthenticated", "NotFound", "ContentPrivate",
+            "RateLimited", "UpstreamRiskControl", "SigningFailed", "UpstreamChanged", "Internal"},
+    }
+    result = {key: value[key] for key, choices in allowed.items()
+        if isinstance(value.get(key), str) and value[key] in choices}
+    status = value.get("http_status")
+    if type(status) is int and 100 <= status <= 599:
+        result["http_status"] = status
+    return result
+
+
 class CollectionError(Exception):
     def __init__(self, code="unavailable", diagnostic=None):
         self.code = code
@@ -25,7 +48,7 @@ class CollectionError(Exception):
             "limited": "采集服务限流，请稍后重试。", "pagination": "分页未继续推进，已保留获取到的作品。",
             "invalid": "采集接口返回的数据结构不兼容。", "timeout": "采集超时，请稍后重试。",
             "unavailable": "采集服务不可用，请检查服务和登录状态。"}.get(code, "采集失败，请检查服务状态。")
-        diagnostic = diagnostic if isinstance(diagnostic, dict) else {}
+        self.diagnostic = diagnostic = safe_collection_diagnostic(diagnostic)
         endpoint = {"douyin.content_detail": "视频详情", "douyin.author_profile": "账号资料", "douyin.author_posts": "作品列表"}.get(diagnostic.get("endpoint"))
         status = diagnostic.get("http_status")
         if endpoint and type(status) is int and 100 <= status <= 599:

@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch, AsyncMock
 from types import SimpleNamespace
 import json
+import io
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
@@ -92,6 +93,75 @@ class CollectorSourceTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(collector.BridgeError) as error:
                     await collector.request(collector.CONTENT_DETAIL, {'aweme_id': fixtures.POST_ID}, identity, transport)
                 self.assertEqual(str(error.exception), expected)
+                self.assertEqual(error.exception.diagnostic['http_status'], status)
+                self.assertEqual(error.exception.diagnostic['endpoint'], collector.CONTENT_DETAIL)
+
+    async def test_network_failure_preserves_stage_without_request_secrets(self):
+        identity = collector.make_identity(fixtures.COOKIES, fixtures.UA)
+        failure = collector.TransportFailure('private-cookie signed-url', identity_id='private-identity',
+            url='https://example.test/?token=private-token', elapsed_ms=100)
+        transport = SimpleNamespace(request=AsyncMock(side_effect=failure))
+        with self.assertRaises(collector.BridgeError) as caught:
+            await collector.request(collector.AUTHOR_PROFILE, {'sec_user_id': 'TEST'}, identity, transport)
+        self.assertEqual(collector.error_result(caught.exception), {
+            'error': 'unavailable', 'diagnostic': {'stage': 'transport',
+                'endpoint': collector.AUTHOR_PROFILE, 'error_type': 'TransportFailure'},
+        })
+
+    async def test_signer_failure_keeps_stage_and_type(self):
+        identity = collector.make_identity(fixtures.COOKIES, fixtures.UA)
+        signer = SimpleNamespace(sign=AsyncMock(side_effect=AttributeError('private-signature')))
+        with patch.object(collector, 'NativeSigner', return_value=signer):
+            with self.assertRaises(collector.BridgeError) as caught:
+                await collector.request(collector.AUTHOR_PROFILE, {'sec_user_id': 'TEST'}, identity)
+        self.assertEqual(collector.error_result(caught.exception), {
+            'error': 'unavailable', 'diagnostic': {'stage': 'sign',
+                'endpoint': collector.AUTHOR_PROFILE, 'error_type': 'AttributeError'},
+        })
+
+    async def test_shortlink_timeout_keeps_stage(self):
+        with patch.object(collector, 'author_id', side_effect=collector.httpx.ConnectTimeout('private-url')):
+            with self.assertRaises(collector.BridgeError) as caught:
+                await collector.run({'operation': 'profile', 'config': {
+                    'cookies': json.dumps(fixtures.COOKIES), 'user_agent': fixtures.UA},
+                    'params': {'url': 'https://v.douyin.com/TEST/'}})
+        self.assertEqual(collector.error_result(caught.exception), {
+            'error': 'timeout', 'diagnostic': {'stage': 'resolve_url',
+                'endpoint': collector.AUTHOR_PROFILE, 'error_type': 'ConnectTimeout'},
+        })
+
+    def test_transport_timeout_is_not_a_schema_error(self):
+        error = collector.TransportFailure('private-url', identity_id='private-identity',
+            url='https://example.test/?token=private-token', elapsed_ms=100,
+            cause=TimeoutError('private-body'))
+        self.assertEqual(collector.error_result(error), {
+            'error': 'timeout', 'diagnostic': {'error_type': 'TransportFailure'},
+        })
+
+    async def test_parser_failure_retains_http_status(self):
+        identity = collector.make_identity(fixtures.COOKIES, fixtures.UA)
+        from dtk.core.errors import UpstreamChanged
+        transport = SimpleNamespace(request=AsyncMock(return_value=RawResponse(status=200, body=b'{"user":{}}')),
+            classify=lambda _: SimpleNamespace(outcome=collector.Outcome.OK))
+        with patch.object(type(collector.ADAPTER), 'parse_author', side_effect=UpstreamChanged('private-field')):
+            with self.assertRaises(collector.BridgeError) as caught:
+                await collector.request(collector.AUTHOR_PROFILE, {'sec_user_id': 'TEST'}, identity, transport)
+        self.assertEqual(collector.error_result(caught.exception), {
+            'error': 'invalid', 'diagnostic': {'stage': 'parse', 'http_status': 200,
+                'endpoint': collector.AUTHOR_PROFILE, 'error_type': 'UpstreamChanged'},
+        })
+
+    def test_main_emits_diagnostics_without_exception_payload(self):
+        failure = collector.BridgeError('unavailable')
+        failure.diagnostic = {'stage': 'transport', 'endpoint': collector.AUTHOR_PROFILE,
+            'error_type': 'TransportFailure'}
+        output = io.StringIO()
+        with patch.object(collector, 'run', AsyncMock(side_effect=failure)), \
+                patch.object(collector.sys, 'stdin', io.StringIO('{"config":{"cookies":"private-cookie"}}')), \
+                patch.object(collector.sys, 'stdout', output):
+            collector.main()
+        self.assertEqual(json.loads(output.getvalue()), collector.error_result(failure))
+        self.assertNotIn('private-cookie', output.getvalue())
 
     def test_app_allowlist_covers_pinned_dtk_douyin_media_domains(self):
         from dtk.media.domains import DOUYIN_MEDIA_DOMAINS as source_domains

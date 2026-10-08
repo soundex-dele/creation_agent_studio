@@ -56,6 +56,8 @@ backend\venv\Scripts\python.exe -X utf8 backend/manage.py backfill_douyin_observ
 
 **真实账号链路验收边界**：最近实测结果见上方“扩展部署与验证”。自动化检查另使用 DTK 仓库样本验证签名、传输封装和解析，不替代线上验收。页面配置检查仅验证格式和运行环境，不声称 Cookie 有效。
 
+采集失败时，在 media worker 日志中查找同一 `run_id` 的 `collector.failed` 行：`code` 为错误分类，`stage` 区分短链解析（`resolve_url`）、签名（`sign`）、网络传输（`transport`）、响应分类（`response`）和数据解析（`parse`）；另保留已知接口名、HTTP 状态和异常类型。没有响应时 HTTP 状态为 `-`。日志不输出 Cookie、签名地址、响应正文或原始异常消息。网络传输失败按 `unavailable` / `timeout` 最多重试一次，不再误报为数据结构不兼容；仅有外层 `CollectionError` / `execution_adapter_failed` 无法确定根因。
+
 ## 部署与页面配置
 
 1. 从仓库根目录使用统一安装脚本（默认全量安装也包含此步骤）：
