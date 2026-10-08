@@ -54,6 +54,8 @@ backend\venv\Scripts\python.exe -X utf8 backend/manage.py backfill_douyin_observ
 
 主应用继续使用 Python 3.11，通过 JSON stdin/stdout 调用独立 Python 3.12/3.13 进程。凭据只通过 stdin 管道传递，不出现在命令行、Run 输入、模型提示词、错误信息或任务日志中。取消／超时会终止并回收子进程。每页重新读取当前用户配置，清除配置后后续请求停止。
 
+采集入口兼容 `wreq 0.12/0.13`：0.13 将响应正文和响应头改为 `memoryview`，公共传输适配器在交给固定版本 DTK 前统一转为 `bytes`，避免收到 HTTP 200 后在响应分类阶段触发 `TypeError`，并保留响应头分类、重复响应头合并和 Set-Cookie 过滤行为。该适配由账号采集与视频地址脚本共用，不修改固定版本的 DTK 子模块；依赖范围限制为 `wreq>=0.12,<0.14`。测试包含本机 HTTP 服务和实际 wreq 客户端，不仅使用替身响应。
+
 **真实账号链路验收边界**：最近实测结果见上方“扩展部署与验证”。自动化检查另使用 DTK 仓库样本验证签名、传输封装和解析，不替代线上验收。页面配置检查仅验证格式和运行环境，不声称 Cookie 有效。
 
 采集失败时，在 media worker 日志中查找同一 `run_id` 的 `collector.failed` 行：`code` 为错误分类，`stage` 区分短链解析（`resolve_url`）、签名（`sign`）、网络传输（`transport`）、响应分类（`response`）和数据解析（`parse`）；另保留已知接口名、HTTP 状态和异常类型。没有响应时 HTTP 状态为 `-`。日志不输出 Cookie、签名地址、响应正文或原始异常消息。网络传输失败按 `unavailable` / `timeout` 最多重试一次，不再误报为数据结构不兼容；仅有外层 `CollectionError` / `execution_adapter_failed` 无法确定根因。

@@ -29,10 +29,56 @@ try:
     from dtk.signing.native.signer import NativeSigner
     from dtk.signing.native.websign import pick_uifid
     from dtk.transport.base import Fingerprint, RequestSpec, TransportFailure, TransportIdentity
-    from dtk.transport.wreq_transport import WreqTransport
+    from dtk.transport.wreq_transport import WreqTransport as SourceWreqTransport, default_client_factory
     from dtk.urls import ResourceKind, require_content_id, resolve
 except ImportError as exc:
     raise SystemExit("缺少源码或依赖，请按 douyin_video_url.md 安装独立运行环境") from exc
+
+
+def _response_bytes(value):
+    return bytes(value) if isinstance(value, (memoryview, bytearray)) else value
+
+
+class _WreqResponse:
+    """Adapt binary bodies and header pairs before pinned DTK reads them."""
+
+    def __init__(self, response):
+        self._response = response
+
+    def __getattr__(self, name):
+        return getattr(self._response, name)
+
+    async def bytes(self):
+        return _response_bytes(await self._response.bytes())
+
+    @property
+    def headers(self):
+        headers = self._response.headers
+        if headers is None:
+            return None
+        pairs = headers.items() if hasattr(headers, "items") else headers
+        return [(_response_bytes(name), _response_bytes(value)) for name, value in pairs]
+
+
+class _WreqClient:
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+    async def request(self, *args, **kwargs):
+        return _WreqResponse(await self._client.request(*args, **kwargs))
+
+
+class WreqTransport(SourceWreqTransport):
+    """Keep pinned DTK's bytes contract with wreq 0.12 and 0.13 responses."""
+
+    def __init__(self, *, client_factory=None, **kwargs):
+        # wreq 0.13 returns memoryviews for both bodies and headers. DTK expects
+        # bytes for JSON decoding, charset detection and header classification.
+        factory = client_factory or default_client_factory
+        super().__init__(client_factory=lambda options: _WreqClient(factory(options)), **kwargs)
 
 
 class VideoUrlError(RuntimeError):

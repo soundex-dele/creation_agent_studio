@@ -2,4 +2,4 @@
 httpx>=0.28,<0.29
 pydantic>=2.9,<3
 structlog>=24.4,<27
-wreq>=0.12,<1.0
+wreq>=0.12,<0.14

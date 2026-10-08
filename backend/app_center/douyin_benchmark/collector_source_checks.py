@@ -19,9 +19,9 @@ class CollectorSourceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         collector.configure(level="critical")
 
-    async def fetch(self, endpoint, params, fixture):
+    async def fetch(self, endpoint, params, fixture, body_type=bytes):
         identity = collector.make_identity(fixtures.COOKIES, fixtures.UA)
-        client = fixtures.RecordingClient(fixture)
+        client = fixtures.RecordingClient(fixture, body_type)
         transport = collector.WreqTransport(client_factory=lambda options: client)
         try:
             result = await collector.request(endpoint, params, identity, transport)
@@ -50,6 +50,17 @@ class CollectorSourceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['content_id'], fixtures.POST_ID)
         self.assertTrue(result['media']['video']['url'])
         self.assertIsNotNone(result['stats']['digg_count'])
+
+    async def test_memoryview_profile_posts_and_detail(self):
+        cases = [
+            (collector.AUTHOR_PROFILE, {'sec_user_id': 'TEST'}, 'user_profile.json', 'uid'),
+            (collector.AUTHOR_POSTS, {'sec_user_id': 'TEST', 'count': 20}, 'user_posts_page1.json', 'items'),
+            (collector.CONTENT_DETAIL, {'aweme_id': fixtures.POST_ID}, 'video_normal.json', 'content_id'),
+        ]
+        for endpoint, params, fixture, key in cases:
+            with self.subTest(endpoint=endpoint):
+                result, _ = await self.fetch(endpoint, params, fixture, memoryview)
+                self.assertTrue(result[key])
 
     async def test_risk_control(self):
         with self.assertRaises((collector.BridgeError, collector.DtkError)):

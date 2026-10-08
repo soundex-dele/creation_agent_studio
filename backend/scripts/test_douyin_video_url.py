@@ -1,5 +1,6 @@
 """Offline source-integration checks; no DTK server or Douyin account required."""
 
+import asyncio
 import json
 import importlib.util
 import sys
@@ -17,7 +18,7 @@ if any(importlib.util.find_spec(name) is None for name in ("httpx", "wreq", "pyd
 import httpx
 import douyin_video_url as script
 from dtk.core.errors import InvalidParam
-from dtk.transport.wreq_transport import WreqTransport
+from douyin_video_url import WreqTransport
 
 FIXTURES = script.SOURCE.parent / "tests/fixtures/douyin"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -27,17 +28,19 @@ POST_ID = "7000000000000000001"
 
 
 class RecordingClient:
-    def __init__(self, fixture):
-        self.body = (FIXTURES / fixture).read_bytes()
+    def __init__(self, fixture, body_type=bytes, headers=None):
+        self.body = body_type((FIXTURES / fixture).read_bytes())
+        self.headers = headers if headers is not None else {"content-type": "application/json"}
         self.calls = []
 
     async def request(self, method, url, **kwargs):
         self.calls.append((url, kwargs))
         body = self.body
+        response_headers = self.headers
 
         class Response:
             status = 200
-            headers = {"content-type": "application/json"}
+            headers = response_headers
 
             async def bytes(self):
                 return body
@@ -50,12 +53,54 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
         script.configure(level="critical")
         self.identity = script.make_identity(COOKIES, UA)
 
-    async def fetch_fixture(self, name):
-        client = RecordingClient(name)
+    async def fetch_fixture(self, name, body_type=bytes):
+        client = RecordingClient(name, body_type)
         transport = WreqTransport(client_factory=lambda options: client)
         try:
             result = await script.fetch_video(POST_ID, self.identity, transport=transport)
             return result, client.calls
+        finally:
+            await transport.close()
+
+    async def test_buffer_response_body_is_normalized_before_classification(self):
+        for body_type in (memoryview, bytearray):
+            with self.subTest(body_type=body_type.__name__):
+                result, _ = await self.fetch_fixture('video_normal.json', body_type)
+                self.assertEqual(result['content_id'], POST_ID)
+                with self.assertRaises(script.VideoUrlError):
+                    await self.fetch_fixture('risk_control_captcha.json', body_type)
+
+    async def test_real_wreq_http_body_contract(self):
+        """Use the installed binary client, with only a loopback fixture server."""
+        body = (FIXTURES / 'user_profile.json').read_bytes()
+
+        async def handle(reader, writer):
+            try:
+                await reader.readuntil(b'\r\n\r\n')
+                writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n'
+                    + b'X-Test: first\r\nX-Test: second\r\nSet-Cookie: test-only=value\r\n'
+                    + b'Content-Length: ' + str(len(body)).encode()
+                    + b'\r\nConnection: close\r\n\r\n' + body)
+                await writer.drain()
+            finally:
+                writer.close()
+                await writer.wait_closed()
+
+        server = await asyncio.start_server(handle, '127.0.0.1', 0)
+        transport = WreqTransport()
+        try:
+            async with server:
+                port = server.sockets[0].getsockname()[1]
+                response = await transport.request(self.identity,
+                    script.RequestSpec(url=f'http://127.0.0.1:{port}/', endpoint='douyin.author_profile'), timeout=5)
+            self.assertIs(type(response.body), bytes)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers['content-type'], 'application/json')
+            self.assertEqual(response.headers['x-test'], 'first, second')
+            self.assertNotIn('set-cookie', response.headers)
+            self.assertEqual(response.body, body)
+            self.assertIs(transport.classify(response).outcome, script.Outcome.OK)
+            self.assertTrue(script.ADAPTER.parse_author(response.json_or_none()).uid)
         finally:
             await transport.close()
 
@@ -79,6 +124,18 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["url"], payload["aweme_detail"]["video"]["play_addr"]["url_list"][0])
         for watermarked in payload["aweme_detail"]["video"]["download_addr"]["url_list"]:
             self.assertNotIn(watermarked, result["urls"])
+
+    async def test_memoryview_headers_preserve_signature_refusal(self):
+        headers = [(memoryview(name), memoryview(value)) for name, value in [
+            (b'content-type', b'application/json'), (b'tt_orcas_res', b'1'),
+        ]]
+        client = RecordingClient('video_normal.json', memoryview, headers)
+        transport = WreqTransport(client_factory=lambda options: client)
+        try:
+            with self.assertRaisesRegex(script.VideoUrlError, 'signature.rejected'):
+                await script.fetch_video(POST_ID, self.identity, transport=transport)
+        finally:
+            await transport.close()
 
     async def test_risk_control_is_an_error(self):
         with self.assertRaises(script.VideoUrlError):
