@@ -73,7 +73,7 @@ class ConnectionView(BaseView):
 class CollectorConfigView(BaseView):
     @swagger_auto_schema(responses={200: CollectorConfigOutput})
     def get(self, request, **kwargs):
-        return Response(public_config(config_for(self.app(), request.user)), headers={"Cache-Control": "no-store"})
+        return Response(public_config(config_for(self.app())), headers={"Cache-Control": "no-store"})
 
     @swagger_auto_schema(request_body=CollectorConfigInput, responses={200: CollectorConfigOutput})
     @sensitive_variables()
@@ -83,7 +83,7 @@ class CollectorConfigView(BaseView):
         serializer.is_valid(raise_exception=True)
         values = dict(serializer.validated_data)
         cookies = values.pop("cookies", "").strip()
-        existing = config_for(app, request.user)
+        existing = config_for(app)
         try:
             if not cookies:
                 cookies = private_config(existing)["cookies"]
@@ -91,18 +91,19 @@ class CollectorConfigView(BaseView):
         except CollectionError as exc:
             raise ValidationError({"detail": str(exc), "code": exc.code}) from None
         config, _ = CollectorConfig.objects.update_or_create(organization_id=app.organization_id,
-            application=app, owner=request.user, defaults={**values, "cookies": cookies})
+            application=app, defaults={**values, "cookies": cookies, "owner": request.user})
         return Response(public_config(config), headers={"Cache-Control": "no-store"})
 
-    @swagger_auto_schema(responses={204: "已清除个人采集配置"})
+    @swagger_auto_schema(responses={204: "已清除应用共享采集配置"})
     def delete(self, request, **kwargs):
         from .models import Subscription
         from django.db.models import F
         app = self.app()
         with transaction.atomic():
-            CollectorConfig.objects.filter(organization_id=self.kwargs['organization_id'], application=app, owner=request.user).delete()
-            Subscription.objects.filter(application=app, owner=request.user).update(enabled=False, next_run_at=None, blocked_reason='采集配置已清除。', revision=F('revision') + 1)
-            for task in Task.objects.filter(application=app, owner=request.user, kind__in=['collect', 'comments', 'refresh']).select_related('run'):
+            scope = {"organization_id": app.organization_id, "application": app}
+            CollectorConfig.objects.filter(**scope).delete()
+            Subscription.objects.filter(**scope).update(enabled=False, next_run_at=None, blocked_reason='共享采集配置已清除。', revision=F('revision') + 1)
+            for task in Task.objects.filter(**scope, kind__in=['collect', 'comments', 'refresh']).select_related('run'):
                 cancel(task)
         return Response(status=204)
 

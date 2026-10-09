@@ -75,7 +75,7 @@ def dispatch_due(now=None):
                         scope = task_scope(row)
                         try:
                             application_for(row.owner, org_id, row.application_id)
-                            if not m.CollectorConfig.objects.filter(**scope).exists():
+                            if not m.CollectorConfig.objects.filter(organization_id=scope['organization_id'], application_id=scope['application_id']).exists():
                                 raise ValueError('采集配置已清除。')
                         except Exception as exc:
                             from rest_framework.exceptions import APIException

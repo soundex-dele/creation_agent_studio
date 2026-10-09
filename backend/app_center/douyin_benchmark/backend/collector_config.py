@@ -1,4 +1,4 @@
-"""Personal collector settings, passed to the collector over a child stdin pipe."""
+"""Application-shared collector settings, passed over a child stdin pipe."""
 
 from core.observability import log_operation
 import json
@@ -14,9 +14,9 @@ from .models import CollectorConfig
 from .provider import DTKClient, CollectionError
 
 
-def config_for(application, owner):
+def config_for(application):
     with tenant_database_context(application.organization_id):
-        return CollectorConfig.objects.filter(organization_id=application.organization_id, application=application, owner=owner).first()
+        return CollectorConfig.objects.filter(organization_id=application.organization_id, application=application).first()
 
 
 def public_config(config):
@@ -94,7 +94,7 @@ class LocalDTKClient(DTKClient):
         operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail", "/comments": "comments", "/replies": "replies"}[path]
         for attempt in range(2):
             try:
-                return invoke(operation, private_config(config_for(self.application, self.owner)), params, self.check)
+                return invoke(operation, private_config(config_for(self.application)), params, self.check)
             except CollectionError as exc:
                 if attempt or exc.code not in {'timeout', 'unavailable'}:
                     raise
@@ -134,11 +134,11 @@ class LocalDTKClient(DTKClient):
             time.sleep(1)
 
     def media_headers(self):
-        config = config_for(self.application, self.owner)
+        config = config_for(self.application)
         if not config:
             raise CollectionError("not_configured")
         return {"User-Agent": config.user_agent, "Referer": "https://www.douyin.com/"}
 
     @log_operation
     def validate(self):
-        return invoke("validate", private_config(config_for(self.application, self.owner)), check=self.check)
+        return invoke("validate", private_config(config_for(self.application)), check=self.check)

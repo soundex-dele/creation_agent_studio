@@ -91,7 +91,7 @@ class RecordsView(WorkspaceMixin, BaseView):
         extra = {**scope, 'revision': instance.revision + 1 if instance else 1}
         if model is m.Subscription:
             enabled = serializer.validated_data.get('enabled', instance.enabled if instance else False)
-            if enabled and not m.CollectorConfig.objects.filter(**scope).exists():
+            if enabled and not m.CollectorConfig.objects.filter(organization_id=scope['organization_id'], application_id=scope['application_id']).exists():
                 raise ValidationError('请先保存采集配置。')
             extra.update(next_run_at=timezone.now() if enabled else None, blocked_reason='')
         try:

@@ -91,7 +91,8 @@ class ScriptVersion(models.Model):
 
 class CollectorConfig(TenantOwnedModel):
     application = models.ForeignKey("applications.Application", on_delete=models.CASCADE)
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # Records the last editor; shared settings survive that user's deletion.
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     user_agent = models.CharField(max_length=2000)
     cookies = models.TextField()
     screen = models.CharField(max_length=20, default="1920x1080")
@@ -100,7 +101,7 @@ class CollectorConfig(TenantOwnedModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["organization", "application", "owner"], name="dy_collector_owner_unique")]
+        constraints = [models.UniqueConstraint(fields=["organization", "application"], name="dy_collector_application_unique")]
 
 
 class PrivateRecord(TenantOwnedModel):

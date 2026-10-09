@@ -103,7 +103,7 @@ uv pip install --python backend/.venv-dtk/bin/python -r backend/scripts/douyin_v
 
 3. Web 与 media worker 都需要上述源码和独立运行环境。非默认路径设置 `DOUYIN_DTK_PYTHON` 为独立解释器绝对路径；Windows 默认使用 `backend/.venv-dtk/Scripts/python.exe`。
 4. 进入应用 → **采集设置**，粘贴同一桌面 Chrome/Chromium 浏览器抖音网页请求的 User-Agent 和 Cookie。Cookie 支持请求头、JSON 对象、浏览器导出的 JSON 数组，需包含有效 `UIFID` 或 `UIFID_TEMP`。屏幕尺寸、语言和时区应与该浏览器一致。无需向开发者发送凭据。
-5. 保存配置后添加账号或刷新已有账号。Cookie 明文保存，按组织、应用和所有者隔离；采集设置直接回显本人已保存的 Cookie，可查看和编辑，留空保留原值，“清除已保存配置”仅删除本人的配置。迁移 `0010_collector_cookies_plaintext` 使用原 Django `SECRET_KEY` 解密旧配置并保留原值，迁移后读写不再依赖加密密钥。通过 HTTPS 访问页面，反向代理不要记录配置请求体。
+5. 保存配置后添加账号或刷新已有账号。同一组织、同一应用的所有用户共用一套 Cookie 和 User-Agent；Cookie 明文保存并回显，可查看和编辑，留空保留原值。保存对所有用户生效；“清除已保存配置”会清除共享配置、暂停该应用所有用户的采集订阅并取消采集任务。配置不跨组织或应用共享，账号、作品与创作内容仍按用户隔离。迁移 `0010_collector_cookies_plaintext` 使用原 Django `SECRET_KEY` 解密旧配置，`0011_shared_collector_config` 将同一应用的多份旧配置合并为最近保存的一份；后续读写不再依赖加密密钥，删除最后保存配置的用户也不会删除共享配置。通过 HTTPS 访问页面，反向代理不要记录配置请求体。
 
 | 配置 | 作用 |
 | --- | --- |
@@ -161,7 +161,7 @@ HTTP(S) 媒体地址均按 DTK 返回值处理，仅允许平台 CDN 域名和�
 
 前缀 `/api/v1/organizations/{organization_id}/applications/{application_id}/douyin-benchmark`；单租户模式支持已有省略组织前缀的别名。
 
-- `GET/PUT/DELETE /collector-config`：本人采集配置；Cookie 明文保存并回显，空值保留。
+- `GET/PUT/DELETE /collector-config`：组织内当前应用的共享采集配置；有应用访问权限的用户共用，Cookie 明文保存并回显，空值保留。
 - `GET /connection`、`GET /brands`：本地配置检查、可引用私有品牌（仅定位与语气）。
 - `GET/POST /accounts`；`GET/PATCH/DELETE /accounts/{id}`：添加时创建采集任务，支持备注与分组。
 - `GET /accounts/{id}/works`：`batch_id/search/sort/outstanding`；`POST .../works/{work_id}/upload` 接收 multipart `video`。

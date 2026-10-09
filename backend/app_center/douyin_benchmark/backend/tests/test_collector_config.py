@@ -6,8 +6,8 @@ import pytest
 from django.apps import apps
 from django.db import connection
 from .test_douyin import ctx  # shared tenant/application fixture
-from ..collector_config import invoke, LocalDTKClient
-from ..models import CollectorConfig
+from ..collector_config import config_for, invoke, LocalDTKClient
+from ..models import Account, CollectorConfig, Subscription, Task
 from ..provider import CollectionError
 from core.observability import ProcessingFormatter, log_context
 
@@ -15,7 +15,12 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 COOKIE = "ttwid=private-test-only; UIFID_TEMP=test-uifid; s_v_web_id=verify_test"
 
 
-def test_settings_plaintext_owner_only_keep_clear(ctx):
+@pytest.mark.parametrize('single_tenant', [False, True])
+def test_settings_shared_between_users_keep_clear(ctx, settings, single_tenant):
+    if single_tenant:
+        settings.SINGLE_TENANT_MODE = True
+        settings.SINGLE_TENANT_ORGANIZATION_ID = str(ctx.org.pk)
+        ctx.root = f'/api/v1/applications/{ctx.app.pk}/douyin-benchmark'
     url = ctx.root + "/collector-config"
     assert ctx.client.get(url).data["configured"] is False
     assert ctx.client.get(url).data["cookies"] == ""
@@ -38,11 +43,19 @@ def test_settings_plaintext_owner_only_keep_clear(ctx):
     assert ctx.client.put(url, {"user_agent": UA, "cookies": replacement}, format="json").data["cookies"] == replacement
     assert ctx.client.get(url).data["cookies"] == replacement
     ctx.client.force_authenticate(ctx.reader)
-    assert ctx.client.get(url).data["configured"] is False
-    assert ctx.client.get(url).data["cookies"] == ""
+    assert ctx.client.get(url).data["configured"] is True
+    assert ctx.client.get(url).data["cookies"] == replacement
+    assert ctx.client.get(ctx.root + "/connection").data["connected"] is True
+    updated_ua = UA.replace('130.0.0.0', '131.0.0.0')
+    assert ctx.client.put(url, {"user_agent": updated_ua, "cookies": ""}, format="json").status_code == 200
+    assert CollectorConfig.objects.filter(application=ctx.app).count() == 1
+    ctx.client.force_authenticate(ctx.owner)
+    data = ctx.client.get(url).data
+    assert data['user_agent'] == updated_ua and data['cookies'] == replacement
+    ctx.client.force_authenticate(ctx.reader)
     assert ctx.client.delete(url).status_code == 204
     assert ctx.client.get(url).data["cookies"] == ""
-    assert CollectorConfig.objects.filter(pk=config.pk).exists()
+    assert not CollectorConfig.objects.filter(pk=config.pk).exists()
     ctx.client.force_authenticate(ctx.owner)
     assert ctx.client.delete(url).status_code == 204
     assert ctx.client.get(url).data["cookies"] == ""
@@ -87,7 +100,7 @@ def test_invalid_config_preserves_saved_value(ctx):
     assert CollectorConfig.objects.get().cookies == before
 
 
-def test_local_requests_use_current_personal_config(ctx, monkeypatch):
+def test_local_requests_from_different_users_use_shared_config(ctx, monkeypatch):
     ctx.client.put(ctx.root + "/collector-config", {"user_agent": UA, "cookies": COOKIE}, format="json")
     call = Mock(return_value={"platform": "douyin", "uid": "1", "sec_uid": "author", "nickname": "name"})
     monkeypatch.setattr("app_center.douyin_benchmark.backend.collector_config.invoke", call)
@@ -95,9 +108,67 @@ def test_local_requests_use_current_personal_config(ctx, monkeypatch):
     assert client.media_headers() == {"User-Agent": UA, "Referer": "https://www.douyin.com/"}
     assert client.profile(ctx.account.source_url)["platform_id"] == "author"
     assert call.call_args.args[0] == "profile" and call.call_args.args[1]["cookies"] == COOKIE
+    other = Account.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.reader,
+                                   source_url='https://www.douyin.com/user/OTHER')
+    other_client = LocalDTKClient(account=other)
+    other_client.profile(other.source_url)
+    assert call.call_args.args[1]['cookies'] == COOKIE
+    assert call.call_args.args[1]['user_agent'] == UA
+    # Sharing collector credentials does not share users' account libraries.
+    ctx.client.force_authenticate(ctx.reader)
+    assert ctx.client.get(ctx.url).status_code == 404
     CollectorConfig.objects.all().delete()
     with pytest.raises(CollectionError, match="采集设置"):
         client.detail("123")
+
+
+def test_shared_config_does_not_cross_application_or_organization(ctx):
+    from apps.applications.models import Application
+    config = CollectorConfig.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.owner,
+                                           user_agent=UA, cookies=COOKIE)
+    other_app = Application.objects.create(organization=ctx.org, category=ctx.app.category, name='Other',
+                                          slug='other-collector-test', created_by=ctx.owner, kind='custom', visibility='organization')
+    assert config_for(other_app) is None
+    other_org = ctx.reader.owned_organizations.get()
+    assert config_for(Application(organization=other_org, pk=ctx.app.pk)) is None
+    assert config_for(ctx.app).pk == config.pk
+    ctx.client.force_authenticate(None)
+    assert ctx.client.get(ctx.root + '/collector-config').status_code in (401, 403)
+
+
+def test_shared_config_survives_last_editor_deletion(ctx):
+    config = CollectorConfig.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.reader,
+                                           user_agent=UA, cookies=COOKIE)
+    # The fixture user owns an organization, whose FK intentionally protects deletion.
+    ctx.reader.owned_organizations.all().delete()
+    ctx.reader.delete()
+    config.refresh_from_db()
+    assert config.owner_id is None and config.cookies == COOKIE
+
+
+def test_shared_config_supports_other_users_subscriptions_and_clear(ctx):
+    from django.utils import timezone
+    from ..subscriptions import dispatch_due
+    CollectorConfig.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.owner,
+                                   user_agent=UA, cookies=COOKIE)
+    own_subscription = Subscription.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.owner,
+                                                   account=ctx.account, enabled=True, next_run_at=timezone.now())
+    other = Account.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.reader,
+                                   source_url='https://www.douyin.com/user/OTHER')
+    ctx.client.force_authenticate(ctx.reader)
+    response = ctx.client.post(ctx.root + '/subscriptions', {'account': str(other.pk), 'enabled': True}, format='json')
+    assert response.status_code == 201, response.data
+    subscription = Subscription.objects.get(pk=response.data['id'])
+    dispatch_due()
+    task = Task.objects.get(input__subscription_id=str(subscription.pk))
+    assert task.owner_id == ctx.reader.pk
+    ctx.client.force_authenticate(ctx.owner)
+    assert ctx.client.delete(ctx.root + '/collector-config').status_code == 204
+    for row in (own_subscription, subscription):
+        row.refresh_from_db()
+        assert not row.enabled and row.next_run_at is None
+    task.run.refresh_from_db()
+    assert task.run.status in ('cancelled', 'cancelling')
 
 
 def test_subprocess_protocol_and_cancel(monkeypatch):
