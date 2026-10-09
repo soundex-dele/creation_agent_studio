@@ -272,6 +272,8 @@
 .home-app-list { display: flex; flex-direction: column; gap: 4px; }
 .home-app-item { display: flex; width: 100%; align-items: center; gap: 11px; padding: 10px; border: 0; border-radius: var(--border-radius-md); background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .home-app-item:hover { background: var(--color-bg-card); }
+.home-app-item:focus-visible,
+.home-all-apps:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .home-app-item.active {
   background: color-mix(in srgb, var(--color-primary) 11%, var(--color-bg-card));
   box-shadow: inset 3px 0 0 var(--color-primary);
@@ -295,10 +297,6 @@
 .home-app-sidebar-state { padding: 24px 8px; text-align: center; }
 .home-all-apps { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 12px); margin: auto 6px 4px; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: transparent; color: var(--color-text-sec); cursor: pointer; }
 .home-all-apps:hover { border-color: var(--color-primary); color: var(--color-primary); }
-.home-app-config-help { color: var(--color-text-sec); font-size: 13px; }
-.home-app-config-list { display: flex; max-height: 420px; flex-direction: column; overflow-y: auto; }
-.home-app-config-item { display: flex; min-height: 48px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border); }
-.home-app-config-icon { display: inline-block; margin: 0 8px 0 4px; }
 
 @media (max-width: 767px) {
   .home-app-list { gap: 8px; }

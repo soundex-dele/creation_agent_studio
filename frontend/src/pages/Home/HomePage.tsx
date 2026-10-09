@@ -109,7 +109,7 @@ export default function HomePage() {
     </header>
 
     {showInlineApps && (
-      <section className="home-applications" aria-label="我的应用">
+      <section className="home-applications" aria-label="最近使用">
         <HomeApplicationsSidebar horizontalWheelScroll />
       </section>
     )}

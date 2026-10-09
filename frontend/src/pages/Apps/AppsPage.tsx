@@ -9,12 +9,12 @@ import {
   StarOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '@/stores/useAppStore';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { useApplicationPreferences } from '@/hooks/useApplicationPreferences';
 import { applicationPath } from '@/lib/applicationCatalog';
 import { applicationWindowPath } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
-import { CONVERSATION_APP, CONVERSATION_APP_ID, conversationApplicationId, isCoworkApplication } from '@/lib/conversationApplication';
+import { CONVERSATION_APP, CONVERSATION_APP_ID, isCoworkApplication } from '@/lib/conversationApplication';
 import './AppsPage.css';
 
 const { Search } = Input;
@@ -23,15 +23,8 @@ type AppSort = 'recommended' | 'recent' | 'popular' | 'name';
 
 const CONVERSATION_ID = CONVERSATION_APP_ID;
 
-interface ApplicationPreferences {
-  favorites: string[];
-  recent: Record<string, number>;
-}
-
-const EMPTY_PREFERENCES: ApplicationPreferences = { favorites: [], recent: {} };
-
 const AppsPage: React.FC = () => {
-  const userId = useAuthStore((state) => state.user?.id || 'anonymous');
+  const { preferences, recordUsage, toggleFavorite } = useApplicationPreferences();
   const conversationPath = '/chat?entry=apps';
   const {
     apps,
@@ -47,37 +40,12 @@ const AppsPage: React.FC = () => {
   } = useAppStore();
   const [view, setView] = useState<AppView>('all');
   const [sort, setSort] = useState<AppSort>('recommended');
-  const [preferences, setPreferences] = useState<ApplicationPreferences>(EMPTY_PREFERENCES);
 
   const isFirstRun = useRef(true);
-  const storageKey = `application-preferences:${userId}`;
 
   useEffect(() => {
     void loadCategories();
   }, [loadCategories]);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(storageKey);
-      const parsed = saved ? JSON.parse(saved) as Partial<ApplicationPreferences> : null;
-      const merged = {
-        favorites: Array.isArray(parsed?.favorites)
-          ? [...new Set(parsed.favorites.filter((id): id is string => typeof id === 'string').map(conversationApplicationId))]
-          : [],
-        recent: parsed?.recent && typeof parsed.recent === 'object'
-          ? { ...parsed.recent } as Record<string, number>
-          : {},
-      };
-      if (merged.recent.cowork !== undefined && merged.recent[CONVERSATION_ID] === undefined) {
-        merged.recent[CONVERSATION_ID] = merged.recent.cowork;
-      }
-      delete merged.recent.cowork;
-      setPreferences(merged);
-      if (saved && JSON.stringify(merged) !== saved) window.localStorage.setItem(storageKey, JSON.stringify(merged));
-    } catch {
-      setPreferences(EMPTY_PREFERENCES);
-    }
-  }, [storageKey]);
 
   useEffect(() => {
     // First load fires immediately; later category/search changes are debounced.
@@ -100,23 +68,8 @@ const AppsPage: React.FC = () => {
     && (!normalizedQuery || [CONVERSATION_APP.name, CONVERSATION_APP.description, ...CONVERSATION_APP.tags, '沟通', '智能助手', 'chat', 'cowork']
       .some((value) => value.includes(normalizedQuery)));
 
-  const savePreferences = (next: ApplicationPreferences) => {
-    setPreferences(next);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-  };
-
-  const toggleFavorite = (id: string) => {
-    const favorites = preferences.favorites.includes(id)
-      ? preferences.favorites.filter((favoriteId) => favoriteId !== id)
-      : [...preferences.favorites, id];
-    savePreferences({ ...preferences, favorites });
-  };
-
   const openApplication = (id: string, path: string) => {
-    savePreferences({
-      ...preferences,
-      recent: { ...preferences.recent, [id]: Date.now() },
-    });
+    recordUsage(id);
     window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
   };
 
