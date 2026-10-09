@@ -65,6 +65,10 @@ backend\venv\Scripts\python.exe -X utf8 backend/manage.py backfill_douyin_observ
 
 校正原文后填写可选改写要求，生成一篇同主题完整正文，保留核心观点、事实和大致篇幅，优化开头、衔接与口语表达，不把原作者经历写成用户经历。模型提示词约束不能代替人工核实。此流程不生成标题、分镜、清单或成片。改写任务冻结校正原文及要求，不覆盖原始识别内容，历史记录可恢复该快照。结果编辑后保存为新版本，旧版本保留，并使用 revision 检测并发冲突；未保存内容可复制，导出须先保存。
 
+图文作品也可点击“爆款复刻”：先打开表单，自动填入去重后的标题与描述，允许手动补充图片文字。此流程未读取图片内文字，不下载素材、不调用 Whisper，也不做 OCR。填写可选“创作主题”后提交，非空时围绕指定主题写作，留空沿用素材主题；参考原文不能为空。
+
+图文写作从服务端 `CODEX_SKILLS_DIRECTORY/wechat-viral-article/` 加载 `SKILL.md` 及其引用的 `references/`、`templates/` Markdown 资料，注入结构化生成指令。部署时须在执行 worker 可读取的技能目录保留完整技能包；缺失、不可读、空文件、越界引用或资料总量超过160,000字节会明确报错，不回退普通提示词。图文结果仍为 `{text}`，内容是一个 Markdown 标题和完整文章，不输出候选选题、标题列表或自检过程。主题与原始作品类型、标题、描述、校正原文和要求均冻结，历史可恢复；技能的算法与流量断言不视为已核实事实，生成不承诺爆款效果。
+
 复用原有私有 Task／ScriptVersion JSON 存储，无新增迁移；部署时更新前端并重启 Web、coordinator 和 media worker。
 
 ## 采集运行方式与验收边界
@@ -166,7 +170,7 @@ HTTP(S) 媒体地址均按 DTK 返回值处理，仅允许平台 CDN 域名和�
 - `GET/POST /accounts`；`GET/PATCH/DELETE /accounts/{id}`：添加时创建采集任务，支持备注与分组。
 - `GET /accounts/{id}/works`：`batch_id/search/sort/outstanding`；`POST .../works/{work_id}/upload` 接收 multipart `video`。
 - `GET/POST /accounts/{id}/tasks`：操作 `collect/account/breakdown/topics/script/transcribe/rewrite`；`GET .../tasks/{task_id}`、`POST .../cancel`、`GET .../frames/{frame_id}`。
-- `transcribe` 输入 `work_id` 与可选 `force`（默认 false），输出 `text/segments/duration`。`rewrite` 输入 `work_id/source_task_id/source_text` 及可选 `rewrite_requirements`（默认空），来源必须为同作品成功的转写或拆解。原文最多20,000字符，要求最多3,000字符，结果为非空且最多20,000字符的 `{text}`。私有任务详情 `copy_context` 返回来源作品标题、来源任务ID、校正原文及要求，便于历史恢复。
+- `transcribe` 仅支持视频，输入 `work_id` 与可选 `force`（默认 false），输出 `text/segments/duration`。`rewrite` 输入 `work_id/source_text` 及可选 `rewrite_requirements`（默认空）；视频还必须传 `source_task_id`，来源为同作品成功的转写或拆解。图文无需且不接受 `source_task_id`，支持可选 `theme`（最多2,000字符，留空沿用原主题）。原文最多20,000字符，要求最多3,000字符，结果为非空且最多20,000字符的 `{text}`。私有任务详情 `copy_context` 返回作品类型、标题、描述、来源任务ID、校正原文、主题及要求，便于历史恢复；旧任务缺少类型时按视频兼容。
 - `GET/POST .../tasks/{task_id}/versions`：读取或保存脚本／改写正文；按任务类型校验内容。`GET .../versions/{version_id}/download`：Markdown，改写任务仅导出正文。
 - 创建账号、任务要求 `Idempotency-Key`。同键同参重放，同键异参409；脚本保存必须携带读到的最新 `revision`。
 

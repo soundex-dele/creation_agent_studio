@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Select, Spin, Tabs, Tag, Upload } from 'antd';
 import { ArrowUpRight, ChartNoAxesCombined, Clapperboard, Clock3, Film, FolderOpen, Heart, MessageCircle, NotebookPen, Play, RefreshCw, ScanSearch, Share2, Star, TrendingUp, Upload as UploadIcon, UsersRound } from 'lucide-react';
-import { type Brief, type DouyinAccount, type DouyinClient, type DouyinTask, type WorkResult, type Kind, type ProductionFormat, productionFormats, kindLabels, isActive, metric } from '@/services/douyinBenchmark';
+import { type Brief, type DouyinAccount, type DouyinClient, type DouyinTask, type DouyinWork, type WorkResult, type Kind, type ProductionFormat, productionFormats, kindLabels, isActive, metric } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
 import { AnalysisResult } from './AnalysisResult';
 import { AccountAnalysisExport } from './AccountAnalysisExport';
@@ -13,6 +13,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
   const [taskPage, setTaskPage] = useState(1); const [taskCount, setTaskCount] = useState(0);
   const [works, setWorks] = useState<WorkResult | null>(null); const [tab, setTab] = useState('account');
   const [selectedId, setSelectedId] = useState(''); const [selectedTask, setSelectedTask] = useState<DouyinTask | null>(null);
+  const [draftWork, setDraftWork] = useState<DouyinWork | null>(null);
   const [search, setSearch] = useState(''); const [sort, setSort] = useState('likes'); const [outstanding, setOutstanding] = useState(false); const [batchId, setBatchId] = useState<string | undefined>();
   const [count, setCount] = useState(50); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0); const [editing, setEditing] = useState(false); const [deleting, setDeleting] = useState(false);
@@ -53,6 +54,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
     setBusy(true); setError('');
     try {
       const task = await client.start(accountId, body);
+      setDraftWork(null);
       setTasks(old => [task, ...old.filter(item => item.id !== task.id)]); setSelectedId(task.id); setRefresh((v) => v + 1);
       setTab(['transcribe', 'rewrite'].includes(body.kind) ? 'rewrite' : body.kind === 'collect' ? 'works' : body.kind === 'account' ? 'account' : body.kind === 'breakdown' ? 'breakdown' : 'create');
     } catch (e) { setError(documentError(e)); }
@@ -60,7 +62,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
   }, [client, accountId]);
   const activeCollection = tasks.some((t) => t.kind === 'collect' && isActive(t));
   const taskOptions = tasks.filter((t) => tab === 'rewrite' ? ['transcribe', 'rewrite'].includes(t.kind) : tab === 'account' ? t.kind === 'account' : tab === 'works' ? t.kind === 'collect' : tab === 'breakdown' ? t.kind === 'breakdown' : ['topics', 'script'].includes(t.kind));
-  const visibleTask = selectedTask && taskOptions.some((t) => t.id === selectedTask.id) ? selectedTask : null;
+  const visibleTask = !draftWork && selectedTask && taskOptions.some((t) => t.id === selectedTask.id) ? selectedTask : null;
   return <section className="douyin-panel douyin-workspace">
     {error && <Alert type="error" message={error} action={<Button onClick={() => setRefresh((v) => v + 1)}>重新加载</Button>} />}
     {loading && !account ? <div className="douyin-loading" role="status"><Spin /><span>正在打开账号工作台…</span></div> : account && <>
@@ -90,11 +92,12 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
           <div className="douyin-work-body"><div className="douyin-work-meta"><span>{w.published_at ? new Date(w.published_at).toLocaleDateString('zh-CN') : '发布时间未获取'}</span><span>{w.duration == null ? '时长未获取' : `${w.duration.toFixed(1)}秒`}</span>{w.kind === 'image_album' && <Tag>图文作品</Tag>}</div><h4>{w.title || '未命名作品'}</h4>
             <dl>{([['likes', '点赞', Heart], ['comments', '评论', MessageCircle], ['collects', '收藏', Star], ['shares', '分享', Share2]] as const).map(([key, label, Icon]) => <div key={key}><dt><Icon size={13} aria-hidden="true" />{label}</dt><dd>{metric(w[key])}</dd></div>)}</dl>
             <div className="douyin-work-footer"><div className="douyin-source-links">{w.kind === 'video' && (w.video_url ? <a href={w.video_url} target="_blank" rel="noreferrer"><Play size={13} aria-hidden="true" />播放视频</a> : <small>刷新作品数据以获取视频地址</small>)}<a href={w.url} target="_blank" rel="noreferrer">抖音来源页<ArrowUpRight size={13} aria-hidden="true" /></a></div>{w.ratio != null && <Tag className="douyin-ratio" color={w.outstanding ? 'gold' : undefined}>{w.outstanding && <TrendingUp size={13} aria-hidden="true" />}{w.outstanding ? '表现突出 · ' : ''}{w.ratio} 倍</Tag>}</div>
-          </div><div className="douyin-work-actions"><Button type="primary" icon={<ScanSearch size={15} aria-hidden="true" />} disabled={busy || w.kind === 'image_album'} onClick={() => void run({ kind: 'breakdown', work_id: w.id })}>转写并拆解</Button><Button icon={<NotebookPen size={15} aria-hidden="true" />} disabled={busy || w.kind !== 'video'} onClick={() => void run({ kind: 'transcribe', work_id: w.id })}>爆款复刻</Button><Upload showUploadList={false} accept="video/*" beforeUpload={(file) => { setBusy(true); setError(''); void client.upload(accountId, w.id, file).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))).finally(() => setBusy(false)); return false; }}><Button type="text" icon={<UploadIcon size={14} aria-hidden="true" />} disabled={busy}>{w.has_upload ? '替换补传视频' : '补传原视频'}</Button></Upload></div>
+          </div><div className="douyin-work-actions"><Button type="primary" icon={<ScanSearch size={15} aria-hidden="true" />} disabled={busy || w.kind === 'image_album'} onClick={() => void run({ kind: 'breakdown', work_id: w.id })}>转写并拆解</Button><Button icon={<NotebookPen size={15} aria-hidden="true" />} disabled={busy || !['video', 'image_album'].includes(w.kind)} onClick={() => { if (w.kind === 'image_album') { setDraftWork(w); setSelectedId(''); setError(''); setTab('rewrite'); } else { void run({ kind: 'transcribe', work_id: w.id }); } }}>爆款复刻</Button><Upload showUploadList={false} accept="video/*" beforeUpload={(file) => { setBusy(true); setError(''); void client.upload(accountId, w.id, file).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))).finally(() => setBusy(false)); return false; }}><Button type="text" icon={<UploadIcon size={14} aria-hidden="true" />} disabled={busy}>{w.has_upload ? '替换补传视频' : '补传原视频'}</Button></Upload></div>
         </article>)}</div>}
       </>}
       {tab === 'breakdown' && <div className="douyin-guide"><span className="douyin-guide-icon"><Clapperboard size={26} aria-hidden="true" /></span><div><h3>拆开一条视频，理解它的表达方式</h3><p className="douyin-hint">在作品库中选择视频开始拆解，或在下方打开历史成果。最多抽取16帧，结论可以逐条核对出处。</p><Button onClick={() => setTab('works')}>前往作品库</Button></div></div>}
-      {tab === 'rewrite' && !visibleTask && <div className="douyin-guide"><div><h3>把好内容，改写成自然的新表达</h3><p>从作品库选择视频，自动转写后校正原文，再生成同主题文案；也可以打开下方历史任务继续。</p><Button onClick={() => setTab('works')}>前往作品库</Button></div></div>}
+      {tab === 'rewrite' && draftWork && <RewritePanel key={`draft-${draftWork.id}`} client={client} accountId={accountId} draftWork={draftWork} busy={busy} onRun={run} />}
+      {tab === 'rewrite' && !draftWork && !visibleTask && <div className="douyin-guide"><div><h3>把好内容，改写成自然的新表达</h3><p>从作品库选择视频转写后改写，或选择图文、补充参考原文并指定主题生成完整文章；也可以打开下方历史任务继续。</p><Button onClick={() => setTab('works')}>前往作品库</Button></div></div>}
       {tab === 'create' && <div className="douyin-form">
         <fieldset className="douyin-format-field"><legend>视频形式</legend><div className="douyin-format-options">
           {(Object.entries(productionFormats) as [ProductionFormat, typeof productionFormats[ProductionFormat]][]).map(([value, option]) => <label key={value} className={brief.production_format === value ? 'is-selected' : ''}><input type="radio" name="production-format" value={value} checked={brief.production_format === value} onChange={() => setBrief({ ...brief, production_format: value })} /><span><strong>{option.label}</strong><small>{option.hint}</small></span></label>)}
@@ -105,7 +108,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
         {brief.production_format === 'animation' && <Alert type={brief.duration > 120 ? 'warning' : 'info'} message="动画演示最多 30 个分镜、120 秒，可在脚本保存后导入动画制作。" />}
         <Button type="primary" loading={busy} disabled={!source || !brief.positioning.trim() || !brief.theme.trim() || (brief.production_format === 'animation' && brief.duration > 120)} onClick={() => void run({ kind: 'topics', source_task_id: source, ...brief })}>生成 3 个选题方向</Button>
       </div>}
-      <div className="douyin-history"><h3>历史{tab === 'rewrite' ? '文案转写与复刻' : tab === 'create' ? '选题与脚本' : tab === 'works' ? '采集任务' : tab === 'account' ? '账号分析' : '视频拆解'}</h3><Select aria-label="历史任务" placeholder="选择历史任务" value={visibleTask?.id} options={taskOptions.map((t) => ({ value: t.id, label: `${kindLabels[t.kind]} · ${new Date(t.created_at).toLocaleString('zh-CN')} · ${t.stage}` }))} onChange={setSelectedId} />{tasks.length < taskCount && <Button onClick={() => { void client.tasks(accountId, taskPage + 1).then((data) => { setTasks((old) => [...old, ...data.results.filter((t) => !old.some((v) => v.id === t.id))]); setTaskPage((p) => p + 1); }).catch((e) => setError(documentError(e))); }}>加载更早记录</Button>}</div>
+      <div className="douyin-history"><h3>历史{tab === 'rewrite' ? '文案转写与复刻' : tab === 'create' ? '选题与脚本' : tab === 'works' ? '采集任务' : tab === 'account' ? '账号分析' : '视频拆解'}</h3><Select aria-label="历史任务" placeholder="选择历史任务" value={visibleTask?.id} options={taskOptions.map((t) => ({ value: t.id, label: `${kindLabels[t.kind]} · ${new Date(t.created_at).toLocaleString('zh-CN')} · ${t.stage}` }))} onChange={id => { setDraftWork(null); setSelectedId(id); }} />{tasks.length < taskCount && <Button onClick={() => { void client.tasks(accountId, taskPage + 1).then((data) => { setTasks((old) => [...old, ...data.results.filter((t) => !old.some((v) => v.id === t.id))]); setTaskPage((p) => p + 1); }).catch((e) => setError(documentError(e))); }}>加载更早记录</Button>}</div>
       {visibleTask && <section className="douyin-task"><div className="douyin-section-title"><h3>{kindLabels[visibleTask.kind]} · {visibleTask.stage}</h3>{visibleTask.kind === 'account' && <AccountAnalysisExport key={visibleTask.id} client={client} account={account} task={visibleTask} />}{isActive(visibleTask) && <Button onClick={() => { void client.cancel(accountId, visibleTask.id).then(() => setRefresh((v) => v + 1)).catch((e) => setError(documentError(e))); }}>取消任务</Button>}</div>
         {visibleTask.kind === 'transcribe' && visibleTask.status !== 'succeeded' && <p>来源作品：{visibleTask.copy_context?.work_title || '未命名作品'}</p>}
         <div role="status" aria-live="polite">{isActive(visibleTask) && <><Spin size="small" /> 正在处理，可离开页面后回来查看</>}{visibleTask.status === 'cancelled' && '任务已取消，之前的成果仍保留。'}</div>

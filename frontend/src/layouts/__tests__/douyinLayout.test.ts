@@ -110,8 +110,10 @@ describe('Douyin document workspace layout contract', () => {
     expect(columns).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
     const panel = read('../../pages/Apps/douyin/RewritePanel.tsx');
     expect(panel).toContain('douyin-rewrite-columns');
-    expect(panel).toContain('aria-label="口播原文"');
+    expect(panel).toContain("aria-label={isImage ? '参考原文' : '口播原文'}");
+    expect(panel).toContain('aria-label="创作主题"');
     expect(panel).toContain('aria-label="改写正文"');
+    expect(read('../../pages/Apps/douyin/DouyinWorkspace.tsx')).toContain('draftWork={draftWork}');
     expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
   });
   it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('uses the common shell presentation for %s', query => {

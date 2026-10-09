@@ -198,6 +198,84 @@ describe('Douyin benchmark workflow', () => {
 });
 
 
+describe('image album replication', () => {
+  const imageWork = { ...work, kind: 'image_album', description: '读书方法与实践' };
+  const imageTask: DouyinTask = { ...task, id: 'image-rewrite', kind: 'rewrite', status: 'failed',
+    error: '写作失败', output: {}, copy_context: { work_kind: 'image_album', work_title: '如何读书',
+      source_task_id: '', source_text: '补充后的素材', theme: '职场学习', rewrite_requirements: '简洁' } };
+
+  function setup(description = imageWork.description) {
+    const original = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, ...args) => {
+      if (url.endsWith('/works')) return Promise.resolve({ items: [{ ...imageWork, description }], sample_size: 1 });
+      if (url.endsWith('/tasks/image-rewrite')) return Promise.resolve(imageTask);
+      return original(url, ...args);
+    });
+  }
+
+  async function openImage() {
+    await click('作品库');
+    const button = [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(b => b.textContent === '爆款复刻')!;
+    expect(button.disabled).toBe(false);
+    await act(async () => button.click());
+  }
+
+  it.each(['如何读书', '读书方法与实践', ''])('prepares editable references without creating a task (%s)', async description => {
+    setup(description);
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    await openImage();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="参考原文"]')?.value).toBe(description && description !== imageWork.title ? `${imageWork.title}\n\n${description}` : imageWork.title);
+    expect(container.textContent).toContain('未读取图片内文字');
+    expect(container.textContent).not.toContain('重新转写');
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="创作主题"]')?.value).toBe('');
+    await setText('参考原文', ' ');
+    expect([...container.querySelectorAll('button')].find(b => b.textContent === '生成完整文章')?.disabled).toBe(true);
+    await setText('参考原文', '手工补充素材');
+    vi.mocked(api.post).mockResolvedValue(imageTask);
+    await click('生成完整文章');
+    expect(api.post).toHaveBeenLastCalledWith('/dy/accounts/a1/tasks', { kind: 'rewrite', work_id: 'w1',
+      source_text: '手工补充素材', theme: '', rewrite_requirements: '' }, expect.anything());
+  });
+
+  it.each(['missing', 'throwing', 'absent'])('keeps uncertain image requests retryable with crypto %s', async mode => {
+    vi.stubGlobal('crypto', mode === 'absent' ? undefined : mode === 'missing' ? {} : { randomUUID: () => { throw new Error('unavailable'); } });
+    setup();
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败')).mockRejectedValueOnce(new Error('网络失败')).mockResolvedValue(imageTask);
+    await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
+    await openImage();
+    await setText('创作主题', '职场学习');
+    await setText('参考原文', '补充后的素材');
+    await click('生成完整文章');
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="创作主题"]')?.value).toBe('职场学习');
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="参考原文"]')?.value).toBe('补充后的素材');
+    await click('生成完整文章');
+    await setText('创作主题', '新的主题');
+    await click('生成完整文章');
+    const keys = vi.mocked(api.post).mock.calls.map(([, , options]) => options?.headers?.['Idempotency-Key']);
+    expect(keys[0]).toEqual(expect.any(String));
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+    expect(vi.mocked(api.post).mock.calls[2][1]).toMatchObject({ theme: '新的主题' });
+    await openImage();
+    await setText('创作主题', '新的主题');
+    await setText('参考原文', '补充后的素材');
+    await click('生成完整文章');
+    expect(vi.mocked(api.post).mock.calls[3][2]?.headers?.['Idempotency-Key']).not.toBe(keys[2]);
+    expect(vi.mocked(api.post).mock.calls.every(([, body]) => (body as { kind: string }).kind === 'rewrite')).toBe(true);
+  });
+
+  it('restores image history and retries with its saved theme without transcription', async () => {
+    const onRun = vi.fn().mockResolvedValue(undefined);
+    await render(<RewritePanel client={douyinApi('/dy')} accountId="a1" task={imageTask} busy={false} onRun={onRun} />);
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="参考原文"]')?.value).toBe('补充后的素材');
+    expect(container.querySelector<HTMLTextAreaElement>('[aria-label="创作主题"]')?.value).toBe('职场学习');
+    expect(container.textContent).not.toContain('重新转写');
+    await click('重试改写');
+    expect(onRun).toHaveBeenCalledWith({ kind: 'rewrite', work_id: 'w1', source_text: '补充后的素材', theme: '职场学习', rewrite_requirements: '简洁' });
+  });
+});
+
 describe('text replication editor', () => {
   const context = { work_title: '如何读书', source_task_id: 'transcript-1', source_text: '已校正的原文', rewrite_requirements: '简洁自然' };
   const rewrite: DouyinTask = { ...task, id: 'rewrite-1', kind: 'rewrite', output: { text: '改写结果' }, copy_context: context };

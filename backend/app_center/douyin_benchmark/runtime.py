@@ -177,10 +177,16 @@ def execute(payload, sink):
                 save("completed", output)
         elif kind == "rewrite":
             save("改写文案")
-            result = analysis.call_model(task, analysis.REWRITE_PROMPT,
-                {"source_text": data["source_text"], "rewrite_requirements": data["rewrite_requirements"]},
-                config, cancelled=lambda: sink.cancelled)
-            output = analysis.validate_rewrite(result)
+            model_data = {"source_text": data["source_text"], "rewrite_requirements": data["rewrite_requirements"]}
+            prompt, validate = analysis.REWRITE_PROMPT, analysis.validate_rewrite
+            if data.get("work_kind", "video") == "image_album":
+                from .backend.image_rewrite import writing_instruction, validate_image_rewrite
+                save("加载图文写作技能")
+                prompt, validate = writing_instruction(), validate_image_rewrite
+                model_data["theme"] = data.get("theme", "")
+                save("撰写图文文章")
+            result = analysis.call_model(task, prompt, model_data, config, cancelled=lambda: sink.cancelled)
+            output = validate(result)
             with current(payload, sink) as active:
                 ScriptVersion.objects.create(task=active, revision=1, content=output)
                 active.stage, active.output = "completed", output

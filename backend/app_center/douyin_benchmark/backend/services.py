@@ -39,10 +39,15 @@ def frozen_input(account, values):
         if not values.get("work_id"):
             raise ValidationError("请选择作品。")
         work = get_object_or_404(account.works, pk=values["work_id"])
-        if kind in ("transcribe", "rewrite") and work.metadata.get("kind") != "video":
-            raise ValidationError("爆款复刻暂只支持视频作品。")
+        work_kind = work.metadata.get("kind")
+        if kind == "transcribe" and work_kind != "video":
+            raise ValidationError("文案转写只支持视频作品。")
+        if kind == "rewrite" and work_kind not in ("video", "image_album"):
+            raise ValidationError("爆款复刻只支持视频或图文作品。")
         data.update({"metadata": work.metadata, "media_key": work.media_key, "media_urls": list(work.media_urls)})
         data["work_title"] = work.metadata.get("title", "")
+        data["work_kind"] = work_kind
+        data["work_description"] = work.metadata.get("description", "")
     if kind == "transcribe" and not values.get("force"):
         from .analysis import transcript_text
         for source in account.tasks.filter(work=work, kind__in=["breakdown", "transcribe"], run__status="succeeded").iterator():
@@ -53,9 +58,14 @@ def frozen_input(account, values):
                 data["source_task_id"] = str(source.pk)
                 break
     if kind == "rewrite":
-        source = get_object_or_404(account.tasks, pk=values["source_task_id"], work=work,
-                                  kind__in=["transcribe", "breakdown"], run__status="succeeded")
-        data["source_task_id"] = str(source.pk)
+        if work_kind == "video":
+            if not values.get("source_task_id"):
+                raise ValidationError({"source_task_id": "请先获取并校正原文。"})
+            source = get_object_or_404(account.tasks, pk=values["source_task_id"], work=work,
+                                      kind__in=["transcribe", "breakdown"], run__status="succeeded")
+            data["source_task_id"] = str(source.pk)
+        elif values.get("source_task_id"):
+            raise ValidationError({"source_task_id": "图文复刻无需转写来源，请直接提交参考原文。"})
         # The corrected text is a private immutable snapshot, not an edit to ASR output.
         data["source_text"] = values["source_text"]
     if kind in ("topics", "script"):

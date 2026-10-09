@@ -27,7 +27,7 @@ export interface RewriteVersion { id: string; revision: number; content: Rewrite
 export interface DouyinTask {
   id: string; kind: Kind; work_id: string | null; run_id: string; status: string; stage: string; error: string; created_at: string;
   progress: { current?: number; total?: number; ai_preview?: { text: string; state: 'waiting' | 'receiving' | 'received' } }; sources: (DouyinWork & { id: string })[];
-  copy_context?: { work_title: string; source_task_id: string; source_text: string; rewrite_requirements: string } | null;
+  copy_context?: { work_title: string; work_kind?: string; work_description?: string; theme?: string; source_task_id: string; source_text: string; rewrite_requirements: string } | null;
   output: Partial<Script> & {
     text?: string;
     claims?: Claim[]; actual?: number; requested?: number; complete?: boolean; warning?: string; captured_at?: string;

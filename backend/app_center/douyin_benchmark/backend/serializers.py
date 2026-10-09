@@ -57,10 +57,10 @@ class TaskInput(serializers.Serializer):
         if attrs["kind"] == "transcribe":
             attrs.setdefault("force", False)
         if attrs["kind"] in ("transcribe", "rewrite") and not attrs.get("work_id"):
-            raise serializers.ValidationError({"work_id": "请选择视频作品。"})
+            raise serializers.ValidationError({"work_id": "请选择作品。"})
         if attrs["kind"] == "rewrite":
             attrs.setdefault("rewrite_requirements", "")
-            for field in ("source_task_id", "source_text"):
+            for field in ("source_text",):
                 if not attrs.get(field):
                     raise serializers.ValidationError({field: "请先获取并校正原文。"})
         if attrs["kind"] == "topics" and attrs["production_format"] == "animation" and attrs["duration"] > 120:
@@ -88,8 +88,9 @@ class TaskSerializer(serializers.ModelSerializer):
     def get_copy_context(self, obj):
         if obj.kind not in ("transcribe", "rewrite"):
             return None
-        return {key: obj.input.get(key, "") for key in
-                ("work_title", "source_task_id", "source_text", "rewrite_requirements")}
+        return {"work_kind": obj.input.get("work_kind", "video"),
+                **{key: obj.input.get(key, "") for key in
+                   ("work_title", "work_description", "source_task_id", "source_text", "rewrite_requirements", "theme")}}
 
     @swagger_serializer_method(serializer_or_field=serializers.JSONField())
     def get_output(self, obj):
