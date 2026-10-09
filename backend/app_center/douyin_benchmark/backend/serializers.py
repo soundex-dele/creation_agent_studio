@@ -10,6 +10,7 @@ class AccountInput(serializers.Serializer):
         ref_name = "DouyinAccountInput"
 
     source = serializers.CharField(max_length=4000)
+    is_owned = serializers.BooleanField(default=False)
     count = serializers.ChoiceField(choices=[20, 50, 100], default=50)
     group = serializers.CharField(max_length=100, allow_blank=True, default="")
     notes = serializers.CharField(max_length=5000, allow_blank=True, default="")
@@ -93,6 +94,9 @@ class TaskSerializer(serializers.ModelSerializer):
     @swagger_serializer_method(serializer_or_field=serializers.JSONField())
     def get_output(self, obj):
         value = dict(obj.output)
+        brief = obj.input.get('brief', {})
+        if brief.get('target_account_id'):
+            value['creation_context'] = {k: brief[k] for k in ['target_account_id', 'account_name', 'voice_version_number'] if k in brief}
         if obj.kind == 'variants' and obj.input.get('source_version_id'):
             source = ScriptVersion.objects.filter(pk=obj.input['source_version_id'], task__owner_id=obj.owner_id,
                 task__application_id=obj.application_id, task__organization_id=obj.organization_id).first()
@@ -124,6 +128,9 @@ class ScriptEdit(serializers.Serializer):
     def validate_content(self, value):
         from .analysis import validate_script, validate_rewrite
         try:
+            if self.context.get('kind') == 'article':
+                from .article import validate_article
+                return validate_article(value)
             if self.context.get('kind') == 'variants':
                 from .research_runtime import validate_variants
                 return validate_variants(value)
@@ -209,6 +216,7 @@ class CollectorConfigOutput(serializers.Serializer):
     configured = serializers.BooleanField()
     user_agent = serializers.CharField(allow_blank=True)
     has_cookies = serializers.BooleanField()
+    cookies = serializers.CharField(allow_blank=True)
     screen = serializers.CharField()
     language = serializers.CharField()
     timezone = serializers.CharField()

@@ -3,10 +3,13 @@ import { Alert, Button, Input, Modal, Pagination, Select, Tag } from 'antd';
 import { documentError } from '@/services/documents';
 import { researchLabels, type CommentRow, type Comparison, type ResearchClient, type ResearchTask, type ResearchVersion, type Variant } from '@/services/douyinResearch';
 import { ScriptEditor } from './ScriptEditor';
+import { ArticleEditor } from './ArticleEditor';
+import { GenerationPreview } from './GenerationPreview';
 import { ComparisonTable } from './ResearchLibrary';
 import { Field } from './ResearchCommon';
 
-export function ResearchResult({ client, task, run }: { client: ResearchClient; task: ResearchTask; run: (body: Record<string, unknown>) => Promise<void> }) {
+export function ResearchResult({ client, task, run, onDirty }: { client: ResearchClient; task: ResearchTask; run: (body: Record<string, unknown>) => Promise<void>; onDirty?: (value: boolean) => void }) {
+  const [starting, setStarting] = useState<number | null>(null);
   const [error, setError] = useState(''); const [saved, setSaved] = useState(''); const [ref, setRef] = useState(''); const [image, setImage] = useState('');
   const [comments, setComments] = useState<CommentRow[]>([]); const [commentPage, setCommentPage] = useState(1); const [commentTotal, setCommentTotal] = useState(0);
   const output = task.output;
@@ -24,9 +27,12 @@ export function ResearchResult({ client, task, run }: { client: ResearchClient; 
   }, [client, evidence?.task_id, task.id, frame]);
   const saveIdea = (title: string, notes: string) => action(() => client.create('ideas', { title: title.slice(0, 300), notes, source_task: task.id, tags: [] }));
   return <section className="douyin-form">{error && <Alert type="error" message={error} />}{saved && <Alert type="success" message={saved} />}{output.warning && <Alert type="warning" message={output.warning} />}{output.note && <p>{output.note}</p>}
+    {output.creation_context?.account_name && <p>创作账号：{output.creation_context.account_name} · 文风 v{output.creation_context.voice_version_number}</p>}
+    <GenerationPreview key={task.id} task={task} />
+    {task.kind === 'article' && task.status === 'succeeded' && <ArticleEditor key={task.id} client={client} taskId={task.id} onDirty={onDirty} />}
     {output.coverage && <p>最近{output.coverage.days}天，使用 {output.coverage.sampled} / {output.coverage.available} 条已采集作品。{output.baseline && '这是首次基线报告。'}</p>}
     {output.coverage && <details><summary>查看各账号样本覆盖</summary>{output.coverage.accounts.map(a => <p key={a.account_id}>{a.account_name}：{a.sampled} / {a.available}</p>)}</details>}{output.new_topic_note && <p>{output.new_topic_note}</p>}
-    {output.topics && <div className="douyin-research-grid">{output.topics.map((topic, i) => <article className="douyin-research-card" key={i}><h3>{topic.title} {topic.is_new && <Tag>新出现主题</Tag>}</h3><p>{topic.angle}</p>{topic.hook && <blockquote>{topic.hook}</blockquote>}{topic.sample_count != null && <p>{topic.account_count} 个账号 · {topic.sample_count} 条样本 · 点赞中位数 {topic.median_likes ?? '未获取'}</p>}<div className="douyin-actions"><Button onClick={() => void saveIdea(topic.title, `${topic.angle}\n${topic.hook || ''}`)}>保存为选题</Button>{task.kind === 'topics' && <Button type="primary" onClick={() => void action(() => run({ kind: 'script', source_task_id: task.id, topic_index: i }))}>生成拍摄脚本</Button>}{topic.refs?.map(id => <Button key={id} onClick={() => setRef(id)}>核对作品 {id.slice(0, 6)}</Button>)}</div></article>)}</div>}
+    {output.topics && <div className="douyin-research-grid">{output.topics.map((topic, i) => <article className="douyin-research-card" key={i}><h3>{topic.title} {topic.is_new && <Tag>新出现主题</Tag>}</h3><p>{topic.angle}</p>{topic.hook && <blockquote>{topic.hook}</blockquote>}{topic.pillar && <p>内容支柱：{topic.pillar}</p>}{topic.reason && <p>适合原因：{topic.reason}</p>}{topic.materials_needed && <p>需要补充：{topic.materials_needed}</p>}{topic.duplicate_note && <p>重复提醒：{topic.duplicate_note}</p>}{topic.sample_count != null && <p>{topic.account_count} 个账号 · {topic.sample_count} 条样本 · 点赞中位数 {topic.median_likes ?? '未获取'}</p>}<div className="douyin-actions"><Button onClick={() => void saveIdea(topic.title, [topic.angle, topic.hook, topic.pillar, topic.reason, topic.materials_needed, topic.duplicate_note].filter(Boolean).join('\n'))}>保存为选题</Button>{task.kind === 'topics' && <><Button type="primary" loading={starting === i} disabled={task.status !== 'succeeded' || starting !== null} onClick={() => { setStarting(i); void action(() => run({ kind: 'article', source_task_id: task.id, topic_index: i })).finally(() => setStarting(null)); }}>开始写作</Button><Button disabled={task.status !== 'succeeded' || starting !== null} onClick={() => void action(() => run({ kind: 'script', source_task_id: task.id, topic_index: i }))}>生成拍摄脚本</Button></>}{topic.refs?.map(id => <Button key={id} onClick={() => setRef(id)}>核对作品 {id.slice(0, 6)}</Button>)}</div></article>)}</div>}
     {output.children?.map(child => <p key={child.task_id}>视频 {child.work_id.slice(0, 8)} · {child.status} {child.error}</p>)}
     {output.claims?.map((claim, i) => <article className="douyin-research-card" key={i}><Tag>{({ observation: '观察事实', inference: '初步推测', suggestion: '创作建议' })[claim.type]}</Tag><p>{claim.text}</p><div className="douyin-actions">{claim.refs.map(id => <Button key={id} onClick={() => setRef(id)}>出处 {id.slice(0, 8)}</Button>)}<Button onClick={() => void saveIdea(claim.text.slice(0, 100), claim.text)}>保存为选题</Button></div></article>)}
     {output.comparison && !Array.isArray(output.comparison) && <ComparisonTable data={output.comparison} />}

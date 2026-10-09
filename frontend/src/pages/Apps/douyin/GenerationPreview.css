@@ -1,0 +1,10 @@
+.douyin-generation-preview { min-width: 0; }
+.douyin-generation-preview > .douyin-section-title { flex-wrap: wrap; }
+.douyin-generation-output {
+  min-width: 0;
+  max-height: min(24rem, 45dvh);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}

@@ -15,13 +15,16 @@ describe.each(['missing', 'throwing', 'absent'])('Douyin requests with crypto %s
     });
   });
 
-  it.each(['account', 'task', 'research', 'refresh'])('submits %s and keeps the key until success', async operation => {
+  it.each(['account', 'task', 'research', 'refresh', 'voice', 'owned-topics', 'article'])('submits %s and keeps the key until success', async operation => {
     const client = douyinApi('/dy');
     const research = researchApi('/dy');
     const submit = () => {
       if (operation === 'account') return client.create({ source: 'https://www.douyin.com/user/test', count: 50, group: '', notes: '' });
       if (operation === 'task') return client.start('a1', { kind: 'collect', count: 50 });
       if (operation === 'research') return research.start({ kind: 'radar', days: 7 });
+      if (operation === 'voice') return research.start({ kind: 'voice_analysis', target_account_id: 'a1' });
+      if (operation === 'article') return research.start({ kind: 'article', source_task_id: 'topics1', topic_index: 1 });
+      if (operation === 'owned-topics') return research.start({ kind: 'topics', target_account_id: 'a1', theme: '' });
       return research.refresh('s1');
     };
     vi.mocked(api.post).mockRejectedValueOnce(new Error('Network Error'));

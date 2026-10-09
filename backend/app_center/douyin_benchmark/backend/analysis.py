@@ -28,17 +28,26 @@ def call_model(task, prompt, data, config, frames=None, *, cancelled=None):
             {"id": frame["id"], "time": frame["time"]} for frame in frames
         ], ensure_ascii=False)
         image_paths = [str(path_for(frame["key"])) for frame in frames]
+    preview = config['_generation_preview']() if callable(config.get('_generation_preview')) else None
     try:
-        return generate_json(
+        value = generate_json(
             organization=task.organization, user=task.owner,
             resource_type="douyin_analysis", resource_id=task.id,
             instruction=INSTRUCTION + prompt, content=content,
             cancelled=cancelled, image_paths=image_paths,
+            **({'on_event': preview.on_event} if preview else {}),
         )
+        if preview:
+            # Adapters without incremental output still provide a final snapshot.
+            preview.on_event('output.snapshot', {'text': json.dumps(value, ensure_ascii=False)})
+        return value
     except InterruptedError:
         raise
     except RuntimeError as exc:
         raise ValueError(str(exc)) from None
+    finally:
+        if preview:
+            preview.finish()
 
 
 def validate_claims(data, allowed, *, visual=False):

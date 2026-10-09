@@ -11,9 +11,11 @@ from .serializers import TaskSerializer, VersionSerializer
 from .research import scope_for, works_for, work_data, valid_date, trend, comparison, start_research
 from .services import Conflict
 from datetime import timedelta
+from .owned import VoiceSampleSerializer
 
 
 RESOURCES = {
+    'voice-samples': (m.VoiceSample, VoiceSampleSerializer),
     'creator-profiles': (m.CreatorProfile, rs.ProfileSerializer), 'inspirations': (m.Inspiration, rs.InspirationSerializer),
     'ideas': (m.Idea, rs.IdeaSerializer), 'publications': (m.Publication, rs.PublicationSerializer),
     'subscriptions': (m.Subscription, rs.SubscriptionSerializer), 'notifications': (m.Notification, rs.NotificationSerializer),
@@ -39,6 +41,12 @@ class RecordsView(WorkspaceMixin, BaseView):
         qs = model.objects.filter(**self.scope())
         if model is m.CreatorProfile:
             qs = qs.order_by('-is_default', '-updated_at', 'id')
+            if request.query_params.get('account'):
+                from rest_framework import serializers
+                qs = qs.filter(account_id=serializers.UUIDField().run_validation(request.query_params['account']))
+        if model is m.VoiceSample and request.query_params.get('profile'):
+            from rest_framework import serializers
+            qs = qs.filter(profile_id=serializers.UUIDField().run_validation(request.query_params['profile']))
         if kwargs.get('record_id'):
             return Response(serializer(get_object_or_404(qs, pk=kwargs['record_id'])).data)
         search = request.query_params.get('search', '')[:200]
@@ -179,6 +187,10 @@ class ResearchTasksView(WorkspaceMixin, BaseView):
         qs = m.Task.objects.filter(**self.scope()).select_related('run')
         if request.query_params.get('kind'):
             qs = qs.filter(kind__in=request.query_params['kind'].split(','))
+        if request.query_params.get('target_account'):
+            from rest_framework import serializers
+            target = str(serializers.UUIDField().run_validation(request.query_params['target_account']))
+            qs = qs.filter(Q(input__target_account_id=target) | Q(input__brief__target_account_id=target))
         return Response(page(request, qs, TaskSerializer))
 
     def post(self, request, **kwargs):

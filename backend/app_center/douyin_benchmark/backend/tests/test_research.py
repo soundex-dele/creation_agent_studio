@@ -220,7 +220,7 @@ def test_subscription_growth_deduplicates_and_daily_digest(ctx):
 
 def test_subscriptions_opt_in_dispatch_and_config_removal(ctx):
     scope = scope_for(ctx.app, ctx.owner)
-    m.CollectorConfig.objects.create(**scope, user_agent='UA', encrypted_cookies='test')
+    m.CollectorConfig.objects.create(**scope, user_agent='UA', cookies='test')
     response = ctx.client.post(ctx.root + '/subscriptions', {'account': str(ctx.account.pk)}, format='json')
     assert response.status_code == 201, response.data
     subscription = m.Subscription.objects.get(pk=response.data['id'])
@@ -309,7 +309,7 @@ def test_cancelled_refresh_cannot_write_a_late_response(ctx, monkeypatch):
 def test_scheduler_serializes_accounts_and_pauses_removed_members(ctx):
     from apps.enterprise.models import Membership
     scope = scope_for(ctx.app, ctx.owner)
-    m.CollectorConfig.objects.create(**scope, user_agent='UA', encrypted_cookies='test')
+    m.CollectorConfig.objects.create(**scope, user_agent='UA', cookies='test')
     finish(ctx.task)
     other = other_account(ctx)
     for account in [ctx.account, other]:

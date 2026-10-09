@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.mocked(api.get).mockImplementation(async (url) => {
     if (url.endsWith('/accounts')) return { count: 1, results: [account] };
     if (url.endsWith('/connection')) return { connected: false, message: '采集登录状态已失效' };
-    if (url.endsWith('/collector-config')) return { configured: true, user_agent: 'Chrome saved UA', has_cookies: true, screen: '1920x1080', language: 'zh-CN', timezone: 'Asia/Shanghai', updated_at: null };
+    if (url.endsWith('/collector-config')) return { configured: true, user_agent: 'Chrome saved UA', has_cookies: true, cookies: 'UIFID_TEMP=saved-cookie', screen: '1920x1080', language: 'zh-CN', timezone: 'Asia/Shanghai', updated_at: null };
     if (url.endsWith('/brands')) return [];
     if (url.endsWith('/works')) return { items: [work], sample_size: 1, median_likes: null, explanation: '样本不足10条', batch: { ...task, kind: 'collect', output: { actual: 1, complete: true } } };
     if (url.endsWith('/tasks')) return { count: 1, results: [task] };
@@ -264,17 +264,24 @@ describe('text replication editor', () => {
 });
 
 describe('personal collector settings', () => {
-  it('keeps saved cookies blank and saves replacement credentials', async () => {
-    vi.mocked(api.put).mockResolvedValue({ configured: true });
+  it('shows saved cookies and reloads replacement credentials when reopened', async () => {
+    const originalGet = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.put).mockImplementation(async (url, body) => {
+      vi.mocked(api.get).mockImplementation(async (path, ...args) => {
+        const data = await originalGet(path, ...args);
+        return path === url ? { ...data as object, ...body as object } : data;
+      });
+      return { configured: true };
+    });
     await render(<DouyinHome base="/dy" />); await click('采集设置');
-    expect((document.querySelector('[aria-label="采集 Cookie"]') as HTMLTextAreaElement).value).toBe('');
+    expect((document.querySelector('[aria-label="采集 Cookie"]') as HTMLTextAreaElement).value).toBe('UIFID_TEMP=saved-cookie');
     expect(document.body.textContent).toContain('已保存，留空保留原值');
     await setText('采集 User-Agent', 'new Chrome UA'); await setText('采集 Cookie', 'UIFID_TEMP=personal-cookie');
     await click('保存配置');
     expect(api.put).toHaveBeenCalledWith('/dy/collector-config', expect.objectContaining({ user_agent: 'new Chrome UA', cookies: 'UIFID_TEMP=personal-cookie' }));
     expect(document.querySelector('[aria-label="采集 Cookie"]')).toBeNull();
     await click('采集设置');
-    expect((document.querySelector('[aria-label="采集 Cookie"]') as HTMLTextAreaElement).value).toBe('');
+    expect((document.querySelector('[aria-label="采集 Cookie"]') as HTMLTextAreaElement).value).toBe('UIFID_TEMP=personal-cookie');
   });
   it('clears only the personal collector configuration', async () => {
     vi.mocked(api.delete).mockResolvedValue(undefined);
@@ -287,6 +294,7 @@ describe('personal collector settings', () => {
     await render(<DouyinHome base="/dy" />); await click('采集设置'); await click('保存配置');
     expect(document.body.textContent).toContain('Cookie 格式错误');
     expect(document.querySelector('[aria-label="采集 Cookie"]')).not.toBeNull();
+    expect((document.querySelector('[aria-label="采集 Cookie"]') as HTMLTextAreaElement).value).toBe('UIFID_TEMP=saved-cookie');
   });
 });
 

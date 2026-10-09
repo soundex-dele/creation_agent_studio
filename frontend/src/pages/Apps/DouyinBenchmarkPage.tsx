@@ -13,6 +13,7 @@ import { CollectorSettings } from './douyin/CollectorSettings';
 import { DouyinNavigation, douyinSections } from './douyin/DouyinNavigation';
 import './DouyinBenchmarkPage.css';
 import { ResearchHub } from './douyin/ResearchHub';
+import { OwnedAccounts } from './douyin/OwnedAccounts';
 import './douyin/ResearchHub.css';
 
 export function DouyinHome({ base }: { base: string }) {
@@ -64,7 +65,7 @@ export function DouyinHome({ base }: { base: string }) {
     <header className="douyin-header"><div className="douyin-header-copy">
       <div className="douyin-title"><div><small>内容研究 · 创作工作台</small><h1>{accountId ? '账号研究' : section.label}</h1></div></div>
       <p>{section.description}</p>
-    </div><div className="douyin-actions douyin-header-actions">{accountId && <Button icon={<UsersRound size={16} aria-hidden="true" />} onClick={() => navigate(null)}>全部账号</Button>}<Button type="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => { setOpen(true); setFormError(''); }}>添加对标账号</Button></div></header>
+    </div><div className="douyin-actions douyin-header-actions">{accountId && <Button icon={<UsersRound size={16} aria-hidden="true" />} onClick={() => navigate(null)}>全部账号</Button>}{view !== 'owned' && <Button type="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => { setOpen(true); setFormError(''); }}>添加对标账号</Button>}</div></header>
     {!accountId && !view && <section className="douyin-intro" aria-label="研究与创作流程">
       <div className="douyin-intro-copy"><span className="douyin-eyebrow">从观察到表达</span><h2>读懂好内容，<br />找到你的创作方向。</h2><p>把值得学习的账号放在一起，<br />从真实作品中积累下一条视频的灵感。</p></div>
       <ol className="douyin-process">
@@ -72,7 +73,7 @@ export function DouyinHome({ base }: { base: string }) {
       </ol>
     </section>}
     {connection && <Alert className="douyin-connection" type={connection.connected ? 'success' : 'warning'} showIcon message={connection.message} action={<Button size="small" onClick={() => setRefresh((v) => v + 1)}>检查配置</Button>} />}
-    {view ? <ResearchHub base={base} section={view} onSection={setView} openAccount={navigate} /> : accountId ? <DouyinWorkspace key={accountId} client={client} accountId={accountId} onRemoved={() => { navigate(null); setRefresh((v) => v + 1); }} /> : <section className="douyin-panel douyin-library">
+    {view === 'owned' ? <OwnedAccounts base={base} openAccount={navigate} /> : view ? <ResearchHub base={base} section={view} onSection={setView} openAccount={navigate} /> : accountId ? <DouyinWorkspace key={accountId} client={client} accountId={accountId} onRemoved={() => { navigate(null); setRefresh((v) => v + 1); }} /> : <section className="douyin-panel douyin-library">
       <div className="douyin-section-title"><div><span className="douyin-eyebrow">账号库</span><h2>我的对标账号 {!loading && !error && <span className="douyin-count">{count}</span>}</h2></div><span className="douyin-private"><LockKeyhole size={14} aria-hidden="true" />个人资料与创作历史仅自己可见</span></div>
       {error ? <Alert type="error" message={error} action={<Button onClick={() => setRefresh((v) => v + 1)}>重试</Button>} /> : loading ? <div className="douyin-loading" role="status"><Spin /><span>正在加载对标账号…</span></div> : !accounts.length ? <div className="douyin-empty"><Empty image={<span className="douyin-empty-icon"><UsersRound size={32} aria-hidden="true" /></span>} description={<><h3>你的内容研究，从这里开始</h3><p>添加第一个账号，开始研究选题和内容结构</p></>}><Button type="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => { setOpen(true); setFormError(''); }}>添加账号</Button></Empty></div> : <div className="douyin-account-grid">{accounts.map((a) => <button type="button" className="douyin-account-card" key={a.id} onClick={() => navigate(a.id)}><span className="douyin-card-top"><span className="douyin-avatar" aria-hidden="true">{Array.from(a.name || '待')[0]}</span><ArrowUpRight className="douyin-card-arrow" size={20} aria-hidden="true" /></span><strong className="douyin-card-name">{a.name || '待采集账号'}</strong><span className="douyin-card-description">{a.profile.signature || a.notes || '采集作品后查看账号分析'}</span><span className="douyin-card-footer"><span className="douyin-group"><FolderOpen size={14} aria-hidden="true" />{a.group || '未分组'}</span><span className="douyin-card-enter">进入研究<ArrowRight size={14} aria-hidden="true" /></span></span></button>)}</div>}
       <Pagination current={page} total={count} pageSize={20} showSizeChanger={false} hideOnSinglePage onChange={setPage} />

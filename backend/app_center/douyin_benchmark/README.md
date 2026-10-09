@@ -2,6 +2,19 @@
 
 独立应用 `douyin-benchmark`：个人对标账号 → 跨账号研究／评论需求 → 灵感和选题库 → 个人创作档案／脚本与表达实验 → 关联发布作品 → 指标追踪和复盘。保留单账号分析、视频拆解、文案改写、脚本版本和动画制作导入。订阅为用户主动开启的定时采集；不自动发布，也不把公开互动数据解释为播放量、完播率或未来效果。
 
+## 我的账号与个人文风
+
+入口 `?view=owned&owned=<accountId>` 支持多个自己的账号，保留原有入口与展示参数。每个账号绑定独立创作档案；旧档案不自动绑定，新账号也不继承其他账号的默认文风。
+
+- 从已采集作品添加样本，优先复用成功转写；缺失时可转写或粘贴正文。样本分为“代表我的风格／只参考内容／不学习”。转写结果需核对后保存。每次最多20篇、12万字符；建议5—10篇，少于3篇正文标注初步分析。仅标题只可分析定位。
+- 分析任务只产生草稿，结论必须引用原文连续片段。编辑定位、规则、示例及完整提示词后确认新版本；可复制提示词、查看历史、重新启用旧版本。共享经历从文本灵感中显式选取，专属经历、产品事实与拍摄条件随确认版本保存。
+- 每次生成3个账号选题，说明支柱、适配原因、素材缺口及重复提醒（仅覆盖已采集最近100条）。选题与脚本冻结账号、文风版本、样本和共享素材。后续编辑或切换版本不影响已有任务。不提供“AI率”或未获取的完播率。
+- 已完成的选题卡片提供“开始写作”：通过`POST tasks`的`kind=article`、`source_task_id`和`topic_index`生成完整文章，沿用该选题冻结的文风和事实快照。文章标题、正文、待核实事项分别保存；可编辑、保存历史版本、复制正文和导出Markdown。文章独立于拍摄脚本，不受视频时长或分镜要求限制；删除来源账号后仍保留已保存文章。此扩展无需新增迁移。
+- API：`voice-samples` 沿用私有记录的分页、CRUD和revision冲突校验；`creator-profiles` 增加account、active_version等字段；`GET/POST creator-profiles/{id}/voice-versions` 查看历史／确认版本，`POST …/voice-versions/{versionId}/activate` 启用历史版本；`POST tasks` 支持`voice_analysis`与`target_account_id`，选题支持省略主题。
+- 删除账号后保留已确认档案、样本文本、版本和已保存文案，清除失效外键。新表沿用组织RLS和应用／用户访问隔离。
+
+部署前应用迁移0008、0009（包含PostgreSQL RLS）：在仓库根目录运行 `backend\venv\Scripts\python.exe -X utf8 backend\manage.py migrate`。Windows测试使用项目虚拟环境和`-X utf8`，避免测试夹具按GBK读取UTF-8文件。
+
 ## 账号分析导出
 
 打开账号工作台的「对标账号」，选择已完成且有结论的历史分析，点击结果标题旁的「导出 Markdown」。新完成的分析也可直接导出；下载失败可重试。报告包含样本统计、时长分布、分类结论和编号出处，使用该任务冻结的作品及视频拆解快照，账号名称与主页链接使用导出时的当前信息。
@@ -90,7 +103,7 @@ uv pip install --python backend/.venv-dtk/bin/python -r backend/scripts/douyin_v
 
 3. Web 与 media worker 都需要上述源码和独立运行环境。非默认路径设置 `DOUYIN_DTK_PYTHON` 为独立解释器绝对路径；Windows 默认使用 `backend/.venv-dtk/Scripts/python.exe`。
 4. 进入应用 → **采集设置**，粘贴同一桌面 Chrome/Chromium 浏览器抖音网页请求的 User-Agent 和 Cookie。Cookie 支持请求头、JSON 对象、浏览器导出的 JSON 数组，需包含有效 `UIFID` 或 `UIFID_TEMP`。屏幕尺寸、语言和时区应与该浏览器一致。无需向开发者发送凭据。
-5. 保存配置后添加账号或刷新已有账号。Cookie 使用 Django `SECRET_KEY` 派生的独立 Fernet 密钥加密，按组织、应用和所有者隔离。API 只回传 `has_cookies`，编辑留空保留原值，“清除已保存配置”仅删除本人的配置。密钥变更后需重新保存 Cookie；生产环境保护 `SECRET_KEY`，通过 HTTPS 访问页面，反向代理不要记录配置请求体。
+5. 保存配置后添加账号或刷新已有账号。Cookie 明文保存，按组织、应用和所有者隔离；采集设置直接回显本人已保存的 Cookie，可查看和编辑，留空保留原值，“清除已保存配置”仅删除本人的配置。迁移 `0010_collector_cookies_plaintext` 使用原 Django `SECRET_KEY` 解密旧配置并保留原值，迁移后读写不再依赖加密密钥。通过 HTTPS 访问页面，反向代理不要记录配置请求体。
 
 | 配置 | 作用 |
 | --- | --- |
@@ -144,9 +157,11 @@ HTTP(S) 媒体地址均按 DTK 返回值处理，仅允许平台 CDN 域名和�
 
 ## 接口
 
+“我的账号”的定位／文风分析、选题和文章写作，以及研究创作结果页，支持显示生成中的公开回复。执行器将有界预览写入私有任务的 `progress.ai_preview`，最多每秒写入一次，页面复用约 2.5 秒轮询；不会显示推理、工具参数或模型诊断。预览按可读字段呈现，重试会替换上一轮内容，失败保留已收到片段，成功后清除预览并显示通过校验的正式结果。模型若不提供增量消息，只能在完整回复到达后显示。无需数据库迁移；已开始的旧任务不会补发预览。
+
 前缀 `/api/v1/organizations/{organization_id}/applications/{application_id}/douyin-benchmark`；单租户模式支持已有省略组织前缀的别名。
 
-- `GET/PUT/DELETE /collector-config`：本人采集配置；Cookie 只写入不回显，空值保留。
+- `GET/PUT/DELETE /collector-config`：本人采集配置；Cookie 明文保存并回显，空值保留。
 - `GET /connection`、`GET /brands`：本地配置检查、可引用私有品牌（仅定位与语气）。
 - `GET/POST /accounts`；`GET/PATCH/DELETE /accounts/{id}`：添加时创建采集任务，支持备注与分组。
 - `GET /accounts/{id}/works`：`batch_id/search/sort/outstanding`；`POST .../works/{work_id}/upload` 接收 multipart `video`。

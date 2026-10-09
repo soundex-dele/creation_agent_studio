@@ -1,24 +1,17 @@
-"""Personal credentials: encrypted at rest and passed only over a child stdin pipe."""
+"""Personal collector settings, passed to the collector over a child stdin pipe."""
 
 from core.observability import log_operation
-import base64
-import hashlib
 import json
 import logging
 import os
 from pathlib import Path
 import subprocess
 import time
-from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from modules.tenancy.database import tenant_database_context
 from django.views.decorators.debug import sensitive_variables
 from .models import CollectorConfig
 from .provider import DTKClient, CollectionError
-
-
-def cipher():
-    return Fernet(base64.urlsafe_b64encode(hashlib.sha256((settings.SECRET_KEY + ":douyin-benchmark").encode()).digest()))
 
 
 def config_for(application, owner):
@@ -28,7 +21,7 @@ def config_for(application, owner):
 
 def public_config(config):
     return {"configured": bool(config), "user_agent": config.user_agent if config else "",
-        "has_cookies": bool(config and config.encrypted_cookies),
+        "has_cookies": bool(config and config.cookies), "cookies": config.cookies if config else "",
         "screen": config.screen if config else "1920x1080", "language": config.language if config else "zh-CN",
         "timezone": config.timezone if config else "Asia/Shanghai", "updated_at": config.updated_at if config else None}
 
@@ -37,11 +30,7 @@ def public_config(config):
 def private_config(config):
     if not config:
         raise CollectionError("not_configured")
-    try:
-        return {key: getattr(config, key) for key in ("user_agent", "screen", "language", "timezone")} | {
-            "cookies": cipher().decrypt(config.encrypted_cookies.encode()).decode()}
-    except InvalidToken:
-        raise CollectionError("credentials") from None
+    return {key: getattr(config, key) for key in ("user_agent", "screen", "language", "timezone", "cookies")}
 
 
 @sensitive_variables()

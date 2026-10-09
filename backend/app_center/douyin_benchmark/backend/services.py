@@ -73,7 +73,7 @@ def frozen_input(account, values):
             data["brief"]["production_format"] = data.get("production_format", DEFAULT_FORMAT)
             from .models import CreatorProfile
             profiles = CreatorProfile.objects.filter(organization_id=account.organization_id, application_id=account.application_id, owner_id=account.owner_id)
-            profile = get_object_or_404(profiles, pk=values['profile_id']) if values.get('profile_id') else profiles.filter(is_default=True).first()
+            profile = get_object_or_404(profiles, pk=values['profile_id']) if values.get('profile_id') else profiles.filter(is_default=True, account__isnull=True).first()
             if profile:
                 data['brief']['profile'] = {key: getattr(profile, key) for key in ['name', 'positioning', 'audience', 'experiences', 'products', 'voice', 'conditions']}
             if values.get("brand_profile_id"):

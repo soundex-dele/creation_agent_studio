@@ -3,6 +3,7 @@ import { ArrowLeft, Bell, ChartNoAxesCombined, Clapperboard, Lightbulb, ScanSear
 
 export const douyinSections = [
   { key: '', label: '对标账号', icon: UsersRound, description: '管理值得学习的账号，积累真实作品样本。' },
+  { key: 'owned', label: '我的账号', icon: UserRound, description: '分析自己的定位与文风，让每个账号保持独立表达。' },
   { key: 'research', label: '对标研究', icon: ScanSearch, description: '跨账号研究作品，发现值得继续探索的选题。' },
   { key: 'ideas', label: '选题库', icon: Lightbulb, description: '整理研究中发现的灵感，推进下一条内容。' },
   { key: 'create', label: '创作中心', icon: Clapperboard, description: '结合自身定位，把灵感写成可拍摄的脚本。' },

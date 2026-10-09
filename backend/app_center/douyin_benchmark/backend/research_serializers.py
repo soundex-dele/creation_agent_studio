@@ -36,11 +36,28 @@ READ = ['id', 'created_at', 'updated_at']
 
 
 class ProfileSerializer(PrivateSerializer):
+    active_version_number = serializers.IntegerField(source='active_version.number', read_only=True, allow_null=True)
+
     class Meta:
         model = m.CreatorProfile
-        fields = BASE + ['name', 'positioning', 'audience', 'experiences', 'products', 'voice', 'conditions', 'is_default']
-        read_only_fields = READ
+        fields = BASE + ['name', 'positioning', 'audience', 'experiences', 'products', 'voice', 'conditions', 'is_default',
+                         'account', 'content_pillars', 'content_boundaries', 'shared_inspiration_ids', 'active_version', 'active_version_number']
+        read_only_fields = READ + ['active_version']
         validators = []
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        account = attrs.get('account', getattr(self.instance, 'account', None))
+        if account and not account.is_owned:
+            raise serializers.ValidationError('请先将账号标记为我的账号。')
+        if self.instance and 'account' in attrs and self.instance.account_id and getattr(account, 'pk', None) != self.instance.account_id:
+            raise serializers.ValidationError('已有账号档案不能更换账号。')
+        if self.instance and 'account' in attrs and not self.instance.account_id and self.instance.voice_versions.exists():
+            raise serializers.ValidationError('有历史文风版本的档案不能绑定其他账号，请新建独立档案。')
+        if 'shared_inspiration_ids' in attrs:
+            from .owned import shared_materials
+            attrs['shared_inspiration_ids'] = [r['id'] for r in shared_materials(self.context['scope'], attrs['shared_inspiration_ids'])]
+        return attrs
 
 
 class InspirationSerializer(PrivateSerializer):
@@ -138,7 +155,9 @@ class DigestSerializer(PrivateSerializer):
 
 
 class ResearchInput(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=['radar', 'joint', 'compare', 'comments', 'needs', 'variants', 'review', 'refresh', 'topics', 'script'])
+    kind = serializers.ChoiceField(choices=['radar', 'joint', 'compare', 'comments', 'needs', 'variants', 'review', 'refresh', 'topics', 'script', 'voice_analysis', 'article'])
+    target_account_id = serializers.UUIDField(required=False)
+    analysis_mode = serializers.ChoiceField(choices=['style', 'positioning'], default='style')
     account_ids = serializers.ListField(child=serializers.UUIDField(), max_length=50, default=list)
     work_ids = serializers.ListField(child=serializers.UUIDField(), max_length=20, default=list)
     days = serializers.ChoiceField(choices=[7, 30, 90], default=30)
@@ -162,6 +181,8 @@ class ResearchInput(serializers.Serializer):
         attrs['account_ids'] = list(dict.fromkeys(attrs['account_ids']))
         attrs['work_ids'] = list(dict.fromkeys(attrs['work_ids']))
         kind = attrs['kind']
+        if kind == 'voice_analysis' and not attrs.get('target_account_id'):
+            raise serializers.ValidationError('请选择自己的账号。')
         if kind == 'joint' and not 2 <= len(attrs['work_ids']) <= 5:
             raise serializers.ValidationError('联合拆解请选择2–5条视频。')
         if kind == 'compare' and not 2 <= len(attrs['account_ids']) <= 5:
@@ -170,7 +191,7 @@ class ResearchInput(serializers.Serializer):
             raise serializers.ValidationError('请选择一条作品采集评论。')
         if kind == 'refresh' and not attrs['work_ids']:
             raise serializers.ValidationError('请选择需要刷新的作品。')
-        if kind in ['needs', 'script'] and not attrs.get('source_task_id'):
+        if kind in ['needs', 'script', 'article'] and not attrs.get('source_task_id'):
             raise serializers.ValidationError('请选择来源任务。')
         if kind == 'variants' and not attrs.get('source_version_id'):
             raise serializers.ValidationError('请选择已保存的文案版本。')

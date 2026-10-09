@@ -93,7 +93,7 @@ class CollectorConfig(TenantOwnedModel):
     application = models.ForeignKey("applications.Application", on_delete=models.CASCADE)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_agent = models.CharField(max_length=2000)
-    encrypted_cookies = models.TextField()
+    cookies = models.TextField()
     screen = models.CharField(max_length=20, default="1920x1080")
     language = models.CharField(max_length=50, default="zh-CN")
     timezone = models.CharField(max_length=100, default="Asia/Shanghai")
@@ -117,6 +117,11 @@ class PrivateRecord(TenantOwnedModel):
 
 
 class CreatorProfile(PrivateRecord):
+    account = models.OneToOneField(Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='creator_profile')
+    content_pillars = models.TextField(blank=True)
+    content_boundaries = models.TextField(blank=True)
+    shared_inspiration_ids = models.JSONField(default=list, blank=True)
+    active_version = models.ForeignKey('VoiceVersion', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     name = models.CharField(max_length=100)
     positioning = models.TextField(blank=True)
     audience = models.TextField(blank=True)
@@ -128,6 +133,27 @@ class CreatorProfile(PrivateRecord):
 
     class Meta(PrivateRecord.Meta):
         constraints = [models.UniqueConstraint(fields=["organization", "application", "owner"], condition=models.Q(is_default=True), name="dy_default_profile")]
+
+
+class VoiceSample(PrivateRecord):
+    profile = models.ForeignKey(CreatorProfile, on_delete=models.CASCADE, related_name='voice_samples')
+    work = models.ForeignKey(Work, null=True, blank=True, on_delete=models.SET_NULL)
+    source_task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.SET_NULL)
+    title = models.CharField(max_length=300)
+    text = models.TextField(blank=True)
+    usage = models.CharField(max_length=20, default='style')
+    source_url = models.URLField(max_length=1000, blank=True)
+
+
+class VoiceVersion(PrivateRecord):
+    profile = models.ForeignKey(CreatorProfile, on_delete=models.CASCADE, related_name='voice_versions')
+    number = models.PositiveIntegerField()
+    content = models.JSONField(default=dict)
+    evidence = models.JSONField(default=list)
+    source_task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta(PrivateRecord.Meta):
+        constraints = [models.UniqueConstraint(fields=['profile', 'number'], name='dy_voice_version_number')]
 
 
 class Inspiration(PrivateRecord):

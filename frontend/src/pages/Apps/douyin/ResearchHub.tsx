@@ -20,7 +20,7 @@ export function ResearchHub({ base, section, onSection, openAccount }: { base: s
   useEffect(() => { let alive = true; void allRows<DouyinAccount>(client, 'accounts').then(rows => { if (alive) setAccounts(rows); }).catch(e => { if (alive) setError(documentError(e)); }); return () => { alive = false; }; }, [client, refresh]);
   useEffect(() => {
     let alive = true; let timer: ReturnType<typeof setTimeout>; setTask(null); if (!taskId) return;
-    const poll = async () => { try { const value = await client.task(taskId); if (!alive) return; setTask(value); if (isActive(value)) timer = setTimeout(() => void poll(), 2500); } catch (e) { if (alive) setError(documentError(e)); } };
+    const poll = async () => { try { const value = await client.task(taskId); if (!alive) return; setTask(value); setError(''); if (isActive(value)) timer = setTimeout(() => void poll(), 2500); } catch (e) { if (alive) { setError(documentError(e)); timer = setTimeout(() => void poll(), 5000); } } };
     void poll(); return () => { alive = false; clearTimeout(timer); };
   }, [client, taskId, retry]);
   function selectTask(id: string) { setParams(old => { const next = new URLSearchParams(old); next.set('task', id); return next; }); }

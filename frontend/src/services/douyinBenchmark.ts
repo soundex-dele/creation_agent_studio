@@ -2,7 +2,7 @@ import { api } from './api';
 import { createDouyinSubmitter } from './douyinRequests';
 import type { AnimationDestination } from './douyinAnimation';
 
-export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; screen: string; language: string; timezone: string; updated_at: string | null }
+export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; cookies: string; screen: string; language: string; timezone: string; updated_at: string | null }
 export type CollectorConfigInput = Pick<CollectorConfig, 'user_agent' | 'screen' | 'language' | 'timezone'> & { cookies?: string };
 
 export interface DouyinAccount { is_owned?: boolean; id: string; source_url: string; name: string; group: string; notes: string; profile: { signature?: string }; updated_at: string }
@@ -26,7 +26,7 @@ export interface RewriteContent { text: string }
 export interface RewriteVersion { id: string; revision: number; content: RewriteContent; created_at: string }
 export interface DouyinTask {
   id: string; kind: Kind; work_id: string | null; run_id: string; status: string; stage: string; error: string; created_at: string;
-  progress: { current?: number; total?: number }; sources: (DouyinWork & { id: string })[];
+  progress: { current?: number; total?: number; ai_preview?: { text: string; state: 'waiting' | 'receiving' | 'received' } }; sources: (DouyinWork & { id: string })[];
   copy_context?: { work_title: string; source_task_id: string; source_text: string; rewrite_requirements: string } | null;
   output: Partial<Script> & {
     text?: string;
@@ -48,7 +48,7 @@ export function douyinApi(base: string) {
   const account = (id: string) => `${base}/accounts/${id}`;
   const task = (id: string, taskId: string) => `${account(id)}/tasks/${taskId}`;
   return {
-    profiles: () => api.get<{ count: number; results: { id: string; name: string; positioning: string; audience: string; conditions: string; is_default: boolean }[] }>(`${base}/creator-profiles`),
+    profiles: () => api.get<{ count: number; results: { id: string; name: string; positioning: string; audience: string; conditions: string; is_default: boolean; account?: string | null }[] }>(`${base}/creator-profiles`),
     animationDestinations: () => api.get<AnimationDestination[]>(`${base}/animation-integrations`),
     collectorConfig: () => api.get<CollectorConfig>(`${base}/collector-config`),
     saveCollectorConfig: (body: CollectorConfigInput) => api.put<CollectorConfig>(`${base}/collector-config`, body),
@@ -56,7 +56,7 @@ export function douyinApi(base: string) {
     connection: () => api.get<{ connected: boolean; message: string }>(`${base}/connection`),
     brands: () => api.get<{ id: string; name: string }[]>(`${base}/brands`),
     accounts: (page = 1) => api.get<{ count: number; results: DouyinAccount[] }>(`${base}/accounts`, { page }),
-    create: (body: { source: string; count: number; group: string; notes: string }) => submit<DouyinAccount & { task: DouyinTask }>(`${base}/accounts`, body),
+    create: (body: { source: string; count: number; group: string; notes: string; is_owned?: boolean }) => submit<DouyinAccount & { task: DouyinTask }>(`${base}/accounts`, body),
     account: (id: string) => api.get<DouyinAccount>(account(id)),
     save: (id: string, body: { group: string; notes: string }) => api.patch<DouyinAccount>(account(id), body),
     remove: (id: string) => api.delete(account(id)),

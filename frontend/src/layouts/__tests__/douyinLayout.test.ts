@@ -4,6 +4,37 @@ import { describe, expect, it } from 'vitest';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 describe('Douyin document workspace layout contract', () => {
+  it('bounds generation previews inside the existing page scroll owner', () => {
+    const source = read('../../pages/Apps/douyin/GenerationPreview.css');
+    expect(source).toContain('max-height: min(24rem, 45dvh)');
+    expect(source).toContain('overflow-y: auto');
+    expect(source).toContain('overflow-wrap: anywhere');
+    expect(source).toContain('white-space: pre-wrap');
+    expect(source).toContain('min-width: 0');
+    expect(source).not.toMatch(/height:\s*(100vh|100dvh|auto)/);
+    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+  });
+  it.each([320, 375, 390, 767, 768, 1280])('keeps owned-account content in the page scroll container at %spx', width => {
+    const css = postcss.parse(read('../../pages/Apps/douyin/OwnedAccounts.css'));
+    let columns = '';
+    css.walkRules(rule => {
+      if (rule.parent?.type === 'atrule' && rule.parent.name === 'media') {
+        const max = rule.parent.params.match(/max-width:\s*(\d+)px/);
+        if (max && width > Number(max[1])) return;
+      }
+      if (rule.selectors.includes('.douyin-owned-grid')) rule.walkDecls('grid-template-columns', decl => { columns = decl.value; });
+      rule.walkDecls('height', decl => { expect(['100vh', '100dvh']).not.toContain(decl.value); });
+    });
+    expect(columns).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain("view === 'owned' ? <OwnedAccounts");
+  });
+  it('bounds the owned sample editor at short viewport heights', () => {
+    const source = read('../../pages/Apps/douyin/OwnedAccounts.css');
+    expect(source).toContain('max-height: 65dvh; overflow-y: auto;');
+    expect(source).toContain('@media (max-height: 500px)');
+    expect(source).toContain('max-height: 50dvh;');
+  });
   it('lets the account report action wrap without changing the document scroll owner', () => {
     const source = read('../../pages/Apps/DouyinBenchmarkPage.css');
     expect(source).toContain('.douyin-task > .douyin-section-title { flex-wrap: wrap; }');

@@ -24,12 +24,15 @@ urlpatterns = [
 
 
 from . import research_views as rv
+from .owned import VoiceVersionsView
 for resource in rv.RESOURCES:
     urlpatterns += [
         path(root + '/' + resource, rv.RecordsView.as_view(), {'resource': resource}),
         path(root + '/' + resource + '/<uuid:record_id>', rv.RecordsView.as_view(), {'resource': resource}),
     ]
 urlpatterns += [
+    path(root + '/creator-profiles/<uuid:profile_id>/voice-versions', VoiceVersionsView.as_view()),
+    path(root + '/creator-profiles/<uuid:profile_id>/voice-versions/<uuid:version_id>/activate', VoiceVersionsView.as_view()),
     path(root + '/works', rv.AllWorksView.as_view()),
     path(root + '/works/<uuid:work_id>/trend', rv.TrendView.as_view()),
     path(root + '/works/<uuid:work_id>/comments', rv.CommentsView.as_view()),

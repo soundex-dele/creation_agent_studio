@@ -1,0 +1,37 @@
+.douyin-owned {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.douyin-owned-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.douyin-owned-grid > *, .douyin-owned .douyin-research-field {
+  min-width: 0;
+}
+.douyin-owned .douyin-research-card,
+.douyin-owned .douyin-research-field,
+.douyin-owned details {
+  overflow-wrap: anywhere;
+}
+.douyin-owned-prompt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.7;
+}
+.douyin-owned .ant-select { width: 100%; }
+.douyin-owned .douyin-actions { flex-wrap: wrap; }
+.douyin-owned details > summary { cursor: pointer; padding: 12px 0; }
+.douyin-owned-modal .ant-modal-body { max-height: 65dvh; overflow-y: auto; }
+@media (max-width: 767px) {
+  .douyin-owned-grid { grid-template-columns: minmax(0, 1fr); }
+  .douyin-owned .ant-btn { min-height: 44px; height: auto; white-space: normal; }
+  .douyin-owned .douyin-section-title { flex-wrap: wrap; }
+  .douyin-owned textarea { font-size: 16px; }
+}
+@media (max-height: 500px) {
+  .douyin-owned-modal .ant-modal-body { max-height: 50dvh; }
+}

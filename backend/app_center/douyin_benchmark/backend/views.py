@@ -16,7 +16,7 @@ from .serializers import AccountInput, AccountSerializer, TaskInput, TaskSeriali
 from .serializers import AccountPage, TaskPage, ConnectionSerializer, WorkResultSerializer, UploadInput, AccountCreated
 from .services import start, cancel, Conflict
 from .provider import CollectionError, work_web_url, ordered_media_urls
-from .collector_config import LocalDTKClient, config_for, public_config, private_config, cipher, invoke
+from .collector_config import LocalDTKClient, config_for, public_config, private_config, invoke
 from .models import CollectorConfig
 from .serializers import CollectorConfigInput, CollectorConfigOutput
 from django.views.decorators.debug import sensitive_variables
@@ -73,7 +73,7 @@ class ConnectionView(BaseView):
 class CollectorConfigView(BaseView):
     @swagger_auto_schema(responses={200: CollectorConfigOutput})
     def get(self, request, **kwargs):
-        return Response(public_config(config_for(self.app(), request.user)))
+        return Response(public_config(config_for(self.app(), request.user)), headers={"Cache-Control": "no-store"})
 
     @swagger_auto_schema(request_body=CollectorConfigInput, responses={200: CollectorConfigOutput})
     @sensitive_variables()
@@ -91,8 +91,8 @@ class CollectorConfigView(BaseView):
         except CollectionError as exc:
             raise ValidationError({"detail": str(exc), "code": exc.code}) from None
         config, _ = CollectorConfig.objects.update_or_create(organization_id=app.organization_id,
-            application=app, owner=request.user, defaults={**values, "encrypted_cookies": cipher().encrypt(cookies.encode()).decode()})
-        return Response(public_config(config))
+            application=app, owner=request.user, defaults={**values, "cookies": cookies})
+        return Response(public_config(config), headers={"Cache-Control": "no-store"})
 
     @swagger_auto_schema(responses={204: "已清除个人采集配置"})
     def delete(self, request, **kwargs):
@@ -111,6 +111,8 @@ class AccountsView(BaseView):
     @swagger_auto_schema(responses={200: AccountPage})
     def get(self, request, **kwargs):
         qs = Account.objects.filter(application=self.app(), owner=request.user)
+        if request.query_params.get('owned') in ['true', 'false']:
+            qs = qs.filter(is_owned=request.query_params['owned'] == 'true')
         search = request.query_params.get("search", "")[:200]
         if search:
             qs = qs.filter(name__icontains=search)
@@ -124,8 +126,11 @@ class AccountsView(BaseView):
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
         account, created = Account.objects.get_or_create(application=app, owner=request.user, organization_id=app.organization_id,
-            source_url=values["source"], defaults={"group": values["group"], "notes": values["notes"]})
+            source_url=values["source"], defaults={"group": values["group"], "notes": values["notes"], "is_owned": values['is_owned']})
         account = self.account_by_id(account.pk)
+        if values['is_owned'] and not account.is_owned:
+            account.is_owned = True
+            account.save(update_fields=['is_owned'])
         task = start(account, {"kind": "collect", "count": values["count"]}, request.headers.get("Idempotency-Key"))
         return Response({**AccountSerializer(account).data, "task": TaskSerializer(task).data, "reused": not created}, status=201 if created else 200)
 
@@ -153,7 +158,7 @@ class AccountView(BaseView):
         related = Task.objects.filter(source_links__account=account).distinct()
         for task in related.select_related('run'):
             cancel(task)
-        authored = related.filter(kind__in=['script', 'rewrite', 'variants'])
+        authored = related.filter(kind__in=['script', 'rewrite', 'variants', 'article'])
         for document in authored:
             document.account_id, document.work_id, document.input = None, None, {}
             document.request_key = f'preserved:{document.pk}'
@@ -163,7 +168,7 @@ class AccountView(BaseView):
         for task in account.tasks.select_related("run"):
             cancel(task)
         # Authored documents survive account removal with their frozen context scrubbed.
-        authored = account.tasks.filter(kind__in=['script', 'rewrite', 'variants'])
+        authored = account.tasks.filter(kind__in=['script', 'rewrite', 'variants', 'article'])
         for document in authored:
             document.account_id, document.work_id, document.input = None, None, {}
             document.request_key = f'preserved:{document.pk}'
@@ -293,13 +298,13 @@ class VersionsView(BaseView):
     @transaction.atomic
     def post(self, request, **kwargs):
         task = self.task(True)
-        if task.kind not in ("script", "rewrite", "variants") or not task.run or task.run.status != "succeeded":
-            raise ValidationError("请选择已完成的脚本或改写文案。")
+        if task.kind not in ("script", "rewrite", "variants", "article") or not task.run or task.run.status != "succeeded":
+            raise ValidationError("请选择已完成的文章、脚本或改写文案。")
         serializer = ScriptEdit(data=request.data, context={"kind": task.kind})
         serializer.is_valid(raise_exception=True)
         latest = task.versions.first()
         if not latest or latest.revision != serializer.validated_data["revision"]:
-            raise Conflict("脚本已被更新，请重新加载后保存。")
+            raise Conflict("文稿已被更新，请重新加载后保存。")
         version = ScriptVersion.objects.create(task=task, revision=latest.revision + 1, content=serializer.validated_data["content"])
         return Response(VersionSerializer(version).data, status=201)
 
@@ -308,7 +313,10 @@ class DownloadView(BaseView):
     def get(self, request, **kwargs):
         task = self.task()
         version = get_object_or_404(task.versions, pk=kwargs["version_id"])
-        if task.kind == 'variants':
+        if task.kind == 'article':
+            from .article import markdown as article_markdown
+            body = article_markdown(version.content)
+        elif task.kind == 'variants':
             body = '\n\n'.join(f'## {label}\n' + '\n\n'.join(f'{index + 1}. {row["text"]}\n\n{row["angle"]}' for index, row in enumerate(version.content.get(key, []))) for key, label in [('hooks', '开头'), ('titles', '标题'), ('covers', '封面短句')])
         else:
             body = version.content["text"] if task.kind == "rewrite" else markdown(version.content)

@@ -171,7 +171,13 @@ def joint_evidence(task, payload, sink, save):
 def execute_research(task, payload, sink, save, check, config):
     from ..runtime import current
     data, kind = task.input, task.kind
-    if kind == 'refresh':
+    if kind == 'voice_analysis':
+        from .owned import analyze_voice
+        analyze_voice(task, config, sink, save)
+    elif kind == 'article':
+        from .article import execute_article
+        execute_article(task, payload, sink, save, config)
+    elif kind == 'refresh':
         failures = []
         for index, work in enumerate(m.Work.objects.filter(pk__in=data['work_ids']).select_related('account')):
             try:

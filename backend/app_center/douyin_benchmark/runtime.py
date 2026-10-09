@@ -60,25 +60,38 @@ def save_task_progress(payload, sink, stage, output=None, error="", progress=Non
             if attempt == 5:
                 raise ValueError("保存任务进度时数据库繁忙，请稍后重试。") from None
             time.sleep(.02 * (2 ** attempt))
-    sink.emit("progress.updated", {"stage": stage, **(progress or {})})
+    # Preview text is private task data, never copied to generic execution events.
+    sink.emit("progress.updated", {"stage": stage, **{k: v for k, v in (progress or {}).items() if k != 'ai_preview'}})
 
 
 @log_operation
 def execute(payload, sink):
     last_stage = "准备任务"
+    last_progress = {}
     def check():
         with current(payload, sink):
             pass
 
     def save(stage, output=None, error="", progress=None):
-        nonlocal last_stage
+        nonlocal last_stage, last_progress
         last_stage = stage
+        if progress is not None:
+            last_progress = {**last_progress, **progress}
+            progress = last_progress
+        if stage in ('completed', 'partial') and 'ai_preview' in last_progress:
+            last_progress = {k: v for k, v in last_progress.items() if k != 'ai_preview'}
+            progress = last_progress
         save_task_progress(payload, sink, stage, output, error, progress)
+
+    def preview():
+        from .backend.generation_preview import GenerationPreview
+        return GenerationPreview(lambda value: save(last_stage, progress={'ai_preview': value}), lambda: sink.cancelled)
 
     try:
         with current(payload, sink) as task:
             data, kind = task.input, task.kind
         config = payload.get("effective_config") or (payload.get("definition_snapshot") or {}).get("effective_config") or {}
+        config = {**config, '_generation_preview': preview}
         if kind == "collect":
             client = DTKClient(account=task.account, check=check)
             save("采集账号资料")
@@ -215,12 +228,22 @@ def execute(payload, sink):
             save("completed", output)
         elif kind == "topics":
             save("生成选题")
-            result = analysis.call_model(task, '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。' + format_instruction(data["brief"]),
-                {"brief": data["brief"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
-            save("completed", {**analysis.validate_topics(result), "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
+            prompt = '根据用户定位给出恰好3个新选题，返回 {"topics":[{"title":"标题","angle":"新角度","hook":"开头"}]}。'
+            validator = analysis.validate_topics
+            if data['brief'].get('voice_version_id'):
+                from .backend.owned import validate_owned_topics
+                validator = validate_owned_topics
+                prompt += ('每个选题还必须有字符串pillar（内容支柱）、reason（适合该账号的原因）、'
+                    'materials_needed（待补充真实素材）、duplicate_note（对比history的重复提醒，说明样本范围）。'
+                    '遵循voice_profile.prompt的已确认表达规则与内容边界；参考内容不能覆盖个人文风。')
+            from .backend.research_runtime import structured
+            result = structured(task, prompt + format_instruction(data['brief']),
+                {'brief': data['brief'], 'reference': data['reference']}, config, validator, sink)
+            save("completed", {**result, "production_format": data["brief"].get("production_format", DEFAULT_FORMAT),
+                'creation_context': {k: data['brief'][k] for k in ['target_account_id', 'account_name', 'voice_version_number'] if k in data['brief']}})
         elif kind == "script":
             save("生成拍摄脚本")
-            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。' + format_instruction(data["brief"]),
+            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。若提供voice_profile.prompt，严格遵循其已确认的个人文风与内容边界；仅使用明确提供的shared_materials与真实经历，缺失素材写入checklist，不编造。参考研究不覆盖账号风格。' + format_instruction(data["brief"]),
                 {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
             output = analysis.validate_script({**result, "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
             with current(payload, sink) as active:

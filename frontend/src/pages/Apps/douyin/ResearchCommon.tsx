@@ -16,10 +16,10 @@ export function useRows<T>(client: ResearchClient, resource: string, filters: Re
   return { ...data, page, setPage, loading, error, reload: () => setTick(v => v + 1) };
 }
 
-export async function allRows<T>(client: ResearchClient, resource: string): Promise<T[]> {
+export async function allRows<T>(client: ResearchClient, resource: string, filters: Record<string, unknown> = {}): Promise<T[]> {
   const rows: T[] = []; let page = 1;
   for (;;) {
-    const data = await client.list<T>(resource, { page });
+    const data = await client.list<T>(resource, { ...filters, page });
     rows.push(...data.results);
     if (!data.results.length || rows.length >= data.count) return rows;
     page += 1;

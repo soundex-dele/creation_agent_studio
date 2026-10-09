@@ -12,7 +12,7 @@ export function CollectorSettings({ client, onClose, onSaved }: { client: Douyin
   useEffect(() => {
     let active = true;
     setError('');
-    void client.collectorConfig().then((data) => { if (active) setConfig(data); }).catch((e) => { if (active) setError(documentError(e)); });
+    void client.collectorConfig().then((data) => { if (active) { setConfig(data); setCookies(data.cookies); } }).catch((e) => { if (active) setError(documentError(e)); });
     return () => { active = false; };
   }, [client, attempt]);
   const save = async () => {
@@ -39,7 +39,7 @@ export function CollectorSettings({ client, onClose, onSaved }: { client: Douyin
       {!config ? !error && <Spin /> : <>
         <label>User-Agent<Input.TextArea aria-label="采集 User-Agent" autoComplete="off" spellCheck={false} rows={3} maxLength={2000} value={config.user_agent} onChange={(e) => setConfig({ ...config, user_agent: e.target.value })} /></label>
         <label>Cookie{config.has_cookies && <small>（已保存，留空保留原值）</small>}<Input.TextArea aria-label="采集 Cookie" autoComplete="off" spellCheck={false} rows={4} maxLength={64000} value={cookies} placeholder={config.has_cookies ? '粘贴新 Cookie 可替换原值' : '粘贴 Cookie 请求头或 JSON'} onChange={(e) => setCookies(e.target.value)} /></label>
-        <p>配置仅供当前用户在此应用中采集。Cookie 加密保存，保存后不再回显；不会写入分析提示词或任务日志。</p>
+        <p>配置仅供当前用户在此应用中采集。Cookie 明文保存，可在此查看和编辑；不会写入分析提示词或任务日志。</p>
         <label>屏幕尺寸<Input aria-label="采集屏幕尺寸" value={config.screen} maxLength={20} onChange={(e) => setConfig({ ...config, screen: e.target.value })} /></label>
         <label>浏览器语言<Input aria-label="采集浏览器语言" value={config.language} maxLength={50} onChange={(e) => setConfig({ ...config, language: e.target.value })} /></label>
         <label>时区<Input aria-label="采集时区" value={config.timezone} maxLength={100} onChange={(e) => setConfig({ ...config, timezone: e.target.value })} /></label>

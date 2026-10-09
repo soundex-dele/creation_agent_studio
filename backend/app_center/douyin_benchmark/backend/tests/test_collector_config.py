@@ -1,8 +1,12 @@
 import json
+import importlib
+from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
+from django.apps import apps
+from django.db import connection
 from .test_douyin import ctx  # shared tenant/application fixture
-from ..collector_config import cipher, invoke, LocalDTKClient
+from ..collector_config import invoke, LocalDTKClient
 from ..models import CollectorConfig
 from ..provider import CollectionError
 from core.observability import ProcessingFormatter, log_context
@@ -11,40 +15,76 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 COOKIE = "ttwid=private-test-only; UIFID_TEMP=test-uifid; s_v_web_id=verify_test"
 
 
-def test_settings_encrypted_private_keep_clear(ctx):
+def test_settings_plaintext_owner_only_keep_clear(ctx):
     url = ctx.root + "/collector-config"
     assert ctx.client.get(url).data["configured"] is False
+    assert ctx.client.get(url).data["cookies"] == ""
     response = ctx.client.put(url, {"user_agent": UA, "cookies": COOKIE}, format="json")
     assert response.status_code == 200, response.data
     config = CollectorConfig.objects.get(owner=ctx.owner)
-    assert "private-test-only" not in config.encrypted_cookies
-    assert cipher().decrypt(config.encrypted_cookies.encode()).decode() == COOKIE
-    for result in [response, ctx.client.get(url), ctx.client.get(ctx.root + "/connection")]:
-        assert "private-test-only" not in json.dumps(result.data, default=str)
-        assert "cookies" not in result.data
+    assert config.cookies == COOKIE
+    for result in [response, ctx.client.get(url)]:
+        assert result.data["cookies"] == COOKIE
+        assert result.data["has_cookies"] is True
+        assert result["Cache-Control"] == "no-store"
+    connection = ctx.client.get(ctx.root + "/connection")
+    assert "private-test-only" not in json.dumps(connection.data, default=str)
+    assert "cookies" not in connection.data
     assert ctx.client.get(ctx.root + "/connection").data["connected"] is True
     assert ctx.client.put(url, {"user_agent": UA, "cookies": "", "screen": "1440x900"}, format="json").status_code == 200
     config.refresh_from_db()
-    assert config.screen == "1440x900" and cipher().decrypt(config.encrypted_cookies.encode()).decode() == COOKIE
+    assert config.screen == "1440x900" and config.cookies == COOKIE
+    replacement = 'UIFID_TEMP=replacement-cookie'
+    assert ctx.client.put(url, {"user_agent": UA, "cookies": replacement}, format="json").data["cookies"] == replacement
+    assert ctx.client.get(url).data["cookies"] == replacement
     ctx.client.force_authenticate(ctx.reader)
     assert ctx.client.get(url).data["configured"] is False
+    assert ctx.client.get(url).data["cookies"] == ""
     assert ctx.client.delete(url).status_code == 204
+    assert ctx.client.get(url).data["cookies"] == ""
     assert CollectorConfig.objects.filter(pk=config.pk).exists()
     ctx.client.force_authenticate(ctx.owner)
     assert ctx.client.delete(url).status_code == 204
+    assert ctx.client.get(url).data["cookies"] == ""
     assert ctx.client.get(ctx.root + "/connection").data["code"] == "not_configured"
+
+
+def test_existing_cookies_migration_roundtrip(ctx, settings):
+    migration = importlib.import_module('app_center.douyin_benchmark.backend.migrations.0010_collector_cookies_plaintext')
+    config = CollectorConfig.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.owner,
+                                           user_agent=UA, cookies=COOKIE)
+    schema_editor = SimpleNamespace(connection=connection)
+    migration.encrypt_cookies(apps, schema_editor)
+    config.refresh_from_db()
+    assert config.cookies != COOKIE
+    assert 'private-test-only' not in config.cookies
+    migration.decrypt_cookies(apps, schema_editor)
+    config.refresh_from_db()
+    assert config.cookies == COOKIE
+    settings.SECRET_KEY = 'new-key-after-migration'
+    assert ctx.client.get(ctx.root + '/collector-config').data['cookies'] == COOKIE
+
+
+def test_existing_cookies_migration_rejects_unreadable_values(ctx):
+    migration = importlib.import_module('app_center.douyin_benchmark.backend.migrations.0010_collector_cookies_plaintext')
+    config = CollectorConfig.objects.create(organization=ctx.org, application=ctx.app, owner=ctx.owner,
+                                           user_agent=UA, cookies='unreadable-old-value')
+    with pytest.raises(RuntimeError, match='original SECRET_KEY'):
+        migration.decrypt_cookies(apps, SimpleNamespace(connection=connection))
+    config.refresh_from_db()
+    assert config.cookies == 'unreadable-old-value'
 
 
 def test_invalid_config_preserves_saved_value(ctx):
     url = ctx.root + "/collector-config"
     assert ctx.client.put(url, {"user_agent": UA, "cookies": COOKIE}, format="json").status_code == 200
-    before = CollectorConfig.objects.get().encrypted_cookies
+    before = CollectorConfig.objects.get().cookies
     for body in [{"user_agent": "Safari", "cookies": COOKIE}, {"user_agent": UA, "cookies": "ttwid=secret-invalid"},
                  {"user_agent": UA, "cookies": COOKIE, "timezone": "invalid"}]:
         response = ctx.client.put(url, body, format="json")
         assert response.status_code == 400
         assert "secret-invalid" not in str(response.data) and "private-test-only" not in str(response.data)
-    assert CollectorConfig.objects.get().encrypted_cookies == before
+    assert CollectorConfig.objects.get().cookies == before
 
 
 def test_local_requests_use_current_personal_config(ctx, monkeypatch):

@@ -201,13 +201,20 @@ def freeze(scope, values):
         refs.update((p.work.account_id, p.work_id, None) for p in pubs[:100])
         if not data['publications']:
             raise ValidationError('请先关联自己的发布作品。')
-    if kind in ['topics', 'script']:
-        if kind == 'script':
+    if kind in ['topics', 'script', 'article']:
+        if kind in ['script', 'article']:
             if not source or source.kind != 'topics':
                 raise ValidationError('请选择已完成的选题任务。')
+            topics = source.output.get('topics')
+            if not isinstance(topics, list) or values['topic_index'] >= len(topics) or not isinstance(source.input.get('brief'), dict):
+                raise ValidationError('选题或创作档案快照不完整，请重新生成选题。')
             data.update(brief=source.input['brief'], reference=source.input.get('reference', {}), topic=source.output['topics'][values['topic_index']])
+            if values.get('target_account_id') and str(values['target_account_id']) != data['brief'].get('target_account_id'):
+                raise ValidationError('选题不属于当前目标账号，请切换账号或重新生成选题。')
         else:
-            profile = get_object_or_404(m.CreatorProfile.objects.filter(**scope), pk=values['profile_id']) if values.get('profile_id') else m.CreatorProfile.objects.filter(**scope, is_default=True).first()
+            profile = get_object_or_404(m.CreatorProfile.objects.filter(**scope), pk=values['profile_id']) if values.get('profile_id') else m.CreatorProfile.objects.filter(**scope, is_default=True, account__isnull=True).first()
+            if profile and profile.account_id and not values.get('target_account_id'):
+                values = {**values, 'target_account_id': profile.account_id}
             brief = {key: getattr(profile, key, '') if profile else '' for key in ['positioning', 'audience', 'conditions']}
             if profile:
                 brief['profile'] = {key: getattr(profile, key) for key in ['name', 'positioning', 'audience', 'experiences', 'products', 'voice', 'conditions']}
@@ -220,10 +227,18 @@ def freeze(scope, values):
                 from app_center.brand_library.backend.views import private_profiles
                 brand = get_object_or_404(private_profiles(scope['organization_id'], m.CreatorProfile._meta.get_field('owner').remote_field.model.objects.get(pk=scope['owner_id'])), pk=values['brand_profile_id'])
                 brief['brand'] = {'name': brand.name, 'positioning': brand.positioning, 'voice': brand.voice}
+            if values.get('target_account_id'):
+                from .owned import owned_brief
+                owned = owned_brief(scope, values, refs)
+                brief = {**owned, **{k: brief[k] for k in ['duration', 'production_format'] if k in brief}}
+                data['target_account_id'] = owned['target_account_id']
             if not brief.get('theme', '').strip() or not brief.get('positioning', '').strip():
                 raise ValidationError('请填写定位与主题，或选择创作档案和选题。')
             data['brief'] = brief
             data.setdefault('reference', {})
+    if kind == 'voice_analysis':
+        from .owned import freeze_analysis
+        freeze_analysis(scope, values, data, refs)
     return data, refs
 
 
