@@ -2,7 +2,7 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: copy-to-jianying
-  version: 1.0.0
+  version: 1.1.0
   name: 文案转剪映
   description: 将口播文案、旁白或文章制作成可编辑剪映草稿，自动编排画面、配音、字幕与时间线。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
@@ -56,6 +56,8 @@ spec:
           时长要求：{duration}
           配音方式：{voice}
           已有图片、视频或录音：{assets}
+          是否添加空镜：{add_broll}
+          空镜目录：{broll_directory}
           项目资料目录：{output_directory}
           剪映草稿根目录：{drafts_root}
           视觉风格、音色与补充要求：{requirements}
@@ -63,12 +65,14 @@ spec:
           用户已通过应用表单确认以上设置，请直接执行，不重复询问已有信息。先读取 Skill 的 references/backend.md 并运行 scripts/run_project.py --probe；写脚本前必读 references/storyboard_builder_guide.md。使用执行环境的项目虚拟环境运行 Python，只使用 Skill 内置 scripts/jianying-editor 后端，不搜索其他剪映后端。子模块或普通依赖缺失时按 Skill 文档处理，无法补齐时明确报告阻塞。
           交付范围优先：「生成可编辑剪映草稿」必须继续到实际构建与审计，不能停在分镜或脚本；「仅生成分镜脚本」由 AI 写好 builder.py 后交付，不执行构建；「仅检查已有脚本」要求输入已有 builder.py 路径，只运行 --check-only，不改写源文件或生成新草稿。检查模式沿用已有脚本设置，其他表单默认值不覆盖脚本。
           默认简体中文、30fps。「9:16 竖版」使用 1080×1920，「16:9 横版」使用 1920×1080，「1:1 方形」使用 1080×1080。已有口播稿默认完整保留措辞、数字、否定和限定；文章未指定时长时先提炼为约 60 秒口播。明确要求压缩或限时才调整口播稿，并保留关键事实；实际时长以配音实测为准。
+          旁白字幕只删除末尾多余标点：先按原文标点与语义确定分句，再在 builder.py 中用同一个文本清理函数处理每句，仅从句尾连续移除收尾标点「，。！？；：、,.!?;:…」及尾随空白，遇到其他字符即停止；不替换为空格，不删除或改写句首、句中的标点、符号及空白。不得按 Unicode 类别 P、S 一概删除，百分号、货币符号、数学符号、括号、引号及 emoji 等不属于本次清理范围；保留小数点和成对括号、引号，不越过句尾括号或引号向内部删除标点。例如「你好，世界！」变为「你好，世界」，「价格3.5元，优惠20%！」变为「价格3.5元，优惠20%」，「你好！世界」「优惠20%」「说明（必看）」保持不变。清理后的同一句文本同时用于旁白 TTS 和对应 TextMaterial 字幕，narration.txt 按原分句顺序逐行保存清理后的正文；清理后为空的句子跳过，不生成空字幕或空配音。已有录音不改写音频，只清理对应字幕并保持录音对齐；无声模式同样清理字幕。这是保留原稿规则中的句尾多余标点处理例外，不改写用户源文件，不清理素材路径、目录、代码或配置。仅检查已有脚本时只报告未符合此规则的旁白字幕，不修改脚本或已有草稿。
           「自动配音（优先已有录音）」在有录音时优先使用录音，无录音时默认启用自然普通话 TTS；「仅使用已有录音」缺录音时询问必要路径，不擅自合成；只有选择「无声字幕」才关闭旁白和 TTS。音色和效果查询内置词表，不编造标识符。补充要求明确的配音偏好优先于默认值。
           项目资料目录留空时使用工作区 outputs/jianying/<唯一项目名>/；指定目录已有内容时创建新子目录，保留用户修改与旧工程。保存 narration.txt 和由 AI 直接编写、可重复运行的 builder.py；narration.txt 只包含最终朗读正文。按语义段落与画面变化设计 Scene，不机械地一句一镜，不调用 generate_builder.py、json_to_builder.py，也不先填 PLAN/JSON 再转码代替 AI 编排。JSON 仅由 builder 派生。
           优先使用用户真实素材；缺画面时设计正式信息卡或本地绘图，不使用搜索词、调试占位图或虚构截图。按需读取预设、剪辑手法与音效指南，使用内置真实音效且不盖过配音。每个镜头写清画面、旁白字幕、强调文字、时序、转场和声音。
+          空镜设置以「是否添加空镜」为准：选择「不添加空镜」时，即使填写了空镜目录也不扫描、不读取该目录，不额外插入空镜，Draft 的 broll_dir 留空；仍可按用途使用「已有图片、视频或录音」中的主画面素材。选择「添加空镜」时，将目录解析为绝对路径并传给 Draft(broll_dir=...)，使用技能内置的按时长随机选片，不做文案语义匹配，也不建立语义索引。递归扫描目录及子目录中的视频：有逐句配音时，每句优先随机选一条足够长的视频，从开头裁到该句实测时长；没有足够长的视频则继续随机选片拼接；没有逐句配音时按整个分镜时长选片。允许重复使用素材，每次重建可能不同。空镜填充未指定真实素材的主画面，已指定真实图片或视频的分镜保留；需要空镜填充的位置使用技能支持的主画面占位声明，构建后必须核对已替换为真实视频，不交付调试占位图。保留旁白与字幕完整内容；空镜视频默认静音，保留主配音。目录必须是执行环境可访问的路径，相对路径按工作目录解析，不把用户浏览器所在设备的路径当作服务端可访问路径。启用但目录未填、不可访问或没有可用视频时，明确说明问题并索取有效目录，不擅自跳过空镜或编造素材。选用的视频先检查可用时长，必要时组合多个素材，不截断旁白，不修改或删除源素材。仅生成脚本也遵守上述设置；仅检查已有脚本时沿用脚本，不根据表单空镜设置改写脚本。
           默认生成时先使用 scripts/run_project.py <builder.py> --check-only，再运行 scripts/run_project.py <builder.py>。草稿根目录留空则沿用技能默认位置；指定时通过 --drafts-root 传入，提醒自定义位置不保证剪映首页自动发现。由同一个 Draft 对象导出分镜、校验并调用 to_jianying；每次构建创建唯一草稿与素材目录。
           配音失败必须报错，不交付缺旁白的草稿；视频短于实测旁白时更换素材，不截断语音。相同外部资源最多重试两次，连续两次修复无效则保留诊断并报告阻塞。不得自动发布、上传或操作客户端导出成片。
-          验收检查 builder.py、result.json、build.log、timeline.json 与实际素材，核对旁白与字幕数量和精确时间范围。只有实际生成草稿且 result.json 状态为 complete、文件审计通过，才报告草稿完成；checked 仅表示检查通过。无声模式明确标注无旁白。具备获准的预览能力时检查开头、最密集镜头、结尾并试听；不得使用 Codex 内置浏览器。无法完成客户端检查时明确仅通过文件与素材审计，不宣称播放或效果验收通过。
+          验收检查 builder.py、result.json、build.log、timeline.json 与实际素材，核对旁白与字幕数量和精确时间范围，并检查实际草稿中的旁白字幕仅删除句尾多余标点、保留句中标点和有意义的符号（如百分号、小数点、括号）、无空字幕；合成旁白文本须与对应字幕一致。只有实际生成草稿且 result.json 状态为 complete、文件审计通过，才报告草稿完成；checked 仅表示检查通过。无声模式明确标注无旁白。具备获准的预览能力时检查开头、最密集镜头、结尾并试听；不得使用 Codex 内置浏览器。无法完成客户端检查时明确仅通过文件与素材审计，不宣称播放或效果验收通过。
           交付 builder.py、剪映草稿目录、项目资料目录及审计文件的可访问路径，说明画幅、实际时长、配音与字幕状态以及未完成的检查。仅脚本或检查模式按对应范围交付，不声称已生成草稿；未导出 MP4 不称为成片。提醒保留素材目录与技能运行库。
         presets:
         - id: portrait-narration
@@ -80,6 +84,7 @@ spec:
             aspect: '9:16'
             duration: 约 60 秒
             voice: auto
+            add_broll: disabled
             requirements: 画面简洁，字幕清晰，按语义组织分镜。
         - id: landscape-explainer
           name: 横版讲解
@@ -90,6 +95,7 @@ spec:
             aspect: '16:9'
             duration: 按原稿完整表达
             voice: auto
+            add_broll: disabled
             requirements: 以结构清晰的信息卡与真实素材辅助讲解。
         questions:
           - {key: source, preset_save: optional, label: 文案、文章或文件路径, type: text, placeholder: 粘贴口播稿、旁白或文章，也可填写工作目录内的文本文件路径；仅检查时填写 builder.py 路径, required: true, default_value: null, order: 0}
@@ -128,9 +134,21 @@ spec:
               - {value: recording, label: 仅使用已有录音, description: 请在素材中提供录音路径, order: 1}
               - {value: silent, label: 无声字幕, description: 不生成旁白配音, order: 2}
           - {key: assets, preset_save: never, label: 已有图片、视频或录音, type: text, placeholder: 填写工作目录内的素材路径及用途；无素材可留空, help_text: 缺少画面时自动设计信息卡或本地绘图。, required: false, default_value: "", order: 5}
-          - {key: requirements, preset_save: preference, label: 视觉风格、音色与补充要求, type: text, placeholder: 例如：简洁知识卡片；自然女声；突出三个关键词；保留原稿开头, required: false, default_value: "", order: 6}
-          - {key: output_directory, preset_save: never, label: 项目资料目录, type: text, placeholder: 留空则在工作区自动创建唯一项目目录, help_text: 保存分镜脚本、文案、素材和审计文件。, required: false, default_value: "", order: 7}
-          - {key: drafts_root, preset_save: never, label: 剪映草稿根目录, type: text, placeholder: 留空使用默认位置, help_text: 自定义位置不保证剪映首页自动发现；请保留草稿引用的素材目录。, required: false, default_value: "", order: 8}
+          - key: add_broll
+            preset_save: preference
+            label: 是否添加空镜
+            type: single_choice
+            required: true
+            default_value: disabled
+            help_text: 启用后按配音或分镜时长随机选取视频填充主画面，不做语义匹配；已指定的真实素材保留，仅检查脚本时沿用脚本设置。
+            order: 6
+            options:
+              - {value: disabled, label: 不添加空镜, description: 不读取空镜目录，不额外插入空镜, order: 0}
+              - {value: enabled, label: 添加空镜, description: 从下方目录及子目录按时长随机选取视频, order: 1}
+          - {key: broll_directory, preset_save: never, label: 空镜目录, type: text, placeholder: 例如：素材/空镜，或执行环境可访问的绝对路径, help_text: 添加空镜时请填写包含视频的目录（含子目录）；关闭时忽略此目录。相对路径以工作目录为准，浏览器所在设备的本地目录不一定可访问。, required: false, default_value: "", order: 7}
+          - {key: requirements, preset_save: preference, label: 视觉风格、音色与补充要求, type: text, placeholder: 例如：简洁知识卡片；自然女声；突出三个关键词；保留原稿开头, required: false, default_value: "", order: 8}
+          - {key: output_directory, preset_save: never, label: 项目资料目录, type: text, placeholder: 留空则在工作区自动创建唯一项目目录, help_text: 保存分镜脚本、文案、素材和审计文件。, required: false, default_value: "", order: 9}
+          - {key: drafts_root, preset_save: never, label: 剪映草稿根目录, type: text, placeholder: 留空使用默认位置, help_text: 自定义位置不保证剪映首页自动发现；请保留草稿引用的素材目录。, required: false, default_value: "", order: 10}
   backend:
     definition_factory: app_center.copy_to_jianying.provision.prepare_definition
   database: {mode: none}

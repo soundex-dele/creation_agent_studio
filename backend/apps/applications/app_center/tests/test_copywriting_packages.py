@@ -74,6 +74,65 @@ def test_skill_app_sync_exposes_guided_runtime_without_duplicate_revisions(
 
 
 @pytest.mark.django_db
+def test_jianying_broll_settings_reach_the_composed_prompt(settings, tmp_path):
+    settings.CODEX_SKILLS_DIRECTORY = str(tmp_path / "skills")
+    owner = get_user_model().objects.create_user(username="jianying-broll-owner")
+    organization = owner.owned_organizations.get()
+    call_command(
+        "sync_app_center", package_id="copy-to-jianying",
+        organization_id=str(organization.id),
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    headers = {"HTTP_X_ORGANIZATION_ID": str(organization.id)}
+    runtime = client.get("/api/v1/apps/copy-to-jianying/", **headers)
+    assert runtime.status_code == 200, runtime.data
+    prompt = next(
+        item for item in runtime.data["guided_prompts"]
+        if item["key"] == "create-jianying-draft"
+    )
+    questions = {item["key"]: item for item in prompt["questions"]}
+    assert questions["add_broll"]["default_value"] == "disabled"
+    assert questions["add_broll"]["required"] is True
+    assert questions["add_broll"]["preset_save"] == "preference"
+    assert questions["broll_directory"]["required"] is False
+    assert questions["broll_directory"]["preset_save"] == "never"
+
+    directory = r"E:\视频素材\空镜 {旅行}"
+    for answers, expected_choice, expected_directory in [
+        ({}, "不添加空镜", ""),
+        ({"add_broll": "enabled", "broll_directory": directory}, "添加空镜", directory),
+        ({"add_broll": "disabled", "broll_directory": directory}, "不添加空镜", directory),
+        ({"add_broll": "enabled"}, "添加空镜", ""),
+        ({"task": "check", "add_broll": "enabled", "broll_directory": directory}, "添加空镜", directory),
+    ]:
+        response = client.post("/api/v1/apps/copy-to-jianying/compose-prompt/", {
+            "prompt_id": prompt["key"],
+            "answers": {"source": "保留完整旁白。", **answers},
+        }, format="json", **headers)
+        assert response.status_code == 200, response.data
+        assert response.data["normalized_answers"]["add_broll"] == expected_choice
+        assert response.data["normalized_answers"]["broll_directory"] == expected_directory
+        content = response.data["prompt"]
+        assert f"是否添加空镜：{expected_choice}" in content
+        assert f"空镜目录：{expected_directory}" in content
+        assert "即使填写了空镜目录也不扫描、不读取该目录" in content
+        assert "启用但目录未填、不可访问或没有可用视频时" in content
+        assert "Draft(broll_dir=...)" in content
+        assert "按时长随机选片，不做文案语义匹配" in content
+        assert "仅检查已有脚本时沿用脚本" in content
+        assert "{add_broll}" not in content
+        assert "{broll_directory}" not in content
+
+    invalid = client.post("/api/v1/apps/copy-to-jianying/compose-prompt/", {
+        "prompt_id": prompt["key"],
+        "answers": {"source": "示例文案", "add_broll": "invalid"},
+    }, format="json", **headers)
+    assert invalid.status_code == 400, invalid.data
+    assert "add_broll" in str(invalid.data)
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("skill_installed", [True, False])
 def test_wechat_guided_prompt_can_start_a_run_or_report_missing_skill(
     settings, tmp_path, skill_installed,
