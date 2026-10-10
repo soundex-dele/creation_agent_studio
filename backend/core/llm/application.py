@@ -28,6 +28,8 @@ def generate_json(*, organization, user, resource_type, resource_id,
                 raise UnsupportedImageInput("当前系统 AI 引擎不支持关键帧图片输入，请使用支持图片输入的系统引擎。")
             options = dict(cancelled=cancelled, permission_mode="default",
                            require_tool_approval=True, timeout_seconds=timeout_seconds)
+            if engine.adapter_name == "codex":
+                options["final_response_only"] = True
             if image_paths:
                 options["image_paths"] = image_paths
             if on_event is not None:

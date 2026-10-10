@@ -22,6 +22,25 @@ def transport():
     return value
 
 
+@pytest.mark.parametrize('final_text', ['{"text":"最终正文"}', '{"text":"尚未完成', ''])
+def test_response_only_excludes_other_items_and_never_falls_back_to_old_answer(final_text):
+    server = transport()
+    for item in [
+        {'id': 'old', 'type': 'agentMessage', 'phase': 'final_answer', 'text': '{"text":"旧结果"}'},
+        {'id': 'final', 'type': 'agentMessage', 'phase': 'final_answer', 'text': final_text},
+        {'id': 'comment', 'type': 'agentMessage', 'phase': 'commentary', 'text': '过程说明'},
+        {'id': 'plan', 'type': 'plan', 'text': '# 内部计划'},
+    ]:
+        server._notifications.put({'method': 'item/completed', 'params': {'item': item}})
+    server._notifications.put({'method': 'turn/completed', 'params': {'turn': {
+        'id': 'turn-1', 'status': 'completed',
+    }}})
+    result = _consume_codex_turn(
+        _AppServerThread(transport=server, thread_id='thread-1'), '生成', final_response_only=True,
+    )
+    assert result.final_response == final_text
+
+
 def request(method="item/commandExecution/requestApproval", **params):
     return {"id": 47, "method": method, "params": {"threadId": "thread-1", "turnId": "turn-1", "itemId": "item-1", **params}}
 

@@ -151,6 +151,7 @@ def _consume_codex_turn(
     thread, text, *, model="", skills=None, image_paths=None, on_event=None,
     cancelled=None, collaboration_mode=None, timeout_seconds=None,
     on_input_request=None, poll_commands=None, tool_handlers=None,
+    final_response_only=False,
 ):
     """Consume one Codex turn while preserving text and tool notifications."""
 
@@ -209,13 +210,24 @@ def _consume_codex_turn(
     # per item so item/completed can replace its draft without discarding the
     # surrounding commentary (or duplicating the streamed plan).
     text_items = {}
+    text_phases = {}
     published_text = ""
 
     def update_text(item_type, item_id, text, *, append=False):
         nonlocal published_text
         key = (item_type, item_id)
         text_items[key] = text_items.get(key, "") + text if append else text
-        output = "\n\n".join(value for value in text_items.values() if value)
+        if final_response_only:
+            # Application JSON is one answer, not a transcript. A model may
+            # abandon an incomplete message and emit a replacement in the same
+            # turn. Preserve item boundaries instead of joining both documents.
+            candidates = [key for key in text_items
+                          if key[0] == "agentMessage" and text_phases.get(key) != "commentary"]
+            finals = [key for key in candidates if text_phases.get(key) == "final_answer"]
+            selected = finals or candidates
+            output = text_items[selected[-1]] if selected else ""
+        else:
+            output = "\n\n".join(value for value in text_items.values() if value)
         if output == published_text:
             return
         if on_event is not None:
@@ -254,6 +266,7 @@ def _consume_codex_turn(
                 if command is not None and transport.is_pending(message):
                     transport.respond(message, response_for_request(message, command))
                 text_items.clear()
+                text_phases.clear()
                 published_text = ""
                 continue
             if method in {"item/agentMessage/delta", "item/plan/delta"}:
@@ -274,6 +287,9 @@ def _consume_codex_turn(
                         on_event("agent.item", {**safe, "completed": method == "item/completed"})
                 if item_type in {"agentMessage", "plan"}:
                     item_id = str(_object_value(item, "id", ""))
+                    phase = _object_value(item, "phase")
+                    if phase is not None:
+                        text_phases[(item_type, item_id)] = _enum_value(phase)
                     if method == "item/completed" or (item_type, item_id) not in text_items:
                         update_text(item_type, item_id, str(
                             _object_value(item, "text", "") or ""
@@ -1118,6 +1134,7 @@ class CodexAdapter(AgentAdapter):
                 on_input_request=options.get("on_input_request"),
                 poll_commands=options.get("poll_commands"),
                 tool_handlers=options.get("tool_handlers"),
+                final_response_only=options.get("final_response_only", False),
             )
             input_request = getattr(client, "input_request", None)
         finally:
