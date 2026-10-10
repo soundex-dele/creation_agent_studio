@@ -1,0 +1,36 @@
+.repo-page { color: var(--color-text); background: var(--color-bg-surface); }
+.repo-inner { max-width: 1120px; margin: 0 auto; padding: 28px 28px calc(40px + env(safe-area-inset-bottom)); min-width: 0; }
+.repo-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.repo-heading h1 { font-size: clamp(24px, 4vw, 32px); margin: 10px 0; }
+.repo-heading p, .repo-card p { line-height: 1.7; }
+.repo-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .08em; color: var(--color-text-sec); }
+.repo-card { padding: 20px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card); min-width: 0; overflow-wrap: anywhere; }
+.repo-card h2 { font-size: 21px; margin: 0 0 12px; }
+.repo-card h3 { font-size: 17px; margin: 0; }
+.repo-stack, .repo-editor { display: grid; gap: 18px; min-width: 0; }
+.repo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.repo-project-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; }
+.repo-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin-bottom: 16px; font-weight: 500; }
+.repo-field .ant-select, .repo-field .ant-input-number { width: 100%; }
+.repo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.repo-actions > .ant-select { min-width: 180px; max-width: 100%; }
+.repo-page .ant-checkbox-wrapper { display: inline-flex; align-items: center; }
+.repo-page .ant-alert { margin: 12px 0; }
+.repo-page details { margin: 12px 0; }
+.repo-page summary { cursor: pointer; padding: 8px 0; }
+.repo-page dl > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; margin: 8px 0; }
+.repo-page dt { color: var(--color-text-sec); }
+.repo-page dd { margin: 0; white-space: pre-wrap; }
+.repo-prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+.repo-code { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: var(--color-bg-card); font-size: 13px; }
+.repo-page a:focus-visible, .repo-page summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+@media (max-width: 767px) {
+  .repo-inner { padding: 16px 12px calc(28px + env(safe-area-inset-bottom)); }
+  .repo-grid, .repo-project-controls { grid-template-columns: minmax(0, 1fr); }
+  .repo-card { padding: 16px; }
+  .repo-heading { align-items: flex-start; }
+  .repo-page .ant-btn { min-height: 44px; height: auto; white-space: normal; }
+  .repo-page dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .repo-actions > .ant-select { flex: 1 1 180px; min-width: 0; }
+}
+@media (max-height: 480px) { .repo-inner { padding-top: 12px; } }

@@ -1,0 +1,39 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: repo-explainer
+  version: 1.0.0
+  name: 仓库解读助手
+  description: 从源码证据解读工具功能，生成视频与图文，并衔接剪映和动画制作。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: desktop, order: 1}
+  icon: code
+  color: '#2563EB'
+  tags: [仓库分析, 功能解读, 视频文案, 源码溯源]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: repo-explainer
+    executor_protocol_version: 1
+    renderer_key: repo-explainer
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      required: [repo_project_id, task_id]
+      additionalProperties: false
+      properties:
+        repo_project_id: {type: string, format: uuid}
+        task_id: {type: string, format: uuid}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.repo_explainer.backend.apps.RepoExplainerConfig
+    urlconf: app_center.repo_explainer.backend.urls
+    executor_entrypoint: app_center.repo_explainer.runtime.execute
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

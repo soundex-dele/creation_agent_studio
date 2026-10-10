@@ -199,6 +199,9 @@ def _can_access_run(request, run):
     # user. Generic Run endpoints must preserve that boundary for the tree.
     if root.executor_key in {"kitchen-assistant", "prompt-master"}:
         return root.owner_id == request.user.id
+    if root.executor_key == "repo-explainer":
+        from app_center.repo_explainer.backend.access import can_access_run as repo_access
+        return repo_access(request.user, root)
     if root.executor_key == "rental-growth-assistant":
         from app_center.rental_growth_assistant.backend.access import can_access_run as rental_access
         return rental_access(request.user, root)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -31,6 +31,7 @@ import type {
   GuidedQuestion,
 } from '@/types';
 import './ChatApplicationRuntimePage.css';
+import { useRepoHandoff } from './repo/useRepoHandoff';
 
 type AnswerValue = string | string[] | number;
 
@@ -105,6 +106,14 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
     ?? prompts[0]
     ?? null;
   const answers = formAnswers(selectedPrompt, preset, overrides);
+  const repoHandoffId = searchParams.get('repoHandoff');
+  const repoApplicationId = searchParams.get('repoApplication');
+  const repoUrl = repoHandoffId && repoApplicationId && organizationId && slug === 'copy-to-jianying'
+    ? `${tenantApiRoot(organizationId)}/applications/${repoApplicationId}/repo-explainer/handoffs/${repoHandoffId}` : '';
+  const loadRepoDraft = useCallback((draft: Record<string, string>) => {
+    setOverrides(draft); setExplicitFields(Object.keys(draft)); setGeneratedPrompt('');
+  }, []);
+  const repoDraft = useRepoHandoff(repoUrl, Boolean(selectedPrompt), answers, loadRepoDraft);
   const defaultAgent = runtime?.agent_bindings.find((binding) => binding.is_default)
     ?? runtime?.agent_bindings[0]
     ?? null;
@@ -164,6 +173,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
     setComposing(true);
     const version = ++composeVersion.current;
     try {
+      await repoDraft.flush();
       const response = await api.post<ComposePromptResponse>(
         `/apps/${slug}/compose-prompt/`,
         { prompt_id: guidedPromptIdentifier(selectedPrompt), answers, explicit_fields: explicitFields,
@@ -189,6 +199,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
 
   const handleConversationCreated = (createdConversationId: string) => {
     setConversationId(createdConversationId);
+    if (repoUrl) void repoDraft.attach(createdConversationId).catch(() => undefined);
     if (!manualWorkflowId || !manualRunId || !workflowStepKey) return;
     void api.post(`/workflows/${manualWorkflowId}/manual-session/`, {
       action: 'attach_conversation',
@@ -213,6 +224,8 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
 
   return (
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
+      {repoUrl && <Alert type={repoDraft.error ? 'error' : 'info'} message={repoDraft.error || (repoDraft.saving ? '正在保存制作草稿…' : repoDraft.ready ? '已带入仓库文案，表单修改会自动保存。请核对后开始制作。' : '正在读取制作草稿…')}
+        action={repoDraft.hasConflict ? <><Button onClick={() => void repoDraft.resolveConflict(true).catch(() => undefined)}>保留本地并保存</Button><Button onClick={() => void repoDraft.resolveConflict(false).catch(() => undefined)}>采用服务器版本</Button></> : repoDraft.error ? <Button onClick={() => void repoDraft.retry().catch(() => undefined)}>重试</Button> : undefined} />}
       {showApplicationHeader && (
         <header className="chat-app-header">
           <div className="chat-app-heading">
@@ -335,7 +348,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
                     </label>
                   ))}
                 </div>
-                <Button type="primary" size="large" loading={composing} disabled={Boolean(manualRunId && !manualContext)} onClick={composePrompt}>
+                <Button type="primary" size="large" loading={composing} disabled={Boolean(manualRunId && !manualContext) || !repoDraft.ready} onClick={composePrompt}>
                   生成提示词
                 </Button>
               </>

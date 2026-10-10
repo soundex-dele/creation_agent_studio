@@ -43,6 +43,7 @@ const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
 const DouyinBenchmarkPage = lazy(() => import('@/pages/Apps/DouyinBenchmarkPage'));
 const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
+const RepoExplainerPage = lazy(() => import('@/pages/Apps/RepoExplainerPage'));
 const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
 const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
 const AnimationStudioPage = lazy(() => import('@/pages/Apps/AnimationStudioPage'));
@@ -88,6 +89,10 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  {
+    path: '/applications/:applicationId/repo-explainer',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<RepoExplainerPage />)}</ApplicationShell></ProtectedRoute>,
+  },
   {
     path: '/applications/:applicationId/disk-cleaner',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<DiskCleanerPage />)}</ApplicationShell></ProtectedRoute>,
