@@ -22,12 +22,13 @@ vi.mock('@/stores/usePreferencesStore', () => ({ usePreferencesStore: (select: (
 let host: HTMLDivElement;
 let root: Root;
 function Location() { const location = useLocation(); return <output>{location.pathname}{location.search}</output>; }
-const render = async (home = false) => act(async () => root.render(
-  <MemoryRouter>{home ? <HomeApplicationsSidebar /> : <AppsPage />}<Location /></MemoryRouter>,
+const render = async (home = false, entry = '/') => act(async () => root.render(
+  <MemoryRouter initialEntries={[entry]}>{home ? <HomeApplicationsSidebar /> : <AppsPage />}<Location /></MemoryRouter>,
 ));
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(window, 'open').mockReturnValue(null);
   window.matchMedia = vi.fn().mockImplementation(query => ({ matches: false, media: query,
     addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   window.localStorage.clear();
@@ -47,7 +48,8 @@ it('migrates recent cowork usage to the unified conversation entry and records r
   expect(host.querySelectorAll('.home-app-item')).toHaveLength(1);
   expect(host.querySelector('.home-app-copy strong')?.textContent).toBe('对话');
   await act(async () => host.querySelector<HTMLButtonElement>('.home-app-item')!.click());
-  expect(host.querySelector('output')?.textContent).toBe('/chat?entry=home');
+  expect(window.open).toHaveBeenCalledWith('/chat?entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
+  expect(host.querySelector('output')?.textContent).toBe('/');
   const saved = JSON.parse(localStorage.getItem('application-preferences:1')!);
   expect(saved.recent.cowork).toBeUndefined();
   expect(saved.recent['platform-conversation']).toBeGreaterThan(100);
@@ -64,9 +66,10 @@ it('shows only available used apps in most-recent order regardless of old home c
   expect(names()).toEqual(['研究', '绘图']);
   expect(host.querySelector('.sidebar-title')?.textContent).toBe('最近使用');
   expect(host.querySelector('[aria-label="配置首页应用"]')).toBeNull();
-  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="绘图"]')!.click());
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="绘图（在新窗口打开）"]')!.click());
   expect(names()).toEqual(['绘图', '研究']);
-  expect(host.querySelector('output')?.textContent).toBe('/applications/2/ai-drawing?entry=home');
+  expect(window.open).toHaveBeenCalledWith('/applications/2/ai-drawing?entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
+  expect(host.querySelector('output')?.textContent).toBe('/');
   expect(JSON.parse(localStorage.getItem('application-preferences:1')!).favorites).toEqual(['drawing']);
 });
 
@@ -76,6 +79,16 @@ it('shows an empty state and a working all-apps entry for a new user', async () 
   expect(host.textContent).toContain('暂无最近使用的应用');
   await act(async () => host.querySelector<HTMLButtonElement>('.home-all-apps')!.click());
   expect(host.querySelector('output')?.textContent).toBe('/apps');
+});
+
+it.each(['left-right', 'top-bottom'])('opens recent apps in a new window from any sidebar under %s', async layoutMode => {
+  session.layoutMode = layoutMode;
+  state.apps = [drawing];
+  localStorage.setItem('application-preferences:1', JSON.stringify({ recent: { drawing: 100 } }));
+  await render(true, '/applications/3/research-assistant?entry=home');
+  await act(async () => host.querySelector<HTMLButtonElement>('.home-app-item')!.click());
+  expect(window.open).toHaveBeenCalledWith('/applications/2/ai-drawing?entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
+  expect(host.querySelector('output')?.textContent).toBe('/applications/3/research-assistant?entry=home');
 });
 
 it('shares catalog usage with the workbench and retains new-window behavior', async () => {
@@ -120,7 +133,8 @@ it('keeps navigation working when persisting history fails', async () => {
   await render(true);
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage unavailable'); });
   await act(async () => host.querySelector<HTMLButtonElement>('.home-app-item')!.click());
-  expect(host.querySelector('output')?.textContent).toBe('/chat?entry=home');
+  expect(window.open).toHaveBeenCalledWith('/chat?entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
+  expect(host.querySelector('output')?.textContent).toBe('/');
 });
 
 it('shows one catalog card and migrates cowork favorites and recent usage', async () => {

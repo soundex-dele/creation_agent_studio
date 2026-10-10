@@ -62,6 +62,11 @@ describe('application presentation', () => {
       .toBe('/chat?conversation=42&entry=apps&standalone=1#message');
   });
 
+  it('leaves embedded mode when launching a separate window', () => {
+    expect(applicationWindowPath('/applications/12/chat?embedded=1&conversation=42#message'))
+      .toBe('/applications/12/chat?conversation=42&entry=apps&standalone=1#message');
+  });
+
   it('keeps launch presentation across internal navigation without copying page state', () => {
     const current = new URLSearchParams('entry=apps&standalone=1&conversation=old&slug=writer');
     const path = applicationNavigationPath('/chat?conversation=new', current);

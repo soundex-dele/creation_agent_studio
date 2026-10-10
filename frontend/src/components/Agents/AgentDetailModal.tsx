@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Spin, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { openApplicationWindowWhenReady } from '@/lib/applicationPresentation';
 import { api } from '@/services/api';
 import { useConversationStore } from '@/stores/useConversationStore';
 import '../Modal/Modal.css';
@@ -25,7 +25,6 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
   const createConversation = useConversationStore((s) => s.createConversation);
 
   useEffect(() => {
@@ -56,13 +55,15 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
   };
 
   const handleStartConversation = async () => {
-    if (!agentId || !agent) return;
+    if (!agentId || !agent || isStarting) return;
     setIsStarting(true);
     try {
-      const conversation = await createConversation(agent.name, agentId);
+      await openApplicationWindowWhenReady(async () => {
+        const conversation = await createConversation(agent.name, agentId);
+        return `/chat?conversation=${encodeURIComponent(conversation.id)}`;
+      });
       message.success('对话已创建');
       onClose();
-      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
     } catch (error: any) {
       message.error(error.message || '创建对话失败');
     } finally {

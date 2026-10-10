@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Select, Spin } from 'antd';
-import useApplicationNavigate from '@/hooks/useApplicationNavigate';
+import { openApplicationWindowWhenReady } from '@/lib/applicationPresentation';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { scriptToAnimation, type AnimationDestination } from '@/services/douyinAnimation';
 import { projectApi } from '@/services/animationProjects';
@@ -10,7 +10,6 @@ import type { DouyinClient, Script } from '@/services/douyinBenchmark';
 
 export function ImportAnimationModal({ client, script, onClose }: { client: DouyinClient; script: Script; onClose: () => void }) {
   const organizationId = useOrganizationStore(state => state.currentOrganizationId);
-  const navigate = useApplicationNavigate();
   const [apps, setApps] = useState<AnimationDestination[]>([]);
   const [destination, setDestination] = useState<number>();
   const [loading, setLoading] = useState(true);
@@ -34,10 +33,13 @@ export function ImportAnimationModal({ client, script, onClose }: { client: Douy
     if (flight.current || !organizationId || !destination || !prepared.document) return;
     flight.current = true; setBusy(true); setError('');
     try {
-      const project = await projectApi(`${tenantApiRoot(organizationId)}/applications/${destination}/animation-studio`).create(prepared.document, script.title || '抖音创作脚本');
-      if (alive.current && useOrganizationStore.getState().currentOrganizationId === organizationId) {
-        navigate(`/applications/${destination}/animation-studio?project=${encodeURIComponent(project.id)}`);
-      }
+      const opened = await openApplicationWindowWhenReady(async () => {
+        const project = await projectApi(`${tenantApiRoot(organizationId)}/applications/${destination}/animation-studio`).create(prepared.document!, script.title || '抖音创作脚本');
+        return alive.current && useOrganizationStore.getState().currentOrganizationId === organizationId
+          ? `/applications/${destination}/animation-studio?project=${encodeURIComponent(project.id)}`
+          : null;
+      });
+      if (opened && alive.current) onClose();
     } catch (e) { if (alive.current) setError(documentError(e)); }
     finally { flight.current = false; if (alive.current) setBusy(false); }
   };

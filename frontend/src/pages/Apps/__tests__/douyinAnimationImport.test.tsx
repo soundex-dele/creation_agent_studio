@@ -12,9 +12,11 @@ vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 const script: Script = { title: '我的视频', cover: '封面短句', narration: '完整口播', checklist: ['准备道具'], scenes: [{ time: '0–10秒', visual: '书本翻页', spoken: '镜头口播' }] };
 const client = douyinApi('/organizations/org/applications/22/douyin-benchmark');
 let host: HTMLDivElement; let root: Root;
+const applicationWindow = { opener: window as Window | null, closed: false, location: { replace: vi.fn() }, close: vi.fn() };
 function Location() { const location = useLocation(); return <output>{location.pathname}{location.search}</output>; }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(window, 'open').mockReturnValue(applicationWindow as unknown as Window);
   useOrganizationStore.setState({ currentOrganizationId: 'org' });
   Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
   Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
@@ -31,14 +33,16 @@ async function render() {
 function submit() { return [...document.querySelectorAll('button')].find(button => button.textContent === '创建动画作品并打开')!; }
 
 describe('import saved scripts into animation', () => {
-  it('creates a separate tenant-scoped project and preserves the launch presentation', async () => {
+  it('creates a separate tenant-scoped project in a new standalone window', async () => {
     await render();
     expect(api.get).toHaveBeenCalledWith('/organizations/org/applications/22/douyin-benchmark/animation-integrations');
     await act(async () => submit().click());
     expect(api.post).toHaveBeenCalledWith('/organizations/org/applications/33/animation-studio/projects', expect.objectContaining({
       title: script.title, draft: expect.objectContaining({ aspect: '9:16', scenes: [expect.objectContaining({ title: '', narration: '镜头口播', frames: 300 })] }),
     }));
-    expect(host.querySelector('output')?.textContent).toBe('/applications/33/animation-studio?project=imported-project&entry=home&embedded=1');
+    expect(applicationWindow.location.replace).toHaveBeenCalledWith('/applications/33/animation-studio?project=imported-project&entry=apps&standalone=1');
+    expect(applicationWindow.opener).toBeNull();
+    expect(host.querySelector('output')?.textContent).toBe('/source?entry=home&embedded=1');
   });
 
   it('does not allow import when the animation application is unavailable', async () => {
@@ -53,10 +57,11 @@ describe('import saved scripts into animation', () => {
     vi.mocked(api.post).mockRejectedValueOnce(new Error('创建失败'));
     await render(); await act(async () => submit().click());
     expect(document.body.textContent).toContain('创建失败');
+    expect(applicationWindow.close).toHaveBeenCalledOnce();
     expect(host.querySelector('output')?.textContent).toContain('/source');
     await act(async () => submit().click());
     expect(api.post).toHaveBeenCalledTimes(2);
-    expect(host.querySelector('output')?.textContent).toContain('project=imported-project');
+    expect(applicationWindow.location.replace).toHaveBeenCalledWith('/applications/33/animation-studio?project=imported-project&entry=apps&standalone=1');
   });
 
   it('submits once while creation is pending and does not navigate after a tenant switch', async () => {
@@ -67,5 +72,7 @@ describe('import saved scripts into animation', () => {
     expect(api.post).toHaveBeenCalledTimes(1);
     await act(async () => { useOrganizationStore.setState({ currentOrganizationId: 'other-org' }); resolve({ id: 'imported-project' }); });
     expect(host.querySelector('output')?.textContent).toContain('/source');
+    expect(applicationWindow.location.replace).not.toHaveBeenCalled();
+    expect(applicationWindow.close).toHaveBeenCalledOnce();
   });
 });

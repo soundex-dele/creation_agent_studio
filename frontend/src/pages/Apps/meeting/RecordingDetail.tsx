@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { applicationWindowPath } from '@/lib/applicationPresentation';
 import { Alert, Button, Checkbox, Empty, Input, Modal, Popconfirm, Select, Space, Tabs, Tag } from 'antd';
 import { Check, FileText, ListTodo, Pencil, Play, RotateCcw, Trash2 } from 'lucide-react';
 import { activeMeeting, meetingError, meetingStatus, timeLabel, type Evidence, type MeetingAction, type MeetingClient, type MeetingRecord, type TranscriptSegment } from '@/services/meetingAssistant';
@@ -77,7 +78,7 @@ export function RecordingDetail({ client, record, onChange, onDelete, onDirty }:
         const result = await client.confirm(record.id, record.version, record.actions.filter(item => selected.includes(item.id)));
         setTodosApp(result.application_id); setSelected([]); onChange(await client.get(record.id));
       })}>确认加入待办{selected.length ? `（${selected.length}）` : ''}</Button></div>
-    {todosApp && <Alert type="success" message={<span>已加入待办。<Link to={`/applications/${todosApp}/ideas-todos`}>打开我的待办</Link></span>} />}
+    {todosApp && <Alert type="success" message={<span>已加入待办。<Link target="_blank" rel="noopener noreferrer" to={applicationWindowPath(`/applications/${todosApp}/ideas-todos`)}>打开我的待办</Link></span>} />}
     {!record.actions.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有明确的行动项" />}
     <ul className="meeting-evidence">{record.actions.map(item => <li key={item.id}>
       <div className="meeting-action-heading"><Checkbox aria-label={`选择行动项：${item.title}`} checked={selected.includes(item.id)} disabled={!!item.confirmed_at || running || stale || busy} onChange={e => setSelected(old => e.target.checked ? [...old, item.id] : old.filter(id => id !== item.id))} /><strong>{item.title}</strong>
@@ -117,7 +118,7 @@ export function RecordingDetail({ client, record, onChange, onDelete, onDirty }:
       <Button disabled={!record.segments.length || busy} onClick={() => exportDocument('transcript')}>逐字稿</Button>
       <Button disabled={stale || busy || running} onClick={() => exportDocument('minutes')}>会议纪要</Button>
       {record.kind === 'interview' && <Button disabled={stale || busy || running} onClick={() => exportDocument('materials')}>访谈素材包</Button>}</Space></div>
-    {exported && <Alert type="success" message={<span>文档已保存。<Link to={`/applications/${exported.application_id}/documents?document=${exported.document_id}`}>打开文档继续编辑</Link></span>} />}
+    {exported && <Alert type="success" message={<span>文档已保存。<Link target="_blank" rel="noopener noreferrer" to={applicationWindowPath(`/applications/${exported.application_id}/documents?document=${exported.document_id}`)}>打开文档继续编辑</Link></span>} />}
     <Tabs activeKey={tab} onChange={setTab} items={[{ key: 'topics', label: '主题摘要', children: evidence(record.analysis.topics) }, { key: 'transcript', label: '逐字稿', children: transcript },
       { key: 'decisions', label: '决策', children: evidence(record.analysis.decisions) }, { key: 'actions', label: `行动项${record.actions.length ? ` · ${record.actions.length}` : ''}`, children: actions },
       ...(record.kind === 'interview' ? [{ key: 'materials', label: '文章素材', children: material }] : [])]} />

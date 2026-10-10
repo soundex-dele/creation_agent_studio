@@ -41,5 +41,31 @@ export function applicationNavigationPath(path: string, searchParams: SearchPara
 
 /** All separate application windows use the same chrome-free presentation. */
 export function applicationWindowPath(path: string): string {
-  return applicationNavigationPath(path, new URLSearchParams('entry=apps&standalone=1'));
+  const url = new URL(path, 'https://application.local');
+  url.searchParams.delete('embedded');
+  return applicationNavigationPath(`${url.pathname}${url.search}${url.hash}`, new URLSearchParams('entry=apps&standalone=1'));
+}
+
+/** Call from the launch gesture so the browser can open the new window. */
+export function openApplicationWindow(path: string): void {
+  window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
+}
+
+/** Reserve the window before an async creation request loses user activation. */
+export async function openApplicationWindowWhenReady(resolvePath: () => Promise<string | null>): Promise<boolean> {
+  const applicationWindow = window.open('about:blank', '_blank');
+  if (!applicationWindow) throw new Error('新窗口被浏览器拦截，请允许弹出窗口后重试');
+  applicationWindow.opener = null;
+  try {
+    const path = await resolvePath();
+    if (!path) {
+      applicationWindow.close();
+      return false;
+    }
+    if (!applicationWindow.closed) applicationWindow.location.replace(applicationWindowPath(path));
+    return true;
+  } catch (error) {
+    applicationWindow.close();
+    throw error;
+  }
 }

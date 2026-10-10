@@ -1,3 +1,4 @@
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Button, Descriptions, Drawer, Empty, Input, Select, Space, Spin, Table,
@@ -252,7 +253,7 @@ export default function TaskCenterPage() {
     const destination = taskDestination(run, requestedType);
     if (!destination) return;
     if (destination.target === '_blank') {
-      window.open(destination.path, '_blank', 'noopener,noreferrer');
+      openApplicationWindow(destination.path);
       return;
     }
     navigate(destination.path);

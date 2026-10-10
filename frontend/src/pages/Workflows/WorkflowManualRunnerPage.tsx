@@ -14,6 +14,7 @@ import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
 import type { Workflow, WorkflowStep } from '@/types';
 import { workflowApplicationPath } from '@/lib/workflowApplicationPath';
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 import './Workflows.css';
 
 
@@ -157,10 +158,8 @@ export default function WorkflowManualRunnerPage() {
               <div className="workflow-run-header-actions">
                 <Button
                   icon={<ExportOutlined />}
-                  onClick={() => window.open(
+                  onClick={() => openApplicationWindow(
                     workflowApplicationPath(selectedStep, false, id, manualRun),
-                    '_blank',
-                    'noopener,noreferrer',
                   )}
                 >
                   新窗口打开

@@ -11,7 +11,7 @@ import {
 import { useAppStore } from '@/stores/useAppStore';
 import { useApplicationPreferences } from '@/hooks/useApplicationPreferences';
 import { applicationPath } from '@/lib/applicationCatalog';
-import { applicationWindowPath } from '@/lib/applicationPresentation';
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
 import { CONVERSATION_APP, CONVERSATION_APP_ID, isCoworkApplication } from '@/lib/conversationApplication';
@@ -70,7 +70,7 @@ const AppsPage: React.FC = () => {
 
   const openApplication = (id: string, path: string) => {
     recordUsage(id);
-    window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
+    openApplicationWindow(path);
   };
 
   const visibleApps = useMemo(() => {

@@ -4,7 +4,7 @@ import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { applicationPath } from '@/lib/applicationCatalog';
-import { applicationWindowPath, resolveApplicationPresentation } from '@/lib/applicationPresentation';
+import { openApplicationWindow, resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import type { AppItem } from '@/types';
 import './AppDetailPage.css';
@@ -65,7 +65,7 @@ const AppDetailPage: React.FC = () => {
   const shots = app.screenshots && app.screenshots.length > 0 ? app.screenshots : ['', '', ''];
 
   const handleOpen = () => {
-    window.open(applicationWindowPath(applicationPath(app)), '_blank', 'noopener,noreferrer');
+    openApplicationWindow(applicationPath(app));
   };
 
   return (

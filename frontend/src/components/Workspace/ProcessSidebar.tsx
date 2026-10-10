@@ -10,7 +10,7 @@ interface ProcessSidebarProps {
   /** processId -> conversation exists (chat started) */
   startedMap: Record<string, boolean>;
   onSelect: (processId: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
@@ -24,7 +24,7 @@ const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   return (
     <aside className="ws-sidebar">
       <div className="ws-sidebar-head">
-        <Button
+        {onBack && <Button
           type="text"
           size="small"
           icon={<ArrowLeftOutlined />}
@@ -32,7 +32,7 @@ const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           className="ws-back-btn"
         >
           应用中心
-        </Button>
+        </Button>}
         <div className="ws-workspace-title">{project.title}</div>
       </div>
 

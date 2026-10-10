@@ -119,7 +119,10 @@ describe('会议与访谈助手', () => {
     vi.mocked(api.post).mockImplementation(async url => url.endsWith('/access') ? { token: 't', expires_in: 3600 } : { document_id: 'doc-1', application_id: 55 });
     await detail();
     await click(button('访谈素材包'));
-    expect(document.querySelector('a[href="/applications/55/documents?document=doc-1"]')).not.toBeNull();
+    const link = document.querySelector('a[href="/applications/55/documents?document=doc-1&entry=apps&standalone=1"]');
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
     await click(button('访谈素材包'));
     const calls = vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith('/documents'));
     expect(calls).toHaveLength(2);

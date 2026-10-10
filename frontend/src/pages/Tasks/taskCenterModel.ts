@@ -116,7 +116,7 @@ export const taskDestination = (
   if (requestedType === 'application') {
     const applicationId = taskApplicationId(run);
     return applicationId
-      ? { path: `/applications/${encodeURIComponent(applicationId)}/run?entry=apps`, label: '打开应用' }
+      ? { path: `/applications/${encodeURIComponent(applicationId)}/run?entry=apps`, label: '打开应用', target: '_blank' }
       : null;
   }
   return null;

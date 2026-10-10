@@ -3,12 +3,11 @@ import { Button, Empty, Spin } from 'antd';
 import { AppstoreOutlined, MessageOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applicationPath } from '@/lib/applicationCatalog';
-import { applicationWindowPath } from '@/lib/applicationPresentation';
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 import ApplicationIcon from '@/components/ApplicationIcon';
 import { scrollHorizontalWithWheel } from '@/lib/horizontalWheelScroll';
 import { useAppStore } from '@/stores/useAppStore';
 import { useApplicationPreferences } from '@/hooks/useApplicationPreferences';
-import { usePreferencesStore } from '@/stores/usePreferencesStore';
 import type { AppItem } from '@/types';
 import { CONVERSATION_APP, CONVERSATION_APP_ID, isCoworkApplication } from '@/lib/conversationApplication';
 
@@ -21,9 +20,6 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const layoutMode = usePreferencesStore((state) => state.layoutMode);
-  const openInNewWindow = layoutMode === 'left-right'
-    && (location.pathname === '/' || location.pathname === '');
   const { apps, isLoading, error, loadApps, setSearchQuery } = useAppStore();
   const { preferences, recordUsage } = useApplicationPreferences();
   const applicationListRef = useRef<HTMLDivElement>(null);
@@ -57,11 +53,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
   const openApplication = (app: AppItem) => {
     const path = homeApplicationPath(app);
     recordUsage(app.id);
-    if (openInNewWindow) {
-      window.open(applicationWindowPath(path), '_blank', 'noopener,noreferrer');
-      return;
-    }
-    navigate(path);
+    openApplicationWindow(path);
   };
 
   const isActiveApplication = (app: AppItem) => {
@@ -74,7 +66,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
       <div className="home-app-sidebar-head">
         <div>
           <div className="sidebar-title">最近使用</div>
-          <p>{openInNewWindow ? '按最近打开排序 · 在新窗口打开' : '按最近打开排序'}</p>
+          <p>按最近打开排序 · 在新窗口打开</p>
         </div>
       </div>
 
@@ -98,7 +90,7 @@ const HomeApplicationsSidebar: React.FC<HomeApplicationsSidebarProps> = ({
               className={`home-app-item ${isActiveApplication(app) ? 'active' : ''}`}
               style={{ '--app-accent': app.color || 'var(--color-primary)' } as CSSProperties}
               aria-current={isActiveApplication(app) ? 'page' : undefined}
-              aria-label={openInNewWindow ? `${app.name}（在新窗口打开）` : app.name}
+              aria-label={`${app.name}（在新窗口打开）`}
               title={app.name}
               onClick={() => openApplication(app)}
             >

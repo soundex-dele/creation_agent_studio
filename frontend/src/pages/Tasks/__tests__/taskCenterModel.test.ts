@@ -224,4 +224,10 @@ describe('task center relationships', () => {
   it('does not redirect a task without a conversation or workflow to a resource definition', () => {
     expect(taskDestination(run({ task_type: 'automation', source_type: 'application', application_id: '9', automation_id: 8 }))).toBeNull();
   });
+
+  it('opens an explicitly requested application in a separate window', () => {
+    expect(taskDestination(run({ source_type: 'application', application_id: '9' }), 'application')).toEqual({
+      path: '/applications/9/run?entry=apps', label: '打开应用', target: '_blank',
+    });
+  });
 });

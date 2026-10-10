@@ -1,3 +1,4 @@
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 import { useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Empty, Progress, Spin, Typography, message,
@@ -289,7 +290,7 @@ const WorkflowRunnerPage = () => {
                           </Button>}
                           {step.content?.kind === 'chat' && <Button icon={<ExportOutlined aria-hidden />}
                             disabled={!conversationId} title={conversationId ? '在新窗口查看对话' : '步骤开始后可查看对话'}
-                            onClick={() => window.open(`/chat?conversation=${encodeURIComponent(conversationId)}`, '_blank', 'noopener,noreferrer')}>
+                            onClick={() => openApplicationWindow(`/chat?conversation=${encodeURIComponent(conversationId)}`)}>
                             查看对话
                           </Button>}
                         </footer>

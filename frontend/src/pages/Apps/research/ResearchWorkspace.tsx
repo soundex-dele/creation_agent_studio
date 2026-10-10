@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { applicationWindowPath } from '@/lib/applicationPresentation';
 import { Alert, Button, Checkbox, Collapse, Drawer, Empty, Grid, Input, Modal, Pagination, Popconfirm, Progress, Select, Space, Spin, Tabs, Tag, message } from 'antd';
 import { Download, FileText, Search, Upload } from 'lucide-react';
 import { documentError } from '@/services/documents';
@@ -187,7 +188,7 @@ export function ResearchWorkspace({ client, projectId, resultId, citationId, nav
     <Drawer rootClassName="research-citation-drawer" title="原文出处" open={!!citationId} onClose={() => navigate(projectId, resultId)} width={520}>
       {citationError ? <Alert type="error" message={citationError} /> : !citation ? <Spin /> : <div className="research-citation-detail"><h2>{citation.title}</h2><Tag>{citationLocation(citation)}</Tag><blockquote>{citation.quote}</blockquote><h3>所在原文片段</h3><p className="research-context">{highlightQuote(citation.context || '', citation.quote)}</p>
         <Button disabled={busy} icon={<FileText size={16} aria-hidden="true" />} onClick={() => void action(async () => saveResearchBlob(await client.original(projectId, citation.source_id), citation.filename || citation.title))}>下载导入时的原文件</Button>
-        {citation.origin?.type === 'document' && <p><Link to={`/applications/${citation.origin.application_id}/documents?document=${citation.origin.id}`}>打开原始在线文档（当前版本）</Link></p>}
+        {citation.origin?.type === 'document' && <p><Link target="_blank" rel="noopener noreferrer" to={applicationWindowPath(`/applications/${citation.origin.application_id}/documents?document=${citation.origin.id}`)}>打开原始在线文档（当前版本）</Link></p>}
         <p className="research-hint">此处展示生成时使用的资料版本。</p></div>}
     </Drawer>
   </div>;

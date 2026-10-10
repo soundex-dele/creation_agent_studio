@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Drawer, Empty, Spin, message } from 'antd';
 import { ArrowLeftOutlined, FolderOpenOutlined, MenuOutlined } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useConversationStore } from '@/stores/useConversationStore';
 import { useAgentStore } from '@/stores/useAgentStore';
@@ -16,6 +16,8 @@ import './WorkspacePage.css';
 const WorkspacePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const showBack = searchParams.get('standalone') !== '1' && searchParams.get('embedded') !== '1';
   const { currentProject, isLoading, loadProject } = useProjectStore();
   const {
     createConversation,
@@ -136,7 +138,7 @@ const WorkspacePage: React.FC = () => {
     return (
       <div className="ws-page ws-page-empty">
         <Empty description="请选择一个应用或工作流">
-          <Button type="primary" onClick={() => navigate('/apps')}>浏览应用中心</Button>
+          {showBack && <Button type="primary" onClick={() => navigate('/apps')}>浏览应用中心</Button>}
         </Empty>
       </div>
     );
@@ -156,7 +158,7 @@ const WorkspacePage: React.FC = () => {
     return (
       <div className="ws-page ws-page-empty">
         <Empty description="工作空间不存在或无权访问">
-          <Button onClick={() => navigate('/apps')}>返回应用中心</Button>
+          {showBack && <Button onClick={() => navigate('/apps')}>返回应用中心</Button>}
         </Empty>
       </div>
     );
@@ -207,19 +209,19 @@ const WorkspacePage: React.FC = () => {
           activeProcessId={activeProcessId}
           startedMap={startedMap}
           onSelect={handleProcessSelect}
-          onBack={() => navigate('/apps')}
+          onBack={showBack ? () => navigate('/apps') : undefined}
         />
 
         <section className="ws-center">
           <header className="ws-center-head">
-            <Button
+            {showBack && <Button
               type="text"
               size="small"
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/templates')}
               className="ws-back-btn"
               aria-label="返回模板列表"
-            />
+            />}
             <div className="ws-center-proc">
               {activeProcess && <span className="ws-center-proc-icon">{activeProcess.icon || '✨'}</span>}
               <div>
@@ -266,7 +268,7 @@ const WorkspacePage: React.FC = () => {
           activeProcessId={activeProcessId}
           startedMap={startedMap}
           onSelect={handleProcessSelect}
-          onBack={() => navigate('/apps')}
+          onBack={showBack ? () => navigate('/apps') : undefined}
         />
       </Drawer>
 

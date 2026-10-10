@@ -10,6 +10,7 @@ import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { tenantApiRoot } from '@/services/tenantContext';
 import SidebarCategoryLabel from './SidebarCategoryLabel';
 import { categoryIcon } from '@/lib/categoryIcons';
+import { openApplicationWindow } from '@/lib/applicationPresentation';
 
 interface AppHistoryItem {
   key: string;
@@ -80,11 +81,11 @@ const AppHistorySidebar: React.FC = () => {
     try {
       if (item.kind === 'application' && item.projectId) {
         if (item.applicationId) {
-          navigate(`/applications/${item.applicationId}/run`);
+          openApplicationWindow(`/applications/${item.applicationId}/run`);
         } else {
           // Legacy records without an application association retain the old
           // project workspace fallback.
-          navigate(`/workspace/${item.projectId}`);
+          openApplicationWindow(`/workspace/${item.projectId}`);
         }
         return;
       }
