@@ -32,7 +32,7 @@ def script():
 
 
 @pytest.fixture
-def ctx(db, settings, tmp_path):
+def ctx(db, settings, tmp_path, skill):
     settings.DOUYIN_MEDIA_ROOT = tmp_path / "media"
     owner = get_user_model().objects.create_user(username="dy-owner")
     reader = get_user_model().objects.create_user(username="dy-reader")

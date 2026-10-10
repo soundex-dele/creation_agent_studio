@@ -88,6 +88,8 @@ backend\venv\Scripts\python.exe -X utf8 backend/manage.py backfill_douyin_observ
 
 图文写作从服务端 `CODEX_SKILLS_DIRECTORY/wechat-viral-article/` 加载 `SKILL.md` 及其引用的 `references/`、`templates/` Markdown 资料，注入结构化生成指令。部署时须在执行 worker 可读取的技能目录保留完整技能包；缺失、不可读、空文件、越界引用或资料总量超过160,000字节会明确报错，不回退普通提示词。图文结果仍为 `{text}`，内容是一个 Markdown 标题和完整文章，不输出候选选题、标题列表或自检过程。主题与原始作品类型、标题、描述、校正原文和要求均冻结，历史可恢复；技能的算法与流量断言不视为已核实事实，生成不承诺爆款效果。
 
+创作流程中的“生成选题”（`topics`）和“开始写作”（`article`，包括已保存选题直接写作）也复用上述加载器，完整加载 `wechat-viral-article` 及引用资料，结构修正重试继续使用同一份技能指令。任务的账号定位、已确认个人文风、事实边界与 JSON 契约优先：选题仍返回3个方向，文章仍返回 `title/body/notes`，不额外输出技能默认的候选标题或自检清单。技能加载失败会明确报错，不回退普通提示词。
+
 复用原有私有 Task／ScriptVersion JSON 存储，无新增迁移；部署时更新前端并重启 Web、coordinator 和 media worker。
 
 ## 采集运行方式与验收边界

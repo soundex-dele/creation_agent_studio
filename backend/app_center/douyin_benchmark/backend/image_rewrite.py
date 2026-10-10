@@ -1,45 +1,13 @@
 """Load the deployed writing skill for text-only image-album replication."""
 
 import re
-from pathlib import Path
-
-from django.conf import settings
 
 from .analysis import validate_rewrite
-
-SKILL_NAME = "wechat-viral-article"
-REFERENCE = re.compile(r"(?:references|templates)/[\w./-]+\.md")
-MAX_SKILL_BYTES = 160000
+from .writing_skill import load_writing_skill
 
 
 def writing_instruction():
-    root = (Path(settings.CODEX_SKILLS_DIRECTORY).expanduser() / SKILL_NAME).resolve()
-    pending = ["SKILL.md"]
-    seen = set()
-    sections = []
-    total = 0
-    while pending:
-        name = pending.pop(0)
-        if name in seen:
-            continue
-        seen.add(name)
-        try:
-            path = (root / name).resolve()
-            if not path.is_relative_to(root):
-                raise ValueError("技能引用越过目录边界")
-            with path.open("rb") as stream:
-                raw = stream.read(MAX_SKILL_BYTES - total + 1)
-            total += len(raw)
-            if total > MAX_SKILL_BYTES:
-                raise ValueError("技能资料过大")
-            content = raw.decode("utf-8-sig")
-            if not content.strip():
-                raise ValueError("技能资料为空")
-        except (OSError, UnicodeError, ValueError):
-            raise ValueError(f"无法加载 {SKILL_NAME} 技能资料（{name}），请检查服务端技能目录及文件。") from None
-        sections.append(f"\n--- {name} ---\n{content}")
-        pending.extend(REFERENCE.findall(content))
-    return "使用以下 wechat-viral-article 技能及参考资料完成写作：\n" + "\n".join(sections) + '''
+    return load_writing_skill() + '''
 
 本次任务的明确要求优先于上述技能的默认选题、读者和交付设置：
 根据提供的抖音图文参考原文撰写一篇完整中文文章，仅提供了标题、描述及用户补充文字，未读取图片内文字。
