@@ -26,7 +26,7 @@ class TaskInput(serializers.Serializer):
     analysis_id = serializers.UUIDField(required=False)
     feature_ids = serializers.ListField(child=serializers.CharField(max_length=30), required=False, max_length=60)
     angle = serializers.ChoiceField(choices=['overview', 'feature', 'tutorial'], default='overview')
-    output = serializers.ChoiceField(choices=['both', 'video', 'article'], default='both')
+    output = serializers.ChoiceField(choices=['video', 'image_text'], default='video')
     audience = serializers.CharField(max_length=1000, default='有 AI 使用需求的普通用户')
     style = serializers.CharField(max_length=2000, default='清晰、具体、口语自然')
     duration = serializers.IntegerField(min_value=5, max_value=600, default=60)

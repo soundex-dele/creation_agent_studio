@@ -5,8 +5,9 @@ import { Code2, Plus, RefreshCw } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { tenantApiRoot } from '@/services/tenantContext';
-import { defaultRepoBrief, repoApi, repoError, repoTerminal, type RepoBrief, type RepoDestination, type RepoDetail, type RepoEvidence, type RepoHandoff, type RepoProject, type RepoReport } from '@/services/repoExplainer';
+import { defaultRepoBrief, repoApi, repoError, repoTerminal, type RepoBrief, type RepoDestination, type RepoDetail, type RepoEvidence, type RepoHandoff, type RepoProject, type RepoReport, type RepoTask } from '@/services/repoExplainer';
 import RepoContentEditor from './repo/RepoContentEditor';
+import RepoTaskProgress from './repo/RepoTaskProgress';
 import './RepoExplainerPage.css';
 
 export default function RepoExplainerPage() {
@@ -43,12 +44,15 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
   const [editing, setEditing] = useState(false);
   const activeProject = useRef(projectId); activeProject.current = projectId;
   const uploadBody = useRef<{ file: File; data: FormData }>();
+  const refreshSequence = useRef(0);
   const refreshProjects = useCallback(async () => { setProjects(await client.projects(archived)); }, [client, archived]);
   const refresh = useCallback(async () => {
     if (!projectId) return;
+    const sequence = ++refreshSequence.current;
     const result = await client.project(projectId);
-    if (activeProject.current === projectId) setDetail(result);
+    if (activeProject.current === projectId && sequence === refreshSequence.current) setDetail(result);
   }, [client, projectId]);
+  const refreshAfterTask = useCallback(() => { void refresh().catch(e => setError(repoError(e))); }, [refresh]);
   useEffect(() => { if (organization) void refreshProjects().catch(e => setError(repoError(e))); }, [organization, refreshProjects]);
   useEffect(() => { void client.destinations().then(setDestinations).catch(e => setError(repoError(e))); }, [client]);
   useEffect(() => {
@@ -56,16 +60,24 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
     if (!projectId) return;
     setLoading(true); void refresh().catch(e => setError(repoError(e))).finally(() => setLoading(false));
   }, [projectId, refresh]);
+  const hasActiveTasks = detail?.tasks.some(t => !repoTerminal(t.status)) || false;
   useEffect(() => {
-    if (!detail?.tasks.some(t => !repoTerminal(t.status))) return;
-    const timer = setInterval(() => { void refresh().catch(e => setError(repoError(e))); }, 2500);
-    return () => clearInterval(timer);
-  }, [detail, refresh]);
+    if (!hasActiveTasks) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try { await refresh(); } catch (e) { if (!stopped) setError(repoError(e)); }
+      if (!stopped) timer = setTimeout(() => void poll(), 2500);
+    };
+    timer = setTimeout(() => void poll(), 2500);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [hasActiveTasks, refresh]);
   const snapshot = detail?.snapshots.find(s => s.id === snapshotId) || detail?.snapshots[0];
   const analyses = detail?.tasks.filter(t => t.kind === 'analyze' && t.status === 'succeeded') || [];
-  const analysis = analyses.find(t => t.id === analysisId) || analyses[0];
+  const analysis = analysisId ? analyses.find(t => t.id === analysisId) : analyses[0];
   const report = analysis?.output as RepoReport | undefined;
   const content = detail?.contents.find(c => c.id === contentId) || detail?.contents[0];
+  useEffect(() => { setHandoff(undefined); }, [content?.id]);
   useEffect(() => {
     if (!analysisId && analysis?.id) { setAnalysisId(analysis.id); setSelected([]); }
   }, [analysisId, analysis?.id]);
@@ -76,6 +88,12 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
     try { await work(); await refresh(); } catch (e) { setError(repoError(e)); } finally { setBusy(false); }
   }
   const selectAnalysis = (id: string) => { setAnalysisId(id); setSelected([]); };
+  const trackTask = (task: RepoTask) => {
+    if (activeProject.current !== projectId) return;
+    setDetail(current => current && current.id === projectId ? {
+      ...current, tasks: [task, ...current.tasks.filter(t => t.id !== task.id)],
+    } : current);
+  };
   const create = () => act(async () => { const p = await client.create(name.trim()); await refreshProjects(); selectProject(p.id); setName(''); });
   const importSource = () => act(async () => {
     let body: FormData | Record<string, string> = { kind, ...(kind === 'github' ? { url: source, ref } : { path: source }) };
@@ -84,7 +102,7 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
       if (uploadBody.current?.file !== file) { const data = new FormData(); data.append('kind', 'zip'); data.append('file', file); uploadBody.current = { file, data }; }
       body = uploadBody.current.data;
     }
-    await client.import(projectId, body);
+    trackTask(await client.import(projectId, body));
   });
   async function showEvidence(id: string) {
     if (!analysis || !report?.evidence[id]) return;
@@ -95,14 +113,14 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
     } catch (e) { setError(repoError(e)); }
   }
   const statuses = { documented: '文档描述', implemented: '找到实现依据', unconfirmed: '尚待确认' };
-  const taskList = detail?.tasks.filter(t => !repoTerminal(t.status) || t.status === 'failed').slice(0, 6);
+  const taskList = detail?.tasks.filter((t, index) => !repoTerminal(t.status) || index === 0 || (t.status === 'failed' && index < 6));
   return <div className="repo-page app-scroll-page"><div className="repo-inner">
     <header className="repo-heading"><div><span className="repo-eyebrow"><Code2 size={16} aria-hidden="true" /> SOURCE TO STORY</span><h1>仓库解读助手</h1><p>从源码证据出发，把工具功能变成值得分享的内容。</p></div><Button icon={<RefreshCw size={16} />} onClick={() => void act(refreshProjects)}>刷新</Button></header>
     {error && <Alert type="error" showIcon message={error} closable onClose={() => setError('')} />}
     <section className="repo-card"><div className="repo-project-controls">
       <label className="repo-field">当前项目<Select aria-label="当前项目" placeholder="选择项目" value={projectId || undefined} disabled={editing} onChange={selectProject} options={projects.map(p => ({ value: p.id, label: p.title }))} /></label>
-      <label className="repo-field">新项目名称<Input value={name} onChange={e => setName(e.target.value)} placeholder="例如：AI 文档问答工具" maxLength={200} /></label>
-      <Button type="primary" icon={<Plus size={16} />} disabled={!name.trim() || busy || editing} onClick={() => void create()}>创建项目</Button>
+      <label className="repo-field" htmlFor="repo-project-name">新项目名称<Input id="repo-project-name" value={name} onChange={e => setName(e.target.value)} placeholder="例如：AI 文档问答工具" maxLength={200} /></label>
+      <Button type="primary" icon={<Plus size={16} aria-hidden="true" />} disabled={!name.trim() || busy || editing} onClick={() => void create()}>创建项目</Button>
     </div><div className="repo-actions"><Checkbox checked={archived} onChange={e => setArchived(e.target.checked)}>查看归档</Checkbox>
       {detail && <Button disabled={editing || busy} onClick={() => void act(async () => { await client.update(projectId, { archived: !detail.archived }); await refreshProjects(); })}>{detail.archived ? '恢复项目' : '归档项目'}</Button>}
       {detail && <Button disabled={editing || busy} onClick={() => {
@@ -114,7 +132,8 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
     {loading && <Spin />}
     {!projectId && <Empty description="创建一个项目，导入你准备介绍的工具仓库" />}
     {detail && <>
-      {taskList?.map(task => <Alert key={task.id} type={task.status === 'failed' ? 'error' : 'info'} message={task.status === 'failed' ? task.error || '任务失败，可以重新提交' : task.progress.stage || '任务已排队'} action={!repoTerminal(task.status) ? <Button onClick={() => void act(() => client.cancel(projectId, task.id))}>取消</Button> : undefined} />)}
+      {taskList?.map(task => <RepoTaskProgress key={task.id} task={task} organization={organization || ''} busy={busy}
+        onSettled={refreshAfterTask} onCancel={() => void act(() => client.cancel(projectId, task.id))} />)}
       <Tabs activeKey={tab} onChange={value => { if (!editing) setTab(value); }} items={[
         { key: 'sources', label: '仓库资料', children: <section className="repo-stack">
           <div className="repo-card"><h2>导入源码快照</h2><p>只读取文件，不安装或运行仓库。重新导入会创建新快照。</p>
@@ -127,27 +146,30 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
           {snapshot && <div className="repo-card"><h3>{snapshot.origin.url || snapshot.origin.path || snapshot.origin.filename}</h3><p>状态：{snapshot.status} · 提交：{snapshot.origin.commit || '无 Git 提交信息'}</p><p>快照哈希：{snapshot.digest || '等待导入'}</p>
             {snapshot.error && <Alert type="error" message={snapshot.error} />}<p>已纳入 {snapshot.coverage.files_included || 0} 个文本文件 · 所有结论均为静态分析</p>
             <details><summary>排除内容与读取说明</summary>{snapshot.coverage.notes?.map(n => <p key={n}>{n}</p>)}<ul>{snapshot.coverage.excluded?.map(s => <li key={s.path}>{s.path}：{s.reason}</li>)}</ul></details>
-            <Button type="primary" disabled={snapshot.status !== 'ready' || busy} onClick={() => void act(async () => { await client.task(projectId, { kind: 'analyze', snapshot_id: snapshot.id }); setTab('analysis'); })}>分析此版本功能</Button></div>}
+            <Button type="primary" disabled={snapshot.status !== 'ready' || busy} onClick={() => void act(async () => { trackTask(await client.task(projectId, { kind: 'analyze', snapshot_id: snapshot.id })); setTab('analysis'); })}>分析此版本功能</Button></div>}
         </section> },
         { key: 'analysis', label: '功能解读', children: <section className="repo-stack">
           <label className="repo-field">分析版本<Select aria-label="分析版本" value={analysis?.id} onChange={selectAnalysis} options={analyses.map((t, i) => ({ value: t.id, label: `分析 ${analyses.length - i} · 快照 ${t.snapshot_id.slice(0, 8)}` }))} /></label>
-          {!report && <Empty description="导入快照后开始分析，完成的功能报告会显示在这里" />}
+          {!report && <Empty description={analysisId ? '所选分析已不可用，请重新选择分析版本' : '导入快照后开始分析，完成的功能报告会显示在这里'} />}
           {report && <><div className="repo-card"><h2>{report.summary}</h2><p>适合：{report.audience}</p><p>已读取 {report.coverage.files_read}/{report.coverage.files_total} 个文件、{report.coverage.chunks_read}/{report.coverage.chunks_total} 个片段。{report.coverage.note}</p>
             {[['使用流程', report.workflow], ['部署条件', report.deployment], ['限制', report.limitations]].map(([label, rows]) => <details key={String(label)}><summary>{label}</summary><ul>{(rows as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul></details>)}</div>
             {report.features.map(f => <article className="repo-card" key={f.id}><div className="repo-actions"><Checkbox checked={selected.includes(f.id)} onChange={e => setSelected(v => e.target.checked ? [...v, f.id] : v.filter(id => id !== f.id))}>用于创作</Checkbox><Tag>{statuses[f.status]}</Tag><h3>{f.title}</h3></div><p>{f.description}</p>
               <dl>{[['场景', f.scenario], ['入口', f.entry], ['前置条件', f.requirements], ['限制', f.limitations], ['差异或缺口', f.discrepancies]].filter(([, v]) => v).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
               <div className="repo-actions">{f.evidence_ids.map(id => <Button key={id} onClick={() => void showEvidence(id)}>{id} · 查看源码依据</Button>)}</div></article>)}
-            <Button type="primary" disabled={!selected.length} onClick={() => setTab('content')}>用已选 {selected.length} 项功能创作</Button></>}
+            <div className="repo-actions repo-workflow-actions">
+              <span>已选 {selected.length} 项功能</span>
+              <Button type="primary" disabled={!selected.length} onClick={() => setTab('content')}>用已选 {selected.length} 项功能创作</Button>
+            </div></>}
         </section> },
         { key: 'content', label: '内容创作', children: <section className="repo-stack">
-          <div className="repo-card"><h2>创作要求</h2><p>已选 {selected.length} 项功能。每次生成创建新作品，不覆盖已有文案。</p><div className="repo-grid">
+          <div className="repo-card"><h2>创作要求</h2><p>已选 {selected.length} 项功能。每次生成独立文案，保留已有版本。</p><div className="repo-grid">
             <label className="repo-field">介绍角度<Select value={brief.angle} onChange={angle => setBrief({ ...brief, angle })} options={[{ value: 'overview', label: '工具速览' }, { value: 'feature', label: '单功能介绍' }, { value: 'tutorial', label: '场景教程' }]} /></label>
-            <label className="repo-field">产出<Select value={brief.output} onChange={output => setBrief({ ...brief, output })} options={[{ value: 'both', label: '视频稿＋图文' }, { value: 'video', label: '视频稿' }, { value: 'article', label: '图文' }]} /></label>
+            <label className="repo-field">文案类型<Select aria-label="文案类型" value={brief.output} onChange={output => setBrief({ ...brief, output })} options={[{ value: 'video', label: '视频文案' }, { value: 'image_text', label: '图文文案' }]} /></label>
             <label className="repo-field">面向人群<Input value={brief.audience} onChange={e => setBrief({ ...brief, audience: e.target.value })} /></label>
             <label className="repo-field">表达风格<Input value={brief.style} onChange={e => setBrief({ ...brief, style: e.target.value })} /></label>
-            <label className="repo-field">目标时长（秒）<InputNumber min={5} max={600} value={brief.duration} onChange={duration => setBrief({ ...brief, duration: duration || 60 })} /></label>
-            <label className="repo-field">画幅<Select value={brief.aspect} onChange={aspect => setBrief({ ...brief, aspect })} options={['16:9', '9:16', '1:1'].map(value => ({ value }))} /></label>
-          </div><Button type="primary" disabled={!analysis || !selected.length || busy || editing} onClick={() => void act(() => client.task(projectId, { ...brief, kind: 'write', analysis_id: analysis?.id, feature_ids: selected }))}>生成新作品</Button></div>
+            {brief.output === 'video' && <><label className="repo-field">目标时长（秒）<InputNumber min={5} max={600} value={brief.duration} onChange={duration => setBrief({ ...brief, duration: duration || 60 })} /></label>
+            <label className="repo-field">制作画幅<Select value={brief.aspect} onChange={aspect => setBrief({ ...brief, aspect })} options={['16:9', '9:16', '1:1'].map(value => ({ value }))} /></label></>}
+          </div><p>{brief.output === 'video' ? '使用 write-short-video-copy 生成口播文案；保存后可交给动画制作或文案转剪映设计分镜。' : '使用 write-image-text-copy 生成图文文案；完成后可编辑和导出。'}</p><Button type="primary" disabled={!analysis || !selected.length || busy || editing} onClick={() => void act(async () => { trackTask(await client.task(projectId, { ...brief, kind: 'write', analysis_id: analysis?.id, feature_ids: selected })); })}>生成文案</Button></div>
           <label className="repo-field">内容作品<Select aria-label="内容作品" disabled={editing} value={content?.id} onChange={setContentId} options={detail.contents.map(c => ({ value: c.id, label: c.title }))} /></label>
           {content && <RepoContentEditor key={`${projectId}:${content.id}`} initial={content} client={client} projectId={projectId} destinations={destinations} onDirty={setEditing} onHandoff={h => { setHandoff(h); void refresh(); }} />}
           {handoff && <Alert type="success" message={handoff.status} description={<a href={handoff.url}>打开制作页，检查内容与参数</a>} />}

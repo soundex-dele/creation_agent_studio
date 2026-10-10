@@ -18,4 +18,13 @@ describe('repository workspace scroll and route contracts (static checks)', () =
     expect(css).not.toMatch(/(?:^|\})\s*(?:body|#root|\.app-main)\s*\{/);
     expect(applicationPath({ id: 'repo-explainer', applicationId: 5, kind: 'custom', rendererKey: 'repo-explainer' }, 'home')).toBe('/applications/5/repo-explainer?entry=home');
   });
+  it('aligns creation controls without inheriting field bottom spacing', () => {
+    const css = read('../../pages/Apps/RepoExplainerPage.css');
+    const page = read('../../pages/Apps/RepoExplainerPage.tsx');
+    expect(css).toMatch(/\.repo-project-controls\s*\{[^}]*align-items:\s*end/);
+    expect(css).toMatch(/\.repo-project-controls\s*>\s*\.repo-field\s*\{\s*margin-bottom:\s*0;/);
+    expect(css).toMatch(/\.repo-task-header\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.repo-task-header\s*>\s*strong\s*\{[^}]*min-width:\s*0/);
+    expect(page).toContain('htmlFor="repo-project-name"');
+  });
 });

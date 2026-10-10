@@ -2,9 +2,9 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: repo-explainer
-  version: 1.0.0
+  version: 1.1.0
   name: 仓库解读助手
-  description: 从源码证据解读工具功能，生成视频与图文，并衔接剪映和动画制作。
+  description: 从源码证据解读工具功能，使用写作技能生成文案，视频文案可导入剪映或动画制作。
   category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: desktop, order: 1}
   icon: code
   color: '#2563EB'

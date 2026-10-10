@@ -23,17 +23,28 @@ def test_real_repository_to_production_drafts(ctx, settings, tmp_path):
     analysis = Task.objects.get(pk=response.data['id']); report = finish(analysis)
     selected = [f['id'] for f in report['features'][:3]]
     response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'analysis_id': str(analysis.id), 'feature_ids': selected,
-        'duration': 60, 'output': 'both'}, format='json', HTTP_IDEMPOTENCY_KEY='live-write')
+        'duration': 60, 'output': 'video'}, format='json', HTTP_IDEMPOTENCY_KEY='live-write')
     assert response.status_code == 202, response.data
     writing = Task.objects.get(pk=response.data['id']); result = finish(writing)
     content = Content.objects.get(pk=result['content_id'])
+    assert content.draft['skill']['slug'] == 'write-short-video-copy'
+    assert 'scenes' not in content.draft
     for slug in ['copy-to-jianying', 'animation-studio']:
         app = target(ctx, slug)
         response = ctx.client.post(ctx.root + '/handoffs', {'version_id': str(content.versions.first().id), 'target_id': app.id},
             format='json', HTTP_IDEMPOTENCY_KEY='live-' + slug)
         assert response.status_code == 201, response.data
         assert response.data['url'].startswith('/applications/')
+        if slug == 'animation-studio':
+            assert response.data['draft']['scenes'] == []
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'analysis_id': str(analysis.id), 'feature_ids': selected,
+        'output': 'image_text'}, format='json', HTTP_IDEMPOTENCY_KEY='live-image-copy')
+    assert response.status_code == 202, response.data
+    result = finish(Task.objects.get(pk=response.data['id']))
+    image_copy = Content.objects.get(pk=result['content_id'])
+    assert image_copy.draft['skill']['slug'] == 'write-image-text-copy'
+    assert image_copy.draft['kind'] == 'image_text'
     output = tmp_path / 'repo-explainer-live-validation.json'
-    output.write_text(json.dumps({'repository': str(repository), 'report': report, 'content': content.draft,
+    output.write_text(json.dumps({'repository': str(repository), 'report': report, 'content': content.draft, 'image_copy': image_copy.draft,
         'checks': 'Real configured model, immutable local snapshot, both production handoff APIs; no browser or video rendering.'}, ensure_ascii=False, indent=2), encoding='utf-8')
     print('LIVE_VALIDATION_ARTIFACT=' + str(output))

@@ -40,10 +40,13 @@ def project_data(p):
 
 
 def task_data(t):
+    # A single event boundary lets clients order polled state against SSE replay.
+    sequence = t.run.next_event_sequence if t.run else 0
     return {'id': str(t.id), 'kind': t.kind, 'snapshot_id': str(t.snapshot_id), 'options': t.options,
             'status': t.run.status if t.run else 'failed', 'run_id': str(t.run_id or ''),
+            'event_sequence': sequence,
             'error': t.run.error_message if t.run else '任务不可用', 'output': t.output,
-            'progress': (t.run.events.filter(type='progress.updated').order_by('-sequence').values_list('payload', flat=True).first() or {}) if t.run else {},
+            'progress': (t.run.events.filter(type='progress.updated', sequence__lte=sequence).order_by('-sequence').values_list('payload', flat=True).first() or {}) if t.run else {},
             'created_at': t.created_at}
 
 
@@ -248,6 +251,12 @@ class ContentView(BaseView):
         if values['revision'] != c.revision:
             return Response({'detail': '服务器已有新版本，本地内容已保留。', 'current': content_data(c)}, status=409)
         document = validate_document(values['document'], c.analysis.output)
+        if c.draft.get('schema_version') == 2:
+            if document.get('kind') != c.draft['kind'] or document.get('schema_version') != 2:
+                raise ValidationError('请另行生成其他类型的文案。')
+            # Skill provenance is set by the worker, never supplied by an editor.
+            if c.draft.get('skill'):
+                document['skill'] = c.draft['skill']
         if document != c.draft:
             c.revision += 1
             c.draft, c.title = document, document['title']

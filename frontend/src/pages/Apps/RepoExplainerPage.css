@@ -11,11 +11,20 @@
 .repo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .repo-project-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; }
 .repo-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin-bottom: 16px; font-weight: 500; }
+.repo-project-controls > .repo-field { margin-bottom: 0; }
+.repo-project-controls > .ant-btn { align-self: end; }
 .repo-field .ant-select, .repo-field .ant-input-number { width: 100%; }
 .repo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
 .repo-actions > .ant-select { min-width: 180px; max-width: 100%; }
+.repo-workflow-actions { min-width: 0; }
+.repo-workflow-actions > small { flex-basis: 100%; color: var(--color-text-sec); overflow-wrap: anywhere; }
 .repo-page .ant-checkbox-wrapper { display: inline-flex; align-items: center; }
 .repo-page .ant-alert { margin: 12px 0; }
+.repo-task { margin: 12px 0; }
+.repo-task-header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.repo-task-header > strong { flex: 1; min-width: 0; }
+.repo-task-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--color-text-sec); font-size: 13px; font-variant-numeric: tabular-nums; }
+.repo-task p { margin: 12px 0; }
 .repo-page details { margin: 12px 0; }
 .repo-page summary { cursor: pointer; padding: 8px 0; }
 .repo-page dl > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; margin: 8px 0; }
@@ -32,5 +41,6 @@
   .repo-page .ant-btn { min-height: 44px; height: auto; white-space: normal; }
   .repo-page dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .repo-actions > .ant-select { flex: 1 1 180px; min-width: 0; }
+  .repo-workflow-actions > .ant-btn { max-width: 100%; min-width: 0; }
 }
 @media (max-height: 480px) { .repo-inner { padding-top: 12px; } }

@@ -25,6 +25,15 @@ class Sink:
         pass
 
 
+@pytest.fixture(autouse=True)
+def writing_skills(settings, tmp_path):
+    settings.CODEX_SKILLS_DIRECTORY = str(tmp_path / 'skills')
+    for slug in ('write-short-video-copy', 'write-image-text-copy'):
+        path = tmp_path / 'skills' / slug / 'SKILL.md'
+        path.parent.mkdir(parents=True)
+        path.write_text(f'# {slug}\nUse grounded facts and natural language.', encoding='utf-8')
+
+
 def archive(files=None):
     data = io.BytesIO()
     with zipfile.ZipFile(data, 'w') as z:
@@ -75,6 +84,12 @@ def report():
 
 
 def document():
+    return {'schema_version': 2, 'kind': 'video', 'title': '用 AI 阅读资料', 'cover': '文档变问答',
+        'aspect': '16:9', 'duration': 60, 'alternatives': [], 'notes': [], 'publish_copy': '支持文档问答',
+        'paragraphs': [{'heading': '', 'text': '导入文档后可以提问。', 'feature_ids': ['f1'], 'evidence_ids': ['e2']}]}
+
+
+def legacy_document():
     refs = {'feature_ids': ['f1'], 'evidence_ids': ['e2']}
     return {'title': '用 AI 阅读资料', 'cover': '文档变问答', 'aspect': '16:9', 'checklist': ['补充真实截图'],
             'scenes': [{**refs, 'narration': '导入文档后可以提问。', 'visual': '示意流程图', 'seconds': 60}],
@@ -85,8 +100,11 @@ def model(**kwargs):
     instruction = kwargs['instruction']
     if 'queries' in instruction:
         return {'queries': ['answer', 'app.py']}
-    if '"scenes"' in instruction:
-        return document()
+    if '"paragraphs"' in instruction:
+        result = document()
+        if 'write-image-text-copy' in instruction:
+            result['kind'] = 'image_text'
+        return result
     return report()
 
 
@@ -120,6 +138,54 @@ def test_import_snapshot_and_idempotency(ctx):
     assert 'search(query)' in response.data['text']
 
 
+def test_model_progress_reports_activity_without_raw_output(ctx, monkeypatch):
+    task = upload(ctx); finish(task)
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'analyze', 'snapshot_id': str(task.snapshot_id)},
+        format='json', HTTP_IDEMPOTENCY_KEY='progress-analysis')
+    analysis = Task.objects.get(pk=response.data['id'])
+    events = []
+    sink = Sink()
+    sink.emit = lambda kind, payload: events.append((kind, payload))
+    monkeypatch.setattr(runtime.time, 'monotonic', lambda: 10)
+
+    def streaming_model(**kwargs):
+        callback = kwargs['on_event']
+        callback('agent.reasoning', {'text': 'private reasoning'})
+        callback('tool.started', {'text': 'private tool arguments'})
+        callback('output.delta', {'text': 'test'})
+        callback('output.delta', {'text': 'more'})
+        return model(**kwargs)
+
+    monkeypatch.setattr(runtime, 'generate_json', streaming_model)
+    finish(analysis, sink)
+    waiting = [p for _, p in events if p.get('activity') == 'waiting_model']
+    responding = [p for _, p in events if p.get('activity') == 'responding']
+    assert waiting and len(waiting) == len(responding)
+    assert all(p['characters'] == 4 for p in responding)  # throttles subsequent deltas
+    assert all(kind == 'progress.updated' for kind, _ in events)
+    assert all(set(p) <= {'stage', 'activity', 'characters'} for _, p in events)
+    assert events[-1][1]['stage'] == '校验生成结果与来源引用'
+
+
+def test_task_progress_has_consistent_event_boundary(ctx):
+    from modules.execution.models import RunEvent
+    from ..views import task_data
+    task = upload(ctx)
+    sequence = task.run.next_event_sequence + 1
+    RunEvent.objects.create(run=task.run, organization=ctx.org, sequence=sequence,
+        type='progress.updated', payload={'stage': '读取源码'})
+    task.run.status = 'running'; task.run.next_event_sequence = sequence
+    task.run.save(update_fields=['status', 'next_event_sequence'])
+    # An event committed after the loaded Run must not leak into that response.
+    RunEvent.objects.create(run=task.run, organization=ctx.org, sequence=sequence + 1,
+        type='progress.updated', payload={'stage': '保存快照'})
+    data = task_data(task)
+    assert data['run_id'] == str(task.run_id)
+    assert data['status'] == 'running'
+    assert data['event_sequence'] == sequence
+    assert data['progress'] == {'stage': '读取源码'}
+
+
 def test_private_projects_and_runs(ctx):
     task = upload(ctx)
     ctx.client.force_authenticate(ctx.other)
@@ -146,13 +212,13 @@ def test_cancelled_import_not_published(ctx):
 def test_analysis_and_content_versions(ctx, monkeypatch):
     c = create_content(ctx, monkeypatch)
     old_version = c.versions.first()
-    edited = copy.deepcopy(c.draft); edited['scenes'][0]['narration'] = '手工修改的内容。'
+    edited = copy.deepcopy(c.draft); edited['paragraphs'][0]['text'] = '手工修改的内容。'
     response = ctx.client.put(ctx.root + f'/contents/{c.id}', {'revision': 1, 'document': edited}, format='json')
     assert response.status_code == 200, response.data
     assert response.data['revision'] == 2
-    assert response.data['draft']['scenes'][0]['needs_review']
+    assert response.data['draft']['paragraphs'][0]['needs_review']
     old_version.refresh_from_db()
-    assert old_version.document['scenes'][0]['narration'] == '导入文档后可以提问。'
+    assert old_version.document['paragraphs'][0]['text'] == '导入文档后可以提问。'
     conflict = ctx.client.put(ctx.root + f'/contents/{c.id}', {'revision': 1, 'document': c.draft}, format='json')
     assert conflict.status_code == 409
     assert conflict.data['current']['revision'] == 2
@@ -171,8 +237,8 @@ def test_handoff_fixed_version_permissions_and_duplicate(ctx, monkeypatch, slug)
     if slug == 'animation-studio':
         from app_center.animation_studio.backend.models import AnimationProject
         work = AnimationProject.objects.get(pk=response.data['target_id'])
-        assert work.draft['scenes'][0]['narration'] == '导入文档后可以提问。'
-        assert work.draft['scenes'][0]['source'] == ''
+        assert work.draft['scenes'] == []
+        assert '导入文档后可以提问。' in work.draft['prompt']
     else:
         url = ctx.url + '/handoffs/' + response.data['id']
         assert ctx.client.get(url).data['draft']['source'] == '导入文档后可以提问。'
@@ -180,7 +246,7 @@ def test_handoff_fixed_version_permissions_and_duplicate(ctx, monkeypatch, slug)
         assert saved.status_code == 200
         assert ctx.client.get(url).data['draft']['source'] == '目标制作页修改'
         assert ctx.client.patch(url, {'revision': 1, 'draft': {}}, format='json').status_code == 409
-        c.refresh_from_db(); assert c.draft['scenes'][0]['narration'] == '导入文档后可以提问。'
+        c.refresh_from_db(); assert c.draft['paragraphs'][0]['text'] == '导入文档后可以提问。'
     ctx.client.force_authenticate(ctx.other)
     assert ctx.client.get(ctx.url + '/handoffs/' + response.data['id']).status_code == 404
     ctx.client.force_authenticate(ctx.owner)
@@ -309,12 +375,73 @@ def test_local_detects_mid_copy_change(ctx, monkeypatch):
 
 
 def test_animation_limits():
-    doc = document(); doc['scenes'][0]['seconds'] = 121
+    doc = document(); doc['duration'] = 121
     with pytest.raises(ValueError, match='120'):
         animation(doc)
-    doc['scenes'] *= 31
-    with pytest.raises(ValueError, match='30'):
+    doc['duration'] = 60; doc['paragraphs'][0]['text'] = 'a' * 16000
+    with pytest.raises(ValueError, match='16000'):
         animation(doc)
+
+
+def test_legacy_copy_remains_readable_and_imports_as_text():
+    from ..content import markdown, jianying
+    doc = legacy_document()
+    report_data = {**report(), 'features': [{'id': 'f1'}], 'evidence': {'e2': {}}}
+    validated = validate_document(doc, report_data)
+    assert '导入文档后可以提问。' in markdown(validated)
+    assert jianying(validated)['source'] == '导入文档后可以提问。'
+    assert animation(validated)['scenes'] == []
+
+
+@pytest.mark.parametrize('kind,slug', [('video', 'write-short-video-copy'), ('image_text', 'write-image-text-copy')])
+def test_writing_uses_installed_skill_and_only_video_has_handoffs(ctx, monkeypatch, kind, slug):
+    from ..content import markdown
+    original = create_content(ctx, monkeypatch)
+    calls = []
+    def capture(**kwargs):
+        calls.append(kwargs)
+        return model(**kwargs)
+    monkeypatch.setattr(runtime, 'generate_json', capture)
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'output': kind,
+        'analysis_id': str(original.analysis_id), 'feature_ids': ['f1']}, format='json', HTTP_IDEMPOTENCY_KEY='copy-' + kind)
+    assert response.status_code == 202, response.data
+    task = Task.objects.get(pk=response.data['id']); finish(task)
+    content = Content.objects.get(generation=task)
+    assert content.draft['kind'] == kind
+    assert content.draft['skill']['slug'] == slug
+    assert len(content.draft['skill']['sha256']) == 64
+    assert '# ' + slug in calls[0]['instruction']  # actual Skill file, not just a name
+    assert 'Use grounded facts and natural language.' in calls[0]['instruction']
+    assert 'scenes' not in content.draft and 'article' not in content.draft
+    assert '导入文档后可以提问。' in markdown(content.draft)
+    for target_slug in ('animation-studio', 'copy-to-jianying'):
+        app = target(ctx, target_slug)
+        response = ctx.client.post(ctx.root + '/handoffs', {'version_id': str(content.versions.first().id), 'target_id': app.id},
+            format='json', HTTP_IDEMPOTENCY_KEY=kind + target_slug)
+        assert response.status_code == (201 if kind == 'video' else 400), response.data
+    if kind == 'image_text':
+        assert Handoff.objects.count() == 0
+    edited = copy.deepcopy(content.draft); edited['skill'] = {'slug': 'forged', 'sha256': 'x'}
+    response = ctx.client.put(ctx.root + f'/contents/{content.id}', {'revision': content.revision, 'document': edited}, format='json')
+    assert response.status_code == 200
+    assert response.data['draft']['skill'] == content.draft['skill']
+
+
+def test_missing_skill_fails_explicitly(settings, tmp_path):
+    from ..copywriting import load_copy_skill
+    settings.CODEX_SKILLS_DIRECTORY = str(tmp_path / 'missing-skills')
+    with pytest.raises(ValueError, match='write-short-video-copy'):
+        load_copy_skill('video')
+
+
+def test_copy_schema_rejects_scenes_and_forged_references():
+    report_data = {**report(), 'features': [{'id': 'f1'}], 'evidence': {'e2': {}}}
+    doc = document(); doc['scenes'] = []
+    with pytest.raises(ValueError, match='分镜'):
+        validate_document(doc, report_data)
+    doc = document(); doc['paragraphs'][0]['evidence_ids'] = ['fake']
+    with pytest.raises(ValueError, match='不存在'):
+        validate_document(doc, report_data)
 
 
 def test_github_fixed_sha_and_no_redirects(monkeypatch):
