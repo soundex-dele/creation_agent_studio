@@ -1,12 +1,14 @@
 import { api } from './api';
 import { createDouyinSubmitter } from './douyinRequests';
 import type { AnimationDestination } from './douyinAnimation';
+import type { CasePreview, CaseSaveInput, CaseSaved } from './cases';
 
 export interface CollectorConfig { configured: boolean; user_agent: string; has_cookies: boolean; cookies: string; screen: string; language: string; timezone: string; updated_at: string | null }
 export type CollectorConfigInput = Pick<CollectorConfig, 'user_agent' | 'screen' | 'language' | 'timezone'> & { cookies?: string };
 
 export interface DouyinAccount { is_owned?: boolean; id: string; source_url: string; name: string; group: string; notes: string; profile: { signature?: string }; updated_at: string }
 export interface DouyinWork {
+  case_id?: number | null;
   id: string; platform_id: string; title: string; description: string; url: string; video_url?: string; cover: string; kind: string;
   published_at: string | null; duration: number | null; likes: number | null; comments: number | null;
   collects: number | null; shares: number | null; ratio: number | null; outstanding: boolean; has_upload: boolean;
@@ -48,6 +50,8 @@ export function douyinApi(base: string) {
   const account = (id: string) => `${base}/accounts/${id}`;
   const task = (id: string, taskId: string) => `${account(id)}/tasks/${taskId}`;
   return {
+    casePreview: (workId: string, taskId?: string) => api.get<CasePreview>(`${base}/works/${workId}/case`, taskId ? { task_id: taskId } : {}),
+    saveCase: (workId: string, body: CaseSaveInput) => submit<CaseSaved>(`${base}/works/${workId}/case`, body),
     profiles: () => api.get<{ count: number; results: { id: string; name: string; positioning: string; audience: string; conditions: string; is_default: boolean; account?: string | null }[] }>(`${base}/creator-profiles`),
     animationDestinations: () => api.get<AnimationDestination[]>(`${base}/animation-integrations`),
     collectorConfig: () => api.get<CollectorConfig>(`${base}/collector-config`),

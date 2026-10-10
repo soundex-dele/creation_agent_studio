@@ -1,10 +1,12 @@
 from django.urls import path
 from . import views
+from .cases import WorkCaseView
 
 root = "applications/<int:application_id>/douyin-benchmark"
 account = root + "/accounts/<uuid:account_id>"
 task = account + "/tasks/<uuid:task_id>"
 urlpatterns = [
+    path(root + '/works/<uuid:work_id>/case', WorkCaseView.as_view()),
     path(root + "/animation-integrations", views.AnimationIntegrationsView.as_view()),
     path(root + "/collector-config", views.CollectorConfigView.as_view()),
     path(root + "/connection", views.ConnectionView.as_view()),
@@ -32,6 +34,7 @@ urlpatterns += [
     path(root + '/knowledge-cards/recommend', kv.KnowledgeRecommendView.as_view()),
     path(root + '/knowledge-cards/<uuid:card_id>', kv.KnowledgeCardsView.as_view()),
     path(root + '/knowledge-cards/<uuid:card_id>/retry-index', kv.KnowledgeRetryView.as_view()),
+    path(root + '/knowledge-cards/<uuid:card_id>/shares', kv.KnowledgeSharesView.as_view()),
 ]
 for resource in rv.RESOURCES:
     urlpatterns += [

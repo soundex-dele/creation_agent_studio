@@ -1,3 +1,4 @@
+import { SaveCaseButton } from './CaseIntegration';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Select, Spin } from 'antd';
 import { useSearchParams } from 'react-router-dom';
@@ -53,6 +54,7 @@ export function ReferenceRewrite({ client }: { client: ResearchClient }) {
     {taskId && !task && !error && <Spin />}
     {work?.kind === 'video' && !taskId && <Button type="primary" loading={busy} onClick={() => void run({ kind: 'transcribe', work_id: workId })}>转写参考作品</Button>}
     {task && <><p role="status">{task.stage}</p>{task.error && <Alert type="error" message={task.error} />}{isActive(task) && <Button onClick={() => { void client.cancel(task.id).then(() => setRetry(v => v + 1)).catch(e => setError(documentError(e))); }}>取消任务</Button>}
+      {task.kind === 'transcribe' && task.status === 'succeeded' && task.work_id && <SaveCaseButton client={client.editor} workId={task.work_id} taskId={task.id} />}
       {(task.kind === 'rewrite' || task.status === 'succeeded') && <RewritePanel key={task.id} client={client.editor} accountId={accountId} task={task} busy={busy} onRun={run} />}
       {task.kind === 'transcribe' && ['failed', 'cancelled'].includes(task.status) && <Button disabled={busy} onClick={() => void run({ kind: 'transcribe', work_id: task.work_id, force: true })}>重试转写</Button>}
     </>}

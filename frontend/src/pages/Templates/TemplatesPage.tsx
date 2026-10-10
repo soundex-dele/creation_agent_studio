@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Empty, Input, Spin } from 'antd';
+import { Alert, Button, Empty, Input, Pagination, Select, Spin, Tag } from 'antd';
 import {
   ArrowRightOutlined,
   ClockCircleOutlined,
@@ -11,6 +11,8 @@ import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplatesPage.css';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const { Search } = Input;
 
@@ -30,8 +32,12 @@ const formatSource = (platform?: string, author?: string) =>
 const TemplatesPage: React.FC = () => {
   const navigate = useApplicationNavigate();
   const [searchParams] = useSearchParams();
-  const { entry, showApplicationHeader } = resolveApplicationPresentation(searchParams);
+  const organization = useOrganizationStore(s => s.currentOrganizationId);
+  const user = useAuthStore(s => s.user?.id);
+  const { entry, embedded, showApplicationHeader } = resolveApplicationPresentation(searchParams);
   const {
+    count, page, mine, sourceKind, error, setPage, setMine, setSourceKind,
+    clearTemplates,
     templates,
     isLoading,
     selectedCategory,
@@ -42,30 +48,32 @@ const TemplatesPage: React.FC = () => {
   const isFirstRun = useRef(true);
 
   useEffect(() => {
+    clearTemplates();
     if (isFirstRun.current) {
       isFirstRun.current = false;
       loadTemplates(selectedCategory || undefined);
-      return;
+      return clearTemplates;
     }
     const timer = window.setTimeout(
       () => loadTemplates(selectedCategory || undefined),
       300,
     );
-    return () => window.clearTimeout(timer);
-  }, [selectedCategory, searchQuery, loadTemplates]);
+    return () => { window.clearTimeout(timer); clearTemplates(); };
+  }, [selectedCategory, searchQuery, loadTemplates, page, mine, sourceKind, organization, user, clearTemplates]);
 
   return (
-    <div className="templates-page animate-fade-in">
+    <div className={`templates-page animate-fade-in${embedded ? ' app-scroll-page case-library-embedded' : ''}`}>
       {showApplicationHeader && <div className="page-header case-library-header">
         <div>
           <h1 className="page-title">案例库</h1>
           <p className="page-subtitle">阅读真实案例，理解内容结构、表达方法与可复用规律</p>
         </div>
-        <div className="case-library-count">{templates.length} 个案例</div>
+        <div className="case-library-count">{count} 个案例</div>
       </div>}
 
       <div className="page-toolbar case-library-toolbar">
         <Search
+          aria-label="搜索案例"
           placeholder="搜索标题、作者、平台或方法..."
           prefix={<SearchOutlined className="text-text-dim" />}
           value={searchQuery}
@@ -73,9 +81,11 @@ const TemplatesPage: React.FC = () => {
           allowClear
           className="case-library-search"
         />
+        <label className="case-library-filter">可见范围<Select aria-label="案例可见范围" value={mine ? 'mine' : 'all'} options={[{ value: 'all', label: '全部' }, { value: 'mine', label: '我的案例' }]} onChange={v => setMine(v === 'mine')} /></label>
+        <label className="case-library-filter">案例来源<Select aria-label="案例来源" value={sourceKind} options={[{ value: '', label: '全部来源' }, { value: 'douyin', label: '抖音助手来源' }]} onChange={setSourceKind} /></label>
       </div>
 
-      {isLoading ? (
+      {error ? <Alert type="error" message={error} action={<Button onClick={() => void loadTemplates(selectedCategory || undefined)}>重试加载</Button>} /> : isLoading ? (
         <div className="case-library-state"><Spin size="large" /></div>
       ) : templates.length === 0 ? (
         <div className="case-library-state">
@@ -114,6 +124,7 @@ const TemplatesPage: React.FC = () => {
                 <div className="template-source">
                   {formatSource(template.source_platform, template.source_author)}
                 </div>
+                {template.status && template.status !== 'published' && <Tag>仅本人可见</Tag>}
                 <h2 className="template-name">{template.title}</h2>
                 <p className="template-desc">{template.summary || template.recommended_reason}</p>
                 <div className="template-tags">
@@ -135,6 +146,7 @@ const TemplatesPage: React.FC = () => {
           ))}
         </div>
       )}
+      <Pagination current={page} total={count} pageSize={20} showSizeChanger={false} hideOnSinglePage onChange={setPage} showTotal={total => `共 ${total} 个案例`} />
     </div>
   );
 };

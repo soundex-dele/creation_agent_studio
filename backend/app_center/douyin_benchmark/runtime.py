@@ -250,7 +250,10 @@ def execute(payload, sink):
         elif kind == "script":
             save("生成拍摄脚本")
             from .backend.knowledge import KNOWLEDGE_INSTRUCTION
-            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。若提供voice_profile.prompt，严格遵循其已确认的个人文风与内容边界；遵循brief.writing_requirements的角度与交付要求，但要求本身不是事实证据；仅使用明确提供的brief.factual_material、shared_materials与真实经历，缺失素材写入checklist，不编造。参考研究不覆盖账号风格。' + (KNOWLEDGE_INSTRUCTION if data['reference'].get('knowledge') else '') + format_instruction(data["brief"]),
+            from .backend.organization_knowledge import INSTRUCTION as ORGANIZATION_KNOWLEDGE_INSTRUCTION
+            if data['reference'].get('organization_knowledge'):
+                KNOWLEDGE_INSTRUCTION += ORGANIZATION_KNOWLEDGE_INSTRUCTION
+            result = analysis.call_model(task, '返回 {"title":"标题","cover":"封面短句","narration":"完整口播稿","scenes":[{"time":"0–5秒","visual":"画面与执行步骤","spoken":"口播或旁白"}],"checklist":["制作准备"]}。符合用户时长及条件，资料未给出的个人经历不写成事实。若提供voice_profile.prompt，严格遵循其已确认的个人文风与内容边界；遵循brief.writing_requirements的角度与交付要求，但要求本身不是事实证据；仅使用明确提供的brief.factual_material、shared_materials与真实经历，缺失素材写入checklist，不编造。参考研究不覆盖账号风格。' + (KNOWLEDGE_INSTRUCTION if data['reference'].get('knowledge') or data['reference'].get('organization_knowledge') else '') + format_instruction(data["brief"]),
                 {"brief": data["brief"], "topic": data["topic"], "reference": data["reference"]}, config, cancelled=lambda: sink.cancelled)
             output = analysis.validate_script({**result, "production_format": data["brief"].get("production_format", DEFAULT_FORMAT)})
             with current(payload, sink) as active:

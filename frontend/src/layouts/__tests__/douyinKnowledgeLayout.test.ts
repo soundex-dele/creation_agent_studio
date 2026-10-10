@@ -28,4 +28,16 @@ describe('Creative knowledge scroll and responsive contract (static)', () => {
     expect(source).toContain('display: inline-flex; align-items: flex-start');
     expect(source).not.toMatch(/\slabel\s*\{/);
   });
+  it('attaches sharing and organization selection to the existing responsive layout', () => {
+    const integration = read('../../pages/Apps/douyin/OrganizationKnowledge.tsx');
+    expect(integration).toContain('className="douyin-knowledge-drawer"');
+    expect(integration).toContain('className="douyin-knowledge-grid"');
+    expect(integration).toContain('className="douyin-knowledge-selected"');
+    expect(source).toContain('.douyin-knowledge-picker .ant-select { width: 100%; min-width: 0; }');
+    expect(source).toContain('.douyin-knowledge-picker .ant-select-selection-overflow-item { max-width: 100%; }');
+    expect(source).toContain('white-space: normal;');
+    expect(integration).not.toMatch(/100d?vh|preventDefault|touch-action/);
+    const shell = read('../../router/index.tsx');
+    expect(shell).toContain('<ApplicationShell fullBleed>{page(<DouyinBenchmarkPage />)}</ApplicationShell>');
+  });
 });

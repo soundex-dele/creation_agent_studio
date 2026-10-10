@@ -4,6 +4,17 @@
   padding: 8px 4px 48px;
 }
 
+.template-detail-page.case-library-embedded { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+.template-detail-state.app-scroll-page { min-height: 0; }
+.template-detail-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; }
+.template-detail-actions > span { overflow-wrap: anywhere; }
+.template-detail-actions .ant-btn { white-space: normal; height: auto; min-height: 36px; }
+.template-prose { overflow-wrap: anywhere; }
+.case-library-filter { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+@media (max-width: 767px) {
+  .template-detail-actions .ant-btn { min-height: 44px; }
+}
+
 .template-detail-state {
   display: flex;
   align-items: center;

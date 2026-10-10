@@ -206,6 +206,9 @@ class WorksView(BaseView):
             raise ValidationError("排序字段无效。")
         result["items"].sort(key=lambda i: (i.get(sort) is not None, i.get(sort) or ("" if sort == "published_at" else 0)), reverse=True)
         result["batch"] = TaskSerializer(batch).data
+        from .cases import annotate_saved_cases
+        from .research import scope_for
+        annotate_saved_cases(result['items'], scope_for(account.application, request.user))
         response = Response(result)
         response["Cache-Control"] = "private, no-store"
         return response

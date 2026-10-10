@@ -48,10 +48,24 @@ class TemplateListSerializer(serializers.ModelSerializer):
             'word_count', 'reading_time_minutes', 'analysis_count',
             'is_featured', 'view_count', 'created_by_username', 'created_at',
             'updated_at',
+            'status', 'source_kind',
         ]
 
 
 class TemplateDetailSerializer(serializers.ModelSerializer):
+    source_navigation = serializers.SerializerMethodField()
+
+    def get_source_navigation(self, obj):
+        request = self.context.get('request')
+        if obj.source_kind != 'douyin' or not request or request.user.pk != obj.created_by_id:
+            return None
+        from apps.enterprise.permissions import resolve_organization
+        organization = resolve_organization(request)
+        if not organization or organization.pk != obj.organization_id:
+            return {'available': False}
+        from app_center.douyin_benchmark.backend.cases import source_navigation
+        return source_navigation(obj, request.user)
+
     category = TemplateCategorySerializer(read_only=True)
     created_by_username = serializers.CharField(
         source='created_by.username', read_only=True)
@@ -72,6 +86,7 @@ class TemplateDetailSerializer(serializers.ModelSerializer):
             'source_snapshot_at', 'word_count', 'reading_time_minutes',
             'analysis_sections', 'status', 'is_featured', 'view_count',
             'created_by_username', 'created_at', 'updated_at',
+            'source_kind', 'source_navigation',
         ]
 
 

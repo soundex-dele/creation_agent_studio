@@ -84,3 +84,22 @@ class KnowledgeRetryView(KnowledgeCardsView):
         if card.document.status == 'failed':
             k.queue_index(card, request.user)
         return Response(k.serialize_card(card))
+
+
+class KnowledgeSharesView(KnowledgeCardsView):
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get(self, request, **kwargs):
+        from .organization_knowledge import share_data
+        from modules.tenancy.permissions import ROLE_LEVEL
+        card = get_object_or_404(self.cards(), pk=kwargs['card_id'])
+        role = getattr(getattr(request, 'organization_membership', None), 'role', '')
+        return Response({'can_share': ROLE_LEVEL.get(role, 0) >= ROLE_LEVEL['developer'] and getattr(request.user, 'role', '') != 'auditor',
+                         'results': [share_data(row) for row in card.shares.select_related('knowledge_base', 'document')]})
+
+    def post(self, request, **kwargs):
+        from .organization_knowledge import ShareInput, publish
+        fields = ShareInput(data=request.data)
+        fields.is_valid(raise_exception=True)
+        card = get_object_or_404(self.cards(), pk=kwargs['card_id'])
+        return Response(publish(card, request.user, fields.validated_data))

@@ -21,6 +21,7 @@
 .knowledge-title h3 { margin: 0 0 4px !important; }
 .knowledge-toolbar { margin-bottom: 14px; }
 .knowledge-documents { margin-top: 18px; }
+.knowledge-documents .knowledge-document-linked { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: 8px; }
 .knowledge-documents .ant-list-item-meta-title .ant-space { flex-wrap: wrap; gap: 6px !important; }
 .knowledge-documents .ant-list-item-meta-title { overflow-wrap: anywhere; }
 .knowledge-documents .ant-list-item { padding-block: 20px; }

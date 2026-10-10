@@ -17,6 +17,8 @@ beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() })));
   const style = window.getComputedStyle; vi.spyOn(window, 'getComputedStyle').mockImplementation(el => style(el));
   vi.mocked(api.get).mockImplementation(async url => {
+    if (url === '/templates/41/') return { id: 41, title: '问题型案例', status: 'draft' };
+    if (url === '/templates/') return { count: 1, results: [{ id: 41, title: '问题型案例', status: 'draft' }] };
     if (url.endsWith('/accounts')) return { count: 2, results: accounts };
     if (url.endsWith('/creator-profiles')) return { count: 2, results: profiles };
     if (url.endsWith('/ideas')) return { count: 1, results: [idea] };
@@ -214,5 +216,51 @@ describe('Creator-first Douyin workspace', () => {
     await type('本次真实素材', '已校正的事实'); await click('开始写作');
     const calls = vi.mocked(api.post).mock.calls;
     expect(calls[0][2]?.headers?.['Idempotency-Key']).not.toBe(calls[1][2]?.headers?.['Idempotency-Key']);
+  });
+});
+
+
+describe('Case library creative references', () => {
+  it('selects and removes cases without clearing the typed theme or resurrecting removed references', async () => {
+    await render('/?view=create&owned=a1');
+    await type('这次想写什么', '已经填写的主题');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+    await click('选择案例');
+    expect((container.querySelector('[aria-label="这次想写什么"]') as HTMLTextAreaElement).value).toBe('已经填写的主题');
+    expect(container.querySelector('output')?.textContent).toContain('case=41');
+    await act(async () => (container.querySelector('.case-inline-actions .ant-tag-close-icon') as HTMLElement).click());
+    expect(container.querySelector('output')?.textContent).not.toContain('case=');
+    await click('开始写作');
+    expect(vi.mocked(api.post).mock.calls[0][1]).not.toHaveProperty('case_ids');
+    expect(vi.mocked(api.post).mock.calls[0][1]).toHaveProperty('theme', '已经填写的主题');
+  });
+  it.each(['article', 'script'])('uses a deep-linked case for %s without auto-submitting', async output => {
+    await render(`/?view=create&owned=a1&case=41&output=${output}&embedded=1`);
+    expect(container.textContent).toContain('已选参考案例：问题型案例');
+    expect(api.post).not.toHaveBeenCalled();
+    await type('这次想写什么', '我的新主题');
+    await click(output === 'script' ? '生成拍摄脚本' : '开始写作');
+    expect(api.post).toHaveBeenCalledWith('/dy/tasks', expect.objectContaining({ kind: output, case_ids: [41] }), expect.anything());
+    expect(container.querySelector('output')?.textContent).toContain('embedded=1');
+  });
+
+  it('keeps the incoming case when choosing the initial creator, then clears it when switching creators', async () => {
+    await render('/?view=create&case=41&standalone=1');
+    await choose('创作账号或独立档案', '账号1 · 我的账号');
+    expect(container.querySelector('output')?.textContent).toContain('case=41');
+    expect(container.textContent).toContain('已选参考案例：问题型案例');
+    await choose('创作账号或独立档案', '账号2 · 我的账号');
+    expect(container.querySelector('output')?.textContent).not.toContain('case=');
+    expect(container.textContent).not.toContain('已选参考案例：问题型案例');
+    expect(container.querySelector('output')?.textContent).toContain('standalone=1');
+  });
+
+  it('passes the case when switching to topic generation', async () => {
+    await render('/?view=create&owned=a1&case=41&entry=home');
+    await click('还没想好，生成选题');
+    await type('本次主题', '新主题');
+    await click('生成3个创作选题');
+    expect(api.post).toHaveBeenCalledWith('/dy/tasks', expect.objectContaining({ kind: 'topics', case_ids: [41] }), expect.anything());
+    expect(container.querySelector('output')?.textContent).toContain('entry=home');
   });
 });

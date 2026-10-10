@@ -1,3 +1,4 @@
+import { CaseReferences, SaveCaseButton } from './CaseIntegration';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Input, Modal, Pagination, Select, Tag } from 'antd';
 import { documentError } from '@/services/documents';
@@ -8,6 +9,7 @@ import { GenerationPreview } from './GenerationPreview';
 import { ComparisonTable } from './ResearchLibrary';
 import { Field } from './ResearchCommon';
 import { ExtractKnowledge, KnowledgeCandidates, KnowledgeReferences } from './CreationKnowledge';
+import { OrganizationKnowledgeReferences } from './OrganizationKnowledge';
 
 export function ResearchResult({ client, task, run, onDirty, onCreate }: { client: ResearchClient; task: ResearchTask; run: (body: Record<string, unknown>) => Promise<void>; onDirty?: (value: boolean) => void; onCreate?: (source: string, topic: number, output?: 'article' | 'script') => void }) {
   const [starting, setStarting] = useState<number | null>(null);
@@ -32,6 +34,9 @@ export function ResearchResult({ client, task, run, onDirty, onCreate }: { clien
     <GenerationPreview key={task.id} task={task} />
     <ExtractKnowledge task={task} run={run} />
     <KnowledgeReferences cards={output.knowledge_cards} />
+    <OrganizationKnowledgeReferences client={client} items={output.organization_knowledge} />
+    <CaseReferences cases={output.case_references} />
+    {task.status === 'succeeded' && task.work_id && ['transcribe', 'breakdown'].includes(task.kind) && <SaveCaseButton client={client.editor} workId={task.work_id} taskId={task.id} />}
     {task.kind === 'knowledge_extract' && task.status === 'succeeded' && <KnowledgeCandidates key={task.id} client={client} task={task} />}
     {task.kind === 'knowledge_extract' && ['failed', 'cancelled'].includes(task.status) && output.source_task_id && <Button onClick={() => void action(() => run({ kind: 'knowledge_extract', source_task_id: output.source_task_id }))}>重试提炼</Button>}
     {task.kind === 'article' && task.status === 'succeeded' && <ArticleEditor key={task.id} client={client} taskId={task.id} onDirty={onDirty} styleReview={output.style_review} />}

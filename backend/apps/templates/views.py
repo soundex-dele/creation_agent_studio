@@ -1,4 +1,4 @@
-from django.db.models import Count, F, Q
+from django.db.models import Count, F
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -9,6 +9,8 @@ from rest_framework.response import Response
 from core.permissions import IsOwnerOrReadOnly
 from .filters import TemplateFilter
 from .models import Template, TemplateCategory
+from .access import visible_cases
+from apps.enterprise.permissions import resolve_organization
 from .serializers import (
     CreateTemplateSerializer,
     TemplateCategorySerializer,
@@ -34,10 +36,11 @@ class TemplateViewSet(viewsets.ModelViewSet):
     filterset_class = TemplateFilter
 
     def get_queryset(self):
-        return Template.objects.select_related(
+        organization = resolve_organization(self.request)
+        return visible_cases(self.request.user, organization.pk if organization else None).select_related(
             'category', 'created_by').prefetch_related('analysis_sections').annotate(
             analysis_count=Count('analysis_sections', distinct=True)
-        ).filter(Q(status='published') | Q(created_by=self.request.user)).order_by(
+        ).order_by(
             '-is_featured', '-updated_at')
 
     def get_serializer_class(self):
@@ -63,9 +66,19 @@ class TemplateViewSet(viewsets.ModelViewSet):
         return Response(TemplateDetailSerializer(instance, context={'request': request}).data)
 
     @action(detail=False, methods=['get'])
+    def douyin_applications(self, request):
+        from apps.applications.models import Application
+        from core.resource_access import accessible_resources
+        organization = resolve_organization(request)
+        targets = accessible_resources(Application.objects.for_organization(
+            organization.pk if organization else None).filter(
+                slug='douyin-benchmark', kind='custom', is_active=True), request.user, operation='run')
+        return Response([{'id': row.pk, 'name': row.name} for row in targets.order_by('id')])
+
+    @action(detail=False, methods=['get'])
     def my_templates(self, request):
         templates = self.get_queryset().filter(created_by=request.user)
-        return Response(TemplateListSerializer(templates, many=True).data)
+        return Response(TemplateListSerializer(templates, many=True, context={'request': request}).data)
 
     @action(detail=False, methods=['get'])
     def featured(self, request):

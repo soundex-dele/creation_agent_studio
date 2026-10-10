@@ -5,6 +5,16 @@ from .models import Template
 
 
 class TemplateFilter(django_filters.FilterSet):
+    mine = django_filters.BooleanFilter(method='filter_mine')
+    source_kind = django_filters.CharFilter(field_name='source_kind')
+    usable = django_filters.BooleanFilter(method='filter_usable')
+
+    def filter_usable(self, queryset, name, value):
+        return queryset.exclude(status='archived') if value else queryset
+
+    def filter_mine(self, queryset, name, value):
+        return queryset.filter(created_by=self.request.user) if value else queryset
+
     category = django_filters.CharFilter(
         field_name='category__slug', lookup_expr='iexact')
     category_name = django_filters.CharFilter(

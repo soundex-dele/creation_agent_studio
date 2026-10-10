@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert, Button, Card, Empty, Form, Input, InputNumber, List, Modal, Progress,
   Popconfirm, Space, Tabs, Tag, Typography, Upload, message,
@@ -33,6 +34,10 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function KnowledgePage() {
+  const [params, setParams] = useSearchParams();
+  const linkedBase = Number(params.get('base')) || null;
+  const linkedDocument = Number(params.get('document')) || null;
+  const focusedDocument = useRef('');
   const {
     organizations, currentOrganizationId, loadOrganizations,
   } = useOrganizationStore();
@@ -68,10 +73,10 @@ export default function KnowledgePage() {
     try {
       const values = await api.get<KnowledgeBaseSummary[]>(`${root}/knowledge-bases/`);
       setBases(values);
-      setSelectedId(current => current && values.some(item => item.id === current)
-        ? current : values[0]?.id ?? null);
+      setSelectedId(current => linkedBase && values.some(item => item.id === linkedBase) ? linkedBase
+        : current && values.some(item => item.id === current) ? current : values[0]?.id ?? null);
     } finally { setLoading(false); }
-  }, [currentOrganizationId, root]);
+  }, [currentOrganizationId, root, linkedBase]);
 
   const loadSelected = useCallback(async () => {
     if (!selectedId) { setSelected(null); setDocuments([]); return; }
@@ -171,6 +176,16 @@ export default function KnowledgePage() {
     } finally { setSearching(false); }
   };
 
+  useEffect(() => {
+    const key = `${root}:${linkedBase}:${linkedDocument}`;
+    if (!linkedDocument || selectedId !== linkedBase || focusedDocument.current === key) return;
+    const node = document.getElementById(`knowledge-document-${linkedDocument}`);
+    if (!node) return;
+    focusedDocument.current = key;
+    node?.scrollIntoView?.({ block: 'center' });
+    node?.focus({ preventScroll: true });
+  }, [linkedDocument, linkedBase, selectedId, documents, root]);
+
   const tabs = [
     { key: 'documents', label: '文档', children: <>
       <div className="knowledge-toolbar">
@@ -184,11 +199,11 @@ export default function KnowledgePage() {
         multiple maxCount={20} accept=".pdf,.docx,.md,.markdown,.txt" showUploadList={false}
         beforeUpload={(file) => { void uploadFile(file); return Upload.LIST_IGNORE; }}
       ><p className="ant-upload-drag-icon"><InboxOutlined /></p><p>拖拽或点击上传 PDF、DOCX、Markdown、TXT</p><p className="ant-upload-hint">单文件最大 50 MiB，一次最多选择 20 个</p></Upload.Dragger>}
-      <List className="knowledge-documents" dataSource={documents} locale={{ emptyText: <Empty description="暂无文档" /> }} renderItem={document => <List.Item actions={[
+      <List className="knowledge-documents" dataSource={documents} locale={{ emptyText: <Empty description="暂无文档" /> }} renderItem={document => <List.Item id={`knowledge-document-${document.id}`} tabIndex={linkedDocument === document.id ? -1 : undefined} className={linkedDocument === document.id ? 'knowledge-document-linked' : undefined} actions={[
         <Button key="preview" size="small" onClick={() => void previewDocument(document)}>查看原文</Button>,
         ...(canWrite ? [<Button key="reindex" size="small" onClick={async () => { await api.post(`${root}/knowledge-bases/${selectedId}/documents/${document.id}/reindex/`, {}); message.success('已重新加入索引队列'); await loadSelected(); }}>{document.status === 'failed' ? '重试' : '重建索引'}</Button>] : []),
         ...(canAdmin ? [<Popconfirm key="delete" title="确认删除文档和索引？" onConfirm={async () => { await api.delete(`${root}/knowledge-bases/${selectedId}/documents/${document.id}/`); await loadSelected(); }}><Button size="small" danger icon={<DeleteOutlined />} aria-label={`删除 ${document.title}`} /></Popconfirm>] : []),
-      ]}><List.Item.Meta avatar={<FileTextOutlined className="knowledge-file-icon" />} title={<Space>{document.title}<Tag color={statusColor[document.status]}>{statusLabel[document.status] || document.status}</Tag>{Boolean(document.metadata.retrieval_mode) && <Tag>{String(document.metadata.retrieval_mode)}</Tag>}</Space>} description={<>{document.original_filename || '粘贴文本'} · {Math.ceil(document.byte_size / 1024)} KiB{document.error && <Typography.Text type="danger"> · {document.error}</Typography.Text>}{(document.status === 'pending' || document.status === 'indexing') && <Progress size="small" percent={Number(document.metadata.index_progress || 0)} status="active" format={percent => `${String(document.metadata.index_stage || 'pending')} ${percent}%`} />}</>} /></List.Item>} />
+      ]}><List.Item.Meta avatar={<FileTextOutlined className="knowledge-file-icon" />} title={<Space>{document.title}{document.metadata.source_kind === 'douyin_knowledge' && <Tag>来自抖音对标助手 · 卡片 v{String(document.metadata.card_revision)}</Tag>}<Tag color={statusColor[document.status]}>{statusLabel[document.status] || document.status}</Tag>{Boolean(document.metadata.retrieval_mode) && <Tag>{String(document.metadata.retrieval_mode)}</Tag>}</Space>} description={<>{document.original_filename || '粘贴文本'} · {Math.ceil(document.byte_size / 1024)} KiB{document.error && <Typography.Text type="danger"> · {document.error}</Typography.Text>}{(document.status === 'pending' || document.status === 'indexing') && <Progress size="small" percent={Number(document.metadata.index_progress || 0)} status="active" format={percent => `${String(document.metadata.index_stage || 'pending')} ${percent}%`} />}</>} /></List.Item>} />
     </> },
     { key: 'search', label: '搜索与问答', children: <div className="knowledge-search">
       <Input.Search size="large" value={query} onChange={event => setQuery(event.target.value)} onSearch={() => void runSearch()} enterButton={<><SearchOutlined /> 搜索</>} placeholder="输入要查找的问题或关键词" />
@@ -212,11 +227,13 @@ export default function KnowledgePage() {
         { label: '可检索文档', value: documents.filter(item => item.status === 'ready').length, hint: '当前库已完成索引' },
       ]}
     />
+    {linkedBase && !loading && !bases.some(base => base.id === linkedBase) && <Alert type="warning" message="目标知识库不存在或不可访问。" />}
+    {linkedDocument && selectedId === linkedBase && selected?.id === linkedBase && !documents.some(item => item.id === linkedDocument) && <Alert type="warning" message="目标文档已删除或不可访问。" />}
     <div className="knowledge-layout">
       <Card className="knowledge-bases" title={<span className="knowledge-library-title"><FolderOpenOutlined aria-hidden="true" />资料目录</span>} extra={<span className="knowledge-library-count">{bases.length}</span>} loading={loading}>
         <List dataSource={bases} locale={{ emptyText: <Empty description="暂无知识库" /> }} renderItem={item => (
           <List.Item>
-            <button type="button" className={`knowledge-base-button${item.id === selectedId ? ' active' : ''}`} aria-pressed={item.id === selectedId} onClick={() => setSelectedId(item.id)}>
+            <button type="button" className={`knowledge-base-button${item.id === selectedId ? ' active' : ''}`} aria-pressed={item.id === selectedId} onClick={() => { setSelectedId(item.id); setParams(old => { const next = new URLSearchParams(old); next.set('base', String(item.id)); next.delete('document'); return next; }); }}>
               <span className="knowledge-base-icon" aria-hidden="true"><BookOutlined /></span>
               <span className="knowledge-base-copy"><strong>{item.name}</strong><small>{item.document_count} 个文档</small></span>
             </button>

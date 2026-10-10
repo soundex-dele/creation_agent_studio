@@ -4,6 +4,17 @@
 
 ## 创作工作台导航
 
+### 案例库联动
+
+作品卡、作品研究和成功的单作品转写／拆解可手动「存入案例库」。新案例为当前组织本人的草稿，保存已有完整转写、拆解与证据时间戳，不复制视频、不触发 AI、不自动发布。版权默认标记为「参考资料，授权未确认」。同一组织、用户、应用下的抖音作品去重；「更新来源内容」仅替换来源正文与拆解，保留标题、分类、摘要、标签。来源删除不删除案例。
+
+- `GET/POST works/<work_id>/case`：预览／保存；可选 `task_id` 指定成功的本作品转写或拆解。POST 的 `action=save` 返回已有案例而不覆盖，`action=update` 显式更新来源。未指定任务时优先选择匹配当前媒体的最新成功拆解，再选择转写。
+- 案例库 `/api/v1/templates/` 支持 `mine=true`、`source_kind=douyin`、`usable=true`（排除归档）、`search` 和 `page`。`douyin_applications/` 返回当前组织可运行的助手实例。私有来源导航仅向有权限的本人返回。
+- `view=create&mode=write&case=<案例ID>` 打开创作中心，不自动启动任务。`case` 可用逗号分隔最多三个 ID；选择与移除案例不会清空已输入主题，切换创作对象会清除旧案例。
+- `POST tasks` 的直接 `topics/article/script` 可传 `case_ids`（最多三个整数 ID）。服务器检查可见范围，将正文、拆解、可复用规律冻结到 `input.reference.cases`；输出中的 `case_references` 保留实际引用。历史选题创作继承旧快照且重新核验访问权限，不能夹带替换案例。全部创作资料超过 180000 字符时拒绝，不静默截断。
+
+需要执行 templates 的 `0002_template_source_key_template_source_kind_and_more` 迁移；无需导入或重写历史案例。前端继续使用现有幂等请求提交器，手机普通 HTTP 下不直接依赖 `crypto.randomUUID()`。
+
 主流程为「我的账号 → 发现与研究 → 选题库 → 创作中心」，灵感与知识统一放在「素材库」。默认打开我的账号；已确认文风可重复使用，日常直接进入创作中心。
 
 - 我的账号内包含定位与文风、作品复盘、独立档案。账号可移出“我的账号”归类，保留采集数据与历史资料。独立档案不自动绑定账号。
@@ -246,4 +257,22 @@ Windows 验证命令（仓库根目录）：
 .\backend\venv\Scripts\python.exe -X utf8 backend/manage.py migrate douyin_benchmark
 .\backend\venv\Scripts\python.exe -X utf8 -m pytest -c backend/pytest.ini backend/app_center/douyin_benchmark/backend/tests/test_knowledge.py
 npm run test --prefix frontend -- src/pages/Apps/__tests__/douyinKnowledge.test.tsx src/services/__tests__/douyinRequests.test.ts src/layouts/__tests__/douyinKnowledgeLayout.test.ts
+```
+
+### 与组织知识库双向联动
+
+已确认的个人卡片可在“分享到知识库”中预览后发布到当前组织的有效知识库，要求 developer 及以上写入权限。个人库仍然私有；分享生成独立组织文档，只包含知识正文、适用场景、标签、依据类型、原文摘录及公开作品链接，不包含私人任务／账号内部标识。每张卡片在每个目标库只对应一份有效文档。
+
+- `GET /knowledge-cards/{id}/shares` 返回 `can_share` 和分享记录 `results`，包括目标库、文档 ID、已分享版本、索引状态和删除状态。
+- `POST /knowledge-cards/{id}/shares` 接收 `knowledge_base_id`、当前卡片 `revision`、可选 `recreate`。同版本重放不重复建文档；新版本手动更新同一文档；失败索引可重试。目标文档已删除时默认返回409，只有 `recreate: true` 才再次分享。个人卡片删除不删除组织文档。
+- 创作中心中选择组织库、检索并勾选资料后，`POST /tasks` 可携带 `organization_knowledge_chunks: [{chunk_id, revision}]`。与 `knowledge_cards` 合计最多10项，仅支持选题及直接脚本／文章创作。服务端读取片段并冻结到 `reference.organization_knowledge`，响应 `output.organization_knowledge` 用于显示历史引用；不接受客户端正文作为事实依据。
+- 组织检索结果增加 `revision` 和公开 `provenance`。旧片段或不可访问片段返回409，需重新检索。由选题派生的脚本／文章沿用原快照；组织文档被删除或知识库停用后不能派生新任务，已有结果仍保留快照。
+- `/knowledge?base={id}&document={id}` 定位并突出显示组织文档。文档列表标记抖音来源及卡片版本。分享操作不自动更新，历史卡片不会自动发布。
+
+部署时应用 `0013_knowledge_sharing`，同时更新 API、知识库／抖音执行器与前端。小型分享正文沿用现有衍生文档的内联存储方式，继续使用统一异步索引及重试机制，无需迁移历史内容。
+
+```powershell
+.\backend\venv\Scripts\python.exe -X utf8 backend/manage.py migrate douyin_benchmark
+.\backend\venv\Scripts\python.exe -X utf8 -m pytest -c backend/pytest.ini backend/app_center/douyin_benchmark/backend/tests/test_organization_knowledge.py backend/app_center/douyin_benchmark/backend/tests/test_knowledge.py backend/apps/knowledge/tests/test_knowledge.py
+npm run test --prefix frontend -- src/pages/Apps/__tests__/organizationKnowledge.test.tsx src/pages/Apps/__tests__/knowledgeDocumentLink.test.tsx src/services/__tests__/douyinRequests.test.ts src/layouts/__tests__/douyinKnowledgeLayout.test.ts
 ```

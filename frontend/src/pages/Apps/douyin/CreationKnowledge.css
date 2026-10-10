@@ -17,6 +17,10 @@
 .douyin-knowledge-drawer .ant-drawer-body { min-height: 0; overflow-y: auto; }
 .douyin-knowledge-drawer .ant-drawer-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 .douyin-knowledge-drawer .ant-btn, .douyin-knowledge-library .ant-btn, .douyin-knowledge-picker .ant-btn { min-height: 44px; }
+.douyin-knowledge-drawer .ant-select, .douyin-knowledge-picker .ant-select { width: 100%; min-width: 0; }
+.douyin-knowledge-picker .ant-select-selection-overflow-item { max-width: 100%; }
+.douyin-knowledge-picker .ant-select-selection-item-content { overflow-wrap: anywhere; white-space: normal; }
+.douyin-knowledge-drawer a, .douyin-knowledge-card a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
 @media (max-width: 767px) {
   .douyin-knowledge-grid, .douyin-knowledge-filters { grid-template-columns: minmax(0, 1fr); }
   .douyin-knowledge-picker { padding: 12px; }

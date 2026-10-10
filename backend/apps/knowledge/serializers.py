@@ -79,6 +79,8 @@ class KnowledgeIndexAcceptedSerializer(serializers.Serializer):
 
 class KnowledgeSearchResultSerializer(serializers.Serializer):
     chunk_id = serializers.IntegerField()
+    revision = serializers.IntegerField()
+    provenance = serializers.JSONField()
     document_id = serializers.IntegerField()
     knowledge_base_id = serializers.IntegerField()
     knowledge_base_name = serializers.CharField()

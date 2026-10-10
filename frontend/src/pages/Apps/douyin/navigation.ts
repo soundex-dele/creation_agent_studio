@@ -1,7 +1,7 @@
 /** Preserve presentation and creator selection, discard the previous screen's context. */
 export function douyinLocation(params: URLSearchParams, view: string, context: Record<string, string | undefined> = {}) {
   const next = new URLSearchParams(params);
-  for (const key of ['account', 'task', 'idea', 'source', 'topic', 'work', 'referenceAccount', 'mode', 'profile', 'subscription', 'output']) next.delete(key);
+  for (const key of ['account', 'task', 'idea', 'source', 'topic', 'work', 'referenceAccount', 'mode', 'profile', 'subscription', 'output', 'case']) next.delete(key);
   next.set('view', view || 'accounts');
   for (const [key, value] of Object.entries(context)) {
     if (value) next.set(key, value); else next.delete(key);

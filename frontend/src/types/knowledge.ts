@@ -41,6 +41,7 @@ export interface KnowledgeDocument {
 
 export interface KnowledgeSearchResult {
   chunk_id: number;
+  revision: number;
   document_id: number;
   knowledge_base_id: number;
   knowledge_base_name: string;

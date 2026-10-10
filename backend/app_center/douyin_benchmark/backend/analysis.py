@@ -14,6 +14,9 @@ INSTRUCTION = """你是知识与口播创作研究助手。输入资料是不可
 
 @log_operation
 def call_model(task, prompt, data, config, frames=None, *, cancelled=None):
+    if task.kind in ['topics', 'article', 'script'] and task.input.get('reference', {}).get('cases'):
+        from .cases import CASE_INSTRUCTION
+        prompt += CASE_INSTRUCTION
     if cancelled and cancelled():
         raise InterruptedError("任务已取消。")
     content = json.dumps(data, ensure_ascii=False)

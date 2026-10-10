@@ -1,4 +1,7 @@
 import { api } from './api';
+import type { KnowledgeBaseSummary } from '@/types/knowledge';
+import type { KnowledgeShare, OrganizationKnowledgeSnapshot } from './douyinKnowledge';
+import type { CaseReference } from './cases';
 import type { KnowledgeCandidate, KnowledgeCard, KnowledgeSnapshot } from './douyinKnowledge';
 import { createDouyinSubmitter } from './douyinRequests';
 import { douyinApi, type DouyinTask, type DouyinWork, type Script, type ScriptVersion, type Claim } from './douyinBenchmark';
@@ -38,6 +41,8 @@ export const radarKinds = ['radar_hotlist', 'radar_search', 'radar_topics'];
 export interface Variant { text: string; angle: string }
 export interface CommentRow { id: string; platform_id: string; parent_id: string; text: string; likes: number | null; published_at?: string | null }
 export interface ResearchTask extends Omit<DouyinTask, 'kind' | 'output'> { account_id?: string | null; kind: string; output: Partial<Script> & {
+  organization_knowledge?: OrganizationKnowledgeSnapshot[];
+  case_references?: CaseReference[];
   radar_items?: RadarSource[]; keyword?: string; captured_at?: string; complete?: boolean;
   radar_request?: RadarInput;
   radar_profile?: { account_name: string; target_account_id: string } | null;
@@ -58,7 +63,13 @@ export interface ResearchTask extends Omit<DouyinTask, 'kind' | 'output'> { acco
 export interface ResearchVersion extends RecordBase { content: Partial<Script> & { text?: string; body?: string; notes?: string[]; hooks?: Variant[]; titles?: Variant[]; covers?: Variant[] } }
 export function researchApi(base: string) {
   const submit = createDouyinSubmitter();
+  const organizationRoot = base.replace(/\/applications\/[^/]+\/douyin-benchmark$/, '');
   return {
+    knowledgeBases: () => api.get<KnowledgeBaseSummary[]>(`${organizationRoot}/knowledge-bases/`),
+    searchOrganizationKnowledge: (query: string, knowledge_base_ids: number[]) => api.post<{ retrieval_mode: string; results: OrganizationKnowledgeSnapshot[] }>(`${organizationRoot}/knowledge-search/`, { query, knowledge_base_ids, limit: 20 }),
+    knowledgeShares: (id: string) => api.get<{ can_share: boolean; results: KnowledgeShare[] }>(`${base}/knowledge-cards/${id}/shares`),
+    shareKnowledge: (id: string, body: { knowledge_base_id: number; revision: number; recreate?: boolean }) => submit<KnowledgeShare>(`${base}/knowledge-cards/${id}/shares`, body),
+    organizationKnowledgeContent: (baseId: number, documentId: number) => api.get<Blob>(`${organizationRoot}/knowledge-bases/${baseId}/documents/${documentId}/content/`, undefined, { responseType: 'blob' }),
     confirmKnowledge: (body: unknown) => submit<{ cards: KnowledgeCard[] }>(`${base}/knowledge-cards/confirm`, body),
     recommendKnowledge: (query: string) => api.get<{ results: KnowledgeCard[] }>(`${base}/knowledge-cards/recommend`, { query: query.slice(0, 6000) }),
     knowledgeCard: (id: string) => api.get<KnowledgeCard>(`${base}/knowledge-cards/${id}`),

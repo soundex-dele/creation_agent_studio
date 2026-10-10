@@ -7,7 +7,7 @@ export type TemplateContentType =
   | 'product_analysis'
   | 'other';
 
-export type TemplateCopyrightMode = 'link_only' | 'excerpt' | 'authorized' | 'owned';
+export type TemplateCopyrightMode = 'link_only' | 'excerpt' | 'authorized' | 'owned' | 'reference';
 export type TemplateStatus = 'draft' | 'review' | 'published' | 'archived';
 
 export interface TemplateCategory {
@@ -20,6 +20,8 @@ export interface TemplateCategory {
 }
 
 export interface TemplateSummary {
+  status?: TemplateStatus;
+  source_kind?: string;
   id: number;
   title: string;
   summary: string;
@@ -53,6 +55,7 @@ export interface TemplateAnalysisSection {
 }
 
 export interface TemplateDetail extends Omit<TemplateSummary, 'category_name' | 'analysis_count'> {
+  source_navigation?: { available: boolean; application_id?: number; account_id?: string; task_id?: string | null } | null;
   category: TemplateCategory | null;
   source_title?: string;
   source_url?: string;

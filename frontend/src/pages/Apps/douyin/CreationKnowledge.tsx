@@ -5,6 +5,7 @@ import type { ResearchClient, ResearchTask } from '@/services/douyinResearch';
 import { knowledgeFields, type KnowledgeCandidate, type KnowledgeCard, type KnowledgeContent, type KnowledgeSnapshot } from '@/services/douyinKnowledge';
 import { Field, Pager, useRows } from './ResearchCommon';
 import './CreationKnowledge.css';
+import { KnowledgeShareDrawer } from './OrganizationKnowledge';
 
 const categories = { content: '内容知识', method: '创作方法' };
 const bases = { author_view: '作者观点', observation: '观察', inference: 'AI 推断' };
@@ -99,6 +100,7 @@ export function ExtractKnowledge({ task, run }: { task: Pick<ResearchTask, 'id' 
 }
 
 export function KnowledgeLibrary({ client }: { client: ResearchClient }) {
+  const [sharing, setSharing] = useState<KnowledgeCard | null>(null);
   const [search, setSearch] = useState(''); const [category, setCategory] = useState(''); const [tag, setTag] = useState('');
   const rows = useRows<KnowledgeCard>(client, 'knowledge-cards', { search, category, tag });
   const [editing, setEditing] = useState<KnowledgeCard | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
@@ -121,16 +123,17 @@ export function KnowledgeLibrary({ client }: { client: ResearchClient }) {
     <div className="douyin-knowledge-grid">{rows.results.map(card => <CardBody key={card.id} card={card}>
       {card.source_missing && <p>来源已移除，已保存的证据仍可核对。</p>}<small>{statuses[card.index_status] || card.index_status} · 版本 {card.revision}</small>
       {card.index_status === 'failed' && <Alert type="warning" message="索引失败" description="卡片已保存，仍可手动选用。重试后会重新参与推荐。" />}
-      <div className="douyin-actions"><Button disabled={busy} onClick={() => setEditing(card)}>编辑</Button>
+      <div className="douyin-actions"><Button disabled={busy} onClick={() => setSharing(card)}>分享到知识库</Button><Button disabled={busy} onClick={() => setEditing(card)}>编辑</Button>
         {card.index_status === 'failed' && <Button disabled={busy} onClick={() => void action(() => client.retryKnowledgeIndex(card.id))}>重试索引</Button>}
         <Popconfirm title="删除这张知识卡片？" description="将退出推荐和新创作，历史生成快照保留。" onConfirm={() => action(() => client.remove('knowledge-cards', card.id))}><Button danger type="text" disabled={busy}>删除</Button></Popconfirm>
       </div>
     </CardBody>)}</div><Pager rows={rows} />
+    {sharing && <KnowledgeShareDrawer client={client} card={sharing} onClose={() => setSharing(null)}><CardBody card={sharing} /></KnowledgeShareDrawer>}
     {editing && <KnowledgeEditor key={`${editing.id}:${editing.revision}`} card={editing} onClose={() => setEditing(null)} onSave={async value => { await client.update('knowledge-cards', editing.id, { revision: editing.revision, ...knowledgeFields(value) }); rows.reload(); }} />}
   </section>;
 }
 
-export function KnowledgePicker({ client, query, selected, onChange }: { client: ResearchClient; query: string; selected: KnowledgeSnapshot[]; onChange: (value: KnowledgeSnapshot[]) => void }) {
+export function KnowledgePicker({ client, query, selected, onChange, organizationCount = 0 }: { client: ResearchClient; query: string; selected: KnowledgeSnapshot[]; onChange: (value: KnowledgeSnapshot[]) => void; organizationCount?: number }) {
   const [results, setResults] = useState<KnowledgeCard[]>([]); const [lastQuery, setLastQuery] = useState<string | null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [searched, setSearched] = useState(false);
   const [search, setSearch] = useState(''); const [page, setPage] = useState(1); const [count, setCount] = useState(0); const [browsing, setBrowsing] = useState(false);
@@ -146,7 +149,7 @@ export function KnowledgePicker({ client, query, selected, onChange }: { client:
     } catch (e) { if (token === request.current) setError(documentError(e)); } finally { if (token === request.current) setBusy(false); }
   }
   function toggle(card: KnowledgeSnapshot, checked: boolean) {
-    if (checked && selected.length >= 10) { setError('一次最多选择10张知识卡片。'); return; }
+    if (checked && selected.length + organizationCount >= 10) { setError('个人卡片和组织资料合计最多选择10项。'); return; }
     onChange(checked ? [...selected, card] : selected.filter(c => c.id !== card.id));
   }
   return <section className="douyin-form douyin-knowledge-picker" aria-label="参考知识">
@@ -161,7 +164,7 @@ export function KnowledgePicker({ client, query, selected, onChange }: { client:
     {searched && !busy && !results.length && <Empty description="没有匹配的知识，可搜索其他关键词或直接创作。" />}
     <div className="douyin-knowledge-grid">{results.map(card => <CardBody key={card.id} card={card}>
       {card.source_missing && <p>来源已移除，保留证据快照。</p>}
-      <Checkbox checked={selected.some(c => c.id === card.id)} disabled={busy || selected.length >= 10 && !selected.some(c => c.id === card.id)} onChange={e => toggle(card, e.target.checked)}>使用 {card.title}</Checkbox>
+      <Checkbox checked={selected.some(c => c.id === card.id)} disabled={busy || selected.length + organizationCount >= 10 && !selected.some(c => c.id === card.id)} onChange={e => toggle(card, e.target.checked)}>使用 {card.title}</Checkbox>
     </CardBody>)}</div>
     {browsing && <Pager rows={{ page, count, setPage: value => { void load('search', value); } }} />}
   </section>;

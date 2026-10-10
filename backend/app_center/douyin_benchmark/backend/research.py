@@ -270,6 +270,18 @@ def freeze(scope, values):
             check_inherited(scope, selected)
         if selected:
             data['reference']['knowledge'] = selected
+        from .organization_knowledge import freeze_chunks, check_inherited as check_organization_inherited
+        data['reference'].pop('organization_knowledge', None)
+        if kind == 'topics' or not values.get('source_task_id'):
+            organization_refs = freeze_chunks(scope, values.get('organization_knowledge_chunks', []))
+        else:
+            organization_refs = source.input.get('reference', {}).get('organization_knowledge', [])
+            check_organization_inherited(scope, organization_refs)
+        if organization_refs:
+            data['reference']['organization_knowledge'] = organization_refs
+    if kind in ['topics', 'script', 'article']:
+        from .cases import attach_cases
+        attach_cases(scope, values, data, source)
     return data, refs
 
 

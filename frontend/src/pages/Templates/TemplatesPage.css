@@ -1,6 +1,13 @@
 .templates-page {
-  overflow-y: auto;
   padding-bottom: 40px;
+}
+
+.case-library-toolbar { flex-wrap: wrap; gap: 12px; }
+.case-library-filter { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+.templates-page.case-library-embedded { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+@media (max-width: 767px) {
+  .case-library-filter { width: 100%; min-width: 0; }
+  .case-library-toolbar .case-library-search { width: 100%; }
 }
 
 .case-library-header {

@@ -58,6 +58,9 @@ def structured(task, prompt, data, config, validator, sink, *, writing_skill=Tru
     if writing_skill and task.kind in ['topics', 'article']:
         from .writing_skill import creation_instruction
         prompt = creation_instruction(prompt)
+    if task.kind in ['topics', 'article'] and data.get('reference', {}).get('organization_knowledge'):
+        from .organization_knowledge import INSTRUCTION
+        prompt += INSTRUCTION
     if task.kind in ['topics', 'article'] and data.get('reference', {}).get('knowledge'):
         from .knowledge import KNOWLEDGE_INSTRUCTION
         prompt += KNOWLEDGE_INSTRUCTION

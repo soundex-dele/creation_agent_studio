@@ -94,7 +94,11 @@ def create_document(*, knowledge_base, actor, title, source_type, filename,
 def reindex_document(document, actor):
     if document.is_deleted:
         raise ValueError("Deleted documents cannot be reindexed.")
-    revision = max(document.active_revision, document.pending_revision) + 1
+    # Failed/cancelled indexes clear pending_revision. Never reuse their revision:
+    # a late failed worker may still clean up chunks from its own revision.
+    last_revision = (document.indexing_run.definition_snapshot.get('revision', 0)
+                     if document.indexing_run_id else 0)
+    revision = max(document.active_revision, document.pending_revision, last_revision) + 1
     run = create_run(
         organization=document.organization,
         owner=actor,

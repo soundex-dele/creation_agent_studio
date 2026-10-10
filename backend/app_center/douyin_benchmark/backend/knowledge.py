@@ -237,10 +237,12 @@ def preserve_knowledge_history(account):
     tasks = m.Task.objects.filter(Q(account=account) | Q(source_links__account=account)).distinct()
     for task in tasks:
         cards = task.input.get('reference', {}).get('knowledge', [])
-        if not cards or task.kind not in ['topics', 'script', 'article']:
+        organization_refs = task.input.get('reference', {}).get('organization_knowledge', [])
+        cases = task.input.get('reference', {}).get('cases', [])
+        if not (cards or organization_refs or cases) or task.kind not in ['topics', 'script', 'article']:
             continue
         cancel(task)
-        task.output = {**task.output, 'knowledge_cards': cards}
+        task.output = {**task.output, 'knowledge_cards': cards, 'organization_knowledge': organization_refs, 'case_references': cases}
         task.account_id = task.work_id = None
         task.input = {}
         task.request_key = f'preserved:{task.pk}'

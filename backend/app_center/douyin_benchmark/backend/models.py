@@ -196,6 +196,16 @@ class CreationKnowledgeCard(PrivateRecord):
         constraints = [models.UniqueConstraint(fields=['library', 'extraction_key', 'candidate_id'], name='dy_knowledge_candidate_once')]
 
 
+class CreationKnowledgeShare(PrivateRecord):
+    card = models.ForeignKey(CreationKnowledgeCard, on_delete=models.CASCADE, related_name='shares')
+    knowledge_base = models.ForeignKey('knowledge.KnowledgeBase', on_delete=models.CASCADE)
+    document = models.ForeignKey('knowledge.KnowledgeDocument', null=True, on_delete=models.SET_NULL)
+    shared_revision = models.PositiveIntegerField()
+
+    class Meta(PrivateRecord.Meta):
+        constraints = [models.UniqueConstraint(fields=['card', 'knowledge_base'], name='dy_knowledge_share_once')]
+
+
 class Idea(PrivateRecord):
     title = models.CharField(max_length=300)
     notes = models.TextField(blank=True)

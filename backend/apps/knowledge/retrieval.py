@@ -151,6 +151,9 @@ def serialize_result(chunk, score):
     document = chunk.document
     return {
         "chunk_id": chunk.id,
+        "revision": chunk.revision,
+        "provenance": {key: document.metadata[key] for key in
+                       ['source_kind', 'card_revision', 'category', 'basis'] if key in document.metadata},
         "document_id": document.id,
         "knowledge_base_id": document.knowledge_base_id,
         "knowledge_base_name": document.knowledge_base.name,

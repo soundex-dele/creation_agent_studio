@@ -148,6 +148,8 @@ class AllWorksView(WorkspaceMixin, BaseView):
         if days and days not in ['7', '30', '90']:
             raise ValidationError('时间范围必须为7、30或90天。')
         rows = [work_data(w) for w in qs]
+        from .cases import annotate_saved_cases
+        annotate_saved_cases(rows, scope)
         if days:
             now = timezone.now()
             rows = [r for r in rows if (date := valid_date(r.get('published_at'))) and now - timedelta(days=int(days)) <= date <= now]

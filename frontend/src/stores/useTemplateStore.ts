@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
+import { casesApi } from '@/services/cases';
+import { documentError } from '@/services/documents';
 import type {
   TemplateCategory,
   TemplateDetail,
@@ -7,6 +9,12 @@ import type {
 } from '@/types/template';
 
 interface TemplateState {
+  clearTemplates: () => void;
+  detailError: string;
+  count: number; page: number; mine: boolean; sourceKind: string; error: string;
+  setPage: (page: number) => void;
+  setMine: (mine: boolean) => void;
+  setSourceKind: (kind: string) => void;
   categories: TemplateCategory[];
   templates: TemplateSummary[];
   currentTemplate: TemplateDetail | null;
@@ -25,7 +33,16 @@ interface TemplateState {
 const unwrap = <T,>(response: T[] | { results?: T[] }): T[] =>
   Array.isArray(response) ? response : response.results ?? [];
 
+let listRequest = 0;
+let detailRequest = 0;
+
 export const useTemplateStore = create<TemplateState>((set, get) => ({
+  detailError: '',
+  clearTemplates: () => { listRequest++; set({ templates: [], count: 0, isLoading: true, error: '' }); },
+  count: 0, page: 1, mine: false, sourceKind: '', error: '',
+  setPage: page => set({ page }),
+  setMine: mine => set({ mine, page: 1 }),
+  setSourceKind: sourceKind => set({ sourceKind, page: 1 }),
   categories: [],
   templates: [],
   currentTemplate: null,
@@ -46,41 +63,38 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   },
 
   loadTemplate: async (id: number) => {
-    set({ isLoadingTemplate: true });
+    const token = ++detailRequest;
+    set({ isLoadingTemplate: true, currentTemplate: null, detailError: '' });
     try {
       const response = await api.get<TemplateDetail>(`/templates/${id}/`);
-      set({ currentTemplate: response });
+      if (token === detailRequest) set({ currentTemplate: response });
       return response;
     } catch (error) {
-      set({ currentTemplate: null });
+      if (token === detailRequest) set({ currentTemplate: null, detailError: documentError(error) });
       throw error;
     } finally {
-      set({ isLoadingTemplate: false });
+      if (token === detailRequest) set({ isLoadingTemplate: false });
     }
   },
 
-  clearCurrentTemplate: () => set({ currentTemplate: null }),
+  clearCurrentTemplate: () => { detailRequest++; set({ currentTemplate: null, isLoadingTemplate: false, detailError: '' }); },
 
   loadTemplates: async (category?: string) => {
-    set({ isLoading: true });
+    const token = ++listRequest;
+    set({ isLoading: true, error: '', templates: [], count: 0 });
     try {
-      const { searchQuery } = get();
-      const params: Record<string, string> = {};
-      if (category) params.category = category;
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-      const response = await api.get<TemplateSummary[] | { results?: TemplateSummary[] }>(
-        '/templates/',
-        { params },
-      );
-      set({ templates: unwrap(response) });
+      const { searchQuery, page, mine, sourceKind } = get();
+      const response = await casesApi.list({ page, ...(category && { category }),
+        ...(searchQuery.trim() && { search: searchQuery.trim() }), ...(mine && { mine: true }),
+        ...(sourceKind && { source_kind: sourceKind }) });
+      if (token === listRequest) set({ templates: response.results, count: response.count });
     } catch (error) {
-      console.error('Failed to load cases:', error);
-      set({ templates: [] });
+      if (token === listRequest) set({ templates: [], count: 0, error: documentError(error) });
     } finally {
-      set({ isLoading: false });
+      if (token === listRequest) set({ isLoading: false });
     }
   },
 
-  selectCategory: (slug) => set({ selectedCategory: slug }),
-  setSearchQuery: (query) => set({ searchQuery: query }),
+  selectCategory: (slug) => set({ selectedCategory: slug, page: 1 }),
+  setSearchQuery: (query) => set({ searchQuery: query, page: 1 }),
 }));

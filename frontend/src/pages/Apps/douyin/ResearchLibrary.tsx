@@ -1,3 +1,4 @@
+import { SaveCaseButton } from './CaseIntegration';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Input, Modal, Select, Tag } from 'antd';
 import { metric, type DouyinAccount } from '@/services/douyinBenchmark';
@@ -57,7 +58,7 @@ export function ResearchLibrary({ client, accounts, run, onAccounts }: { client:
       <Checkbox aria-label={`选择 ${w.title}`} checked={selected.includes(w.id)} disabled={!selected.includes(w.id) && selected.length >= 20} onChange={e => setSelected(old => e.target.checked ? [...old, w.id] : old.filter(id => id !== w.id))}>{w.account_name}</Checkbox>
       <h3>{w.title || '未命名作品'}</h3><p>{w.published_at ? new Date(w.published_at).toLocaleString() : '发布时间未获取'} {w.kind === 'image_album' && <Tag>图文</Tag>}</p>
       <dl className="douyin-research-metrics">{(Object.keys(metricLabels) as MetricKey[]).map(key => <div key={key}><dt>{metricLabels[key]}</dt><dd>{metric(w[key])}</dd></div>)}</dl>
-      <div className="douyin-actions"><a href={w.url} target="_blank" rel="noreferrer">原作品</a><Button onClick={() => void action(async () => setTrend(await client.trend(w.id)))}>增长趋势</Button><Button onClick={() => void action(() => client.create('inspirations', { title: w.title || '未命名作品', kind: 'work', work: w.id, text: w.description || '', tags: [] }))}>收藏灵感</Button></div>
+      <div className="douyin-actions"><SaveCaseButton client={client.editor} workId={w.id} caseId={w.case_id} /><a href={w.url} target="_blank" rel="noreferrer">原作品</a><Button onClick={() => void action(async () => setTrend(await client.trend(w.id)))}>增长趋势</Button><Button onClick={() => void action(() => client.create('inspirations', { title: w.title || '未命名作品', kind: 'work', work: w.id, text: w.description || '', tags: [] }))}>收藏灵感</Button></div>
     </article>)}</div><Pager rows={rows} />
     <Modal className="douyin-modal" title="作品增长追踪" open={!!trend} width={850} footer={null} onCancel={() => setTrend(null)}>{trend && <TrendPanel data={trend} />}</Modal>
   </section>;

@@ -158,10 +158,12 @@ class DigestSerializer(PrivateSerializer):
 
 
 class ResearchInput(serializers.Serializer):
+    case_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), max_length=3, required=False)
     kind = serializers.ChoiceField(choices=['radar', 'radar_hotlist', 'radar_search', 'radar_topics', 'joint', 'compare', 'comments', 'needs', 'variants', 'review', 'refresh', 'topics', 'script', 'voice_analysis', 'article', 'knowledge_extract'])
     keyword = serializers.CharField(max_length=100, required=False)
     source_ids = serializers.ListField(child=serializers.CharField(max_length=400), min_length=1, max_length=20, required=False)
     knowledge_cards = serializers.ListField(child=serializers.DictField(), max_length=10, required=False)
+    organization_knowledge_chunks = serializers.ListField(child=serializers.DictField(), max_length=10, required=False)
     target_account_id = serializers.UUIDField(required=False)
     analysis_mode = serializers.ChoiceField(choices=['style', 'positioning'], default='style')
     account_ids = serializers.ListField(child=serializers.UUIDField(), max_length=50, default=list)
@@ -189,6 +191,10 @@ class ResearchInput(serializers.Serializer):
         attrs['account_ids'] = list(dict.fromkeys(attrs['account_ids']))
         attrs['work_ids'] = list(dict.fromkeys(attrs['work_ids']))
         kind = attrs['kind']
+        if 'case_ids' in attrs:
+            if kind not in ['topics', 'article', 'script'] or (kind != 'topics' and attrs.get('source_task_id')):
+                raise serializers.ValidationError('请在直接创作或生成选题时选择案例；历史选题沿用原有案例。')
+            attrs['case_ids'] = list(dict.fromkeys(attrs['case_ids']))
         if kind == 'radar_search' and not attrs.get('keyword'):
             raise serializers.ValidationError('请输入要搜索的关键词。')
         if kind == 'radar_topics':
@@ -222,6 +228,15 @@ class ResearchInput(serializers.Serializer):
             fields = CardSelection(data=attrs['knowledge_cards'], many=True)
             fields.is_valid(raise_exception=True)
             attrs['knowledge_cards'] = fields.validated_data
+        if 'organization_knowledge_chunks' in attrs:
+            from .organization_knowledge import ChunkSelection
+            if kind != 'topics' and not (kind in ['article', 'script'] and not attrs.get('source_task_id')):
+                raise serializers.ValidationError('请在直接创作或生成选题时选择组织资料；历史选题沿用原快照。')
+            fields = ChunkSelection(data=attrs['organization_knowledge_chunks'], many=True)
+            fields.is_valid(raise_exception=True)
+            attrs['organization_knowledge_chunks'] = fields.validated_data
+        if len(attrs.get('knowledge_cards', [])) + len(attrs.get('organization_knowledge_chunks', [])) > 10:
+            raise serializers.ValidationError('个人卡片和组织资料合计最多选择10项。')
         if kind == 'variants' and not attrs.get('source_version_id'):
             raise serializers.ValidationError('请选择已保存的文案版本。')
         if attrs['production_format'] == 'animation' and attrs['duration'] > 120:

@@ -14,6 +14,9 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import useApplicationNavigate from '@/hooks/useApplicationNavigate';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import './TemplateDetailPage.css';
+import CaseCreationAction from './CaseCreationAction';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const formatDate = (date?: string | null) =>
   date ? new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN') : '未注明';
@@ -22,37 +25,42 @@ const TemplateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useApplicationNavigate();
   const [searchParams] = useSearchParams();
+  const embedded = searchParams.get('embedded') === '1';
+  const rootClass = `template-detail-page${embedded ? ' app-scroll-page case-library-embedded' : ''}`;
+  const organization = useOrganizationStore(s => s.currentOrganizationId);
+  const user = useAuthStore(s => s.user?.id);
   const libraryPath = `/apps/case-library?entry=${searchParams.get('entry') === 'home' ? 'home' : 'apps'}`;
-  const { currentTemplate, isLoadingTemplate, loadTemplate, clearCurrentTemplate } =
+  const { currentTemplate, isLoadingTemplate, detailError, loadTemplate, clearCurrentTemplate } =
     useTemplateStore();
   const templateId = id ? Number(id) : Number.NaN;
 
   useEffect(() => {
     if (!Number.isNaN(templateId)) loadTemplate(templateId).catch(() => undefined);
     return () => clearCurrentTemplate();
-  }, [templateId, loadTemplate, clearCurrentTemplate]);
+  }, [templateId, loadTemplate, clearCurrentTemplate, organization, user]);
 
   if (isLoadingTemplate) {
-    return <div className="template-detail-state"><Spin size="large" /></div>;
+    return <div className={`${rootClass} template-detail-state`}><Spin size="large" /></div>;
   }
 
   if (!currentTemplate) {
     return (
-      <div className="template-detail-page">
+      <div className={rootClass}>
         <Result
           status="404"
-          title="案例不存在"
-          subTitle="该案例可能尚未发布、已归档或链接有误。"
-          extra={<Button type="primary" onClick={() => navigate(libraryPath)}>返回案例库</Button>}
+          title="案例暂不可用"
+          subTitle={detailError || '该案例可能已删除、无权访问或链接有误。'}
+          extra={<><Button type="primary" onClick={() => navigate(libraryPath)}>返回案例库</Button><Button onClick={() => { if (Number.isInteger(templateId)) void loadTemplate(templateId).catch(() => undefined); }}>重试加载</Button></>}
         />
       </div>
     );
   }
 
+  const source = currentTemplate.source_navigation;
   const sourceBody = currentTemplate.source_content || currentTemplate.source_excerpt;
 
   return (
-    <div className="template-detail-page animate-fade-in">
+    <div className={`${rootClass} animate-fade-in`}>
       <Button
         type="text"
         icon={<ArrowLeftOutlined />}
@@ -62,6 +70,12 @@ const TemplateDetailPage: React.FC = () => {
         返回案例库
       </Button>
 
+      <div className="template-detail-actions">
+        {currentTemplate.status !== 'archived' && <CaseCreationAction key={`${organization}:${user}:${templateId}`} caseId={templateId} />}
+        {currentTemplate.status !== 'published' && <Tag>仅本人可见</Tag>}
+        {source?.available ? <Button onClick={() => navigate(`/applications/${source.application_id}/douyin-benchmark?view=accounts&account=${source.account_id}${source.task_id ? `&task=${source.task_id}` : ''}`)}>返回抖音来源</Button> : source && <span>抖音来源不可用，已保存的内容仍可阅读。</span>}
+        {currentTemplate.source_snapshot_at && <span>来源保存于 {new Date(currentTemplate.source_snapshot_at).toLocaleString('zh-CN')}</span>}
+      </div>
       <header className="template-detail-header">
         <div className="template-detail-eyebrow">
           {currentTemplate.source_platform || currentTemplate.category?.name || '案例'}

@@ -31,6 +31,7 @@ class Template(models.Model):
         ('other', '其他'),
     ]
     COPYRIGHT_MODE_CHOICES = [
+        ('reference', '参考资料，授权未确认'),
         ('link_only', '仅保留链接'),
         ('excerpt', '摘要与引用'),
         ('authorized', '已获授权'),
@@ -62,6 +63,9 @@ class Template(models.Model):
     copyright_mode = models.CharField(
         max_length=20, choices=COPYRIGHT_MODE_CHOICES, default='link_only')
     source_snapshot_at = models.DateTimeField(null=True, blank=True)
+    source_kind = models.CharField(max_length=30, blank=True, default='')
+    source_key = models.CharField(max_length=200, blank=True, default='')
+    source_snapshot = models.JSONField(default=dict, blank=True)
     word_count = models.PositiveIntegerField(default=0)
     reading_time_minutes = models.PositiveIntegerField(default=0)
     tags = models.JSONField(default=list, blank=True)
@@ -83,6 +87,9 @@ class Template(models.Model):
     class Meta:
         ordering = ['-is_featured', '-updated_at']
         db_table = 'templates'
+        constraints = [models.UniqueConstraint(
+            fields=['organization', 'created_by', 'source_kind', 'source_key'],
+            condition=~models.Q(source_key=''), name='template_source_once')]
 
     def __str__(self):
         return self.title
