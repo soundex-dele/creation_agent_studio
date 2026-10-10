@@ -87,6 +87,21 @@ describe('mobile page scrolling', () => {
       expect(focusedActions.opacity).toBe('1');
       expect(focusedActions['pointer-events']).toBe('auto');
     }
+    const conversationActions = declarationsAt(styles, ['.cowork-conversation-action'], width);
+    expect(conversationActions.opacity).toBe(width <= 767 ? '1' : '0');
+    expect(conversationActions['pointer-events']).toBe(width <= 767 ? 'auto' : 'none');
+    for (const state of ['hover', 'focus-within']) {
+      const actions = declarationsAt(styles, ['.cowork-conversation-action', `.cowork-conversation-row:${state} .cowork-conversation-action`], width);
+      expect(actions.opacity).toBe('1');
+      expect(actions['pointer-events']).toBe('auto');
+    }
+    expect(declarationsAt(styles, ['.cowork-conversation-action', '.cowork-conversation-action.ant-dropdown-open'], width).opacity).toBe('1');
+    for (const state of [':hover', ':focus-within', ':has(.ant-dropdown-open)', '.is-active']) {
+      expect(declarationsAt(styles, [`.cowork-conversation-row${state}`], width).background).toBe('var(--color-bg-elevated)');
+    }
+    const conversationRow = declarationsAt(styles, ['.cowork-conversation-row'], width);
+    expect(conversationRow.display).toBe('flex');
+    expect(conversationRow['border-radius']).toBe('8px');
   });
 
   it.each([320, 568, 667, 844])('keeps preview content available in a short %ipx viewport', width => {

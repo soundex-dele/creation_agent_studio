@@ -34,28 +34,34 @@
 .cowork-new-chat { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 44px; margin: 12px 0 18px; text-align: left; flex-shrink: 0; }
 .cowork-section-heading { display: flex; align-items: center; justify-content: space-between; margin: 16px 2px 6px; color: var(--color-text-sec); }
 .cowork-section-heading > button:first-child { flex: 1; text-align: left; min-height: 36px; font-weight: 600; padding: 0 10px; }
+.cowork-section-toggle { display: flex; align-items: center; gap: 8px; }
+.cowork-section-toggle svg { flex-shrink: 0; }
 .cowork-project-row { display: flex; align-items: center; min-width: 0; border-radius: 8px; }
 .cowork-project-action { opacity: 0; pointer-events: none; }
 .cowork-project-row:hover .cowork-project-action, .cowork-project-row:focus-within .cowork-project-action { opacity: 1; pointer-events: auto; }
 .cowork-project-action:hover:not(:disabled), .cowork-project-action:focus-visible { background: var(--color-bg-surface); color: var(--color-primary); }
-@media (hover: none), (pointer: coarse) {
-  .cowork-project-action { opacity: 1; pointer-events: auto; }
-}
-.cowork-project-name { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; text-align: left; min-height: 40px; padding: 4px 0; }
+.cowork-project-name { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; text-align: left; min-height: 40px; padding: 4px 10px; }
 .cowork-project-name svg { flex-shrink: 0; }
 .cowork-project-name span, .cowork-header > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cowork-project-chats { margin-left: 28px; }
 .cowork-conversation { display: block; width: 100%; padding: 9px 12px; min-height: 38px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.cowork-conversation-row { display: flex; align-items: center; min-width: 0; }
+.cowork-conversation-row { display: flex; align-items: center; min-width: 0; border-radius: 8px; }
 .cowork-conversation-row .cowork-conversation { flex: 1; min-width: 0; }
-.cowork-conversation-row:not(:focus-within) .cowork-conversation-action:not(.ant-dropdown-open) {
+.cowork-conversation-action {
   opacity: 0;
   pointer-events: none;
 }
+.cowork-conversation-row:hover .cowork-conversation-action,
+.cowork-conversation-row:focus-within .cowork-conversation-action,
+.cowork-conversation-action.ant-dropdown-open { opacity: 1; pointer-events: auto; }
+@media (hover: none), (pointer: coarse) {
+  .cowork-project-action, .cowork-conversation-action { opacity: 1; pointer-events: auto; }
+}
 .cowork-more { display: block; padding: 10px 12px; color: var(--color-text-sec); }
 .cowork-list-state { padding: 8px 12px; color: var(--color-text-sec); font-size: 13px; overflow-wrap: anywhere; }
-.cowork-icon:hover, .cowork-new-chat:hover, .cowork-conversation:hover, .cowork-project-row:hover, .cowork-more:hover,
-.cowork-conversation[aria-current='page'] { background: var(--color-bg-elevated); }
+.cowork-icon:hover, .cowork-new-chat:hover, .cowork-project-row:hover, .cowork-more:hover,
+.cowork-conversation-row:hover, .cowork-conversation-row:focus-within,
+.cowork-conversation-row:has(.ant-dropdown-open), .cowork-conversation-row.is-active { background: var(--color-bg-elevated); }
 .cowork-page button:focus-visible, .cowork-navigation-drawer button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .cowork-page button:disabled, .cowork-navigation-drawer button:disabled { cursor: not-allowed; opacity: 0.5; }
 .cowork-main { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
@@ -82,7 +88,7 @@
   .cowork-page { grid-template-columns: minmax(0, 1fr); height: 100%; }
   .cowork-header { padding: 4px 10px; }
   .cowork-icon { width: 44px; height: 44px; }
-  .cowork-project-action { opacity: 1; pointer-events: auto; }
+  .cowork-project-action, .cowork-conversation-action { opacity: 1; pointer-events: auto; }
   .cowork-conversation, .cowork-project-name, .cowork-section-heading > button:first-child { min-height: 44px; }
   .cowork-chat .chat-input-area { padding-left: 8px; padding-right: 8px; }
   .cowork-chat .chat-input-accessory { padding-left: 8px; padding-right: 8px; }

@@ -105,7 +105,7 @@ function ConversationRows({ list, selected, onSelect, onManage, disabled }: {
   onManage: ManageConversation; disabled: boolean;
 }) {
   return <>
-    {list.items.map(item => <div key={item.id} className="cowork-conversation-row">
+    {list.items.map(item => <div key={item.id} className={`cowork-conversation-row${selected === item.id ? ' is-active' : ''}`}>
       <button className="cowork-conversation" disabled={disabled}
         aria-current={selected === item.id ? 'page' : undefined} title={item.title || '新对话'}
         onClick={() => onSelect(item)}>{item.title || '新对话'}</button>
@@ -142,9 +142,8 @@ function ProjectRow({ project, api, revision, selected, active, disabled, onNew,
   }, [active, expanded, list.items, selected, onSelectionVisible]);
   return <div className="cowork-project">
     <div className="cowork-project-row">
-      <button className="cowork-icon" aria-label={`${expanded ? '收起' : '展开'} ${project.title}`} aria-expanded={expanded}
-        onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
-      <button className="cowork-project-name" disabled={disabled} onClick={() => onNew(project)} title={project.working_directory}>
+      <button className="cowork-project-name" disabled={disabled} aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)} title={project.working_directory}>
         <Folder size={17} aria-hidden="true" /><span>{project.title}</span>
       </button>
       <button className="cowork-icon cowork-project-action" disabled={disabled} onClick={() => onNew(project)}
@@ -351,7 +350,10 @@ function ChatWorkspace() {
     <button className="cowork-new-chat" disabled={busy} onClick={() => newChat()}><SquarePen size={18} aria-hidden="true" />新建对话</button>
     <div className="cowork-sidebar-scroll">
       <div className="cowork-section-heading">
-        <button aria-expanded={projectsExpanded} onClick={() => setProjectsExpanded(value => !value)}>项目</button>
+        <button className="cowork-section-toggle" aria-expanded={projectsExpanded} onClick={() => setProjectsExpanded(value => !value)}>
+          <span>项目</span>
+          {projectsExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
+        </button>
         <button className="cowork-icon" disabled={busy} onClick={() => setFolderOpen(true)} aria-label="新建项目"><Plus size={17} /></button>
       </div>
       {projectsExpanded && <div className="cowork-projects">
@@ -365,7 +367,12 @@ function ChatWorkspace() {
         {!projectsLoading && !projectsError && !projects.length && <p className="cowork-list-state">绑定文件夹，开始一个项目</p>}
         {projectsMore && <button className="cowork-more" disabled={projectsLoading} onClick={loadMoreProjects}>加载更多</button>}
       </div>}
-      <div className="cowork-section-heading"><button aria-expanded={recentsExpanded} onClick={() => setRecentsExpanded(value => !value)}>最近对话</button></div>
+      <div className="cowork-section-heading">
+        <button className="cowork-section-toggle" aria-expanded={recentsExpanded} onClick={() => setRecentsExpanded(value => !value)}>
+          <span>最近对话</span>
+          {recentsExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
+        </button>
+      </div>
       {recentsExpanded && <ConversationRows list={recents} selected={visibleProjectSelection === conversationId ? null : conversationId}
         onSelect={selectConversation} onManage={manageConversation} disabled={busy} />}
     </div>
