@@ -166,6 +166,25 @@ def test_child_reports_invalid_adapter_without_database_access():
     assert "Cannot load execution adapter" in terminal["error_message"]
 
 
+@pytest.mark.parametrize("cancelled", [True, False])
+def test_child_interruption_is_cancelled_only_with_cancellation_signal(monkeypatch, caplog, cancelled):
+    def interrupted(_payload, _sink):
+        raise InterruptedError("interrupted")
+
+    monkeypatch.setattr("modules.execution.runtime.child._load_entrypoint", lambda _entry: interrupted)
+    messages = queue.Queue()
+    cancel_event = threading.Event()
+    if cancelled:
+        cancel_event.set()
+    execute_child({"input": {}}, messages, cancel_event, "test:adapter")
+    terminal = messages.get_nowait()
+    assert terminal["outcome"] == ("cancelled" if cancelled else "failed")
+    if cancelled:
+        assert "execution.child state=failed" not in caplog.text
+    else:
+        assert terminal["error_code"] == "execution_adapter_failed"
+
+
 def test_child_reports_one_canonical_suspend_message():
     messages = queue.Queue()
     execute_child(

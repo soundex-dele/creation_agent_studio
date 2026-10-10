@@ -4,6 +4,7 @@ import queue
 import time
 import hashlib
 import json
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -11,7 +12,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connections, transaction
+from django.db import OperationalError, connection, connections, transaction
 from django.utils import timezone
 from core.observability import log_context
 
@@ -81,6 +82,10 @@ class ActiveChild:
     span: object = None
     exited_at: float | None = None
     cancel_requested_at: float | None = None
+    pending_message: dict | None = None
+    terminal_received: bool = False
+    delivered_control_id: object = None
+    pending_artifact_key: str | None = None
 
 
 class ExecutionCoordinator:
@@ -128,6 +133,22 @@ class ExecutionCoordinator:
     @property
     def active_count(self):
         return len(self._active)
+
+    @contextmanager
+    def _defer_sqlite_contention(self, phase):
+        # Retry at the next poll, outside the failed transaction. Do not block
+        # sibling children/pools with a sleep/retry loop or cancel their leases.
+        try:
+            yield
+        except OperationalError as exc:
+            if connection.vendor != "sqlite" or not any(
+                text in str(exc).lower() for text in ("locked", "busy")
+            ):
+                raise
+            logger.warning(
+                "execution.database state=busy phase=%s worker_id=%s retry=next_poll",
+                phase, self.worker_id, exc_info=True,
+            )
 
     def _payload(self, claimed):
         from apps.applications.runtime_paths import allow_all_runtime_paths, runtime_roots
@@ -241,6 +262,9 @@ class ExecutionCoordinator:
                 output = execution_domain_port().apply_output_guardrails(
                     claimed.run.organization, output
                 )
+            except OperationalError:
+                # A database outage is not a governance rejection.
+                raise
             except Exception as exc:
                 logger.exception("execution.output state=guardrail_rejected")
                 fail_attempt(
@@ -488,10 +512,13 @@ class ExecutionCoordinator:
             filename = Path(str(message.get("filename") or "artifact.bin")).name
             if not filename or filename in {".", ".."}:
                 filename = "artifact.bin"
-            object_key = (
+            # Retain the same object key if the outer message transaction has
+            # to retry its commit, instead of leaving a new blob on each retry.
+            object_key = getattr(active, "pending_artifact_key", None) or (
                 f"runs/{active.claimed.run.id}/attempts/"
                 f"{active.claimed.attempt.id}/artifacts/{uuid4().hex}-{filename}"
             )
+            active.pending_artifact_key = object_key
             persist_artifact(object_key, content)
             try:
                 record_artifact(
@@ -551,7 +578,40 @@ class ExecutionCoordinator:
             return True
         return False
 
+    def _persist_pending_message(self, active):
+        if connection.vendor != "sqlite":
+            terminal = self._handle_message(active, active.pending_message)
+            active.pending_message = None
+            active.pending_artifact_key = None
+            active.terminal_received = terminal
+            return terminal
+
+        committed = False
+        terminal = False
+
+        def mark_committed():
+            nonlocal committed
+            committed = True
+
+        try:
+            # One IPC message may update child + parent events, projections and
+            # usage. Roll all of them back together before replaying the message.
+            with transaction.atomic():
+                # Register before handler callbacks: a post-commit notification
+                # failure must never cause an already committed message to replay.
+                transaction.on_commit(mark_committed)
+                terminal = self._handle_message(active, active.pending_message)
+        finally:
+            if committed:
+                active.pending_message = None
+                active.pending_artifact_key = None
+                active.terminal_received = terminal
+        return terminal
+
     def _service_child(self, attempt_id, active):
+        if getattr(active, "terminal_received", False):
+            self._remove_child(attempt_id, active)
+            return
         now_monotonic = time.monotonic()
         if now_monotonic >= active.next_heartbeat_at:
             renewed = renew_lease(
@@ -594,10 +654,13 @@ class ExecutionCoordinator:
                 type__in=(RunCommand.Type.ANSWER, RunCommand.Type.GRANT_PERMISSION,
                           RunCommand.Type.DENY_PERMISSION, RunCommand.Type.STEER),
             ).order_by("created_at"):
-                active.controls.put({"id": str(command.id), "type": command.type,
-                                     "input_request_id": str(command.input_request_id),
-                                     "payload": command.payload})
+                if getattr(active, "delivered_control_id", None) != command.id:
+                    active.controls.put({"id": str(command.id), "type": command.type,
+                                         "input_request_id": str(command.input_request_id),
+                                         "payload": command.payload})
+                    active.delivered_control_id = command.id
                 RunCommand.objects.filter(pk=command.pk).update(consumed_at=timezone.now())
+                active.delivered_control_id = None
 
         terminal = False
         messages_drained = False
@@ -611,12 +674,13 @@ class ExecutionCoordinator:
             if time.monotonic() >= message_deadline:
                 break
             try:
-                message = active.messages.get_nowait()
+                if getattr(active, "pending_message", None) is None:
+                    active.pending_message = active.messages.get_nowait()
             except queue.Empty:
                 messages_drained = True
                 break
             try:
-                terminal = self._handle_message(active, message) or terminal
+                terminal = self._persist_pending_message(active) or terminal
             except LeaseLost:
                 logger.warning("execution.event state=lease_lost")
                 active.cancel_event.set()
@@ -730,6 +794,19 @@ class ExecutionCoordinator:
 
     def tick(self, *, allow_claim=True):
         now = time.monotonic()
+        with self._defer_sqlite_contention("maintenance"):
+            self._maintain(now)
+        for attempt_id, active in list(self._active.items()):
+            with tenant_database_context(active.claimed.run.organization_id), log_context(
+                run_id=active.claimed.run.id, attempt_id=attempt_id,
+                organization_id=active.claimed.run.organization_id, worker_id=self.worker_id,
+            ), self._defer_sqlite_contention("service_child"):
+                self._service_child(attempt_id, active)
+        if allow_claim:
+            with self._defer_sqlite_contention("claim"):
+                self._claim_available()
+
+    def _maintain(self, now):
         if now >= self._next_maintenance_at:
             # All PostgreSQL workers share Redis, so one short-lived leader is
             # enough to reap global execution state. SQLite already permits a
@@ -752,14 +829,6 @@ class ExecutionCoordinator:
                 15,
             )
             self._next_maintenance_at = now + 5
-        for attempt_id, active in list(self._active.items()):
-            with tenant_database_context(active.claimed.run.organization_id), log_context(
-                run_id=active.claimed.run.id, attempt_id=attempt_id,
-                organization_id=active.claimed.run.organization_id, worker_id=self.worker_id,
-            ):
-                self._service_child(attempt_id, active)
-        if allow_claim:
-            self._claim_available()
 
     def run_once(self):
         self.tick(allow_claim=True)

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import OperationalError, connection
 from django.utils import timezone
 
 from core.agent_engine.adapters.codex_interactions import input_request
@@ -72,6 +73,36 @@ def test_live_reply_keeps_attempt_and_reaches_waiting_worker(live):
     command.refresh_from_db()
     assert command.consumed_at is not None
     assert run.attempt_count == 1
+
+
+@pytest.mark.skipif(connection.vendor != "sqlite", reason="SQLite contention recovery")
+def test_locked_command_ack_does_not_redeliver_permission(live):
+    actor, run, active, coordinator = live
+    request_id = prompt(active, coordinator)
+    command, _ = submit_run_command(
+        run_id=run.id, organization_id=run.organization_id, actor=actor,
+        command_type="grant_permission", idempotency_key="locked-approval",
+        input_request_id=request_id, payload={"selections": ["accept"]},
+    )
+    coordinator._active[active.claimed.attempt.id] = active
+    coordinator._next_maintenance_at = float("inf")
+
+    def lock_ack(execute, sql, params, many, context):
+        if sql.startswith('UPDATE "run_commands"'):
+            raise OperationalError("database is locked")
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(lock_ack):
+        coordinator.tick(allow_claim=False)
+    assert active.controls.get_nowait()["id"] == str(command.id)
+    command.refresh_from_db()
+    assert command.consumed_at is None
+
+    coordinator.tick(allow_claim=False)
+    assert active.controls.empty()
+    command.refresh_from_db()
+    assert command.consumed_at is not None
+    assert not active.cancel_event.is_set()
 
 
 def test_wrong_request_and_invalid_decision_are_rejected(live):

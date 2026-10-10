@@ -192,6 +192,11 @@ def _execute_child(run_payload, message_queue, cancel_event, adapter_entrypoint,
     except _SuspendExecution:
         return
     except BaseException as exc:
+        if isinstance(exc, InterruptedError) and cancel_event.is_set():
+            logger.info("execution.child state=cancelled duration_ms=%.1f",
+                        (time.perf_counter() - started) * 1000)
+            message_queue.put({"kind": "terminal", "outcome": "cancelled", "output": {}})
+            return
         logger.exception("execution.child state=failed error_type=%s", type(exc).__name__)
         message_queue.put(
             {
