@@ -32,6 +32,13 @@ The sync command is idempotent. When a package manifest sets `activate: true`,
 its active deployment follows the latest changed manifest revision. Removing a
 package does not drop its tables or historical catalog records.
 
+## Disk cleaner
+
+The **磁盘清理大师** (`disk-cleaner`) workspace analyzes fixed disks on the Windows
+backend host and permanently deletes explicitly previewed and confirmed files.
+It is restricted to platform administrators and uses a host-local worker.
+See [`disk_cleaner/README.md`](disk_cleaner/README.md) for setup and file boundaries.
+
 ## Kitchen assistant
 
 The **厨房助手** (`kitchen-assistant`) workspace ports the Flutter kitchen app

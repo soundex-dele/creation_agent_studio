@@ -122,6 +122,8 @@ def _internal_mode(mode: str) -> None:
         _run_management_command("run_wechat_connector")
     elif mode == "remote-connector":
         _run_management_command("run_remote_connector")
+    elif mode == "disk-cleaner":
+        _run_management_command("run_disk_cleaner_worker")
     else:
         raise SystemExit(f"Unknown internal mode: {mode}")
 
@@ -230,6 +232,8 @@ def main() -> int:
     _run_management_command("sync_app_center")
 
     children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler"), _spawn("remote-connector"), _spawn("wechat-connector")]
+    if os.name == "nt":
+        children.append(_spawn("disk-cleaner"))
     try:
         if not _wait_until_ready(children[0]):
             raise RuntimeError("The local Agent Studio server did not start")

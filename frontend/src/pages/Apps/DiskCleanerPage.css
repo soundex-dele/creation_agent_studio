@@ -1,0 +1,65 @@
+.disk-cleaner-page {
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  padding: 28px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+}
+.disk-cleaner-content { width: 100%; max-width: 1180px; min-width: 0; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.disk-cleaner-header, .disk-cleaner-host, .disk-cleaner-volume-title, .disk-cleaner-task-title, .disk-cleaner-result-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.disk-cleaner-header, .disk-cleaner-result-controls { justify-content: space-between; }
+.disk-cleaner-header h1 { display: flex; align-items: center; gap: 10px; margin: 12px 0 6px; font-size: 28px; font-weight: 650; }
+.disk-cleaner-header a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--color-text); }
+.disk-cleaner-header p, .disk-cleaner-note, .disk-cleaner-page small, .disk-cleaner-host span { color: var(--color-text-sec); }
+.disk-cleaner-page p { margin: 8px 0; }
+.disk-cleaner-page small { display: block; font-size: 13px; }
+.disk-cleaner-volumes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.disk-cleaner-panel { min-width: 0; padding: 20px; background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 14px; }
+.disk-cleaner-volume-title strong { flex: 1; }
+.disk-cleaner-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 14px; }
+.disk-cleaner-field { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.disk-cleaner-field > label { font-size: 14px; font-weight: 550; }
+.disk-cleaner-field .ant-select { min-width: 150px; width: 100%; }
+.disk-cleaner-path-input { display: flex; gap: 8px; min-width: 0; }
+.disk-cleaner-path-input input { min-width: 0; }
+.disk-cleaner-note { font-size: 14px; line-height: 1.7; }
+.disk-cleaner-path, .disk-cleaner-entry-info, .disk-cleaner-preview-list span { overflow-wrap: anywhere; word-break: break-word; }
+.disk-cleaner-task-title h2 { margin: 0; font-size: 20px; }
+.disk-cleaner-task-title .ant-btn { margin-left: auto; }
+.disk-cleaner-outcome { background: var(--color-bg-surface); padding: 12px; border-radius: 8px; margin: 12px 0; }
+.disk-cleaner-result-controls { margin: 16px 0; }
+.disk-cleaner-result-controls .disk-cleaner-path { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.disk-cleaner-entry { display: flex; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--color-border); }
+.disk-cleaner-entry .ant-checkbox-wrapper { display: inline-flex; align-items: center; flex-shrink: 0; padding: 12px 4px; }
+.disk-cleaner-entry-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.disk-cleaner-entry-info strong { font-weight: 500; }
+.disk-cleaner-entry-info .ant-btn { height: auto; min-height: 44px; white-space: normal; text-align: left; padding: 4px 0; justify-content: flex-start; }
+.disk-cleaner-entry-size { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-variant-numeric: tabular-nums; }
+.disk-cleaner-selection { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card); }
+.disk-cleaner-selection > span { flex: 1; }
+.disk-cleaner-empty { padding: 40px 12px; }
+.disk-cleaner-page .ant-btn, .disk-cleaner-modal .ant-btn { min-height: 44px; }
+.disk-cleaner-page .ant-btn-primary:not(:disabled):not(.ant-btn-dangerous) { background: var(--color-primary-hover); color: var(--color-on-primary); }
+.disk-cleaner-modal .ant-btn-primary.ant-btn-dangerous:not(:disabled) { background: color-mix(in srgb, var(--color-error) 70%, #000); color: #fff; }
+.disk-cleaner-page .ant-input, .disk-cleaner-page .ant-select-selector, .disk-cleaner-page .ant-input-number { min-height: 44px; font-size: 16px; }
+.disk-cleaner-page .ant-select-single { height: 44px; }
+.disk-cleaner-modal .ant-modal-body { max-height: 60dvh; overflow-y: auto; min-height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.disk-cleaner-preview-list > div { display: flex; align-items: start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.disk-cleaner-preview-list span { flex: 1; min-width: 0; }
+.disk-cleaner-preview-list strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.disk-cleaner-directory-list { display: flex; flex-direction: column; align-items: stretch; margin-top: 12px; }
+.disk-cleaner-directory-list .ant-btn { justify-content: flex-start; height: auto; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .disk-cleaner-page { padding: 16px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .disk-cleaner-header h1 { font-size: 24px; }
+  .disk-cleaner-panel { padding: 14px; }
+  .disk-cleaner-filters { grid-template-columns: minmax(0, 1fr); }
+  .disk-cleaner-field .ant-input-number { width: 100%; }
+  .disk-cleaner-entry { flex-wrap: wrap; gap: 8px; }
+  .disk-cleaner-entry-size { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+  .disk-cleaner-selection > span { flex-basis: 100%; }
+  .disk-cleaner-selection .ant-btn { flex: 1; }
+  .disk-cleaner-result-controls { align-items: stretch; flex-direction: column; }
+}
+@media (max-height: 500px) {
+  .disk-cleaner-modal { top: 12px; padding-bottom: 12px; }
+  .disk-cleaner-modal .ant-modal-body { max-height: 45dvh; }
+}

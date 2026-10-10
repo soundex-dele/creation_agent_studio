@@ -1,0 +1,32 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: disk-cleaner
+  version: 1.0.0
+  name: 磁盘清理大师
+  description: 分析 Windows 主机磁盘占用，预览并确认清理大文件与过期临时缓存。仅平台管理员可用。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: desktop
+  color: "#2563EB"
+  tags: [磁盘, 空间分析, 缓存清理]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: disk-cleaner
+    executor_protocol_version: 1
+    renderer_key: disk-cleaner
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {type: object}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.disk_cleaner.backend.apps.DiskCleanerConfig
+    urlconf: app_center.disk_cleaner.backend.urls
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
+  install: {scope: per-organization, activate: true}

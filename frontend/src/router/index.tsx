@@ -47,6 +47,7 @@ const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPag
 const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
 const AnimationStudioPage = lazy(() => import('@/pages/Apps/AnimationStudioPage'));
 const MyDrivePage = lazy(() => import('@/pages/Apps/MyDrivePage'));
+const DiskCleanerPage = lazy(() => import('@/pages/Apps/DiskCleanerPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 const AccountManagementPage = lazy(() => import('@/pages/Settings/AccountManagementPage'));
@@ -87,6 +88,10 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  {
+    path: '/applications/:applicationId/disk-cleaner',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<DiskCleanerPage />)}</ApplicationShell></ProtectedRoute>,
+  },
   {
     path: '/applications/:applicationId/prompt-master',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<PromptMasterPage />)}</ApplicationShell></ProtectedRoute>,

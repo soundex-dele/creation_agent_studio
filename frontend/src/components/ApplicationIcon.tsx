@@ -1,10 +1,13 @@
 import { AppstoreOutlined, CloudOutlined, DesktopOutlined, MessageOutlined, WechatOutlined } from '@ant-design/icons';
 import type { AppItem } from '@/types';
-import { Boxes, Ship } from 'lucide-react';
+import { Boxes, HardDrive, Ship } from 'lucide-react';
 
 export default function ApplicationIcon({ app }: {
   app: Pick<AppItem, 'id' | 'icon' | 'rendererKey'>;
 }) {
+  if (app.rendererKey === 'disk-cleaner' || app.id === 'disk-cleaner') {
+    return <HardDrive size="1em" aria-hidden="true" />;
+  }
   if (app.rendererKey === 'cowork' || app.id === 'cowork' || app.id === 'platform-conversation') {
     return <MessageOutlined aria-hidden="true" />;
   }

@@ -31,6 +31,9 @@ MY_DRIVE_UPLOAD_TTL_DAYS = config('MY_DRIVE_UPLOAD_TTL_DAYS', default=7, cast=in
 MY_DRIVE_ACCESS_TTL_SECONDS = config('MY_DRIVE_ACCESS_TTL_SECONDS', default=3600, cast=int)
 MY_DRIVE_X_ACCEL_REDIRECT = config('MY_DRIVE_X_ACCEL_REDIRECT', default=False, cast=bool)
 
+# Additional host directories that Disk Cleaner may neither scan nor delete.
+DISK_CLEANER_PROTECTED_ROOTS = config('DISK_CLEANER_PROTECTED_ROOTS', default='[]', cast=json.loads)
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 
