@@ -55,6 +55,9 @@ def validate_variants(value):
 
 
 def structured(task, prompt, data, config, validator, sink):
+    if task.kind in ['topics', 'article'] and data.get('reference', {}).get('knowledge'):
+        from .knowledge import KNOWLEDGE_INSTRUCTION
+        prompt += KNOWLEDGE_INSTRUCTION
     for attempt in range(2):
         value = analysis.call_model(task, prompt, data, config, cancelled=lambda: sink.cancelled)
         try:
@@ -171,7 +174,13 @@ def joint_evidence(task, payload, sink, save):
 def execute_research(task, payload, sink, save, check, config):
     from ..runtime import current
     data, kind = task.input, task.kind
-    if kind == 'voice_analysis':
+    if kind in ('radar_hotlist', 'radar_search', 'radar_topics'):
+        from .radar import execute
+        execute(task, sink, save, check, config)
+    elif kind == 'knowledge_extract':
+        from .knowledge import execute_extract
+        execute_extract(task, sink, save, config)
+    elif kind == 'voice_analysis':
         from .owned import analyze_voice
         analyze_voice(task, config, sink, save)
     elif kind == 'article':

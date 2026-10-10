@@ -14,6 +14,7 @@ from douyin_video_url import (ADAPTER, NativeSigner, Platform, SigningRequest,
 from dtk.platforms.douyin.endpoints import AUTHOR_PROFILE, AUTHOR_POSTS, CONTENT_DETAIL, COMMENTS, COMMENT_REPLIES
 from dtk.urls import resolve, identify, ResourceKind
 from dtk.transport.base import TransportFailure
+from radar_source import HOTLIST, SEARCH, request_spec, parse_hotlist, parse_search, search_failure
 
 
 class BridgeError(Exception):
@@ -73,7 +74,8 @@ async def author_id(url, identity):
 
 async def request(endpoint, params, identity, transport=None):
     with failure_context("sign", endpoint):
-        spec = ADAPTER.build_request(endpoint, **params, profile=ADAPTER.profile_for(identity.fingerprint))
+        spec = (request_spec(endpoint, params, ADAPTER, identity) if endpoint in (HOTLIST, SEARCH)
+                else ADAPTER.build_request(endpoint, **params, profile=ADAPTER.profile_for(identity.fingerprint)))
         signed = await NativeSigner(Platform.DOUYIN).sign(
             SigningRequest.get(spec["url"], spec["params"], spec["headers"]),
             StaticFingerprint.of(identity.fingerprint),
@@ -93,7 +95,7 @@ async def request(endpoint, params, identity, transport=None):
         outcome = classification.outcome
         if outcome is not Outcome.OK:
             if outcome is Outcome.BUSINESS_ERROR:
-                raise BridgeError("content_unavailable")
+                raise BridgeError(search_failure(response.json_or_none()) if endpoint == SEARCH else "content_unavailable")
             if classification.rule.startswith("signature."):
                 raise BridgeError("signature")
             if classification.rule == "body.challenge_marker":
@@ -108,6 +110,13 @@ async def request(endpoint, params, identity, transport=None):
         if not isinstance(payload, dict):
             raise BridgeError("invalid")
         now = datetime.now(timezone.utc)
+        if endpoint in (HOTLIST, SEARCH):
+            if payload.get('status_code') not in (0, '0'):
+                raise BridgeError('invalid')
+            try:
+                return (parse_hotlist if endpoint == HOTLIST else parse_search)(payload, now.isoformat())
+            except (ValueError, TypeError, AttributeError):
+                raise BridgeError('invalid') from None
         if endpoint == AUTHOR_PROFILE:
             result = ADAPTER.parse_author(payload)
         elif endpoint == AUTHOR_POSTS:
@@ -125,6 +134,11 @@ async def request(endpoint, params, identity, transport=None):
         error.diagnostic = {"endpoint": endpoint, "stage": stage,
             **({"http_status": response.status} if response is not None else {}),
             **(result["diagnostic"] or {})}
+        if endpoint in (HOTLIST, SEARCH) and response is not None:
+            envelope = response.json_or_none()
+            status = envelope.get('status_code') if isinstance(envelope, dict) else None
+            if type(status) is int:
+                error.diagnostic['upstream_status'] = status
         raise error from None
     finally:
         if own:
@@ -144,6 +158,8 @@ async def run(data):
     if operation == "validate":
         return {"valid": True}
     params = data.get("params", {})
+    if operation in ('radar_hotlist', 'radar_search'):
+        return await request(HOTLIST if operation == 'radar_hotlist' else SEARCH, params, identity)
     if operation == "profile":
         with failure_context("resolve_url", AUTHOR_PROFILE):
             sec_user_id = await author_id(params["url"], identity)

@@ -7,8 +7,9 @@ import { AnalysisResult } from './AnalysisResult';
 import { AccountAnalysisExport } from './AccountAnalysisExport';
 import { ScriptEditor } from './ScriptEditor';
 import { RewritePanel } from './RewritePanel';
+import { ExtractKnowledge } from './CreationKnowledge';
 
-export function DouyinWorkspace({ client, accountId, onRemoved }: { client: DouyinClient; accountId: string; onRemoved: () => void }) {
+export function DouyinWorkspace({ client, accountId, onRemoved, onExtract }: { client: DouyinClient; accountId: string; onRemoved: () => void; onExtract?: (body: Record<string, unknown>) => Promise<void> }) {
   const [account, setAccount] = useState<DouyinAccount | null>(null); const [tasks, setTasks] = useState<DouyinTask[]>([]);
   const [taskPage, setTaskPage] = useState(1); const [taskCount, setTaskCount] = useState(0);
   const [works, setWorks] = useState<WorkResult | null>(null); const [tab, setTab] = useState('account');
@@ -117,6 +118,7 @@ export function DouyinWorkspace({ client, accountId, onRemoved }: { client: Douy
         {visibleTask.output.production_format && <Tag>视频形式：{productionFormats[visibleTask.output.production_format]?.label}</Tag>}
         {visibleTask.kind === 'collect' && <p>已获取 {visibleTask.output.actual ?? visibleTask.progress.current ?? 0} 条。{visibleTask.output.warning}</p>}
         {['account', 'breakdown'].includes(visibleTask.kind) && <AnalysisResult key={visibleTask.id} client={client} accountId={accountId} task={visibleTask} />}
+        {onExtract && <ExtractKnowledge key={visibleTask.id} task={visibleTask} run={onExtract} />}
         {visibleTask.kind === 'breakdown' && visibleTask.status === 'succeeded' && <Button type="primary" onClick={() => { setSource(visibleTask.id); setTab('create'); }}>用这份拆解创作</Button>}
         {visibleTask.kind === 'topics' && visibleTask.output.topics && <div className="douyin-account-grid">{visibleTask.output.topics.map((topic, index) => <article className="douyin-topic" key={index}><h3>{topic.title}</h3><p>{topic.angle}</p><blockquote>{topic.hook}</blockquote><Button disabled={busy || visibleTask.status !== 'succeeded'} onClick={() => void run({ kind: 'script', source_task_id: visibleTask.id, topic_index: index })}>选择并生成拍摄脚本</Button></article>)}</div>}
         {visibleTask.kind === 'transcribe' && visibleTask.status !== 'succeeded' && !isActive(visibleTask) && <Button disabled={busy} onClick={() => void run({ kind: 'transcribe', work_id: visibleTask.work_id, force: true })}>重试转写</Button>}

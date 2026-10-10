@@ -140,6 +140,9 @@ def publication_summary(scope):
 
 
 def freeze(scope, values):
+    from . import radar
+    if values['kind'] in radar.KINDS:
+        return radar.freeze(scope, values)
     data = json.loads(json.dumps(values, default=str))
     kind = values['kind']
     accounts = selected_accounts(scope, values['account_ids'], values.get('group', ''))
@@ -178,6 +181,9 @@ def freeze(scope, values):
         if source.account_id:
             refs.add((source.account_id, source.work_id, source.pk))
         data['reference'] = {k: v for k, v in source.output.items() if k != 'frames'}
+        if kind == 'knowledge_extract':
+            from .knowledge import extraction_evidence
+            data['knowledge_evidence'] = extraction_evidence(source)
         if kind == 'needs':
             if source.kind != 'comments':
                 raise ValidationError('请选择评论采集任务。')
@@ -239,6 +245,21 @@ def freeze(scope, values):
     if kind == 'voice_analysis':
         from .owned import freeze_analysis
         freeze_analysis(scope, values, data, refs)
+    if kind in ['topics', 'script', 'article']:
+        from .knowledge import freeze_selection, check_inherited
+        data['reference'] = dict(data.get('reference', {}))
+        # Reference research must never implicitly select knowledge from an older task.
+        data['reference'].pop('knowledge', None)
+        data['reference'].pop('knowledge_cards', None)
+        if kind == 'topics':
+            if source and source.kind == 'knowledge_extract':
+                raise ValidationError('请先将候选知识确认入库，再勾选使用。')
+            selected = freeze_selection(scope, values.get('knowledge_cards', []))
+        else:
+            selected = source.input.get('reference', {}).get('knowledge', [])
+            check_inherited(scope, selected)
+        if selected:
+            data['reference']['knowledge'] = selected
     return data, refs
 
 

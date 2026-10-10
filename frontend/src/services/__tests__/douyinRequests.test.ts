@@ -15,10 +15,13 @@ describe.each(['missing', 'throwing', 'absent'])('Douyin requests with crypto %s
     });
   });
 
-  it.each(['account', 'task', 'research', 'refresh', 'voice', 'owned-topics', 'article'])('submits %s and keeps the key until success', async operation => {
+  it.each(['account', 'task', 'research', 'refresh', 'voice', 'owned-topics', 'article', 'knowledge-extract', 'knowledge-confirm', 'knowledge-topics'])('submits %s and keeps the key until success', async operation => {
     const client = douyinApi('/dy');
     const research = researchApi('/dy');
     const submit = () => {
+      if (operation === 'knowledge-extract') return research.start({ kind: 'knowledge_extract', source_task_id: 'source1' });
+      if (operation === 'knowledge-confirm') return research.confirmKnowledge({ task_id: 'extract1', cards: [{ candidate_id: 'card-1', title: 'Knowledge', text: 'Evidence' }] });
+      if (operation === 'knowledge-topics') return research.start({ kind: 'topics', knowledge_cards: [{ id: 'card1', revision: 1 }] });
       if (operation === 'account') return client.create({ source: 'https://www.douyin.com/user/test', count: 50, group: '', notes: '' });
       if (operation === 'task') return client.start('a1', { kind: 'collect', count: 50 });
       if (operation === 'research') return research.start({ kind: 'radar', days: 7 });

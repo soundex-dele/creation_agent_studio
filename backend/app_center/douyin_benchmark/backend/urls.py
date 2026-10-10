@@ -25,6 +25,14 @@ urlpatterns = [
 
 from . import research_views as rv
 from .owned import VoiceVersionsView
+from . import knowledge_views as kv
+urlpatterns += [
+    path(root + '/knowledge-cards', kv.KnowledgeCardsView.as_view()),
+    path(root + '/knowledge-cards/confirm', kv.KnowledgeConfirmView.as_view()),
+    path(root + '/knowledge-cards/recommend', kv.KnowledgeRecommendView.as_view()),
+    path(root + '/knowledge-cards/<uuid:card_id>', kv.KnowledgeCardsView.as_view()),
+    path(root + '/knowledge-cards/<uuid:card_id>/retry-index', kv.KnowledgeRetryView.as_view()),
+]
 for resource in rv.RESOURCES:
     urlpatterns += [
         path(root + '/' + resource, rv.RecordsView.as_view(), {'resource': resource}),

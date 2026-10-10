@@ -19,7 +19,7 @@ def safe_collection_diagnostic(value):
         return {}
     allowed = {
         "endpoint": {"douyin.content_detail", "douyin.author_profile", "douyin.author_posts",
-            "douyin.comments", "douyin.comment_replies"},
+            "douyin.comments", "douyin.comment_replies", "douyin.radar_hotlist", "douyin.radar_search"},
         "stage": {"resolve_url", "sign", "transport", "response", "parse"},
         "error_type": {"TransportFailure", "TimeoutError", "ConnectTimeout", "ReadTimeout",
             "WriteTimeout", "PoolTimeout", "ConnectError", "ReadError", "WriteError",
@@ -33,6 +33,9 @@ def safe_collection_diagnostic(value):
     status = value.get("http_status")
     if type(status) is int and 100 <= status <= 599:
         result["http_status"] = status
+    upstream = value.get('upstream_status')
+    if type(upstream) is int and -100000 <= upstream <= 100000:
+        result['upstream_status'] = upstream
     return result
 
 
@@ -41,6 +44,7 @@ class CollectionError(Exception):
         self.code = code
         message = {"not_configured": "请先在采集设置中保存 User-Agent 和 Cookie。", "runtime": "DTK 独立运行环境未就绪，请按部署说明安装。", "credentials": "请检查同一桌面 Chrome 的 User-Agent 和 Cookie，Cookie 需包含有效 UIFID / UIFID_TEMP。", "auth": "抖音接口要求有效登录状态，请更新采集设置后重试。",
             "content_unavailable": "抖音返回作品或账号不可访问，可能已删除、私密或受限；不代表 Cookie 失效。",
+            "search_unavailable": "抖音暂未允许本次搜索，请检查采集登录状态或稍后重试。",
             "signature": "DTK 请求签名生成失败或被抖音拒绝，请检查采集源码版本与浏览器指纹配置。",
             "challenge": "抖音返回了验证页面，请在原浏览器完成验证后重试，或补传原视频。",
             "empty_response": "抖音接口未返回作品数据；尚不能判断 Cookie 是否失效，可稍后重试或补传原视频。",

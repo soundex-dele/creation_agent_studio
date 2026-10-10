@@ -156,6 +156,11 @@ class AccountView(BaseView):
     def delete(self, request, **kwargs):
         account = self.account(True)
         from .models import TaskSource, Inspiration
+        from .knowledge import preserve_knowledge_history
+        # Cancel active dependents before detaching their historical snapshots.
+        for dependent in Task.objects.filter(source_links__account=account).distinct().select_related('run'):
+            cancel(dependent)
+        preserve_knowledge_history(account)
         related = Task.objects.filter(source_links__account=account).distinct()
         for task in related.select_related('run'):
             cancel(task)

@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { KnowledgeCandidate, KnowledgeCard, KnowledgeSnapshot } from './douyinKnowledge';
 import { createDouyinSubmitter } from './douyinRequests';
 import { douyinApi, type DouyinTask, type DouyinWork, type Script, type ScriptVersion, type Claim } from './douyinBenchmark';
 
@@ -24,9 +25,22 @@ export interface PublicationSummary { note: string; by_theme: SummaryGroup[]; by
 export interface SummaryGroup { label: string; sample_count: number; medians: Record<MetricKey, number | null>; age_days: number[] | null }
 export interface Comparison { days: number; note: string; accounts: { account_id: string; name: string; captured_at: string | null; sample_count: number; posts_per_week: number | null; observed_days: number; duration_buckets: Record<string, number>; medians: Record<MetricKey, number | null>; eligible_sample: number; outstanding_share: number | null; explanation: string }[] }
 export interface Topic { title: string; angle: string; hook?: string; refs?: string[]; is_new?: boolean | null; sample_count?: number; account_count?: number; median_likes?: number | null; pillar?: string; reason?: string; materials_needed?: string; duplicate_note?: string }
+export interface RadarSource {
+  id: string; kind: 'hot' | 'work'; title: string; url: string; captured_at: string;
+  rank?: number | null; heat?: number | null; platform_id?: string; description?: string;
+  author?: string; published_at?: string | null; likes?: number | null; comments?: number | null;
+  collects?: number | null; shares?: number | null;
+}
+export type RadarInput = { kind: 'radar_hotlist' } | { kind: 'radar_search'; keyword: string }
+  | { kind: 'radar_topics'; source_task_id: string; source_ids: string[]; target_account_id?: string };
+export const radarKinds = ['radar_hotlist', 'radar_search', 'radar_topics'];
 export interface Variant { text: string; angle: string }
 export interface CommentRow { id: string; platform_id: string; parent_id: string; text: string; likes: number | null; published_at?: string | null }
 export interface ResearchTask extends Omit<DouyinTask, 'kind' | 'output'> { account_id?: string | null; kind: string; output: Partial<Script> & {
+  radar_items?: RadarSource[]; keyword?: string; captured_at?: string; complete?: boolean;
+  radar_request?: RadarInput;
+  radar_profile?: { account_name: string; target_account_id: string } | null;
+  cards?: KnowledgeCandidate[]; knowledge_cards?: KnowledgeSnapshot[]; saved_candidate_ids?: string[];
   body?: string; notes?: string[];
   content?: VoiceContent; profile_id?: string; target_account_id?: string; voice_evidence?: VoiceEvidence[];
   findings?: { category: 'positioning' | 'keep' | 'improve'; text: string; sample_id: string; quote: string }[];
@@ -43,6 +57,10 @@ export interface ResearchVersion extends RecordBase { content: Partial<Script> &
 export function researchApi(base: string) {
   const submit = createDouyinSubmitter();
   return {
+    confirmKnowledge: (body: unknown) => submit<{ cards: KnowledgeCard[] }>(`${base}/knowledge-cards/confirm`, body),
+    recommendKnowledge: (query: string) => api.get<{ results: KnowledgeCard[] }>(`${base}/knowledge-cards/recommend`, { query: query.slice(0, 6000) }),
+    knowledgeCard: (id: string) => api.get<KnowledgeCard>(`${base}/knowledge-cards/${id}`),
+    retryKnowledgeIndex: (id: string) => api.post<KnowledgeCard>(`${base}/knowledge-cards/${id}/retry-index`),
     list: <T>(resource: string, params: Record<string, unknown> = {}) => api.get<Page<T>>(`${base}/${resource}`, params),
     create: <T>(resource: string, body: unknown) => api.post<T>(`${base}/${resource}`, body),
     update: <T>(resource: string, id: string, body: unknown) => api.patch<T>(`${base}/${resource}/${id}`, body),
@@ -77,5 +95,5 @@ export function researchTaskStatus(task: { status: string; stage: string }): str
   if (task.stage === 'completed') return '正在保存结果';
   return !task.stage || ['queue', 'queued', 'running'].includes(task.stage) ? '正在执行' : task.stage;
 }
-export const researchLabels: Record<string, string> = { article: '文章写作', voice_analysis: '定位与文风分析', radar: '选题雷达', joint: '联合拆解', compare: '账号比较研究', comments: '评论采集', needs: '评论需求研究', variants: '表达实验', review: '作品复盘', refresh: '指标刷新', topics: '创作选题', script: '拍摄脚本', rewrite: '文案改写', breakdown: '视频拆解', transcribe: '转写', account: '账号分析', collect: '账号采集' };
+export const researchLabels: Record<string, string> = { knowledge_extract: '知识提炼', article: '文章写作', voice_analysis: '定位与文风分析', radar: '选题雷达', joint: '联合拆解', compare: '账号比较研究', comments: '评论采集', needs: '评论需求研究', variants: '表达实验', review: '作品复盘', refresh: '指标刷新', topics: '创作选题', script: '拍摄脚本', rewrite: '文案改写', breakdown: '视频拆解', transcribe: '转写', account: '账号分析', collect: '账号采集' };
 export const metricLabels: Record<MetricKey, string> = { likes: '点赞', comments: '评论', collects: '收藏', shares: '分享' };

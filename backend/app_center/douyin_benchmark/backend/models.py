@@ -169,6 +169,33 @@ class Inspiration(PrivateRecord):
     source_time = models.FloatField(null=True, blank=True)
 
 
+class CreationKnowledgeLibrary(PrivateRecord):
+    knowledge_base = models.OneToOneField('knowledge.KnowledgeBase', on_delete=models.CASCADE)
+
+    class Meta(PrivateRecord.Meta):
+        constraints = [models.UniqueConstraint(fields=['organization', 'application', 'owner'], name='dy_knowledge_library_scope')]
+
+
+class CreationKnowledgeCard(PrivateRecord):
+    library = models.ForeignKey(CreationKnowledgeLibrary, on_delete=models.CASCADE, related_name='cards')
+    document = models.OneToOneField('knowledge.KnowledgeDocument', on_delete=models.CASCADE)
+    extraction_task = models.ForeignKey(Task, null=True, on_delete=models.SET_NULL, related_name='+')
+    # Stable even after the original account/task is removed.
+    extraction_key = models.UUIDField()
+    candidate_id = models.CharField(max_length=40)
+    category = models.CharField(max_length=20)
+    basis = models.CharField(max_length=20)
+    title = models.CharField(max_length=300)
+    text = models.TextField()
+    application_notes = models.TextField(blank=True)
+    tags = models.JSONField(default=list)
+    evidence = models.JSONField(default=list)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta(PrivateRecord.Meta):
+        constraints = [models.UniqueConstraint(fields=['library', 'extraction_key', 'candidate_id'], name='dy_knowledge_candidate_once')]
+
+
 class Idea(PrivateRecord):
     title = models.CharField(max_length=300)
     notes = models.TextField(blank=True)

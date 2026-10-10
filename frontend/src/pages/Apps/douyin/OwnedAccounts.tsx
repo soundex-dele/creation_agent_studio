@@ -7,6 +7,8 @@ import { documentError } from '@/services/documents';
 import { allRows, Field, Pager, useRows } from './ResearchCommon';
 import { ResearchResult } from './ResearchResult';
 import { GenerationPreview } from './GenerationPreview';
+import { KnowledgePicker } from './CreationKnowledge';
+import { knowledgeSelection, type KnowledgeSnapshot } from '@/services/douyinKnowledge';
 import './OwnedAccounts.css';
 
 const blankContent: VoiceContent = { current_positioning: '', positioning: '', audience: '', content_pillars: '', content_boundaries: '', rules: '', examples: '', avoid: '', prompt: '' };
@@ -46,6 +48,7 @@ export function OwnedAccounts({ base, openAccount }: { base: string; openAccount
 }
 
 function OwnedWorkspace({ client, account, onDirty, openAccount }: { client: ResearchClient; account: DouyinAccount; onDirty: (value: boolean) => void; openAccount: () => void }) {
+  const [knowledge, setKnowledge] = useState<KnowledgeSnapshot[]>([]);
   const [profile, setProfile] = useState<CreatorProfile | null>(null); const [unbound, setUnbound] = useState<CreatorProfile[]>([]); const [bindId, setBindId] = useState<string>();
   const [samples, setSamples] = useState<VoiceSample[]>([]); const [versions, setVersions] = useState<VoiceVersion[]>([]); const [materials, setMaterials] = useState<Inspiration[]>([]);
   const [tasks, setTasks] = useState<ResearchTask[]>([]); const [transcripts, setTranscripts] = useState<DouyinTask[]>([]);
@@ -80,7 +83,7 @@ function OwnedWorkspace({ client, account, onDirty, openAccount }: { client: Res
   }, [client, account.id, pollRevision]);
   async function action(fn: () => Promise<void>) { setBusy(true); setError(''); setMessage(''); try { await fn(); } catch (e) { setError(documentError(e)); } finally { setBusy(false); } }
   async function run(body: Record<string, unknown>) {
-    const value = await client.start({ ...body, target_account_id: account.id }); setTasks(old => [value, ...old.filter(t => t.id !== value.id)]); setSelectedTask(value.id); setPollRevision(v => v + 1);
+    const value = await client.start({ ...body, target_account_id: account.id, ...(body.kind === 'topics' && knowledge.length ? { knowledge_cards: knowledgeSelection(knowledge) } : {}) }); setTasks(old => [value, ...old.filter(t => t.id !== value.id)]); setSelectedTask(value.id); setPollRevision(v => v + 1);
   }
   const leaveArticle = (next: () => void) => { if (articleDirty) Modal.confirm({ title: '文章有未保存的修改', content: '离开将丢弃未保存的文章修改。', okText: '丢弃并继续', cancelText: '继续编辑', onOk: next }); else next(); };
   const currentTask = tasks.find(t => t.id === selectedTask);
@@ -148,6 +151,7 @@ function OwnedWorkspace({ client, account, onDirty, openAccount }: { client: Res
       {tab === 'create' && <>
         {!active ? <Alert type="info" message="请先确认并启用一个定位与文风版本。" /> : <p>为「{account.name}」创作 · 文风 v{active.number}。选题及后续脚本使用提交时的版本。</p>}
         <Field label="本次主题（可选）"><Input.TextArea aria-label="本次主题（可选）" value={theme} maxLength={2000} placeholder="留空时，根据账号定位推荐下一条内容" onChange={e => setTheme(e.target.value)} /></Field>
+        <KnowledgePicker key={account.id} client={client} query={[theme, active?.content.positioning, active?.content.audience].filter(Boolean).join(' ')} selected={knowledge} onChange={setKnowledge} />
         <Field label="视频形式"><Select aria-label="我的账号视频形式" value={format} options={Object.entries(productionFormats).map(([value, f]) => ({ value, label: f.label }))} onChange={setFormat} /></Field>
         <Button type="primary" disabled={!active || busy || articleDirty} onClick={() => void action(() => run({ kind: 'topics', theme, production_format: format, duration: 60 }))}>生成3个账号专属选题</Button>
         <Field label="此账号的创作历史"><Select aria-label="此账号的创作历史" value={tasks.some(t => t.id === selectedTask && ['topics', 'script', 'article'].includes(t.kind)) ? selectedTask : undefined} options={tasks.filter(t => ['topics', 'script', 'article'].includes(t.kind)).map(t => ({ value: t.id, label: `${t.kind === 'topics' ? '选题' : t.kind === 'article' ? '文章' : '脚本'} · ${new Date(t.created_at).toLocaleString()} · ${researchTaskStatus(t)}` }))} onChange={id => leaveArticle(() => setSelectedTask(id))} /></Field>

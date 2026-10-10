@@ -37,3 +37,20 @@ def can_access_run(user, run):
         return True
     except (Task.DoesNotExist, Http404, APIException, ValueError, ValidationError):
         return False
+
+
+def can_access_knowledge_index(user, run, document):
+    from django.http import Http404
+    from rest_framework.exceptions import APIException
+    from .models import CreationKnowledgeCard
+    if run.owner_id != user.pk or document.is_deleted:
+        return False
+    card = CreationKnowledgeCard.objects.filter(document=document, owner=user,
+        organization_id=run.organization_id, is_deleted=False).first()
+    if card is None:
+        return False
+    try:
+        application_for(user, run.organization_id, card.application_id)
+        return True
+    except (Http404, APIException, ValueError):
+        return False

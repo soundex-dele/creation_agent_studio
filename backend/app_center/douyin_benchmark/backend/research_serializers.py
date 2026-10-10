@@ -155,7 +155,10 @@ class DigestSerializer(PrivateSerializer):
 
 
 class ResearchInput(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=['radar', 'joint', 'compare', 'comments', 'needs', 'variants', 'review', 'refresh', 'topics', 'script', 'voice_analysis', 'article'])
+    kind = serializers.ChoiceField(choices=['radar', 'radar_hotlist', 'radar_search', 'radar_topics', 'joint', 'compare', 'comments', 'needs', 'variants', 'review', 'refresh', 'topics', 'script', 'voice_analysis', 'article', 'knowledge_extract'])
+    keyword = serializers.CharField(max_length=100, required=False)
+    source_ids = serializers.ListField(child=serializers.CharField(max_length=400), min_length=1, max_length=20, required=False)
+    knowledge_cards = serializers.ListField(child=serializers.DictField(), max_length=10, required=False)
     target_account_id = serializers.UUIDField(required=False)
     analysis_mode = serializers.ChoiceField(choices=['style', 'positioning'], default='style')
     account_ids = serializers.ListField(child=serializers.UUIDField(), max_length=50, default=list)
@@ -181,6 +184,12 @@ class ResearchInput(serializers.Serializer):
         attrs['account_ids'] = list(dict.fromkeys(attrs['account_ids']))
         attrs['work_ids'] = list(dict.fromkeys(attrs['work_ids']))
         kind = attrs['kind']
+        if kind == 'radar_search' and not attrs.get('keyword'):
+            raise serializers.ValidationError('请输入要搜索的关键词。')
+        if kind == 'radar_topics':
+            if not attrs.get('source_task_id') or not attrs.get('source_ids'):
+                raise serializers.ValidationError('请选择一次已完成采集中的1–20条来源。')
+            attrs['source_ids'] = list(dict.fromkeys(attrs['source_ids']))
         if kind == 'voice_analysis' and not attrs.get('target_account_id'):
             raise serializers.ValidationError('请选择自己的账号。')
         if kind == 'joint' and not 2 <= len(attrs['work_ids']) <= 5:
@@ -191,8 +200,15 @@ class ResearchInput(serializers.Serializer):
             raise serializers.ValidationError('请选择一条作品采集评论。')
         if kind == 'refresh' and not attrs['work_ids']:
             raise serializers.ValidationError('请选择需要刷新的作品。')
-        if kind in ['needs', 'script', 'article'] and not attrs.get('source_task_id'):
+        if kind in ['needs', 'script', 'article', 'knowledge_extract'] and not attrs.get('source_task_id'):
             raise serializers.ValidationError('请选择来源任务。')
+        if 'knowledge_cards' in attrs:
+            from .knowledge import CardSelection
+            if kind != 'topics':
+                raise serializers.ValidationError('请在生成选题时选择知识。')
+            fields = CardSelection(data=attrs['knowledge_cards'], many=True)
+            fields.is_valid(raise_exception=True)
+            attrs['knowledge_cards'] = fields.validated_data
         if kind == 'variants' and not attrs.get('source_version_id'):
             raise serializers.ValidationError('请选择已保存的文案版本。')
         if attrs['production_format'] == 'animation' and attrs['duration'] > 120:

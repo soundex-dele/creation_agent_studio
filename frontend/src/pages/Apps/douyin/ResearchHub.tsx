@@ -3,7 +3,7 @@ import { Alert, Button, Progress, Select, Spin } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { isActive, type DouyinAccount } from '@/services/douyinBenchmark';
 import { documentError } from '@/services/documents';
-import { researchApi, researchLabels, type Idea, type ResearchTask } from '@/services/douyinResearch';
+import { radarKinds, researchApi, researchLabels, type Idea, type ResearchTask } from '@/services/douyinResearch';
 import { allRows, Field, Pager, useRows } from './ResearchCommon';
 import { ResearchLibrary } from './ResearchLibrary';
 import { IdeaLibrary } from './IdeaLibrary';
@@ -11,12 +11,13 @@ import { CreationCenter, CreatorProfiles } from './CreationCenter';
 import { PublicationReview } from './PublicationReview';
 import { SubscriptionCenter } from './SubscriptionCenter';
 import { ResearchResult } from './ResearchResult';
+import { KnowledgeLibrary } from './CreationKnowledge';
 
 export function ResearchHub({ base, section, onSection, openAccount }: { base: string; section: string; onSection: (section: string) => void; openAccount: (id: string | null) => void }) {
   const client = useMemo(() => researchApi(base), [base]); const [params, setParams] = useSearchParams();
   const [accounts, setAccounts] = useState<DouyinAccount[]>([]); const [refresh, setRefresh] = useState(0); const [error, setError] = useState(''); const [idea, setIdea] = useState<Idea | null>(null);
   const [task, setTask] = useState<ResearchTask | null>(null); const taskId = params.get('task') || ''; const [retry, setRetry] = useState(0);
-  const history = useRows<ResearchTask>(client, 'tasks');
+  const history = useRows<ResearchTask>(client, 'tasks', { exclude_kind: radarKinds.join(',') });
   useEffect(() => { let alive = true; void allRows<DouyinAccount>(client, 'accounts').then(rows => { if (alive) setAccounts(rows); }).catch(e => { if (alive) setError(documentError(e)); }); return () => { alive = false; }; }, [client, refresh]);
   useEffect(() => {
     let alive = true; let timer: ReturnType<typeof setTimeout>; setTask(null); if (!taskId) return;
@@ -26,6 +27,7 @@ export function ResearchHub({ base, section, onSection, openAccount }: { base: s
   function selectTask(id: string) { setParams(old => { const next = new URLSearchParams(old); next.set('task', id); return next; }); }
   async function run(body: Record<string, unknown>) { const value = await client.start(body); setTask(value); selectTask(value.id); history.reload(); }
   return <div className="douyin-research-hub">{error && <Alert type="error" message={error} action={<Button onClick={() => { setError(''); setRetry(v => v + 1); setRefresh(v => v + 1); }}>重试加载</Button>} />}
+    {section === 'knowledge' && <KnowledgeLibrary client={client} />}
     {section === 'research' && <ResearchLibrary client={client} accounts={accounts} run={run} onAccounts={() => onSection('')} />}
     {section === 'ideas' && <IdeaLibrary client={client} onCreate={value => { setIdea(value); onSection('create'); }} />}
     {section === 'create' && <CreationCenter client={client} initialIdea={idea} run={run} onProfiles={() => onSection('profiles')} />}

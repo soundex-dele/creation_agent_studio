@@ -1,0 +1,28 @@
+.douyin-knowledge-library, .douyin-knowledge-picker { min-width: 0; }
+.douyin-knowledge-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.douyin-knowledge-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.douyin-knowledge-card p, .douyin-knowledge-sources blockquote { white-space: pre-wrap; margin: 0; }
+.douyin-knowledge-card h4 { margin: 0; color: var(--color-text); }
+.douyin-knowledge-card small, .douyin-knowledge-sources p { color: var(--color-text-sec); }
+.douyin-knowledge-filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.douyin-knowledge-filters .douyin-research-field { min-width: 0; }
+.douyin-knowledge-filters .ant-select { width: 100%; }
+.douyin-knowledge-picker { padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card); }
+.douyin-knowledge-card .ant-checkbox-wrapper, .douyin-knowledge-selected .ant-checkbox-wrapper { display: inline-flex; align-items: flex-start; gap: 4px; min-height: 44px; min-width: 0; overflow-wrap: anywhere; }
+.douyin-knowledge-selected > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.douyin-knowledge-sources article { padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+.douyin-knowledge-sources blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--color-border); overflow-wrap: anywhere; }
+.douyin-knowledge-sources summary, .douyin-knowledge-reference summary { cursor: pointer; padding: 12px 0; }
+.douyin-knowledge-reference > p { color: var(--color-text-sec); }
+.douyin-knowledge-drawer .ant-drawer-body { min-height: 0; overflow-y: auto; }
+.douyin-knowledge-drawer .ant-drawer-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.douyin-knowledge-drawer .ant-btn, .douyin-knowledge-library .ant-btn, .douyin-knowledge-picker .ant-btn { min-height: 44px; }
+@media (max-width: 767px) {
+  .douyin-knowledge-grid, .douyin-knowledge-filters { grid-template-columns: minmax(0, 1fr); }
+  .douyin-knowledge-picker { padding: 12px; }
+  .douyin-knowledge-drawer .ant-drawer-content-wrapper { max-width: 100%; }
+}
+@media (max-height: 500px) {
+  .douyin-knowledge-drawer .ant-drawer-header { padding-top: 8px; padding-bottom: 8px; }
+  .douyin-knowledge-drawer .ant-drawer-footer { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+}

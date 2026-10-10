@@ -187,6 +187,8 @@ class ResearchTasksView(WorkspaceMixin, BaseView):
         qs = m.Task.objects.filter(**self.scope()).select_related('run')
         if request.query_params.get('kind'):
             qs = qs.filter(kind__in=request.query_params['kind'].split(','))
+        if request.query_params.get('exclude_kind'):
+            qs = qs.exclude(kind__in=request.query_params['exclude_kind'].split(','))
         if request.query_params.get('target_account'):
             from rest_framework import serializers
             target = str(serializers.UUIDField().run_validation(request.query_params['target_account']))

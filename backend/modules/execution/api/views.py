@@ -187,6 +187,14 @@ def _can_access_run(request, run):
     root = run
     while root.parent_id:
         root = Run.objects.get(pk=root.parent_id)
+    if root.executor_key == 'knowledge-index':
+        from apps.knowledge.models import KnowledgeDocument
+        document = KnowledgeDocument.objects.filter(pk=root.source_id, knowledge_base__scope='douyin_creation').first()
+        if document or (root.input or {}).get('douyin_knowledge_card_id'):
+            if document is None:
+                return False
+            from app_center.douyin_benchmark.backend.access import can_access_knowledge_index
+            return can_access_knowledge_index(request.user, root, document)
     # These applications keep their sessions/state private to the initiating
     # user. Generic Run endpoints must preserve that boundary for the tree.
     if root.executor_key in {"kitchen-assistant", "prompt-master"}:

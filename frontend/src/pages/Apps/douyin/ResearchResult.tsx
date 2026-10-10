@@ -7,6 +7,7 @@ import { ArticleEditor } from './ArticleEditor';
 import { GenerationPreview } from './GenerationPreview';
 import { ComparisonTable } from './ResearchLibrary';
 import { Field } from './ResearchCommon';
+import { ExtractKnowledge, KnowledgeCandidates, KnowledgeReferences } from './CreationKnowledge';
 
 export function ResearchResult({ client, task, run, onDirty }: { client: ResearchClient; task: ResearchTask; run: (body: Record<string, unknown>) => Promise<void>; onDirty?: (value: boolean) => void }) {
   const [starting, setStarting] = useState<number | null>(null);
@@ -29,6 +30,10 @@ export function ResearchResult({ client, task, run, onDirty }: { client: Researc
   return <section className="douyin-form">{error && <Alert type="error" message={error} />}{saved && <Alert type="success" message={saved} />}{output.warning && <Alert type="warning" message={output.warning} />}{output.note && <p>{output.note}</p>}
     {output.creation_context?.account_name && <p>创作账号：{output.creation_context.account_name} · 文风 v{output.creation_context.voice_version_number}</p>}
     <GenerationPreview key={task.id} task={task} />
+    <ExtractKnowledge task={task} run={run} />
+    <KnowledgeReferences cards={output.knowledge_cards} />
+    {task.kind === 'knowledge_extract' && task.status === 'succeeded' && <KnowledgeCandidates key={task.id} client={client} task={task} />}
+    {task.kind === 'knowledge_extract' && ['failed', 'cancelled'].includes(task.status) && output.source_task_id && <Button onClick={() => void action(() => run({ kind: 'knowledge_extract', source_task_id: output.source_task_id }))}>重试提炼</Button>}
     {task.kind === 'article' && task.status === 'succeeded' && <ArticleEditor key={task.id} client={client} taskId={task.id} onDirty={onDirty} />}
     {output.coverage && <p>最近{output.coverage.days}天，使用 {output.coverage.sampled} / {output.coverage.available} 条已采集作品。{output.baseline && '这是首次基线报告。'}</p>}
     {output.coverage && <details><summary>查看各账号样本覆盖</summary>{output.coverage.accounts.map(a => <p key={a.account_id}>{a.account_name}：{a.sampled} / {a.available}</p>)}</details>}{output.new_topic_note && <p>{output.new_topic_note}</p>}

@@ -68,7 +68,7 @@ def invoke(operation, config, params=None, check=lambda: None):
         if result.get("error"):
             raise CollectionError(result["error"] if isinstance(result["error"], str) and result["error"] in {
                 "credentials", "auth", "limited", "timeout", "invalid", "unavailable",
-                "content_unavailable", "signature", "challenge", "empty_response", "risk_control"} else "unavailable", diagnostic=result.get("diagnostic"))
+                "content_unavailable", "search_unavailable", "signature", "challenge", "empty_response", "risk_control"} else "unavailable", diagnostic=result.get("diagnostic"))
         return result.get("data")
     except CollectionError as exc:
         diagnostic = exc.diagnostic
@@ -91,7 +91,7 @@ class LocalDTKClient(DTKClient):
 
     @log_operation
     def fetch(self, path, params):
-        operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail", "/comments": "comments", "/replies": "replies"}[path]
+        operation = {"/api/v1/douyin/user": "profile", "/api/v1/douyin/user/posts": "pages", "/api/v1/douyin/video": "detail", "/comments": "comments", "/replies": "replies", '/radar/hotlist': 'radar_hotlist', '/radar/search': 'radar_search'}[path]
         for attempt in range(2):
             try:
                 return invoke(operation, private_config(config_for(self.application)), params, self.check)

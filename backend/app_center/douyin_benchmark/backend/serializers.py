@@ -95,6 +95,17 @@ class TaskSerializer(serializers.ModelSerializer):
     @swagger_serializer_method(serializer_or_field=serializers.JSONField())
     def get_output(self, obj):
         value = dict(obj.output)
+        if obj.kind == 'knowledge_extract':
+            value['source_task_id'] = obj.input.get('source_task_id')
+            from .models import CreationKnowledgeCard
+            value['saved_candidate_ids'] = list(CreationKnowledgeCard.objects.filter(
+                extraction_key=obj.pk, organization_id=obj.organization_id, application_id=obj.application_id,
+                owner_id=obj.owner_id).values_list('candidate_id', flat=True))
+        if obj.kind in ('radar_hotlist', 'radar_search', 'radar_topics'):
+            value['radar_request'] = {key: obj.input[key] for key in
+                ('kind', 'keyword', 'source_task_id', 'source_ids', 'target_account_id') if key in obj.input}
+        if obj.input.get('reference', {}).get('knowledge'):
+            value['knowledge_cards'] = obj.input['reference']['knowledge']
         brief = obj.input.get('brief', {})
         if brief.get('target_account_id'):
             value['creation_context'] = {k: brief[k] for k in ['target_account_id', 'account_name', 'voice_version_number'] if k in brief}

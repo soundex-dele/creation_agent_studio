@@ -187,3 +187,24 @@ npm run build --prefix frontend
 ```
 
 页面使用 `ApplicationShell fullBleed` 和全局 `app-scroll-page`，父容器限定高度。CSS／jsdom 检查覆盖手机、767/768边界和短视口，不代表已做浏览器或真实设备触屏验证；遵守仓库不使用 Codex 内置浏览器的规定。
+
+
+## 创作知识库
+
+个人库按组织、应用、用户隔离，可跨自己的对标账号复用。成功的转写、单视频拆解和联合拆解可按需提炼最多10张候选卡片；确认入库前可编辑正文、适用场景和标签。来源证据与作者观点／观察／AI推断标记不可由客户端覆盖。
+
+- `POST /tasks`：`kind=knowledge_extract` 与 `source_task_id`，复用原任务证据。候选结果保存在任务的 `output.cards`，已处理候选标识通过 `saved_candidate_ids` 返回。
+- `POST /knowledge-cards/confirm`：`task_id` 和1–10个含 `candidate_id/title/text/application_notes/tags` 的对象；同一候选只入库一次，重复请求不覆盖已保存内容。
+- `GET /knowledge-cards`：`search/category/tag/page`；`GET/PATCH/DELETE /knowledge-cards/{id}`；编辑携带最新 `revision` 及全部可编辑字段，冲突返回409。
+- `GET /knowledge-cards/recommend?query=...`：个人库内关键词推荐，最多10张；`POST /knowledge-cards/{id}/retry-index` 重试失败索引。
+- 选题任务可携带 `knowledge_cards: [{id, revision}]`，最多10张。服务端校验并保存快照，后续脚本与文章继承参考知识，保留个人文风和真实经历边界。已删除卡片不能用于新创作；历史结果保留当时快照。
+
+索引复用 knowledge 执行器和内部 `douyin_creation` 集合，无需配置嵌入模型。小型衍生卡片正文存放在内部文档中，不下载或重新上传作品素材。编辑立即停用旧索引；失败仍可浏览和手动选择；卡片和索引任务均受个人访问边界保护。发布需应用增量迁移 `0012_creation_knowledge` 并更新后端执行器和前端。
+
+Windows 验证命令（仓库根目录）：
+
+```powershell
+.\backend\venv\Scripts\python.exe -X utf8 backend/manage.py migrate douyin_benchmark
+.\backend\venv\Scripts\python.exe -X utf8 -m pytest -c backend/pytest.ini backend/app_center/douyin_benchmark/backend/tests/test_knowledge.py
+npm run test --prefix frontend -- src/pages/Apps/__tests__/douyinKnowledge.test.tsx src/services/__tests__/douyinRequests.test.ts src/layouts/__tests__/douyinKnowledgeLayout.test.ts
+```

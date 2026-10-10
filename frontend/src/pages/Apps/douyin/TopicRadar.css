@@ -1,0 +1,16 @@
+.douyin-radar { min-width: 0; color: var(--color-text); }
+.douyin-radar-search, .douyin-radar-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; }
+.douyin-radar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.douyin-radar-grid > article, .douyin-radar-source { min-width: 0; overflow-wrap: anywhere; }
+.douyin-radar-source { display: grid; gap: 10px; padding: 12px 0; }
+.douyin-radar-source h3, .douyin-radar-source p { margin: 0; }
+.douyin-radar-source small { color: var(--color-text-sec); }
+.douyin-radar .ant-checkbox-wrapper { display: inline-flex; align-items: center; min-height: 44px; }
+.douyin-radar summary { cursor: pointer; padding: 12px 0; }
+.douyin-radar summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.douyin-radar blockquote { margin: 12px 0; padding-left: 12px; border-left: 3px solid var(--color-primary); }
+.douyin-radar .ant-btn { min-height: 44px; height: auto; white-space: normal; }
+@media (max-width: 767px) {
+  .douyin-radar-search, .douyin-radar-create, .douyin-radar-grid { grid-template-columns: minmax(0, 1fr); }
+  .douyin-radar .douyin-research-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
