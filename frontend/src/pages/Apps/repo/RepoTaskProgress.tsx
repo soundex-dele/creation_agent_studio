@@ -7,7 +7,7 @@ const labels: Record<string, string> = {
   queued: '排队中', running: '执行中', waiting_input: '等待输入', waiting_children: '等待子任务',
   cancelling: '正在取消', succeeded: '已完成', failed: '失败', cancelled: '已取消',
 };
-const kinds: Record<string, string> = { import: '源码导入', analyze: '功能分析', write: '文案生成' };
+const kinds: Record<string, string> = { import: '源码导入', analyze: '功能分析', topics: '选题策划', write: '文案生成' };
 const stages: Record<string, string> = {
   queued: '任务已入队，等待执行器接单。', running: '执行器已接单，正在准备任务。',
   waiting_input: '任务正在等待输入。', waiting_children: '任务正在等待子任务完成。',

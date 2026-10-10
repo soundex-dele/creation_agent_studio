@@ -18,11 +18,11 @@ def test_real_repository_to_production_drafts(ctx, settings, tmp_path):
     response = ctx.client.post(ctx.root + '/imports', {'kind': 'local', 'path': str(repository)}, format='json', HTTP_IDEMPOTENCY_KEY='live-import')
     assert response.status_code == 202, response.data
     imported = Task.objects.get(pk=response.data['id']); finish(imported)
-    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'analyze', 'snapshot_id': str(imported.snapshot_id)}, format='json', HTTP_IDEMPOTENCY_KEY='live-analysis')
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'topics', 'snapshot_id': str(imported.snapshot_id)}, format='json', HTTP_IDEMPOTENCY_KEY='live-topics')
     assert response.status_code == 202, response.data
     analysis = Task.objects.get(pk=response.data['id']); report = finish(analysis)
-    selected = [f['id'] for f in report['features'][:3]]
-    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'analysis_id': str(analysis.id), 'feature_ids': selected,
+    selected = report['topics'][0]['id']
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'topic_task_id': str(analysis.id), 'topic_id': selected,
         'duration': 60, 'output': 'video'}, format='json', HTTP_IDEMPOTENCY_KEY='live-write')
     assert response.status_code == 202, response.data
     writing = Task.objects.get(pk=response.data['id']); result = finish(writing)
@@ -37,7 +37,7 @@ def test_real_repository_to_production_drafts(ctx, settings, tmp_path):
         assert response.data['url'].startswith('/applications/')
         if slug == 'animation-studio':
             assert response.data['draft']['scenes'] == []
-    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'analysis_id': str(analysis.id), 'feature_ids': selected,
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'topic_task_id': str(analysis.id), 'topic_id': selected,
         'output': 'image_text'}, format='json', HTTP_IDEMPOTENCY_KEY='live-image-copy')
     assert response.status_code == 202, response.data
     result = finish(Task.objects.get(pk=response.data['id']))

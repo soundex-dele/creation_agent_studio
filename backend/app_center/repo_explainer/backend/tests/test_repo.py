@@ -98,23 +98,42 @@ def legacy_document():
 
 def model(**kwargs):
     instruction = kwargs['instruction']
+    if '"action":"finish"' in instruction:
+        return {'action': 'finish', 'evidence_ids': ['e2']}
     if 'queries' in instruction:
         return {'queries': ['answer', 'app.py']}
+    if 'insufficient_reason' in instruction:
+        return topic_result()
     if '"paragraphs"' in instruction:
         result = document()
+        if json.loads(kwargs['content']).get('选题'):
+            result['paragraphs'][0]['feature_ids'] = []
         if 'write-image-text-copy' in instruction:
             result['kind'] = 'image_text'
         return result
     return report()
 
 
-def create_content(ctx, monkeypatch):
+def topic_result():
+    return {'topics': [{'title': f'资料问答切入角度 {index}', 'angle': '研究资料时如何提问',
+        'audience': '资料研究人员', 'outline': ['介绍资料问答入口', '解释源码依据与待核实效果'],
+        'evidence_ids': ['e2'], 'notes': ['实际运行效果待核实']} for index in range(5)]}
+
+
+def create_topics(ctx, monkeypatch, direction=''):
     monkeypatch.setattr(runtime, 'generate_json', model)
     imported = upload(ctx); finish(imported)
-    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'analyze', 'snapshot_id': str(imported.snapshot_id)}, format='json', HTTP_IDEMPOTENCY_KEY='analysis')
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'topics', 'snapshot_id': str(imported.snapshot_id),
+        'direction': direction}, format='json', HTTP_IDEMPOTENCY_KEY='topics')
     assert response.status_code == 202, response.data
-    analysis = Task.objects.get(pk=response.data['id']); finish(analysis)
-    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'analysis_id': str(analysis.id), 'feature_ids': ['f1']}, format='json', HTTP_IDEMPOTENCY_KEY='write')
+    task = Task.objects.get(pk=response.data['id']); finish(task)
+    return task
+
+
+def create_content(ctx, monkeypatch):
+    topics = create_topics(ctx, monkeypatch)
+    response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'topic_task_id': str(topics.id),
+        'topic_id': 't1'}, format='json', HTTP_IDEMPOTENCY_KEY='write')
     assert response.status_code == 202, response.data
     task = Task.objects.get(pk=response.data['id']); output = finish(task)
     return Content.objects.get(pk=output['content_id'])
@@ -403,7 +422,7 @@ def test_writing_uses_installed_skill_and_only_video_has_handoffs(ctx, monkeypat
         return model(**kwargs)
     monkeypatch.setattr(runtime, 'generate_json', capture)
     response = ctx.client.post(ctx.root + '/tasks', {'kind': 'write', 'output': kind,
-        'analysis_id': str(original.analysis_id), 'feature_ids': ['f1']}, format='json', HTTP_IDEMPOTENCY_KEY='copy-' + kind)
+        'topic_task_id': str(original.topic_task_id), 'topic_id': 't1'}, format='json', HTTP_IDEMPOTENCY_KEY='copy-' + kind)
     assert response.status_code == 202, response.data
     task = Task.objects.get(pk=response.data['id']); finish(task)
     content = Content.objects.get(generation=task)

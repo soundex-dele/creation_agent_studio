@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllGlobals());
 const key = (i: number) => vi.mocked(api.post).mock.calls[i][2]?.headers?.['Idempotency-Key'];
 describe.each(['missing', 'throwing', 'absent'])('repo workflows with crypto %s', mode => {
   beforeEach(() => vi.stubGlobal('crypto', mode === 'absent' ? undefined : mode === 'missing' ? {} : { randomUUID: () => { throw new Error('HTTP'); } }));
-  it.each(['import', 'analyze', 'write', 'handoff'])('submits %s, preserves uncertain retries and renews successful requests', async operation => {
+  it.each(['import', 'analyze', 'topics', 'write', 'handoff'])('submits %s, preserves uncertain retries and renews successful requests', async operation => {
     const client = repoApi('/repo');
     const submit = (value = 'first') => operation === 'import' ? client.import('p', { kind: 'github', url: value })
       : operation === 'handoff' ? client.handoff('p', value, 2) : client.task('p', { kind: operation, value });

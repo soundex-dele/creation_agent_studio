@@ -52,7 +52,8 @@ class Task(models.Model):
 class Content(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='contents')
-    analysis = models.ForeignKey(Task, on_delete=models.PROTECT)
+    analysis = models.ForeignKey(Task, null=True, on_delete=models.PROTECT)
+    topic_task = models.ForeignKey(Task, null=True, on_delete=models.PROTECT, related_name='topic_contents')
     generation = models.OneToOneField(Task, on_delete=models.PROTECT, related_name='generated_content')
     title = models.CharField(max_length=200)
     draft = models.JSONField(default=dict)

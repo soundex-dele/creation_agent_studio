@@ -54,6 +54,28 @@ afterEach(async () => {
 });
 
 describe('copy-only editor and production handoff', () => {
+  it('keeps new topic paragraphs local until their source evidence is selected', async () => {
+    saved.analysis_id = null; saved.topic_task_id = 'topics'; saved.topic_id = 't1';
+    (saved.draft as RepoCopyDocument).paragraphs[0].feature_ids = [];
+    saved.source_evidence = { e1: { id: 'e1', path: 'app.py', start: 1, end: 2, quote: 'source' } };
+    await render();
+    await act(async () => button('添加文案段落')!.click());
+    await act(async () => {
+      const input = container.querySelector<HTMLTextAreaElement>('[aria-label="文案正文 2"]')!;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, '新增且有依据的内容');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(1100);
+    });
+    expect(api.put).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('选择源码依据');
+    await act(async () => container.querySelector('[aria-label="段落源码依据 2"]')!.closest('.ant-select')!.querySelector('.ant-select-selector')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    await act(async () => [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].find(el => el.textContent?.includes('e1 · app.py'))!.click());
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(saved.draft).toMatchObject({ paragraphs: [expect.anything(), { text: '新增且有依据的内容', feature_ids: [], evidence_ids: ['e1'] }] });
+    expect(dirty).toHaveBeenLastCalledWith(false);
+  }, 30000);
+
   it.each([['导入动画制作', 1], ['导入文案转剪映', 2]])('saves edited video copy and freezes its version before %s', async (label, target) => {
     await render();
     expect(container.textContent).toContain('write-short-video-copy');

@@ -1,6 +1,5 @@
 """Evidence-grounded analysis over immutable text, using the platform model engine."""
 import json
-import re
 import time
 from django.db import transaction
 from core.llm.application import generate_json
@@ -11,20 +10,9 @@ from .backend.models import Task, Content, Version
 from .backend.sources import from_local, from_zip, github_source, fingerprint, limits
 from .backend.content import validate_document, text, strings
 from .backend.copywriting import load_copy_skill, copy_instruction
-
-
-def chunks(files):
-    result = []
-    for path, file in sorted(files.items()):
-        lines = file['text'].splitlines()
-        for start in range(0, len(lines), 80):
-            # Very long lines remain in the snapshot but are excluded from model context.
-            excerpt = '\n'.join(lines[start:start + 80])
-            if len(excerpt) > 12000:
-                continue
-            result.append({'id': f'e{len(result) + 1}', 'path': path, 'start': start + 1,
-                           'end': min(start + 80, len(lines)), 'quote': excerpt})
-    return result
+from .backend.retrieval import retrieve
+from .backend.exploration import explore
+from .backend.topics import TOPIC_INSTRUCTION, InsufficientEvidence, validate_topics, topic_material, validate_topic_document
 
 
 def validate_report(value, evidence):
@@ -106,6 +94,8 @@ def execute(payload, sink):
                 value = model(instruction, data)
                 progress('校验生成结果与来源引用')
                 return validate(value)
+            except InsufficientEvidence:
+                raise
             except (ValueError, KeyError, TypeError) as exc:
                 task.output = {'diagnostic': str(exc), 'repair_attempt': attempt + 1}
                 task.save(update_fields=['output'])
@@ -139,35 +129,7 @@ def execute(payload, sink):
             output = {'snapshot_id': str(snapshot.id), 'coverage': coverage}
         elif task.kind == 'analyze':
             progress('识别入口、文档和候选功能')
-            all_chunks = chunks(snapshot.files)
-            bound = limits()['analysis_chars']
-            chosen, used = {}, 0
-            def add(rows):
-                nonlocal used
-                for row in rows:
-                    if row['id'] in chosen or used + len(row['quote']) > bound:
-                        continue
-                    chosen[row['id']] = row
-                    used += len(row['quote'])
-            def priority(c):
-                p = c['path'].lower()
-                return (not any(s in p for s in ('readme', 'package.json', 'application.yaml', 'routes', 'urls.py', 'main.', 'app.', 'docs/')), c['start'], p)
-            initial = sorted(all_chunks, key=priority)
-            initial_budget = bound // 3
-            for c in initial:
-                if used + len(c['quote']) <= initial_budget:
-                    add([c])
-            for index in range(limits()['rounds']):
-                progress(f'追踪功能证据（{index + 1}/{limits()["rounds"]}）')
-                response = model('结合入口与目录识别值得介绍的用户功能，提出用于核实实现的路径或关键词。只返回 {"queries":["短关键词或路径"]}，最多12项。',
-                    {'目录': list(snapshot.files)[:5000], '已读片段': list(chosen.values())})
-                queries = strings(response.get('queries', []), '检索查询', 12)
-                terms = [t.lower() for q in queries for t in re.findall(r'[\w./-]+', q) if len(t) > 1]
-                if not terms or used >= bound:
-                    break
-                candidates = sorted((c for c in all_chunks if c['id'] not in chosen),
-                    key=lambda c: -sum(5 * (t in c['path'].lower()) + (t in c['quote'].lower()) for t in terms))
-                add([c for c in candidates[:30] if any(t in c['path'].lower() or t in c['quote'].lower() for t in terms)])
+            chosen, coverage = retrieve(snapshot.files, model, progress)
             progress('综合功能清单并校验引用')
             instruction = '''这是第一版创作简报，不是逐文件审计。将已识别能力合并成最多6组重点用户功能。
 整份JSON控制在4500字符以内；每个功能文本字段不超过60字，根级数组各最多4项。
@@ -180,27 +142,46 @@ status 仅 documented（文档描述）、implemented（存在真实实现依据
 找不到代码只说未找到依据，不断言功能不存在。区分配置条件、文档承诺与当前实现；多应用分别注明功能归属。
 未运行代码，不声称实测效果、速度、稳定性。流程缺口标待补充，所有总结仅来自有证据的功能。'''
             output = validated(instruction, {'来源': snapshot.origin, '证据': list(chosen.values())}, lambda v: validate_report(v, chosen))
-            output['coverage'] = {'files_read': len({c['path'] for c in chosen.values()}), 'files_total': len(snapshot.files),
-                'chunks_read': len(chosen), 'chunks_total': sum((len(f['text'].splitlines()) + 79) // 80 for f in snapshot.files.values()), 'characters_read': used,
-                'incomplete': len(chosen) < sum((len(f['text'].splitlines()) + 79) // 80 for f in snapshot.files.values()),
-                'note': '仅静态分析所列片段；未读取内容、超长片段与功能尚待核实。'}
-        else:
-            analysis = Task.objects.get(pk=task.options['analysis_id'], project=project, kind='analyze', run__status='succeeded')
-            report = analysis.output
-            selected = set(task.options['feature_ids'])
+            output['coverage'] = coverage
+        elif task.kind == 'topics':
+            progress('读取快照并寻找选题依据')
+            chosen, coverage = explore(snapshot.files, model, progress, task.options.get('direction', ''), check)
+            if not chosen:
+                raise InsufficientEvidence('源码资料不足：本次探索未选出可用于选题的证据片段。')
+            progress('策划5个选题并核对源码依据')
+            output = validated(TOPIC_INSTRUCTION, {'方向': task.options.get('direction', ''),
+                '来源': snapshot.origin, '证据': list(chosen.values())}, lambda value: validate_topics(value, chosen))
+            output['coverage'] = coverage
+        elif task.kind == 'write':
+            analysis, topic_task, topic = None, None, None
+            if task.options.get('topic_task_id'):
+                topic_task = Task.objects.get(pk=task.options['topic_task_id'], project=project,
+                    snapshot=snapshot, kind='topics', run__status='succeeded')
+                topic, report = topic_material(topic_task, task.options['topic_id'])
+                selected = set()
+            else:
+                # Only previously queued jobs can use the old analysis-based input.
+                analysis = Task.objects.get(pk=task.options['analysis_id'], project=project,
+                    snapshot=snapshot, kind='analyze', run__status='succeeded')
+                report = analysis.output
+                selected = set(task.options['feature_ids'])
             output_kind = task.options.get('output', 'video')
             if output_kind not in {'video', 'image_text'}:
                 raise ValueError('此任务使用旧版双格式创作，请重新选择视频文案或图文文案。')
             skill, provenance = load_copy_skill(output_kind)
             progress('使用 ' + provenance['slug'] + ' 编写文案')
-            instruction = copy_instruction(output_kind, skill)
+            instruction = copy_instruction(output_kind, skill, from_topic=topic is not None)
             def validate_copy(value):
                 doc = validate_document(value, report)
                 if doc.get('schema_version') != 2 or doc.get('kind') != output_kind:
                     raise ValueError('请只生成所选类型的文案。')
+                if topic is not None:
+                    validate_topic_document(doc)
                 for row in doc['paragraphs']:
                     if not row['text'].strip():
                         raise ValueError('生成的文案段落不能为空。')
+                    if topic is not None:
+                        continue
                     if not row['feature_ids'] or not set(row['feature_ids']) <= selected:
                         raise ValueError('生成段落必须关联已选功能。')
                     supported = {e for f in report['features'] if f['id'] in row['feature_ids'] for e in f['evidence_ids']}
@@ -212,17 +193,22 @@ status 仅 documented（文档描述）、implemented（存在真实实现依据
                 doc['duration'] = task.options['duration']
                 doc['skill'] = provenance
                 return doc
-            output = validated(instruction, {'要求': task.options, '功能': [f for f in report['features'] if f['id'] in selected],
+            # The old overview/feature/tutorial default must not override a topic's angle.
+            writing_options = {key: value for key, value in task.options.items() if key != 'angle' or topic is None}
+            output = validated(instruction, {'要求': writing_options, '功能': [f for f in report['features'] if f['id'] in selected],
+                '选题': topic, '限定方向': topic_task.options.get('direction', '') if topic_task else '',
                 '证据': report['evidence']}, validate_copy)
             check()
             progress('保存文案与初始版本')
             with transaction.atomic():
                 check()
                 content, created = Content.objects.get_or_create(generation=task,
-                    defaults={'project': project, 'analysis': analysis, 'title': output['title'], 'draft': output})
+                    defaults={'project': project, 'analysis': analysis, 'topic_task': topic_task, 'title': output['title'], 'draft': output})
                 if created:
                     Version.objects.create(content=content, revision=1, document=output)
             output = {'content_id': str(content.id)}
+        else:
+            raise ValueError('不支持的仓库任务类型。')
         check()
         task.output = output
         task.save(update_fields=['output'])

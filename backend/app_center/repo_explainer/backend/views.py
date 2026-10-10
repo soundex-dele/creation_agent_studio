@@ -17,6 +17,7 @@ from modules.execution.application.errors import DeploymentUnavailable, Idempote
 from modules.execution.infrastructure.artifacts import get_artifact_storage
 from .access import application_for, project_for
 from .models import Project, Snapshot, Task, Content, Version, Handoff
+from .topics import topic_material, validate_topic_document
 from .sources import fingerprint, limits
 from .content import validate_document, markdown, animation, jianying
 from .serializers import ProjectInput, ImportInput, TaskInput, SaveInput, HandoffInput, HandoffSaveInput
@@ -63,7 +64,10 @@ def snapshot_data(s):
 
 
 def content_data(c):
-    return {'id': str(c.id), 'title': c.title, 'analysis_id': str(c.analysis_id), 'revision': c.revision,
+    source_evidence = topic_material(c.topic_task, c.generation.options['topic_id'])[1]['evidence'] if c.topic_task_id else {}
+    return {'id': str(c.id), 'title': c.title, 'analysis_id': str(c.analysis_id) if c.analysis_id else None,
+            'topic_task_id': str(c.topic_task_id) if c.topic_task_id else None,
+            'topic_id': c.generation.options.get('topic_id'), 'source_evidence': source_evidence, 'revision': c.revision,
             'draft': c.draft, 'versions': [{'id': str(v.id), 'revision': v.revision, 'document': v.document} for v in c.versions.all()]}
 
 
@@ -193,23 +197,21 @@ class TasksView(BaseView):
     def post(self, request, **kwargs):
         p = self.project(lock=True)
         values = parsed(TaskInput, request)
-        for k in ('snapshot_id', 'analysis_id'):
+        for k in ('snapshot_id', 'analysis_id', 'topic_task_id'):
             if k in values:
                 values[k] = str(values[k])
         key, digest = key_for(request), fingerprint(values)
         existing = previous(p, key, digest)
         if existing:
             return Response(task_data(existing))
-        if values['kind'] == 'analyze':
+        if values['kind'] in {'analyze', 'topics'}:
             snapshot = get_object_or_404(p.snapshots, pk=values.get('snapshot_id'), status='ready')
             if not snapshot.task_set.filter(kind='import', run__status='succeeded').exists():
                 raise ValidationError('快照导入任务尚未成功完成。')
         else:
-            analysis = get_object_or_404(p.tasks, pk=values.get('analysis_id'), kind='analyze', run__status='succeeded')
-            selected = values.get('feature_ids', [])
-            if not selected or not set(selected) <= {f['id'] for f in analysis.output['features']}:
-                raise ValidationError('请选择当前分析结果中的功能。')
-            snapshot = analysis.snapshot
+            topics = get_object_or_404(p.tasks, pk=values['topic_task_id'], kind='topics', run__status='succeeded')
+            topic_material(topics, values['topic_id'])
+            snapshot = topics.snapshot
         return Response(task_data(start(p, request.user, snapshot, values['kind'], values, key, digest)), status=202)
 
 
@@ -250,7 +252,11 @@ class ContentView(BaseView):
         values = parsed(SaveInput, request)
         if values['revision'] != c.revision:
             return Response({'detail': '服务器已有新版本，本地内容已保留。', 'current': content_data(c)}, status=409)
-        document = validate_document(values['document'], c.analysis.output)
+        if c.topic_task_id:
+            _, report = topic_material(c.topic_task, c.generation.options['topic_id'])
+            document = validate_topic_document(validate_document(values['document'], report))
+        else:
+            document = validate_document(values['document'], c.analysis.output)
         if c.draft.get('schema_version') == 2:
             if document.get('kind') != c.draft['kind'] or document.get('schema_version') != 2:
                 raise ValidationError('请另行生成其他类型的文案。')

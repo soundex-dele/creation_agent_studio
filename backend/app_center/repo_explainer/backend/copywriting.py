@@ -28,7 +28,11 @@ def load_copy_skill(kind):
     return content, {'slug': slug, 'sha256': hashlib.sha256(raw).hexdigest()}
 
 
-def copy_instruction(kind, skill):
+def copy_instruction(kind, skill, from_topic=False):
+    references = ('围绕所选选题的标题、切入角度与提纲写作，保留待核实事项；只引用该选题的证据。'
+        '每段 feature_ids 必须是空数组，evidence_ids 必须包含该选题提供的证据编号。'
+        if from_topic else '只引用所选功能及其证据，每个正文段填写 feature_ids 和 evidence_ids。')
+    feature_example = '[]' if from_topic else '["f1"]'
     return f'''使用以下已安装的 {SKILLS[kind]} Skill 完成文案创作：
 <writing_skill>
 {skill}
@@ -37,9 +41,9 @@ def copy_instruction(kind, skill):
 不要生成分镜、时间轴、画面描述、图片、HTML 或配图方案；不调用工具。
 视频 paragraphs 是连贯口播的自然段，不是分镜，不按镜头拆段；图文 paragraphs 是逐页上图文字，heading 可标明页名。
 按 Skill 设计标题、封面、正文、发布配文，保留限定和证据。不冒充亲测。缺失操作在 notes 标待补充。
-只引用所选功能及其证据，每个正文段填写 feature_ids 和 evidence_ids。
+{references}
 整份 JSON 建议 6000 字符以内。返回且仅返回以下结构：
 {{"schema_version":2,"kind":"{kind}","title":"推荐标题","cover":"封面短句","alternatives":["备选标题"],
-"paragraphs":[{{"heading":"段落或页名，可为空","text":"可直接使用的正文","feature_ids":["f1"],"evidence_ids":["e1"]}}],
+"paragraphs":[{{"heading":"段落或页名，可为空","text":"可直接使用的正文","feature_ids":{feature_example},"evidence_ids":["e1"]}}],
 "publish_copy":"发布配文","notes":["必要的待核事实"]}}。
 正文与发布配文均需有资料依据，不能编造功能、数据或经历。仅交付文案，不制作成品。'''

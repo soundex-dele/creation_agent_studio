@@ -11,6 +11,7 @@ export default function RepoContentEditor({ initial, client, projectId, destinat
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState<RepoContent>();
   const [dirty, setDirty] = useState(false);
+  const missingEvidence = Boolean(initial.topic_task_id && isRepoCopy(doc) && doc.paragraphs.some(p => !p.evidence_ids.length));
   useEffect(() => { onDirty(dirty || busy); }, [dirty, busy, onDirty]);
   const current = useRef(doc); const server = useRef(initial); const flight = useRef<Promise<RepoContent>>();
   const stopped = useRef(false); const live = useRef(true);
@@ -18,6 +19,9 @@ export default function RepoContentEditor({ initial, client, projectId, destinat
   const change = (value: RepoDocument) => { current.current = value; setDoc(value); setDirty(true); };
   const save = useCallback(() => {
     if (flight.current) return flight.current;
+    if (initial.topic_task_id && isRepoCopy(current.current) && current.current.paragraphs.some(p => !p.evidence_ids.length)) {
+      return Promise.reject(new Error('请为每个文案段落选择所依据的源码片段后再保存。'));
+    }
     if (stopped.current) return Promise.reject(new Error('请先处理保存冲突或重试保存。'));
     if (JSON.stringify(current.current) === JSON.stringify(server.current.draft)) return Promise.resolve(server.current);
     const promise = (async () => {
@@ -48,12 +52,12 @@ export default function RepoContentEditor({ initial, client, projectId, destinat
     })();
     flight.current = promise;
     return promise;
-  }, [client, initial.id, projectId]);
+  }, [client, initial.id, initial.topic_task_id, projectId]);
   useEffect(() => {
-    if (!dirty || stopped.current) return;
+    if (!dirty || stopped.current || missingEvidence) return;
     const timer = setTimeout(() => { void save().catch(() => undefined); }, 1000);
     return () => clearTimeout(timer);
-  }, [doc, dirty, save]);
+  }, [doc, dirty, missingEvidence, save]);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', warn);
@@ -84,6 +88,7 @@ export default function RepoContentEditor({ initial, client, projectId, destinat
       <Button onClick={() => { stopped.current = false; void save().catch(() => undefined); }} disabled={busy || Boolean(conflict)}>保存 / 重试</Button>
       <Button onClick={() => void action('download')} disabled={busy}>导出 Markdown</Button></div>
     {error && <Alert type="error" message={error} />}
+    {missingEvidence && <Alert type="info" message="请为新增或修改的段落选择源码依据，选择后自动保存。" />}
     {conflict && <div className="repo-actions"><Button onClick={() => resolve(true)}>保留本地内容另存新版本</Button><Button onClick={() => resolve(false)}>采用服务器版本</Button></div>}
     <Alert type="info" message="文案需要人工核对；引用有效不代表已实测。手工修改同样标记为待核对。" />
     <label className="repo-field">历史版本<Select aria-label="历史版本" placeholder="选择旧版本复制到当前草稿" disabled={busy} options={saved.versions.map(v => ({ value: v.id, label: `v${v.revision}` }))} onChange={id => { const v = saved.versions.find(x => x.id === id); if (v) change(isRepoCopy(saved.draft) && !isRepoCopy(v.document) ? legacyRepoCopy(v.document, saved.draft.kind) : v.document); }} /></label>
@@ -102,7 +107,10 @@ export default function RepoContentEditor({ initial, client, projectId, destinat
           <Button danger onClick={() => change({ ...doc, paragraphs: doc.paragraphs.filter((_, n) => n !== i) })}>删除段落</Button></div>
         <label className="repo-field">{doc.kind === 'video' ? '段落备注（不朗读，可留空）' : '页标题'}<Input value={paragraph.heading} onChange={e => change({ ...doc, paragraphs: doc.paragraphs.map((p, n) => n === i ? { ...p, heading: e.target.value } : p) })} /></label>
         <label className="repo-field">{doc.kind === 'video' ? '口播正文' : '上图文字'}<Input.TextArea aria-label={`文案正文 ${i + 1}`} autoSize={{ minRows: 4 }} value={paragraph.text} onChange={e => change({ ...doc, paragraphs: doc.paragraphs.map((p, n) => n === i ? { ...p, text: e.target.value, needs_review: true } : p) })} /></label>
-        <small>功能：{paragraph.feature_ids.join('、') || '待补充'} · 证据：{paragraph.evidence_ids.join('、') || '待补充'}</small>
+        {initial.topic_task_id ? <label className="repo-field">源码依据<Select mode="multiple" aria-label={`段落源码依据 ${i + 1}`} value={paragraph.evidence_ids}
+          options={Object.values(initial.source_evidence || {}).map(row => ({ value: row.id, label: `${row.id} · ${row.path} · L${row.start}–${row.end}` }))}
+          onChange={evidence_ids => change({ ...doc, paragraphs: doc.paragraphs.map((p, n) => n === i ? { ...p, evidence_ids, needs_review: true } : p) })} /></label>
+          : <small>功能：{paragraph.feature_ids.join('、') || '待补充'} · 证据：{paragraph.evidence_ids.join('、') || '待补充'}</small>}
       </article>)}
       <Button onClick={() => change({ ...doc, paragraphs: [...doc.paragraphs, { heading: '', text: '', feature_ids: [], evidence_ids: [], needs_review: true }] })}>添加文案段落</Button>
       {doc.kind === 'video' && <details><summary>完整口播</summary><p className="repo-prose">{doc.paragraphs.map(p => p.text).join('\n\n')}</p></details>}

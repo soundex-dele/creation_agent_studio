@@ -27,4 +27,19 @@ describe('repository workspace scroll and route contracts (static checks)', () =
     expect(css).toMatch(/\.repo-task-header\s*>\s*strong\s*\{[^}]*min-width:\s*0/);
     expect(page).toContain('htmlFor="repo-project-name"');
   });
+  it('keeps topic cards in the page scroll owner and reflows long text at phone widths', () => {
+    const css = read('../../pages/Apps/RepoExplainerPage.css');
+    const global = read('../../styles/global.css');
+    const page = read('../../pages/Apps/RepoExplainerPage.tsx');
+    const cards = read('../../pages/Apps/repo/RepoTopicCards.tsx');
+    expect(css).toMatch(/\.repo-topic-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.repo-grid, \.repo-project-controls, \.repo-topic-grid\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(css).toMatch(/\.repo-topic-card \.ant-btn\s*\{[^}]*white-space:\s*normal/);
+    expect(css).toMatch(/\.repo-topic-card li, \.repo-selected-topic li\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(global).toMatch(/\.app-scroll-page\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/s);
+    expect(css).not.toMatch(/\.repo-topic[^}]*overflow(?:-y)?:\s*(?:hidden|auto)/);
+    expect(page).toContain('htmlFor="repo-topic-direction"');
+    expect(cards).toContain('aria-pressed={selectedId === topic.id}');
+    expect(cards).toContain('<ol>');
+  });
 });

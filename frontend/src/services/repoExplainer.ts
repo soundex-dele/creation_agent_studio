@@ -18,9 +18,10 @@ export function legacyRepoCopy(doc: RepoLegacyDocument, kind: RepoCopyDocument['
     paragraphs: kind === 'video' ? doc.scenes.map(s => ({ heading: '', text: s.narration, feature_ids: s.feature_ids, evidence_ids: s.evidence_ids, needs_review: true }))
       : doc.article.sections.map(s => ({ heading: s.heading, text: s.body, feature_ids: s.feature_ids, evidence_ids: s.evidence_ids, needs_review: true })) };
 }
-export interface RepoContent { id: string; title: string; analysis_id: string; revision: number; draft: RepoDocument; versions: { id: string; revision: number; document: RepoDocument }[] }
+export interface RepoContent { id: string; title: string; analysis_id: string | null; topic_task_id?: string | null; topic_id?: string | null; source_evidence?: Record<string, RepoEvidence>; revision: number; draft: RepoDocument; versions: { id: string; revision: number; document: RepoDocument }[] }
 export interface RepoSnapshot { id: string; origin: { kind: string; url?: string; path?: string; filename?: string; commit?: string; ref?: string; working_tree?: boolean }; digest: string; status: string; error: string; created_at: string; coverage: { files_included?: number; text_bytes?: number; excluded?: { path: string; reason: string }[]; notes?: string[] } }
-export interface RepoTask { id: string; kind: string; status: string; run_id?: string; created_at?: string; event_sequence?: number; snapshot_id: string; error: string; progress: { stage?: string; activity?: string; characters?: number }; output: Partial<RepoReport> & { content_id?: string }; options: Record<string, unknown> }
+export interface RepoTopic { id: string; title: string; angle: string; audience: string; outline: string[]; evidence_ids: string[]; notes: string[] }
+export interface RepoTask { id: string; kind: string; status: string; run_id?: string; created_at?: string; event_sequence?: number; snapshot_id: string; error: string; progress: { stage?: string; activity?: string; characters?: number }; output: Partial<RepoReport> & { content_id?: string; topics?: RepoTopic[] }; options: Record<string, unknown> }
 export interface RepoProject { id: string; title: string; archived: boolean; updated_at: string }
 export interface RepoHandoff { id: string; kind: string; version_id: string; target_application_id: number; target_id: string; url: string; status: string; draft: Record<string, string>; revision: number; created_at: string }
 export interface RepoDetail extends RepoProject { snapshots: RepoSnapshot[]; tasks: RepoTask[]; contents: RepoContent[]; handoffs: RepoHandoff[]; limits: Record<string, number> }
@@ -62,6 +63,7 @@ export function repoApi(base: string) {
     update: (id: string, body: Partial<RepoProject>) => api.patch<RepoProject>(`${base}/projects/${id}`, body),
     import: (id: string, body: FormData | Record<string, string>) => post<RepoTask>(`/projects/${id}/imports`, body),
     task: (id: string, body: Record<string, unknown>) => post<RepoTask>(`/projects/${id}/tasks`, body),
+    getTask: (id: string, task: string) => api.get<RepoTask>(`${base}/projects/${id}/tasks/${task}`),
     cancel: (id: string, task: string) => api.post(`${base}/projects/${id}/tasks/${task}/cancel`, {}),
     evidence: (id: string, snapshot: string, path: string) => api.get<{ text: string; source_url: string }>(`${base}/projects/${id}/snapshots/${snapshot}/evidence`, { path }),
     save: (id: string, content: string, revision: number, document: RepoDocument) => api.put<RepoContent>(`${base}/projects/${id}/contents/${content}`, { revision, document }),

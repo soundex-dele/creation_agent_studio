@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,7 +16,13 @@ const route = vi.hoisted(() => ({ id: undefined as string | undefined, query: ''
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }));
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: route.id, applicationId: '7' }), useNavigate: () => route.navigate,
-  useSearchParams: () => [new URLSearchParams(route.query), vi.fn()],
+  useSearchParams: () => {
+    const [, render] = useState(0);
+    return [new URLSearchParams(route.query), (value: URLSearchParams | ((current: URLSearchParams) => URLSearchParams)) => {
+      route.query = String(typeof value === 'function' ? value(new URLSearchParams(route.query)) : value);
+      render(n => n + 1);
+    }];
+  },
 }));
 vi.mock('@/stores/useOrganizationStore', () => ({ useOrganizationStore: (select: (s: unknown) => unknown) => select({ currentOrganizationId: route.organizationId }) }));
 vi.mock('@/stores/useAuthStore', () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { id: route.userId } }) }));
@@ -75,18 +81,17 @@ describe('repository source to workflow editor', () => {
     route.query = `project=${repoSource.projectId}`;
     await render(<RepoExplainerPage />);
     await click([...container.querySelectorAll<HTMLElement>('[role="tab"]')].find(el => el.textContent === '功能解读')!);
-    expect(button('用已选0项功能创作').disabled).toBe(true);
     expect(button('用总预设制作全套素材').disabled).toBe(true);
-    const choices = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter(el => el.closest('label')?.textContent === '用于创作');
+    const choices = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter(el => el.closest('label')?.textContent === '用于工作流素材');
     await click(choices[0]); await click(choices[2]);
     expect(container.textContent).toContain('已选 2 项功能');
-    expect(button('用已选2项功能创作').disabled).toBe(false);
     await click(button('用总预设制作全套素材'));
     expect(route.navigate).toHaveBeenCalledWith(repoWorkflowEditorPath({ ...repoSource, featureIds: ['f1', 'f3'] }));
     route.navigate.mockClear();
-    await click(button('用已选2项功能创作'));
+    await click([...container.querySelectorAll<HTMLElement>('[role="tab"]')].find(el => el.textContent === '内容创作')!);
     expect(container.textContent).toContain('write-short-video-copy');
-    expect(button('生成文案').disabled).toBe(false);
+    expect(button('生成文案').disabled).toBe(true);
+    expect(container.textContent).toContain('请先生成选题');
     expect(route.navigate).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
   });
@@ -137,7 +142,7 @@ describe('repository source to workflow editor', () => {
     route.query = `project=${repoSource.projectId}`;
     await render(<RepoExplainerPage />);
     await click([...container.querySelectorAll<HTMLElement>('[role="tab"]')].find(el => el.textContent === '功能解读')!);
-    const choice = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(el => el.closest('label')?.textContent === '用于创作')!;
+    const choice = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(el => el.closest('label')?.textContent === '用于工作流素材')!;
     await click(choice);
     const newer = repoProjectFixture();
     newer.tasks[0].id = '77777777-7777-4777-8777-777777777777';
