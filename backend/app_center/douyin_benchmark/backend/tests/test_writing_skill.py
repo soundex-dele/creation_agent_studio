@@ -36,11 +36,11 @@ def test_creation_loads_full_skill_into_model_and_keeps_it_on_repair(ctx, skill,
         title=f'选题{i}', angle='新角度', hook='开头', pillar='表达', reason='符合定位',
         materials_needed='真实案例', duplicate_note='已有样本中未发现重复',
     ) for i in range(3)]}
-    model = Mock(side_effect=[{}, output])
+    model = Mock(side_effect=[{}, output] + ([{'article': output, 'summary': '符合个人文风，无需修改。'}] if task.kind == 'article' else []))
     monkeypatch.setattr(analysis, 'generate_json', model)
     execute(*claim(task))
-    assert model.call_count == 2
-    for call in model.call_args_list:
+    assert model.call_count == (3 if task.kind == 'article' else 2)
+    for call in model.call_args_list[:2]:
         instruction = call.kwargs['instruction']
         for text in ['wechat-viral-article', '写作技能正文', '写作资料', '大纲模板',
                      '本次任务的明确要求优先', '不承诺爆款效果']:
@@ -54,7 +54,10 @@ def test_creation_loads_full_skill_into_model_and_keeps_it_on_repair(ctx, skill,
         if route in ['owned_topics', 'article', 'saved_idea']:
             model_data = json.loads(call.kwargs['content'])
             assert model_data['brief']['voice_profile'] == task.input['brief']['voice_profile']
-    assert '上次结构或引用校验未通过' in model.call_args.kwargs['instruction']
+    assert '上次结构或引用校验未通过' in model.call_args_list[1].kwargs['instruction']
+    if task.kind == 'article':
+        assert '写作技能正文' not in model.call_args.kwargs['instruction']
+        assert '只修订有规则或原文依据的偏离' in model.call_args.kwargs['instruction']
     task.refresh_from_db()
     assert task.stage == 'completed'
     if task.kind == 'article':

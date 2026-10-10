@@ -38,16 +38,17 @@ def test_article_uses_topic_voice_snapshot_and_saves_editable_version(ctx, monke
 
     def model(*args, **kwargs):
         task.refresh_from_db()
-        assert task.stage == '正在按文风写作'
+        assert task.stage in ['正在按文风写作', '正在校对个人文风']
         brief = args[2]['brief']
         assert brief['voice_profile']['prompt'] == voice['content']['prompt']
         assert 'production_format' not in brief and 'duration' not in brief
-        return article_content()
+        return {'article': article_content(), 'summary': '表达符合已确认规则，无需修改。'} if task.stage == '正在校对个人文风' else article_content()
 
     monkeypatch.setattr('app_center.douyin_benchmark.backend.analysis.call_model', model)
     execute(*claim(task))
     task.refresh_from_db()
-    assert task.stage == 'completed' and task.output == article_content()
+    assert task.stage == 'completed' and task.output['body'] == article_content()['body']
+    assert task.output['style_review']['status'] == 'completed'
     assert task.versions.first().content == article_content()
     finish(task)
     url = f'{ctx.root}/tasks/{task.pk}'

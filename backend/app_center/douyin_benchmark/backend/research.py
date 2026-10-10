@@ -211,7 +211,7 @@ def freeze(scope, values):
         if not data['publications']:
             raise ValidationError('请先关联自己的发布作品。')
     if kind in ['topics', 'script', 'article']:
-        if kind in ['script', 'article'] and not values.get('idea_id'):
+        if kind in ['script', 'article'] and values.get('source_task_id'):
             if not source or source.kind != 'topics':
                 raise ValidationError('请选择已完成的选题任务。')
             topics = source.output.get('topics')
@@ -235,6 +235,8 @@ def freeze(scope, values):
                 if kind in ['script', 'article']:
                     data['topic'] = {'title': idea.title, 'angle': idea.notes, 'hook': ''}
                 data['reference'] = {**data.get('reference', {}), 'idea': {'title': idea.title, 'notes': idea.notes}}
+            elif kind in ['script', 'article']:
+                data['topic'] = {'title': values['theme'], 'angle': values.get('writing_requirements', ''), 'hook': ''}
             if values.get('brand_profile_id'):
                 from app_center.brand_library.backend.views import private_profiles
                 brand = get_object_or_404(private_profiles(scope['organization_id'], m.CreatorProfile._meta.get_field('owner').remote_field.model.objects.get(pk=scope['owner_id'])), pk=values['brand_profile_id'])
@@ -244,6 +246,8 @@ def freeze(scope, values):
                 owned = owned_brief(scope, values, refs)
                 brief = {**owned, **{k: brief[k] for k in ['duration', 'production_format'] if k in brief}}
                 data['target_account_id'] = owned['target_account_id']
+            if kind in ['article', 'script']:
+                brief.update({key: values[key] for key in ['writing_requirements', 'factual_material'] if key in values})
             if not brief.get('theme', '').strip() or not brief.get('positioning', '').strip():
                 raise ValidationError('请填写定位与主题，或选择创作档案和选题。')
             data['brief'] = brief
@@ -257,7 +261,7 @@ def freeze(scope, values):
         # Reference research must never implicitly select knowledge from an older task.
         data['reference'].pop('knowledge', None)
         data['reference'].pop('knowledge_cards', None)
-        if kind == 'topics' or values.get('idea_id'):
+        if kind == 'topics' or not values.get('source_task_id'):
             if source and source.kind == 'knowledge_extract':
                 raise ValidationError('请先将候选知识确认入库，再勾选使用。')
             selected = freeze_selection(scope, values.get('knowledge_cards', []))

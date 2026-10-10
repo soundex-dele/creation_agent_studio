@@ -54,8 +54,8 @@ def validate_variants(value):
     return output
 
 
-def structured(task, prompt, data, config, validator, sink):
-    if task.kind in ['topics', 'article']:
+def structured(task, prompt, data, config, validator, sink, *, writing_skill=True):
+    if writing_skill and task.kind in ['topics', 'article']:
         from .writing_skill import creation_instruction
         prompt = creation_instruction(prompt)
     if task.kind in ['topics', 'article'] and data.get('reference', {}).get('knowledge'):

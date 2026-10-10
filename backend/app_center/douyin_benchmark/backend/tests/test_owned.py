@@ -3,6 +3,7 @@ from unittest.mock import Mock
 import pytest
 from .. import models as m
 from ..owned import CONTENT_FIELDS, make_prompt, validate_report, validate_owned_topics
+from ..voice_style import DIMENSIONS
 from ..research import scope_for
 from ...runtime import execute
 from .test_douyin import ctx, claim, add_work, script  # noqa: F401
@@ -37,6 +38,12 @@ def sample(ctx, profile, text='我做过一个小实验。', **extra):
     response = ctx.client.post(ctx.root + '/voice-samples', {'profile': str(profile.pk), 'title': '真实文案', 'text': text, **extra}, format='json')
     assert response.status_code == 201, response.data
     return response.data
+
+
+def style_features(sample_id='s', quote='原文'):
+    return [{'dimension': dimension, 'rules': [{'instruction': '先讲具体问题', 'when': '解释一个新观点时',
+        'deviation': '先泛泛升华', 'evidence': [{'sample_id': sample_id, 'quote': quote}]}] if index == 0 else []}
+        for index, dimension in enumerate(DIMENSIONS)]
 
 
 def test_own_account_creation_and_filters(ctx):
@@ -142,7 +149,7 @@ def test_analysis_freezes_samples_excludes_rejected_and_requires_body(ctx):
 
 def test_report_validates_actual_quotes_and_style_sources():
     samples = [{'id': 's', 'title': '标题', 'text': '原文只说这些', 'usage': 'style'}]
-    report = {'content': content(), 'findings': [{'category': 'keep', 'sample_id': 's', 'quote': '原文', 'text': '表达习惯'}]}
+    report = {'content': content(), 'style_features': style_features(), 'findings': [{'category': 'improve', 'sample_id': 's', 'quote': '原文', 'text': '独立改善建议'}]}
     assert validate_report(report, samples, 'style')['content']['prompt'].startswith('【账号定位】')
     for changes in [{'sample_id': 'foreign'}, {'quote': '编造'}, {'category': 'bad'}]:
         broken = copy.deepcopy(report)
@@ -160,7 +167,7 @@ def test_analysis_runtime_and_confirmation_keeps_previous_version(ctx, monkeypat
     row = sample(ctx, p)
     response = start(ctx, {'kind': 'voice_analysis', 'target_account_id': str(ctx.account.pk)})
     task = m.Task.objects.get(pk=response.data['id'])
-    report = {'content': content('新的方向'), 'findings': [{'category': 'keep', 'sample_id': row['id'], 'quote': '小实验', 'text': '用真实案例表达'}]}
+    report = {'content': content('新的方向'), 'style_features': style_features(row['id'], '小实验'), 'findings': [{'category': 'positioning', 'sample_id': row['id'], 'quote': '小实验', 'text': '实验科普'}]}
     def model(*args, **kwargs):
         task.refresh_from_db()
         assert task.stage == '分析账号定位与文风'

@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { isActive, productionFormats, type DouyinAccount, type DouyinTask, type ProductionFormat } from '@/services/douyinBenchmark';
 import { researchApi, researchTaskStatus, type CreatorProfile, type Inspiration, type ResearchClient, type ResearchTask, type ResearchWork, type VoiceContent, type VoiceSample, type VoiceVersion } from '@/services/douyinResearch';
 import { documentError } from '@/services/documents';
+import { makeVoicePrompt } from '@/lib/douyinVoicePrompt';
 import { allRows, Field, Pager, useRows } from './ResearchCommon';
 import { ResearchResult } from './ResearchResult';
 import { GenerationPreview } from './GenerationPreview';
@@ -12,7 +13,7 @@ import { knowledgeSelection, type KnowledgeSnapshot } from '@/services/douyinKno
 import './OwnedAccounts.css';
 
 const blankContent: VoiceContent = { current_positioning: '', positioning: '', audience: '', content_pillars: '', content_boundaries: '', rules: '', examples: '', avoid: '', prompt: '' };
-const contentLabels: Record<keyof VoiceContent, string> = { current_positioning: '历史作品呈现的定位', positioning: '希望建立的定位', audience: '目标受众（推测）', content_pillars: '内容支柱', content_boundaries: '内容边界', rules: '保留与改善的表达规则', examples: '原文示例', avoid: '避免的表达', prompt: '完整创作提示词' };
+const contentLabels: Record<keyof VoiceContent, string> = { current_positioning: '历史作品呈现的定位', positioning: '希望建立的定位', audience: '目标受众（推测）', content_pillars: '内容支柱', content_boundaries: '内容边界', rules: '表达习惯与适用条件', examples: '原文示例与依据', avoid: '有依据的风格偏离', prompt: '完整创作提示词' };
 const usageOptions = [{ value: 'style', label: '代表我的风格' }, { value: 'content', label: '只参考内容' }, { value: 'exclude', label: '不学习' }];
 
 export function OwnedAccounts({ base, openAccount, onCreate }: { onCreate?: (context: Record<string, string | undefined>) => void; base: string; openAccount: (id: string) => void }) {
@@ -131,11 +132,11 @@ function OwnedWorkspace({ client, account, onDirty, openAccount, onCreate, onUnm
         <div className="douyin-owned-grid">{works.results.map(w => <article className="douyin-research-card" key={w.id}><h4>{w.title}</h4><p>{w.kind === 'video' ? '优先复用已有转写，缺失时开始转写。' : w.kind === 'image_album' ? '自动导入已采集的发布文案；图片内文字需另行识别。' : '添加后请手动补充正文。'}</p><Button disabled={busy || samples.some(s => s.work === w.id)} onClick={() => void action(() => importWork(w))}>{samples.some(s => s.work === w.id) ? '已添加' : '作为样本添加'}</Button></article>)}</div><Pager rows={works} />
       </>}
       {tab === 'analysis' && <>
-        <p>不学习的样本会排除。尚未取得正文的作品只用于初步定位；“只参考内容”的正文不用于学习文风。</p>
+        <p>不学习的样本会排除。尚未取得正文的作品只用于初步定位；“只参考内容”的正文不用于学习文风。跨样本共性需要至少两篇不同正文支持，单篇特点标为候选；改善建议单独展示，不自动用于写作。</p>
         <div className="douyin-actions"><Button type="primary" loading={busy} disabled={!samples.some(s => s.usage === 'style' && s.text.trim())} onClick={() => void action(() => run({ kind: 'voice_analysis' }))}>分析有效样本的定位与文风</Button><Button disabled={busy || !samples.some(s => s.usage !== 'exclude')} onClick={() => void action(() => run({ kind: 'voice_analysis', analysis_mode: 'positioning' }))}>仅分析定位</Button></div>
         <Field label="分析历史"><Select aria-label="分析历史" value={analysisTasks.some(t => t.id === selectedTask) ? selectedTask : undefined} options={analysisTasks.map(t => ({ value: t.id, label: `${new Date(t.created_at).toLocaleString()} · ${researchTaskStatus(t)}` }))} onChange={id => leaveArticle(() => setSelectedTask(id))} /></Field>
         {currentTask?.kind === 'voice_analysis' && <div className="douyin-form"><TaskStatus client={client} task={currentTask} /><GenerationPreview key={currentTask.id} task={currentTask} />{currentTask.output.warning && <Alert type="warning" message={currentTask.output.warning} />}
-          {currentTask.output.findings?.map((f, i) => <article className="douyin-research-card" key={i}><Tag>{{ positioning: '定位判断', keep: '建议保留', improve: '建议改善' }[f.category]}</Tag><p>{f.text}</p><blockquote>{f.quote}</blockquote><small>出处：{currentTask.output.voice_evidence?.find(s => s.id === f.sample_id)?.title}</small></article>)}
+          {currentTask.output.findings?.map((f, i) => <article className="douyin-research-card" key={i}><Tag>{{ positioning: '定位判断', keep: '观察到的表达习惯', improve: '改善建议（不自动用于写作）' }[f.category]}</Tag><p>{f.text}</p><blockquote>{f.quote}</blockquote><small>出处：{currentTask.output.voice_evidence?.find(s => s.id === f.sample_id)?.title}</small></article>)}
           {currentTask.status === 'succeeded' && currentTask.output.content && <Button type="primary" onClick={() => replaceDraft(currentTask.output.content!, currentTask.id)}>编辑分析结果并确认</Button>}
         </div>}
       </>}
@@ -144,7 +145,7 @@ function OwnedWorkspace({ client, account, onDirty, openAccount, onCreate, onUnm
         <div className="douyin-actions"><Button disabled={!active} onClick={() => active && replaceDraft(active.content)}>编辑当前生效版本</Button><Button onClick={() => replaceDraft({ ...blankContent, positioning: profile.positioning, audience: profile.audience })}>手动填写新版本</Button></div>
         {draftDirty && <div className="douyin-form"><Alert type="info" message="这是未生效草稿。请核对正文依据，并使完整提示词与上方规则保持一致；生成时以确认后的完整提示词为表达要求。" />
           <div className="douyin-owned-grid">{(Object.keys(contentLabels) as (keyof VoiceContent)[]).map(key => <Field key={key} label={contentLabels[key]}><Input.TextArea aria-label={contentLabels[key]} rows={key === 'prompt' ? 12 : 4} maxLength={20000} value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></Field>)}</div>
-          <div className="douyin-actions"><Button onClick={() => setDraft({ ...draft, prompt: (['positioning', 'audience', 'rules', 'examples', 'avoid'] as const).map(k => `【${contentLabels[k]}】\n${draft[k]}`).join('\n\n') + '\n\n【真实素材约束】\n只使用明确提供的事实和经历，不编造；保留个人特点，精简空话与重复。\n\n【本次任务】\n遵循本次主题、内容支柱、内容边界、时长与制作条件。' })}>按当前规则重建提示词</Button><Button type="primary" loading={busy} disabled={factsDirty || !draft.positioning.trim() || !draft.prompt.trim()} onClick={() => void action(saveDraft)}>确认并启用新版本</Button><Button onClick={() => { setDraftDirty(false); setDraftSource(''); }}>丢弃草稿</Button></div>{factsDirty && <p>请先保存素材设置，再确认新版本。</p>}
+          <div className="douyin-actions"><Button onClick={() => { const prompt = makeVoicePrompt(draft); if (prompt.length > 20000) { setError('完整创作提示词超过20000字，请精简定位、规则和引用。'); return; } setDraft({ ...draft, prompt }); setError(''); }}>按当前规则重建提示词</Button><Button type="primary" loading={busy} disabled={factsDirty || !draft.positioning.trim() || !draft.prompt.trim()} onClick={() => void action(saveDraft)}>确认并启用新版本</Button><Button onClick={() => { setDraftDirty(false); setDraftSource(''); }}>丢弃草稿</Button></div>{factsDirty && <p>请先保存素材设置，再确认新版本。</p>}
         </div>}
         {versions.map(v => <article className="douyin-research-card" key={v.id}><h4>文风 v{v.number} {v.id === profile.active_version && <Tag>生效中</Tag>}</h4><p>{v.content.positioning}</p><details><summary>查看完整提示词与依据</summary><pre className="douyin-owned-prompt">{v.content.prompt}</pre>{v.evidence.map(e => <details key={e.id}><summary>{e.title}</summary><p className="douyin-owned-prompt">{e.text || '仅标题资料'}</p></details>)}</details><div className="douyin-actions"><Button onClick={() => replaceDraft(v.content)}>以此版本编辑</Button><Button onClick={() => void action(async () => { if (!navigator.clipboard?.writeText) throw new Error('当前环境不支持自动复制，请展开提示词后手动选择复制。'); await navigator.clipboard.writeText(v.content.prompt); setMessage('提示词已复制'); })}>复制提示词</Button><Button disabled={busy || profile.active_version === v.id || draftDirty || factsDirty} onClick={() => void action(async () => { await client.activateVoice(profile.id, v.id, profile.revision); await load(); setMessage(`已启用文风 v${v.number}`); })}>启用此版本</Button></div></article>)}
       </>}

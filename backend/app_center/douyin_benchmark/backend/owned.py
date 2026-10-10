@@ -12,6 +12,7 @@ from .research import scope_for
 from .research_serializers import PrivateSerializer, BASE, READ
 from .services import Conflict
 from .views import BaseView
+from .voice_style import ANALYSIS_PROMPT, compile_style, make_prompt
 
 
 CONTENT_FIELDS = ('current_positioning', 'positioning', 'audience', 'content_pillars',
@@ -120,15 +121,6 @@ def freeze_analysis(scope, values, data, refs):
     refs.add((account.pk, None, None))
 
 
-def make_prompt(content):
-    return '\n\n'.join(f'【{label}】\n{content.get(key, "")}' for key, label in [
-        ('positioning', '账号定位'), ('audience', '目标受众'), ('rules', '表达规则'),
-        ('examples', '原文示例'), ('avoid', '避免的表达')]) + (
-        '\n\n【真实素材约束】\n只使用本次明确提供的事实和经历；缺少素材时列出待补充项，不编造第一人称经历。'
-        '\n保留个人特点，精简空话与重复。不推断未提供的数据，不承诺传播效果。'
-        '\n\n【本次任务】\n遵循本次提供的主题、内容支柱、内容边界、时长与制作条件。')
-
-
 def validate_report(value, samples, mode):
     if not isinstance(value, dict):
         raise ValueError('分析结果格式无效。')
@@ -136,15 +128,15 @@ def validate_report(value, samples, mode):
     if not isinstance(content, dict) or any(not isinstance(content.get(k), str) or len(content[k]) > 20000 for k in CONTENT_FIELDS if k != 'prompt'):
         raise ValueError('定位与文风字段不完整。')
     evidence = value.get('findings')
-    if not isinstance(evidence, list) or not 1 <= len(evidence) <= 40:
+    if not isinstance(evidence, list) or not 1 <= len(evidence) <= 20:
         raise ValueError('分析必须包含有依据的结论。')
     sources = {s['id']: s for s in samples}
     for row in evidence:
-        if not isinstance(row, dict) or row.get('category') not in ['positioning', 'keep', 'improve']:
+        if not isinstance(row, dict) or row.get('category') not in ['positioning', 'improve']:
             raise ValueError('结论类型无效。')
-        source = sources.get(row.get('sample_id'))
+        source = sources.get(row['sample_id']) if isinstance(row.get('sample_id'), str) else None
         quote = row.get('quote')
-        if not source or not isinstance(quote, str) or not quote.strip() or len(quote) > 2000:
+        if not source or source['usage'] == 'exclude' or not isinstance(quote, str) or not quote.strip() or len(quote) > 2000:
             raise ValueError('结论缺少有效样本引用。')
         available = source['text'] or source['title']
         if quote not in available or not isinstance(row.get('text'), str) or not 0 < len(row['text']) <= 4000:
@@ -152,9 +144,15 @@ def validate_report(value, samples, mode):
         if row['category'] != 'positioning' and (mode != 'style' or source['usage'] != 'style' or not source['text'].strip()):
             raise ValueError('文风结论只能引用代表风格的正文。')
     content = {k: content[k] for k in CONTENT_FIELDS if k != 'prompt'}
-    if mode != 'style':
+    if mode == 'style':
+        style, observations = compile_style(value.get('style_features'), samples)
+        content.update(style)
+        evidence = evidence + observations
+    else:
         content.update(rules='', examples='', avoid='')
     content['prompt'] = make_prompt(content)
+    if len(content['prompt']) > 20000:
+        raise ValueError('完整创作提示词超过20000字，请精简定位、规则和引用。')
     return {'content': content, 'findings': evidence}
 
 
@@ -162,22 +160,12 @@ def analyze_voice(task, config, sink, save):
     from .research_runtime import structured
     data = task.input
     save('分析账号定位' if data['analysis_mode'] == 'positioning' else '分析账号定位与文风')
-    prompt = ('分析我自己的账号，区分历史定位、目标定位、受众推测和建议。只从正文提取文风，'
-        'content用途只参考内容，不学习风格。保持个人特点，改善空话与重复；'
-        '建议覆盖开头、句式、用词、节奏、观点、案例、结尾。'
-        '返回 {"content":{"current_positioning":"历史定位（标题分析注明初步推测）",'
-        '"positioning":"建议目标定位","audience":"目标受众（推测）","content_pillars":"内容支柱",'
-        '"content_boundaries":"内容边界","rules":"建议保留及改善的表达规则",'
-        '"examples":"带样本名称的原文示例","avoid":"避免的表达"},'
-        '"findings":[{"category":"positioning|keep|improve","text":"结论",'
-        '"sample_id":"实际样本ID","quote":"样本原文的连续摘录"}]}。'
-        '仅定位模式时rules、examples、avoid返回空字符串。不编造经历或数据。')
-    result = structured(task, prompt, {'samples': data['voice_samples'], 'mode': data['analysis_mode'],
+    result = structured(task, ANALYSIS_PROMPT, {'samples': data['voice_samples'], 'mode': data['analysis_mode'],
         'desired_positioning': data['desired_positioning']}, config,
         lambda value: validate_report(value, data['voice_samples'], data['analysis_mode']), sink)
     save('completed', {**result, 'voice_evidence': data['voice_samples'], 'profile_id': data['profile_id'],
         'target_account_id': data['target_account_id'], 'sample_count': len(data['voice_samples']),
-        'warning': '初步分析：代表风格的有效正文不足三篇。' if data['style_sample_count'] < 3 else ''})
+        'warning': '初步分析：代表风格的有效正文不足三篇，文风结论暂不稳定。' if data['analysis_mode'] == 'style' and data['style_sample_count'] < 3 else ''})
 
 
 class VoiceVersionsView(BaseView):

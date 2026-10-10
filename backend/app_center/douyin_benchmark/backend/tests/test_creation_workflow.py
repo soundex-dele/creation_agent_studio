@@ -8,6 +8,68 @@ from .test_article import article_content
 
 
 @pytest.mark.parametrize('kind', ['article', 'script'])
+def test_typed_theme_creates_without_idea_and_freezes_facts_voice_and_requirements(ctx, monkeypatch, kind):
+    profile = setup_profile(ctx)
+    voice = confirm(ctx, profile)
+    body = {'kind': kind, 'theme': '为什么晚上更容易饿', 'target_account_id': str(ctx.account.pk),
+            'writing_requirements': '从作息角度解释，写给新手', 'factual_material': '我最近三天都在晚上十点吃晚餐。'}
+    response = start(ctx, body, 'typed')
+    assert response.status_code == 201, response.data
+    task = m.Task.objects.get(pk=response.data['id'])
+    assert start(ctx, body, 'typed').data['id'] == response.data['id']
+    assert start(ctx, {**body, 'factual_material': '新的事实'}, 'typed').status_code == 409
+    assert task.input['topic'] == {'title': body['theme'], 'angle': body['writing_requirements'], 'hook': ''}
+    assert task.input['brief']['theme'] == body['theme']
+    assert task.input['brief']['voice_version_id'] == voice['id']
+    confirm(ctx, profile, content('之后改了定位'))
+    calls = []
+
+    def model(active, prompt, data, *args, **kwargs):
+        calls.append(data)
+        assert data['brief']['voice_version_id'] == voice['id']
+        assert data['brief']['factual_material'] == body['factual_material']
+        assert data['brief']['writing_requirements'] == body['writing_requirements']
+        assert data['topic']['title'] == body['theme']
+        if kind == 'script':
+            return script()
+        return {'article': article_content(), 'summary': '按个人表达核对完成。'} if 'draft' in data else article_content()
+
+    monkeypatch.setattr('app_center.douyin_benchmark.backend.analysis.call_model', model)
+    execute(*claim(task))
+    assert len(calls) == (2 if kind == 'article' else 1)
+    assert task.versions.count() == 1
+    assert not m.Idea.objects.exists() and not m.Task.objects.filter(kind='topics').exists()
+    if kind == 'article':
+        task.refresh_from_db()
+        assert task.output['style_review']['status'] == 'completed'
+
+
+def test_typed_theme_validation_and_creator_boundaries(ctx):
+    profile = setup_profile(ctx)
+    body = {'kind': 'article', 'theme': '一个新主题', 'target_account_id': str(ctx.account.pk)}
+    assert start(ctx, body, 'unconfirmed-direct').status_code == 400
+    confirm(ctx, profile)
+    for index, change in enumerate([{'theme': ''}, {'theme': '   '}, {'theme': '字' * 2001},
+                                   {'factual_material': '字' * 10001}, {'writing_requirements': '字' * 3001}]):
+        assert start(ctx, {**body, **change}, f'invalid-direct-{index}').status_code == 400
+    foreign = other_account(ctx, ctx.reader)
+    assert start(ctx, {**body, 'target_account_id': str(foreign.pk)}, 'foreign-direct').status_code == 404
+    assert start(ctx, {'kind': 'article', 'theme': '独立主题'}, 'missing-positioning').status_code == 400
+    manual = start(ctx, {'kind': 'article', 'theme': '独立主题', 'positioning': '手动定位', 'factual_material': '手动事实'}, 'manual-direct')
+    assert manual.status_code == 201, manual.data
+    assert m.Task.objects.get(pk=manual.data['id']).input['brief']['factual_material'] == '手动事实'
+
+
+def test_historical_topic_rejects_new_facts_and_keeps_original_snapshot(ctx):
+    from .test_article import topics_for
+    _, _, topics = topics_for(ctx)
+    for field in ['writing_requirements', 'factual_material']:
+        result = start(ctx, {'kind': 'article', 'source_task_id': str(topics.pk), field: '新补充'}, field)
+        assert result.status_code == 400
+    assert start(ctx, {'kind': 'article', 'source_task_id': str(topics.pk)}, 'old-source').status_code == 201
+
+
+@pytest.mark.parametrize('kind', ['article', 'script'])
 def test_saved_idea_writes_directly_and_freezes_voice_and_notes(ctx, monkeypatch, kind):
     profile = setup_profile(ctx)
     voice = confirm(ctx, profile)
@@ -106,13 +168,14 @@ def test_independent_profiles_filter_does_not_include_account_profiles(ctx):
 
 
 @pytest.mark.parametrize('kind', ['article', 'script'])
-def test_direct_creation_only_freezes_explicit_knowledge_revisions(ctx, monkeypatch, kind):
+@pytest.mark.parametrize('source', ['idea', 'typed'])
+def test_direct_creation_only_freezes_explicit_knowledge_revisions(ctx, monkeypatch, kind, source):
     from .test_knowledge import save_card
     _, _, card, _ = save_card(ctx, monkeypatch)
     profile = setup_profile(ctx)
     confirm(ctx, profile)
     idea = ctx.client.post(ctx.root + '/ideas', {'title': '直接写作'}, format='json').data
-    body = {'kind': kind, 'idea_id': idea['id'], 'target_account_id': str(ctx.account.pk)}
+    body = {'kind': kind, 'target_account_id': str(ctx.account.pk), **({'idea_id': idea['id']} if source == 'idea' else {'theme': '直接输入的新主题'})}
     first = start(ctx, body, 'without-cards')
     assert first.status_code == 201, first.data
     assert 'knowledge' not in m.Task.objects.get(pk=first.data['id']).input['reference']

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 import { OwnedAccounts } from '../douyin/OwnedAccounts';
 import { researchTaskStatus } from '@/services/douyinResearch';
+import { makeVoicePrompt } from '@/lib/douyinVoicePrompt';
 import type { CreatorProfile, ResearchTask, VoiceContent, VoiceVersion } from '@/services/douyinResearch';
 
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
@@ -63,7 +64,7 @@ describe('owned account workflow', () => {
     vi.mocked(api.get).mockImplementation(async (url, params, config) => url.endsWith('/tasks/t-article/versions')
       ? [{ id: 'article-v1', revision: 1, content: written, created_at: '' }] : get(url, params, config));
     vi.mocked(api.post).mockImplementation(async (url, body, config) => {
-      if ((body as Record<string, unknown>).kind === 'article') { const value = task('article', written); tasks = [value, ...tasks]; return value; }
+      if ((body as Record<string, unknown>).kind === 'article') { const value = task('article', { ...written, style_review: { status: 'completed', summary: '按开头规则核对，无需修改。', revision: 1 } }); tasks = [value, ...tasks]; return value; }
       if (url.endsWith('/tasks/t-article/versions')) return { id: 'article-v2', revision: 2, content: (body as Record<string, unknown>).content, created_at: '' };
       return post(url, body, config);
     });
@@ -72,19 +73,47 @@ describe('owned account workflow', () => {
     await click('4 · 按账号创作'); await click('生成3个账号专属选题'); await click('开始写作');
     expect(api.post).toHaveBeenCalledWith('/dy/tasks', { kind: 'article', source_task_id: 't-topics', topic_index: 0, target_account_id: 'a1' }, expect.any(Object));
     expect(container.querySelector<HTMLTextAreaElement>('[aria-label="文章正文"]')?.value).toBe(written.body);
+    expect(container.textContent).toContain('生成版本 1 已完成模型文风校对');
     expect(container.textContent).toContain('复制正文');
     expect(container.textContent).not.toContain('分镜与拍摄');
     const editor = container.querySelector<HTMLTextAreaElement>('[aria-label="文章正文"]')!;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(editor, '我修改后的真实表达。'); editor.dispatchEvent(new Event('input', { bubbles: true })); });
     expect(container.textContent).toContain('有未保存的文章修改');
+    expect(container.textContent).toContain('当前修改未进行文风校对');
+    expect(container.textContent).not.toContain('生成版本 1 已完成模型文风校对');
     await click('保存文章新版本');
     expect(api.post).toHaveBeenCalledWith('/dy/tasks/t-article/versions', { revision: 1, content: { ...written, body: '我修改后的真实表达。' } });
     expect(container.textContent).toContain('文章已保存为新版本');
+    expect(container.textContent).toContain('当前修改未进行文风校对');
+  });
+  it('rebuilds the confirmed prompt from the shared specification without adopting advice', async () => {
+    const post = vi.mocked(api.post).getMockImplementation()!;
+    vi.mocked(api.post).mockImplementation(async (url, body, config) => {
+      const value = await post(url, body, config);
+      if ((body as Record<string, unknown>).kind === 'voice_analysis') {
+        const report = value as ResearchTask;
+        report.output.findings = [{ category: 'improve', text: '建议加入三个金句', sample_id: 's1', quote: '小实验' }];
+      }
+      return value;
+    });
+    await render(); await click('2 · 分析定位与文风'); await click('分析有效样本的定位与文风');
+    expect(container.textContent).toContain('改善建议（不自动用于写作）');
+    await click('编辑分析结果并确认');
+    await click('按当前规则重建提示词');
+    const prompt = container.querySelector<HTMLTextAreaElement>('[aria-label="完整创作提示词"]')!.value;
+    expect(prompt).toBe(makeVoicePrompt(content));
+    expect(prompt).toContain('【内容支柱】\n日常实验');
+    expect(prompt).toContain('【内容边界】\n不编造');
+    expect(prompt).not.toContain('三个金句');
+    await click('确认并启用新版本');
+    expect(api.post).toHaveBeenLastCalledWith('/dy/creator-profiles/p1/voice-versions', { revision: 1, content: { ...content, prompt }, source_task_id: 't-voice_analysis' });
   });
   it.each([
     ['queued', 'queued', '排队中'],
     ['running', 'queued', '正在执行'],
     ['running', '分析账号定位与文风', '分析账号定位与文风'],
+    ['running', '正在按文风写作', '正在按文风写作'],
+    ['running', '正在校对个人文风', '正在校对个人文风'],
     ['succeeded', 'queued', '已完成'],
     ['failed', 'queued', '失败'],
     ['cancelled', 'queued', '已取消'],

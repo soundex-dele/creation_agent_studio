@@ -14,6 +14,8 @@ const labels: Record<string, string> = {
   claims: '分析结论', narration: '口播稿', cover: '封面短句', scenes: '分镜',
   time: '时间', visual: '画面', spoken: '口播', checklist: '准备事项',
   hooks: '开头', titles: '标题', covers: '封面短句',
+  style_features: '文风观察', instruction: '怎么写', when: '适用条件', deviation: '风格偏离',
+  article: '校对后的文章', summary: '修订说明',
 };
 
 export function GenerationPreview({ task }: { task: Pick<DouyinTask, 'id' | 'status' | 'progress'> }) {

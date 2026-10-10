@@ -54,12 +54,13 @@ def test_running_preview_is_private_and_does_not_create_a_version(ctx, monkeypat
         ctx.client.force_authenticate(ctx.reader)
         assert ctx.client.get(f'{ctx.root}/tasks/{task.pk}').status_code == 404
         ctx.client.force_authenticate(ctx.owner)
-        return article_content()
+        return {'article': article_content(), 'summary': '无需修改。'} if task.stage == '正在校对个人文风' else article_content()
 
     monkeypatch.setattr('app_center.douyin_benchmark.backend.analysis.generate_json', generate)
     execute(payload, sink)
     task.refresh_from_db()
-    assert task.output == article_content() and task.versions.count() == 1
+    assert task.output['body'] == article_content()['body'] and task.versions.count() == 1
+    assert task.output['style_review']['status'] == 'completed'
     assert 'ai_preview' not in task.progress
     assert '正在写' not in str(sink.emit.call_args_list)
 
@@ -73,12 +74,14 @@ def test_repair_replaces_preview_instead_of_appending(ctx, monkeypatch):
         assert task.progress['ai_preview'] == {'text': '', 'state': 'waiting'}
         attempts.append(1)
         value = {'title': '无正文的第一轮'} if len(attempts) == 1 else article_content()
+        if task.stage == '正在校对个人文风':
+            value = {'article': article_content(), 'summary': '无需修改。'}
         kwargs['on_event']('output.delta', {'text': json.dumps(value, ensure_ascii=False)})
         return value
 
     monkeypatch.setattr('app_center.douyin_benchmark.backend.analysis.generate_json', generate)
     execute(*claim(task))
-    assert len(attempts) == 2 and task.versions.count() == 1
+    assert len(attempts) == 3 and task.versions.count() == 1
 
 
 @pytest.mark.parametrize('stop', ['failure', 'cancel', 'lease'])

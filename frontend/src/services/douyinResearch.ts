@@ -11,6 +11,7 @@ export interface VoiceSample extends RecordBase { profile: string; work: string 
 export interface VoiceEvidence { id: string; title: string; text: string; usage: string; source_url: string; work_id: string | null }
 export interface VoiceVersion { id: string; number: number; profile: string; content: VoiceContent; evidence: VoiceEvidence[]; source_task: string | null; created_at: string }
 export interface ArticleContent { cover?: string; title: string; body: string; notes: string[] }
+export interface StyleReview { status: 'completed' | 'unavailable' | 'not_applicable'; summary: string; revision: number }
 export interface Inspiration extends RecordBase { title: string; kind: string; text: string; notes: string; tags: string[]; work: string | null; source_task: string | null; source_ref: string; source_time: number | null }
 export interface Idea extends RecordBase { title: string; notes: string; tags: string[]; status: string; position: number; inspiration: string | null; source_task: string | null }
 export interface ResearchWork extends DouyinWork { account_id: string; account_name: string; is_owned: boolean; captured_at: string }
@@ -42,6 +43,7 @@ export interface ResearchTask extends Omit<DouyinTask, 'kind' | 'output'> { acco
   radar_profile?: { account_name: string; target_account_id: string } | null;
   cards?: KnowledgeCandidate[]; knowledge_cards?: KnowledgeSnapshot[]; saved_candidate_ids?: string[];
   body?: string; notes?: string[];
+  style_review?: StyleReview;
   content?: VoiceContent; profile_id?: string; target_account_id?: string; voice_evidence?: VoiceEvidence[];
   findings?: { category: 'positioning' | 'keep' | 'improve'; text: string; sample_id: string; quote: string }[];
   creation_context?: { target_account_id?: string; account_name?: string; voice_version_number?: number };

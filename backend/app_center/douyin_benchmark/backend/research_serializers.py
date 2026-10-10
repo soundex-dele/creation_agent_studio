@@ -178,6 +178,8 @@ class ResearchInput(serializers.Serializer):
     positioning = serializers.CharField(max_length=2000, allow_blank=True, required=False)
     audience = serializers.CharField(max_length=2000, allow_blank=True, required=False)
     theme = serializers.CharField(max_length=2000, allow_blank=True, required=False)
+    writing_requirements = serializers.CharField(max_length=3000, allow_blank=True, required=False)
+    factual_material = serializers.CharField(max_length=10000, allow_blank=True, required=False)
     conditions = serializers.CharField(max_length=3000, allow_blank=True, required=False)
     duration = serializers.IntegerField(min_value=15, max_value=600, default=60)
     production_format = serializers.ChoiceField(choices=['talking_head', 'screencast', 'animation', 'live_action', 'mixed'], default='talking_head')
@@ -206,13 +208,16 @@ class ResearchInput(serializers.Serializer):
         if kind in ['needs', 'knowledge_extract'] and not attrs.get('source_task_id'):
             raise serializers.ValidationError('请选择来源任务。')
         if kind in ['script', 'article']:
-            if not attrs.get('source_task_id') and not attrs.get('idea_id'):
-                raise serializers.ValidationError('请选择已保存的选题或来源选题任务。')
+            if not attrs.get('source_task_id') and not attrs.get('idea_id') and not attrs.get('theme'):
+                raise serializers.ValidationError('请输入这次想写的主题，或选择已有选题。')
             if attrs.get('source_task_id') and attrs.get('idea_id'):
                 raise serializers.ValidationError('请选择一种选题来源。')
+        if attrs.get('writing_requirements') or attrs.get('factual_material'):
+            if kind not in ['article', 'script'] or attrs.get('source_task_id'):
+                raise serializers.ValidationError('新增写作要求或真实素材时，请使用直接输入或选题库写作；历史选题沿用原有资料。')
         if 'knowledge_cards' in attrs:
             from .knowledge import CardSelection
-            if kind != 'topics' and not (kind in ['article', 'script'] and attrs.get('idea_id')):
+            if kind != 'topics' and not (kind in ['article', 'script'] and not attrs.get('source_task_id')):
                 raise serializers.ValidationError('请在生成选题时选择知识。')
             fields = CardSelection(data=attrs['knowledge_cards'], many=True)
             fields.is_valid(raise_exception=True)
