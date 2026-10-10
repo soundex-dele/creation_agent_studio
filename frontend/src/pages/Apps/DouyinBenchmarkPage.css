@@ -288,3 +288,7 @@
   .douyin-work dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .douyin-account-card, .douyin-nav-link { transition: none; } }
+
+/* Section navigation stays within the existing bounded document scroll owner. */
+.douyin-section-tabs { width: 100%; min-width: 0; }
+.douyin-section-tabs .ant-tabs-tab { min-height: 44px; }

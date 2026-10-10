@@ -39,7 +39,13 @@ class RecordsView(WorkspaceMixin, BaseView):
     def get(self, request, **kwargs):
         model, serializer = self.resource()
         qs = model.objects.filter(**self.scope())
+        if model in [m.Publication, m.Subscription] and request.query_params.get('account'):
+            from rest_framework import serializers
+            account = serializers.UUIDField().run_validation(request.query_params['account'])
+            qs = qs.filter(**{('work__account_id' if model is m.Publication else 'account_id'): account})
         if model is m.CreatorProfile:
+            if request.query_params.get('unbound') == 'true':
+                qs = qs.filter(account__isnull=True)
             qs = qs.order_by('-is_default', '-updated_at', 'id')
             if request.query_params.get('account'):
                 from rest_framework import serializers
@@ -205,7 +211,11 @@ class ResearchTasksView(WorkspaceMixin, BaseView):
 class PublicationSummaryView(WorkspaceMixin, BaseView):
     def get(self, request, **kwargs):
         from .research import publication_summary
-        return Response(publication_summary(self.scope()))
+        scope = self.scope()
+        if request.query_params.get('account'):
+            from rest_framework import serializers
+            scope['work__account_id'] = serializers.UUIDField().run_validation(request.query_params['account'])
+        return Response(publication_summary(scope))
 
 
 class ResearchTaskView(WorkspaceMixin, TaskView):
@@ -247,15 +257,21 @@ class VariantApplyView(WorkspaceMixin, BaseView):
             if value.strip():
                 values[key] = value.strip()
         content = dict(latest.content)
-        if target.kind == 'rewrite':
+        if target.kind == 'article':
+            content.update({k: v for k, v in values.items() if k != 'hook'})
+            if values.get('hook'):
+                content['body'] = values['hook'] + '\n\n' + content['body']
+        elif target.kind == 'rewrite':
             content['text'] = (values.get('hook', '') + '\n\n' + content['text']).strip()
         else:
             content.update({k: v for k, v in values.items() if k != 'hook'})
             if values.get('hook'):
                 content['narration'] = values['hook'] + '\n\n' + content['narration']
         from .analysis import validate_script, validate_rewrite
+        from .article import validate_article
         try:
-            content = (validate_rewrite if target.kind == 'rewrite' else validate_script)(content)
+            validator = {'article': validate_article, 'rewrite': validate_rewrite}.get(target.kind, validate_script)
+            content = validator(content)
         except ValueError as exc:
             raise ValidationError(str(exc)) from None
         version = m.ScriptVersion.objects.create(task=target, revision=latest.revision + 1, content=content)

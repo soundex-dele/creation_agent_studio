@@ -192,14 +192,17 @@ def freeze(scope, values):
             if not data['comments']:
                 raise ValidationError('该批次暂无可分析评论。')
     if values.get('source_version_id'):
-        version = get_object_or_404(m.ScriptVersion.objects.filter(**{f'task__{k}': v for k, v in scope.items()}, task__kind__in=['script', 'rewrite']), pk=values['source_version_id'])
+        version = get_object_or_404(m.ScriptVersion.objects.filter(**{f'task__{k}': v for k, v in scope.items()}, task__kind__in=['script', 'rewrite', 'article']), pk=values['source_version_id'])
         data['content'] = version.content
+        data['target_account_id'] = version.task.input.get('brief', {}).get('target_account_id')
         source = version.task
         if source.account_id:
             refs.add((source.account_id, source.work_id, source.pk))
         refs.update((link.account_id, link.work_id, source.pk) for link in source.source_links.all())
     if kind == 'review':
         pubs = m.Publication.objects.filter(**scope).select_related('work__account')
+        if values.get('target_account_id'):
+            pubs = pubs.filter(work__account_id=values['target_account_id'])
         if values['work_ids']:
             pubs = pubs.filter(work_id__in=values['work_ids'])
         data['publications'] = [{'id': str(p.pk), 'work': work_data(p.work), 'theme': p.theme, 'title': p.title, 'hook': p.hook,
@@ -208,7 +211,7 @@ def freeze(scope, values):
         if not data['publications']:
             raise ValidationError('请先关联自己的发布作品。')
     if kind in ['topics', 'script', 'article']:
-        if kind in ['script', 'article']:
+        if kind in ['script', 'article'] and not values.get('idea_id'):
             if not source or source.kind != 'topics':
                 raise ValidationError('请选择已完成的选题任务。')
             topics = source.output.get('topics')
@@ -227,7 +230,10 @@ def freeze(scope, values):
             brief.update({k: data[k] for k in ['positioning', 'audience', 'theme', 'conditions', 'duration', 'production_format'] if k in data})
             if values.get('idea_id'):
                 idea = get_object_or_404(m.Idea.objects.filter(**scope), pk=values['idea_id'])
-                brief.setdefault('theme', idea.title)
+                values = {**values, 'theme': idea.title}
+                brief['theme'] = idea.title
+                if kind in ['script', 'article']:
+                    data['topic'] = {'title': idea.title, 'angle': idea.notes, 'hook': ''}
                 data['reference'] = {**data.get('reference', {}), 'idea': {'title': idea.title, 'notes': idea.notes}}
             if values.get('brand_profile_id'):
                 from app_center.brand_library.backend.views import private_profiles
@@ -251,7 +257,7 @@ def freeze(scope, values):
         # Reference research must never implicitly select knowledge from an older task.
         data['reference'].pop('knowledge', None)
         data['reference'].pop('knowledge_cards', None)
-        if kind == 'topics':
+        if kind == 'topics' or values.get('idea_id'):
             if source and source.kind == 'knowledge_extract':
                 raise ValidationError('请先将候选知识确认入库，再勾选使用。')
             selected = freeze_selection(scope, values.get('knowledge_cards', []))

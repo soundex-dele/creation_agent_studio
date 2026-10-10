@@ -108,9 +108,12 @@ class PublicationSerializer(PrivateSerializer):
         work = attrs.get('work', getattr(self.instance, 'work', None))
         if work and not work.account.is_owned:
             raise serializers.ValidationError('请先将该账号标记为我的账号。')
-        version = attrs.get('script_version')
-        if version and version.task.kind not in ['script', 'rewrite']:
-            raise serializers.ValidationError('请选择脚本或改写文案的保存版本。')
+        version = attrs.get('script_version', getattr(self.instance, 'script_version', None))
+        if version and version.task.kind not in ['script', 'rewrite', 'article']:
+            raise serializers.ValidationError('请选择文章、脚本或改写文案的保存版本。')
+        target = version.task.input.get('brief', {}).get('target_account_id') if version else None
+        if target and work and str(work.account_id) != target:
+            raise serializers.ValidationError('文案与发布作品不属于同一个创作账号。')
         return attrs
 
 
@@ -200,11 +203,16 @@ class ResearchInput(serializers.Serializer):
             raise serializers.ValidationError('请选择一条作品采集评论。')
         if kind == 'refresh' and not attrs['work_ids']:
             raise serializers.ValidationError('请选择需要刷新的作品。')
-        if kind in ['needs', 'script', 'article', 'knowledge_extract'] and not attrs.get('source_task_id'):
+        if kind in ['needs', 'knowledge_extract'] and not attrs.get('source_task_id'):
             raise serializers.ValidationError('请选择来源任务。')
+        if kind in ['script', 'article']:
+            if not attrs.get('source_task_id') and not attrs.get('idea_id'):
+                raise serializers.ValidationError('请选择已保存的选题或来源选题任务。')
+            if attrs.get('source_task_id') and attrs.get('idea_id'):
+                raise serializers.ValidationError('请选择一种选题来源。')
         if 'knowledge_cards' in attrs:
             from .knowledge import CardSelection
-            if kind != 'topics':
+            if kind != 'topics' and not (kind in ['article', 'script'] and attrs.get('idea_id')):
                 raise serializers.ValidationError('请在生成选题时选择知识。')
             fields = CardSelection(data=attrs['knowledge_cards'], many=True)
             fields.is_valid(raise_exception=True)

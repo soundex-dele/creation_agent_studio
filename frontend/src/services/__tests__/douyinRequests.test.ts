@@ -15,7 +15,7 @@ describe.each(['missing', 'throwing', 'absent'])('Douyin requests with crypto %s
     });
   });
 
-  it.each(['account', 'task', 'research', 'refresh', 'voice', 'owned-topics', 'article', 'knowledge-extract', 'knowledge-confirm', 'knowledge-topics'])('submits %s and keeps the key until success', async operation => {
+  it.each(['account', 'task', 'research', 'refresh', 'voice', 'owned-topics', 'article', 'direct-article', 'direct-script', 'knowledge-extract', 'knowledge-confirm', 'knowledge-topics'])('submits %s and keeps the key until success', async operation => {
     const client = douyinApi('/dy');
     const research = researchApi('/dy');
     const submit = () => {
@@ -26,6 +26,7 @@ describe.each(['missing', 'throwing', 'absent'])('Douyin requests with crypto %s
       if (operation === 'task') return client.start('a1', { kind: 'collect', count: 50 });
       if (operation === 'research') return research.start({ kind: 'radar', days: 7 });
       if (operation === 'voice') return research.start({ kind: 'voice_analysis', target_account_id: 'a1' });
+      if (operation === 'direct-article' || operation === 'direct-script') return research.start({ kind: operation === 'direct-article' ? 'article' : 'script', idea_id: 'idea1', target_account_id: 'a1' });
       if (operation === 'article') return research.start({ kind: 'article', source_task_id: 'topics1', topic_index: 1 });
       if (operation === 'owned-topics') return research.start({ kind: 'topics', target_account_id: 'a1', theme: '' });
       return research.refresh('s1');

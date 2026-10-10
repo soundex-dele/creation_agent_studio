@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
@@ -79,8 +80,8 @@ describe('Creative knowledge workflow', () => {
 
   it('passes only explicitly selected card revisions to topic generation', async () => {
     const run = vi.fn().mockResolvedValue(undefined);
-    await act(async () => root.render(<CreationCenter client={researchApi('/dy')} initialIdea={null} run={run} onProfiles={() => {}} />));
-    await input('positioning', '科普'); await input('theme', '受众研究');
+    await act(async () => root.render(<MemoryRouter initialEntries={['/?view=create&mode=topics&profile=profile1']}><CreationCenter client={researchApi('/dy')} initialIdea={null} run={run} onProfiles={() => {}} /></MemoryRouter>));
+    await input('positioning', '科普'); await input('本次主题', '受众研究');
     await click('生成3个创作选题'); expect(run.mock.calls[0][0]).not.toHaveProperty('knowledge_cards');
     await click('推荐相关知识'); await check('使用 明确受众'); await click('生成3个创作选题');
     expect(run.mock.calls[1][0].knowledge_cards).toEqual([{ id: 'card1', revision: 1 }]);
@@ -105,11 +106,11 @@ describe('Creative knowledge workflow', () => {
       if (url.includes('knowledge-cards')) return { count: 1, results: [card] };
       return url.endsWith('/brands') ? [] : { count: 0, results: [] };
     });
-    await act(async () => root.render(<CreationCenter client={researchApi('/dy')} initialIdea={null} run={vi.fn()} onProfiles={() => {}} />));
+    await act(async () => root.render(<MemoryRouter initialEntries={['/?view=create&mode=topics&profile=profile1']}><CreationCenter client={researchApi('/dy')} initialIdea={null} run={vi.fn()} onProfiles={() => {}} /></MemoryRouter>));
     await click('推荐相关知识'); await check('使用 明确受众');
-    const selector = document.querySelector('[aria-label="创作档案"]')!.closest('.ant-select')!.querySelector('.ant-select-selector')!;
+    const selector = document.querySelector('[aria-label="创作账号或独立档案"]')!.closest('.ant-select')!.querySelector('.ant-select-selector')!;
     await act(async () => selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
-    const option = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].find(el => el.textContent === '账号乙');
+    const option = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].find(el => el.textContent === '账号乙 · 独立档案');
     expect(option).toBeDefined(); await act(async () => option!.click());
     expect(container.textContent).toContain('已选 0 / 10');
     expect(container.textContent).not.toContain('明确受众 · v1');

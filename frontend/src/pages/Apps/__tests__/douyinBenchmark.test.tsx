@@ -38,7 +38,7 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-async function render(node: React.ReactNode) { await act(async () => root.render(<MemoryRouter>{node}</MemoryRouter>)); }
+async function render(node: React.ReactNode) { await act(async () => root.render(<MemoryRouter initialEntries={['/?view=accounts']}>{node}</MemoryRouter>)); }
 async function click(text: string) {
   const candidates = [...document.querySelectorAll<HTMLElement>('button,[role="tab"]')];
   const element = candidates.find((el) => el.textContent === text) ?? candidates.find((el) => el.textContent?.includes(text));
@@ -82,7 +82,7 @@ describe('Douyin benchmark workflow', () => {
     vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/tasks/transcript-1') ? Promise.resolve(transcript) : original(url, ...args));
     await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
     await click('作品库');
-    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '爆款复刻')!.click());
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '参考改写')!.click());
     expect(api.post).toHaveBeenCalledWith('/dy/accounts/a1/tasks', { kind: 'transcribe', work_id: 'w1' }, expect.anything());
     expect((container.querySelector('[aria-label="口播原文"]') as HTMLTextAreaElement).value).toBe('原始文案。');
     expect(container.textContent).toContain('来源作品：如何读书');
@@ -97,7 +97,7 @@ describe('Douyin benchmark workflow', () => {
     vi.mocked(api.get).mockImplementation((url, ...args) => url.endsWith('/tasks/transcript-1') ? Promise.resolve(transcript) : original(url, ...args));
     await render(<DouyinWorkspace client={douyinApi('/dy')} accountId="a1" onRemoved={vi.fn()} />);
     await click('作品库');
-    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '爆款复刻')!.click());
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(button => button.textContent === '参考改写')!.click());
     expect(container.textContent).toContain('转写口播');
     expect(container.querySelector('[aria-label="口播原文"]')).toBeNull();
     await click('取消任务');
@@ -129,12 +129,12 @@ describe('Douyin benchmark workflow', () => {
     await render(<DouyinHome base="/dy" />);
     await act(async () => container.querySelector<HTMLButtonElement>('.douyin-account-card')!.click());
     expect(container.querySelector('h1')?.textContent).toBe('账号研究');
-    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标账号');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('发现与研究');
     await click('作品库');
     expect(container.textContent).toContain('如何读书');
     await act(async () => container.querySelector<HTMLAnchorElement>('.douyin-nav [aria-current="page"]')!.click());
     expect(container.textContent).toContain('我的对标账号');
-    expect(container.querySelector('h1')?.textContent).toBe('对标账号');
+    expect(container.querySelector('h1')?.textContent).toBe('发现与研究');
   });
   it('adds an account and sends an idempotency key', async () => {
     vi.mocked(api.post).mockResolvedValue({ ...account, task });
@@ -215,7 +215,7 @@ describe('image album replication', () => {
 
   async function openImage() {
     await click('作品库');
-    const button = [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(b => b.textContent === '爆款复刻')!;
+    const button = [...container.querySelectorAll<HTMLButtonElement>('.douyin-work-actions button')].find(b => b.textContent === '参考改写')!;
     expect(button.disabled).toBe(false);
     await act(async () => button.click());
   }

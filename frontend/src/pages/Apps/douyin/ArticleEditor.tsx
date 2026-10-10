@@ -6,7 +6,7 @@ import { saveResearchBlob } from '@/services/researchAssistant';
 import { Field } from './ResearchCommon';
 
 function article(version: ResearchVersion): ArticleContent {
-  return { title: version.content.title || '', body: version.content.body || '', notes: version.content.notes || [] };
+  return { ...(version.content.cover !== undefined && { cover: version.content.cover }), title: version.content.title || '', body: version.content.body || '', notes: version.content.notes || [] };
 }
 
 export function ArticleEditor({ client, taskId, onDirty }: { client: ResearchClient; taskId: string; onDirty?: (value: boolean) => void }) {
@@ -35,6 +35,7 @@ export function ArticleEditor({ client, taskId, onDirty }: { client: ResearchCli
     {content && <>
       <Field label="文章历史版本"><Select aria-label="文章历史版本" value={selected} disabled={dirty || busy} options={versions.map(v => ({ value: v.id, label: `版本 ${v.revision} · ${new Date(v.created_at).toLocaleString('zh-CN')}` }))} onChange={id => { const version = versions.find(v => v.id === id); if (version) { setSelected(id); setContent(article(version)); setMessage(''); } }} /></Field>
       <Field label="文章标题"><Input aria-label="文章标题" maxLength={300} value={content.title} onChange={e => edit({ ...content, title: e.target.value })} /></Field>
+      {content.cover !== undefined && <Field label="封面短句"><Input aria-label="封面短句" maxLength={300} value={content.cover} onChange={e => edit({ ...content, cover: e.target.value })} /></Field>}
       <Field label="文章正文"><Input.TextArea aria-label="文章正文" rows={18} maxLength={20000} value={content.body} onChange={e => edit({ ...content, body: e.target.value })} /></Field>
       <p>正文 {content.body.replace(/\s/g, '').length} 字符</p>
       {!!content.notes.length && <Alert type="warning" message="待核实或补充（不包含在复制和导出的文章中）" description={<ul>{content.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>} />}

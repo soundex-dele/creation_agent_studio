@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { Alert, Button, Input, Select, Tabs, Tag } from 'antd';
+import { Alert, Button, Input, Select, Tag } from 'antd';
 import { documentError } from '@/services/documents';
 import type { Idea, Inspiration, ResearchClient } from '@/services/douyinResearch';
 import { DeleteRecord, Field, Pager, RecordEditor, Status, useRows, type EditorField } from './ResearchCommon';
 
 export const ideaStates = { research: '待研究', create: '待创作', shoot: '待拍摄', published: '已发布' };
 const fields: EditorField[] = [{ key: 'title', label: '标题' }, { key: 'notes', label: '研究笔记', kind: 'long' }, { key: 'tags', label: '标签（逗号分隔）', kind: 'tags' }];
-export function IdeaLibrary({ client, onCreate }: { client: ResearchClient; onCreate: (idea: Idea) => void }) {
-  const [tab, setTab] = useState('ideas'); const [search, setSearch] = useState(''); const [tag, setTag] = useState(''); const [sort, setSort] = useState('position'); const [status, setStatus] = useState('');
+export function IdeaLibrary({ client, onCreate, resource = 'ideas' }: { resource?: 'ideas' | 'inspirations'; client: ResearchClient; onCreate: (idea: Idea) => void }) {
+  const tab = resource; const [search, setSearch] = useState(''); const [tag, setTag] = useState(''); const [sort, setSort] = useState('position'); const [status, setStatus] = useState('');
   const [editing, setEditing] = useState<Idea | Inspiration | Record<string, unknown> | null>(null); const [error, setError] = useState('');
   const rows = useRows<Idea | Inspiration>(client, tab, { search, tag, sort, status });
   async function action(fn: () => Promise<unknown>) { setError(''); try { await fn(); rows.reload(); } catch (e) { setError(documentError(e)); } }
@@ -18,8 +18,8 @@ export function IdeaLibrary({ client, onCreate }: { client: ResearchClient; onCr
     {!record.source_task && 'work' in record && !record.work && <small>独立灵感／来源不可用</small>}
     <div className="douyin-actions"><Button onClick={() => setEditing(record)}>编辑</Button>{tab === 'ideas' ? <><Button type="primary" onClick={() => onCreate(record as Idea)}>用此选题创作</Button><Select aria-label={`${record.title}状态`} value={(record as Idea).status} options={Object.entries(ideaStates).map(([value, label]) => ({ value, label }))} onChange={value => void move(record as Idea, value)} /></> : <Button onClick={() => void action(() => client.create('ideas', { title: record.title, notes: `${'text' in record ? record.text : ''}\n${record.notes}`, tags: record.tags, inspiration: record.id }))}>转为选题</Button>}<DeleteRecord client={client} resource={tab} record={record} done={rows.reload} /></div>
   </article>;
-  return <section className="douyin-form"><div className="douyin-section-title"><h2>灵感与选题库</h2><Button type="primary" onClick={() => setEditing({ title: '', notes: '', tags: [], ...(tab === 'ideas' ? { status: 'research', position: 0 } : { kind: 'text', text: '' }) })}>新建{tab === 'ideas' ? '选题' : '灵感'}</Button></div>
-    <Tabs activeKey={tab} onChange={v => { setTab(v); setEditing(null); setStatus(''); }} items={[{ key: 'ideas', label: '选题看板' }, { key: 'inspirations', label: '灵感收藏' }]} />
+  return <section className="douyin-form"><div className="douyin-section-title"><h2>{tab === 'ideas' ? '选题看板' : '灵感收藏'}</h2><Button type="primary" onClick={() => setEditing({ title: '', notes: '', tags: [], ...(tab === 'ideas' ? { status: 'research', position: 0 } : { kind: 'text', text: '' }) })}>新建{tab === 'ideas' ? '选题' : '灵感'}</Button></div>
+
     <div className="douyin-research-filters"><Field label="搜索标题或笔记"><Input aria-label="搜索标题或笔记" value={search} onChange={e => setSearch(e.target.value)} /></Field><Field label="筛选标签"><Input aria-label="筛选标签" value={tag} onChange={e => setTag(e.target.value)} /></Field><Field label="排序"><Select aria-label="选题排序" value={sort} onChange={setSort} options={[{ value: 'position', label: '自定义顺序' }, { value: 'updated', label: '最近更新' }]} /></Field>{tab === 'ideas' && <Field label="状态"><Select aria-label="状态筛选" value={status || undefined} allowClear onChange={v => setStatus(v || '')} options={Object.entries(ideaStates).map(([value, label]) => ({ value, label }))} /></Field>}</div>
     {error && <Alert type="error" message={error} />}<Status loading={rows.loading} error={rows.error} empty={!rows.results.length} />
     {tab === 'ideas' ? <div className="douyin-idea-board">{Object.entries(ideaStates).filter(([state]) => !status || status === state).map(([state, label]) => <section key={state} className="douyin-idea-column" aria-label={label} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const idea = rows.results.find(r => r.id === e.dataTransfer.getData('text/plain')); if (idea) void move(idea as Idea, state); }}><h3>{label}</h3>{rows.results.filter(r => (r as Idea).status === state).map(renderCard)}</section>)}</div> : <div className="douyin-research-grid">{rows.results.map(renderCard)}</div>}<Pager rows={rows} />

@@ -10,7 +10,7 @@ export interface VoiceContent { current_positioning: string; positioning: string
 export interface VoiceSample extends RecordBase { profile: string; work: string | null; source_task: string | null; title: string; text: string; usage: 'style' | 'content' | 'exclude'; source_url: string; source_missing: boolean; work_kind?: string | null }
 export interface VoiceEvidence { id: string; title: string; text: string; usage: string; source_url: string; work_id: string | null }
 export interface VoiceVersion { id: string; number: number; profile: string; content: VoiceContent; evidence: VoiceEvidence[]; source_task: string | null; created_at: string }
-export interface ArticleContent { title: string; body: string; notes: string[] }
+export interface ArticleContent { cover?: string; title: string; body: string; notes: string[] }
 export interface Inspiration extends RecordBase { title: string; kind: string; text: string; notes: string; tags: string[]; work: string | null; source_task: string | null; source_ref: string; source_time: number | null }
 export interface Idea extends RecordBase { title: string; notes: string; tags: string[]; status: string; position: number; inspiration: string | null; source_task: string | null }
 export interface ResearchWork extends DouyinWork { account_id: string; account_name: string; is_owned: boolean; captured_at: string }
@@ -73,7 +73,7 @@ export function researchApi(base: string) {
     cancel: (id: string) => api.post<ResearchTask>(`${base}/tasks/${id}/cancel`),
     compare: (account_ids: string[], days: number) => api.post<Comparison>(`${base}/comparisons`, { account_ids, days }),
     trend: (id: string) => api.get<Trend>(`${base}/works/${id}/trend`),
-    publicationSummary: () => api.get<PublicationSummary>(`${base}/publications/summary`),
+    publicationSummary: (account?: string) => api.get<PublicationSummary>(`${base}/publications/summary`, { account }),
     comments: (id: string, page = 1, batch?: string) => api.get<Page<CommentRow> & { batch: string | null; task_id?: string; warning?: string; batches: { id: string; task_id: string; created_at: string }[] }>(`${base}/works/${id}/comments`, { page, batch }),
     versions: (id: string) => api.get<ResearchVersion[]>(`${base}/tasks/${id}/versions`),
     saveVersion: (id: string, revision: number, content: ResearchVersion['content']) => api.post<ResearchVersion>(`${base}/tasks/${id}/versions`, { revision, content }),
@@ -95,5 +95,5 @@ export function researchTaskStatus(task: { status: string; stage: string }): str
   if (task.stage === 'completed') return '正在保存结果';
   return !task.stage || ['queue', 'queued', 'running'].includes(task.stage) ? '正在执行' : task.stage;
 }
-export const researchLabels: Record<string, string> = { knowledge_extract: '知识提炼', article: '文章写作', voice_analysis: '定位与文风分析', radar: '选题雷达', joint: '联合拆解', compare: '账号比较研究', comments: '评论采集', needs: '评论需求研究', variants: '表达实验', review: '作品复盘', refresh: '指标刷新', topics: '创作选题', script: '拍摄脚本', rewrite: '文案改写', breakdown: '视频拆解', transcribe: '转写', account: '账号分析', collect: '账号采集' };
+export const researchLabels: Record<string, string> = { knowledge_extract: '知识提炼', article: '文章写作', voice_analysis: '定位与文风分析', radar: '对标主题分析', joint: '联合拆解', compare: '账号比较研究', comments: '评论采集', needs: '评论需求研究', variants: '表达实验', review: '作品复盘', refresh: '指标刷新', topics: '创作选题', script: '拍摄脚本', rewrite: '文案改写', breakdown: '视频拆解', transcribe: '转写', account: '账号分析', collect: '账号采集' };
 export const metricLabels: Record<MetricKey, string> = { likes: '点赞', comments: '评论', collects: '收藏', shares: '分享' };

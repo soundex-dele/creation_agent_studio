@@ -43,7 +43,7 @@ function Location() { const location = useLocation(); return <output>{location.s
 describe('All-site topic radar', () => {
   it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('opens the independent page preserving %s', async query => {
     await render(<><DouyinHome base="/dy" /><Location /></>, `/?${query}&view=radar`);
-    expect(container.querySelector('h1')?.textContent).toBe('选题雷达');
+    expect(container.querySelector('h1')?.textContent).toBe('发现与研究');
     expect(container.querySelector('main')?.className).toContain('app-scroll-page');
     expect(container.querySelector('output')?.textContent).toContain(query);
     expect(container.querySelector('output')?.textContent).toContain('task=scan1');

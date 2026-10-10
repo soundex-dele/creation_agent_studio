@@ -42,30 +42,30 @@ function RouteProbe() {
 }
 
 describe('Private Douyin research workflow', () => {
-  it('exposes the sidebar destinations and keeps the account library selected on entry', async () => {
+  it('exposes the sidebar destinations and starts with the creator workspace', async () => {
     await render(<DouyinHome base="/dy" />);
-    expect(container.textContent).toContain('我的对标账号');
-    for (const label of ['对标研究', '选题库', '创作中心', '作品复盘', '订阅通知']) expect(container.textContent).toContain(label);
-    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标账号');
+    expect(container.textContent).toContain('我的账号');
+    for (const label of ['发现与研究', '选题库', '创作中心', '素材库', '通知与订阅']) expect(container.textContent).toContain(label);
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('我的账号');
     expect(container.querySelector('.douyin-top-nav')).toBeNull();
-    await click('对标研究');
-    expect(container.textContent).toContain('生成选题雷达');
-    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('对标研究');
+    await click('发现与研究'); await click('作品研究');
+    expect(container.textContent).toContain('生成对标主题分析');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('发现与研究');
     expect(container.querySelector('main')?.className).toContain('app-scroll-page');
   });
-  it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('preserves %s and task links across sidebar navigation and browser back', async query => {
-    await render(<><DouyinHome base="/dy" /><RouteProbe /></>, `/?${query}&view=ideas&task=r1`);
-    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('选题库');
-    await click('个人创作档案');
-    expect(container.querySelector('h1')?.textContent).toBe('个人创作档案');
+  it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('preserves %s while clearing unrelated task context across navigation and back', async query => {
+    await render(<><DouyinHome base="/dy" /><RouteProbe /></>, `/?${query}&view=research&task=r1`);
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('发现与研究');
+    await click('我的账号'); await click('独立档案');
+    expect(container.querySelector('h1')?.textContent).toBe('我的账号');
     expect(container.querySelector('[data-testid="location"]')?.textContent).toContain(query);
-    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('task=r1');
+    expect(container.querySelector('[data-testid="location"]')?.textContent).not.toContain('task=');
     expect(document.activeElement).toBe(container.querySelector('main'));
-    await click('测试后退');
-    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('选题库');
+    await click('测试后退'); await click('测试后退');
+    expect(container.querySelector('.douyin-nav [aria-current="page"]')?.textContent).toBe('发现与研究');
     await click('对标账号');
     expect(container.textContent).toContain('我的对标账号');
-    expect(container.querySelector('[data-testid="location"]')?.textContent).not.toContain('view=');
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('view=accounts');
   });
   it('closes the mobile drawer after choosing a destination', async () => {
     await render(<DouyinHome base="/dy" />);
@@ -77,15 +77,15 @@ describe('Private Douyin research workflow', () => {
     await act(async () => link.click());
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('h1')?.textContent).toBe('选题库');
-    expect(container.textContent).toContain('灵感与选题库');
+    expect(container.textContent).toContain('选题看板');
   });
-  it.each([['ideas', '灵感与选题库'], ['create', '开头与标题实验室'], ['review', '自己的作品复盘'], ['subscriptions', '订阅与通知'], ['profiles', '个人创作档案']])('opens %s with its actions', async (section, title) => {
+  it.each([['ideas', '选题看板'], ['create', '开头与标题实验室'], ['review', '自己的作品复盘'], ['subscriptions', '通知与订阅'], ['profiles', '独立创作档案']])('opens %s with its actions', async (section, title) => {
     await render(<ResearchHub base="/dy" section={section} onSection={vi.fn()} openAccount={vi.fn()} />);
     expect(container.textContent).toContain(title);
   });
   it('starts a bounded radar task and offers explicit account comparison', async () => {
     await render(<ResearchHub base="/dy" section="research" onSection={vi.fn()} openAccount={vi.fn()} />);
-    await click('生成选题雷达');
+    await click('生成对标主题分析');
     expect(api.post).toHaveBeenCalledWith('/dy/tasks', { kind: 'radar', account_ids: [], group: '', days: 30 }, expect.objectContaining({ headers: expect.any(Object) }));
     const compare = [...container.querySelectorAll<HTMLButtonElement>('button')].find(el => el.textContent === '比较账号数据');
     expect(compare?.disabled).toBe(true);

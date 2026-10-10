@@ -22,7 +22,12 @@ def validate_article(value):
     notes = value.get('notes', [])
     if not isinstance(notes, list) or len(notes) > 20 or any(not isinstance(n, str) or not n.strip() or len(n) > 1000 for n in notes):
         raise ValueError('待核实事项最多20条，每条1—1000字。')
-    return {'title': value['title'].strip(), 'body': value['body'].strip(), 'notes': notes}
+    result = {'title': value['title'].strip(), 'body': value['body'].strip(), 'notes': notes}
+    if 'cover' in value:
+        if not isinstance(value['cover'], str) or len(value['cover']) > 300:
+            raise ValueError('封面短句不能超过300字。')
+        result['cover'] = value['cover'].strip()
+    return result
 
 
 def markdown(content):
