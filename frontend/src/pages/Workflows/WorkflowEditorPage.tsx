@@ -25,6 +25,10 @@ import './Workflows.css';
 import { workflowStepOutputOptions } from '@/lib/wechatParallelWorkflow';
 import { findWorkflowPreset } from './presets';
 import WorkflowFixedValueInput, { fixedWorkflowValue } from './WorkflowFixedValueInput';
+import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { repoError } from '@/services/repoExplainer';
+import { loadRepoWorkflowMaterial, parseRepoWorkflowSource, repoWorkflowReturnPath } from './repoWorkflowSource';
 
 const WorkflowGraphEditor = lazy(() => import('./WorkflowGraphEditor'));
 
@@ -69,9 +73,20 @@ function WorkflowStepPanel({ graph, open, onClose, children }: {
 }
 
 const WorkflowEditorPage = () => {
+  const organizationId = useOrganizationStore(state => state.currentOrganizationId);
+  const userId = useAuthStore(state => state.user?.id);
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  // Discard source material and pending loads when the identity or route changes.
+  return <WorkflowEditor key={`${organizationId}:${userId}:${id}:${searchParams}`}
+    organizationId={organizationId} />;
+};
+
+const WorkflowEditor = ({ organizationId }: { organizationId: string | null }) => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const preset = searchParams.get('preset');
+  const sourceQuery = searchParams.toString();
   const navigate = useNavigate();
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [apps, setApps] = useState<AppItem[]>([]);
@@ -83,6 +98,7 @@ const WorkflowEditorPage = () => {
   const [selectedStepKey, setSelectedStepKey] = useState<string | null>(null);
   const [nodeConfigOpen, setNodeConfigOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [repoReturnUrl, setRepoReturnUrl] = useState('');
   const [outputSources, setOutputSources] = useState<Record<string, string>>({});
   const nameInputRef = useRef<InputRef>(null);
 
@@ -100,6 +116,16 @@ const WorkflowEditorPage = () => {
         rendererKey: app.renderer_key, kind: app.kind,
       })));
     });
+    let source: ReturnType<typeof parseRepoWorkflowSource> = null;
+    if (!id) {
+      try {
+        source = parseRepoWorkflowSource(new URLSearchParams(sourceQuery), organizationId);
+        if (source) setRepoReturnUrl(repoWorkflowReturnPath(source));
+      } catch (error) {
+        setLoadError(`仓库素材加载失败：${repoError(error)}`);
+        return () => { cancelled = true; };
+      }
+    }
     if (!id && preset) {
       setWorkflow(null);
       const definition = findWorkflowPreset(preset);
@@ -107,18 +133,39 @@ const WorkflowEditorPage = () => {
         setLoadError('该工作流预设不存在，请返回工作流页面重新选择。');
         return () => { cancelled = true; };
       }
-      Promise.all([
-        Promise.all(definition.applicationSlugs.map((slug) => api.get<ApplicationRuntime>(`/apps/${slug}/`))),
-        loadApps(),
-      ]).then(([applications]) => {
+      void (async () => {
+        let material: Awaited<ReturnType<typeof loadRepoWorkflowMaterial>> | undefined;
+        try {
+          if (source) {
+            material = await loadRepoWorkflowMaterial(source);
+          }
+        } catch (error) {
+          if (!cancelled) setLoadError(`仓库素材加载失败：${repoError(error)}`);
+          return;
+        }
         if (cancelled) return;
-        const draft = definition.build(applications);
-        setWorkflow(draft);
-        setSteps(draft.steps || []);
-        setEditorMode(draft.execution_mode === 'automatic' ? 'graph' : 'list');
-      }).catch(() => {
-        if (!cancelled) setLoadError(definition.loadError);
-      });
+        try {
+          const [applications] = await Promise.all([
+            Promise.all(definition.applicationSlugs.map((slug) => api.get<ApplicationRuntime>(`/apps/${slug}/`))),
+            loadApps(),
+          ]);
+          if (cancelled) return;
+          const draft = definition.build(applications);
+          if (material) {
+            draft.name = material.name;
+            draft.is_public = false;
+            draft.input_schema = { ...draft.input_schema, properties: {
+              ...draft.input_schema?.properties,
+              topic: { ...draft.input_schema!.properties!.topic, default: material.topic },
+            } };
+          }
+          setWorkflow(draft);
+          setSteps(draft.steps || []);
+          setEditorMode(!material && draft.execution_mode === 'automatic' ? 'graph' : 'list');
+        } catch {
+          if (!cancelled) setLoadError(definition.loadError);
+        }
+      })();
       return () => { cancelled = true; };
     }
     if (!id) {
@@ -146,9 +193,10 @@ const WorkflowEditorPage = () => {
       setSteps(workflowData.steps || []);
     }).catch(() => { if (!cancelled) setLoadError('工作流加载失败，请刷新重试'); });
     return () => { cancelled = true; };
-  }, [id, preset]);
+  }, [id, preset, sourceQuery, organizationId]);
 
-  if (loadError) return <Alert type="error" showIcon message={loadError} />;
+  if (loadError) return <div className="workflow-editor"><Alert type="error" showIcon message={loadError}
+    action={<Button onClick={() => navigate(repoReturnUrl || '/apps')}>{repoReturnUrl ? '返回仓库解读助手' : '返回应用中心'}</Button>} /></div>;
   if (!workflow) return <div className="workflows-loading"><Spin size="large" /></div>;
 
   const graphEditing = workflow.execution_mode === 'automatic' && editorMode === 'graph';
@@ -469,6 +517,23 @@ const WorkflowEditorPage = () => {
           {id ? '保存工作流' : '创建工作流'}
         </Button>
       </div>
+      {workflow.input_schema?.properties?.topic?.type === 'string' && (
+        <Card className="workflow-topic-input">
+          <label htmlFor="workflow-topic-material">选题与素材</label>
+          <p id="workflow-topic-help">保存后会自动填入运行表单，运行前仍可修改。请保留源码结论的前置条件、限制和待确认状态。</p>
+          <Input.TextArea id="workflow-topic-material" aria-describedby="workflow-topic-help" rows={12}
+            value={String(workflow.input_schema.properties.topic.default ?? '')}
+            onChange={event => {
+              const schema = workflow.input_schema!;
+              const topic = { ...schema.properties!.topic };
+              // Blank means no default; the required runtime input still prompts for a topic.
+              if (event.target.value) topic.default = event.target.value;
+              else delete topic.default;
+              setWorkflow({ ...workflow, input_schema: { ...schema, properties: { ...schema.properties, topic } } });
+            }} />
+          {repoReturnUrl && <Button type="link" onClick={() => navigate(repoReturnUrl)}>返回仓库解读助手</Button>}
+        </Card>
+      )}
       {workflow.execution_mode === 'automatic' && (
         <Card
           title="工作流输入"

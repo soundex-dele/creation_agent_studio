@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, Drawer, Empty, Input, InputNumber, Modal, Select, Spin, Tabs, Tag } from 'antd';
 import { Code2, Plus, RefreshCw } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -8,6 +8,7 @@ import { tenantApiRoot } from '@/services/tenantContext';
 import { defaultRepoBrief, repoApi, repoError, repoTerminal, type RepoBrief, type RepoDestination, type RepoDetail, type RepoEvidence, type RepoHandoff, type RepoProject, type RepoReport, type RepoTask } from '@/services/repoExplainer';
 import RepoContentEditor from './repo/RepoContentEditor';
 import RepoTaskProgress from './repo/RepoTaskProgress';
+import { repoWorkflowEditorPath } from '../Workflows/repoWorkflowSource';
 import './RepoExplainerPage.css';
 
 export default function RepoExplainerPage() {
@@ -18,6 +19,7 @@ export default function RepoExplainerPage() {
 }
 
 function RepoWorkspace({ organization, applicationId }: { organization: string | null; applicationId?: string }) {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const client = useMemo(() => repoApi(`${tenantApiRoot(organization || '')}/applications/${applicationId}/repo-explainer`), [organization, applicationId]);
   const [projects, setProjects] = useState<RepoProject[]>([]);
@@ -158,7 +160,14 @@ function RepoWorkspace({ organization, applicationId }: { organization: string |
               <div className="repo-actions">{f.evidence_ids.map(id => <Button key={id} onClick={() => void showEvidence(id)}>{id} · 查看源码依据</Button>)}</div></article>)}
             <div className="repo-actions repo-workflow-actions">
               <span>已选 {selected.length} 项功能</span>
-              <Button type="primary" disabled={!selected.length} onClick={() => setTab('content')}>用已选 {selected.length} 项功能创作</Button>
+              <Button type="primary" disabled={!selected.length || !organization || !applicationId || !analysis || busy || editing}
+                onClick={() => {
+                  if (!organization || !applicationId || !analysis || !selected.length) return;
+                  navigate(repoWorkflowEditorPath({ organizationId: organization, applicationId,
+                    projectId, analysisId: analysis.id, featureIds: selected }));
+                }}>用总预设制作全套素材</Button>
+              <Button disabled={!selected.length} onClick={() => setTab('content')}>用已选 {selected.length} 项功能创作</Button>
+              <small>进入编辑器后可修改素材和节点；保存后运行，生成文章、图文图片、封面、短视频文案及 builder 脚本。</small>
             </div></>}
         </section> },
         { key: 'content', label: '内容创作', children: <section className="repo-stack">

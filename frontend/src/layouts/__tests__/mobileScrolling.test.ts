@@ -28,6 +28,36 @@ function declarationsAt(sources: string[], selectors: string[], width: number, h
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 1440])('keeps repository workflow actions and source editing reachable at %ipx', width => {
+    const repoCss = readSource('../../pages/Apps/RepoExplainerPage.css');
+    const editorCss = readSource('../../pages/Workflows/Workflows.css');
+    expect(readSource('../../pages/Apps/RepoExplainerPage.tsx')).toContain('repo-actions repo-workflow-actions');
+    expect(readSource('../../pages/Workflows/WorkflowEditorPage.tsx')).toContain('htmlFor="workflow-topic-material"');
+    expect(readSource('../../router/index.tsx')).toContain('<MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout>');
+    for (const height of [320, 900]) {
+      const root = declarationsAt([globalStyles, repoCss], ['.app-scroll-page', '.repo-page'], width, height);
+      expect(root.height).toBe('100%');
+      expect(root['min-height']).toBe('0');
+      expect(root['overflow-y']).toBe('auto');
+      expect(declarationsAt([repoCss], ['.repo-inner'], width, height).padding).toContain('safe-area-inset-bottom');
+      const actions = declarationsAt([repoCss], ['.repo-actions', '.repo-workflow-actions'], width, height);
+      expect(actions['flex-wrap']).toBe('wrap');
+      expect(actions['min-width']).toBe('0');
+      const field = declarationsAt([editorCss], ['.workflow-topic-input textarea.ant-input'], width, height);
+      expect(field.width).toBe('100%');
+      expect(field['max-width']).toBe('100%');
+      expect(field['overflow-y']).toBe('auto');
+      expect(field['max-height']).toBe(height <= 480 ? '180px' : '360px');
+      if (width <= 767) {
+        expect(field['font-size']).toBe('16px');
+        const button = declarationsAt([repoCss], ['.repo-page .ant-btn', '.repo-workflow-actions > .ant-btn'], width, height);
+        expect(button['min-height']).toBe('44px');
+        expect(button['white-space']).toBe('normal');
+        expect(button['max-width']).toBe('100%');
+      }
+    }
+  });
+
   it.each([320, 375, 390, 767, 768, 844, 1440])('keeps prompt master document scrolling bounded at %ipx', width => {
     const page = readSource('../../pages/Apps/PromptMasterPage.tsx');
     const css = readSource('../../pages/Apps/PromptMasterPage.css');
