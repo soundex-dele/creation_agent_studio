@@ -120,7 +120,7 @@ spec:
             placeholder: 例如：AI 工具测评、职场成长、母婴科普
             help_text: 未指定时使用干货型个人成长号。
             required: true
-            default_value: 干货型个人成长号
+            default_value: "智能体AI工坊：深耕 Agentic AI，分享智能体搭建教程、实战案例与工具测评，手把手带读者构建自己的数字化「超级员工」。"
             validation: {}
             order: 2
             options: []
@@ -131,7 +131,7 @@ spec:
             placeholder: 例如：25–35 岁一线城市职场人
             help_text: 描述越具体，场景和语言越准确。
             required: true
-            default_value: 25–40 岁微信深度阅读用户
+            default_value: "有 AI 使用基础、想动手搭建智能体的职场人和独立创作者；不默认具备开发基础。"
             validation: {}
             order: 3
             options: []
@@ -142,7 +142,7 @@ spec:
             placeholder: 请选择
             help_text: 决定文章结尾和传播钩子的侧重点。
             required: true
-            default_value: reading
+            default_value: "branding"
             validation: {}
             order: 4
             options:

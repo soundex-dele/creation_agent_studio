@@ -1,5 +1,7 @@
 # Agent Studio
 
+中文项目介绍见 [项目概览](docs/PROJECT_OVERVIEW.md)，涵盖项目定位、主要应用、技术架构、目录结构和运行方式。
+
 ## Bundled submodules
 
 Creation Master is mounted as the complete

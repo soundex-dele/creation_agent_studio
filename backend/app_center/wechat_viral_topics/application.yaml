@@ -102,7 +102,7 @@ spec:
             placeholder: 例如：AI 工具实测、职场成长、母婴科普
             help_text: 描述账号长期提供的价值和擅长领域。
             required: true
-            default_value: 干货型个人成长号
+            default_value: "智能体AI工坊：深耕 Agentic AI，分享智能体搭建教程、实战案例与工具测评，手把手带读者构建自己的数字化「超级员工」。"
             validation: {}
             order: 0
             options: []
@@ -113,7 +113,7 @@ spec:
             placeholder: 例如：25–35 岁，希望提升效率的一线城市职场人
             help_text: 尽量写明年龄、身份、场景和核心需求。
             required: true
-            default_value: 25–40 岁微信深度阅读用户
+            default_value: "有 AI 使用基础、想动手搭建智能体的职场人和独立创作者；不默认具备开发基础。"
             validation: {}
             order: 1
             options: []
@@ -124,7 +124,7 @@ spec:
             placeholder: 例如：AI 办公提效、个人知识管理；也可以填写“自动探索”
             help_text: 可以指定一个领域，也可以让 Skill 根据账号定位自动探索。
             required: true
-            default_value: 自动探索
+            default_value: "Agentic AI：智能体搭建教程、实战案例、工具测评与排错；优先围绕资料整理、内容生产、知识问答等具体任务。"
             validation: {}
             order: 2
             options: []
@@ -135,7 +135,7 @@ spec:
             placeholder: 请选择
             help_text: 决定选题评分和推荐排序的主要权重。
             required: true
-            default_value: balanced
+            default_value: "branding"
             validation: {}
             order: 3
             options:
@@ -151,7 +151,7 @@ spec:
             placeholder: 可多选
             help_text: 未限制时建议多选，让选题组合更丰富。
             required: true
-            default_value: [tutorial, insight, opinion]
+            default_value: ["tutorial", "insight"]
             validation: {}
             order: 4
             options:
@@ -167,7 +167,7 @@ spec:
             placeholder: 请选择
             help_text: 实时热点必须基于用户提供或可核验的信息。
             required: true
-            default_value: mixed
+            default_value: "evergreen"
             validation: {}
             order: 5
             options:
