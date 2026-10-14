@@ -37,6 +37,7 @@ def task_data(task):
     return dict(id=str(task.pk), kind=task.kind, status=status, error=task.error or (
         '任务未完成，请检查配置后重试。' if status in {'failed', 'cancelled'} else ''), result=task.result,
         applied=task.applied, request=task.snapshot.get('request', {}), stage=task.data.get('stage', ''), created_at=task.created_at.isoformat(),
+        activity=task.data.get('activity', {'items': [], 'dropped': 0}),
         run_id=str(task.run_id) if task.run_id else None, organization_id=str(task.organization_id))
 
 

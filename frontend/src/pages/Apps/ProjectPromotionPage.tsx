@@ -12,6 +12,7 @@ import { promotionApi, promotionError, activeTask, platforms, statuses, directio
 import { Choice, Field, RecordEditor, VersionEditor, caseFields, type Library } from './promotion/Editors';
 import './ProjectPromotionPage.css';
 import SourceEvidence from './promotion/SourceEvidence';
+import TaskActivity, { TaskRecord } from './promotion/TaskActivity';
 import type { SourceSnapshot } from '@/services/projectPromotion';
 
 const navigation = [
@@ -81,7 +82,7 @@ export function ProjectPromotionWorkspace({ base, root }: { base: string; root: 
     {loading ? <div className="promotion-loading"><Spin /><p>正在载入宣传工作区…</p></div> : <>
       <section className="promotion-intro"><div><span className="promotion-eyebrow">{tab === 'cases' ? 'STORY BANK' : tab === 'topics' ? 'EDITORIAL DESK' : tab === 'channels' ? 'PUBLISHING BOARD' : 'LEARN & ITERATE'}</span><h2>{tab === 'cases' ? '先积累值得讲的真实故事' : tab === 'topics' ? '一个案例，找到不同表达' : tab === 'channels' ? '让准备好的内容真正发出去' : '从真实反馈里，找到下一期内容'}</h2><p className="promotion-muted">{tab === 'cases' ? '从公众号内容生产、多平台改编、重复工作自动化开始。案例审核确认后再用于创作。' : tab === 'topics' ? '先确认选题，再分别创建公众号、小红书、抖音与朋友圈的渠道任务。' : tab === 'channels' ? '各渠道独立保存版本、安排日期和登记发布。发布操作由你完成。' : '登记观察当天的累计数据，匿名摘录咨询问题。未知数据与未知来源可以留空。'}</p></div><Button type="primary" icon={<PlusOutlined aria-hidden />} onClick={() => setEditor({ kind: tab })}>{tab === 'cases' ? '新增案例' : tab === 'topics' ? '新增选题' : tab === 'channels' ? '新增渠道任务' : '记录反馈'}</Button></section>
       {tab === 'cases' && <section className="promotion-card" aria-label="从项目生成案例"><h2>填入项目路径，让 AI 发现可展示的能力</h2>
-        <p className="promotion-muted">填写后端运行机器上的 Git 项目目录（需有提交记录）。读取当前工作区的源码与文档，生成带文件依据的待审核案例。</p>
+        <p className="promotion-muted">填写后端运行机器上的 Git 项目目录（需有提交记录）。AI 会像对话助手一样自主搜索、批量阅读源码与文档，整理带文件依据的案例。</p>
         <Field label="项目绝对路径">{id => <Input id={id} placeholder="例如 D:\\workspace\\my-project" maxLength={2000} value={projectPath} onChange={e => setProjectPath(e.target.value)} />}</Field>
         <Field label="探索方向（可选）">{id => <Input.TextArea id={id} rows={2} maxLength={30000} placeholder="例如：优先寻找公众号内容生产、多平台改编和重复工作自动化的案例" value={projectDirection} onChange={e => setProjectDirection(e.target.value)} />}</Field>
         <BrandReferencePicker root={root} config={brandConfig} value={brand} onChange={setBrand} />
@@ -107,13 +108,14 @@ export function ProjectPromotionWorkspace({ base, root }: { base: string; root: 
         <div className="promotion-actions">{tab === 'cases' && row.status === 'confirmed' && !row.archived && <Button onClick={() => { setCaseId(row.id); switchTab('topics'); }}>用此案例策划</Button>}{tab === 'channels' && !row.archived && <><Button type="primary" onClick={() => setCopy(row)}>编辑文案</Button><Button disabled={busy} onClick={() => void start(taskInput('copy', { channel_id: row.id }))}>生成新草稿</Button>{row.status === 'published' && <Button onClick={() => setEditor({ kind: 'feedback', initial: { channel_id: row.id, title: `${row.title} · 反馈` } })}>记录反馈</Button>}</>}<Button onClick={() => setEditor({ kind: tab, row })}>{tab === 'channels' ? '安排／登记发布' : '编辑与审核'}</Button><Button type="text" disabled={busy} onClick={() => void action(async () => { await api.update(tab, row, { archived: !row.archived }); })}>{row.archived ? '恢复' : '归档'}</Button></div>
       </article>)}</div><Pagination current={currentPage} total={selected.length} pageSize={12} showSizeChanger={false} hideOnSinglePage onChange={setPage} />
       {tab === 'channels' && <details className="promotion-card"><summary>创作偏好与品牌资料</summary><Field label="渠道生成补充要求">{id => <Input.TextArea id={id} rows={3} value={instruction} onChange={e => setInstruction(e.target.value)} />}</Field><BrandReferencePicker root={root} config={brandConfig} value={brand} onChange={setBrand} /></details>}
-      <section className="promotion-task-section"><h2>生成记录 <span className="promotion-muted">{tasks.length}</span></h2>{!tasks.length && <p className="promotion-muted">生成结果先保存在这里。加入草稿后，可以编辑、核对并确认。</p>}{tasks.map(task => <details className="promotion-card" key={task.id}><summary>{tasksLabels[task.kind]} · {activeTask(task) ? '生成中' : task.status === 'succeeded' ? task.applied ? '已加入草稿' : '待查看' : '未完成'} <span className="promotion-muted">{new Date(task.created_at).toLocaleString()}</span></summary>
+      <section className="promotion-task-section"><h2>生成记录 <span className="promotion-muted">{tasks.length}</span></h2>{!tasks.length && <p className="promotion-muted">生成结果先保存在这里。加入草稿后，可以编辑、核对并确认。</p>}{tasks.map(task => <TaskRecord task={task} label={tasksLabels[task.kind]} key={task.id}>
         {task.kind === 'project' && <p>项目：{string(task.request.project_path)}</p>}
         {activeTask(task) && <div className="promotion-actions"><p role="status">{task.stage || '等待开始'}</p><Button disabled={busy} onClick={() => void action(async () => { const cancelled = await api.cancel(task.id); setTasks(old => old.map(t => t.id === task.id ? cancelled : t)); })}>取消生成</Button></div>}
         {task.status === 'cancelled' && <p>已取消，可重新生成。</p>}
         {task.error && task.status !== 'cancelled' && <Alert type="error" message={task.error} />}
+        <TaskActivity task={task} />
         {task.status === 'succeeded' && <>{task.kind === 'project' ? <ProjectResult result={task.result} /> : <pre className="promotion-prose">{taskText(task.result)}</pre>}<Button disabled={task.applied || busy} onClick={() => void action(async () => { await api.apply(task.id); setNotice(task.kind === 'copy' ? '已加入文案版本，请在发布看板审核。' : '已加入待审核草稿，请编辑核对后确认。'); })}>{task.applied ? '已加入草稿' : '加入可编辑草稿'}</Button></>}{!activeTask(task) && <Button disabled={busy} onClick={() => void start(task.request)}>重新生成</Button>}
-      </details>)}</section>
+      </TaskRecord>)}</section>
       {!!handoffs.length && <section><h2>创作交接记录</h2>{handoffs.map(h => <article className="promotion-card" key={h.id}><div className="promotion-actions"><a href={h.url}>打开{destinations.find(d => d.id === h.target_application_id)?.name || '创作应用'}</a><Button disabled={busy} onClick={() => void action(async () => setIncoming({ handoff: h, messages: await api.results(h.id) }))}>查看可回存结果</Button></div></article>)}</section>}
       {incoming && <section className="promotion-card"><h3>选择要回存的回复</h3>{!incoming.messages.length && <p>尚无已完成的助手回复。请打开创作应用完成生成后重试。</p>}{incoming.messages.map(m => <details key={m.id}><summary>{new Date(m.created_at).toLocaleString()} · 查看回复</summary><pre className="promotion-prose">{m.content}</pre><Button disabled={busy} onClick={() => void action(async () => { await api.importResult(incoming.handoff.id, m.id); setNotice('已回存为新版本，请到发布看板核对与编辑。'); setIncoming(undefined); })}>回存为新版本</Button></details>)}<Button onClick={() => setIncoming(undefined)}>关闭结果</Button></section>}
     </>}

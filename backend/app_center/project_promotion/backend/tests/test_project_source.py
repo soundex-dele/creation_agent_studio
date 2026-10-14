@@ -2,9 +2,11 @@ import hashlib
 import json
 import subprocess
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 from rest_framework.exceptions import ValidationError
+from core.llm.application import GenerationError
 from core.user_directories import user_directory
 from app_center.project_promotion import runtime
 from .. import project_source
@@ -46,19 +48,22 @@ def model_result(ids):
 
 def project_model(monkeypatch):
     calls = []
-    def generate(**kwargs):
-        data = json.loads(kwargs['content']); calls.append(data)
-        if '当前源码窗口' in data:
-            step = sum('当前源码窗口' in c for c in calls)
-            if step == 1:
-                assert '5个选题' not in kwargs['instruction']
-                return {'action': 'search', 'query': 'render'}
-            if step == 2:
-                assert data['上次动作结果']['matches']
-                return {'action': 'read', 'path': 'app.py', 'start': 1}
-            return {'action': 'finish', 'evidence_ids': [r['id'] for r in data['当前源码窗口'] if r['path'] == 'app.py']}
-        return model_result([r['id'] for r in data['证据']])
-    monkeypatch.setattr(runtime, 'generate_json', generate)
+    def generate(task, **kwargs):
+        calls.append(kwargs)
+        path = Path(kwargs['working_directory'])
+        assert not (path / '.env').exists() and not (path / 'ignored.txt').exists()
+        assert 'Uncommitted working tree note' in (path / 'notes.md').read_text(encoding='utf8')
+        assert '<article>' in (path / 'app.py').read_text(encoding='utf8')
+        assert '当前源码窗口' not in kwargs['content']
+        evidence = json.loads(kwargs['handlers']['promotion_cite_sources']({'sources': [
+            {'path': 'app.py', 'start': 1, 'end': 2}, {'path': 'README.md', 'start': 1, 'end': 1}]}))['evidence']
+        # The native Agent can correct its result in the same session.
+        with pytest.raises(ValidationError):
+            kwargs['handlers']['promotion_submit_cases'](model_result(['forged']))
+        kwargs['handlers']['promotion_submit_cases'](model_result([r['id'] for r in evidence]))
+        return 'native-thread-1'
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
+    monkeypatch.setattr(runtime, 'generate_json', lambda **kwargs: pytest.fail('Project used stateless JSON generation'))
     return calls
 
 
@@ -70,14 +75,15 @@ def test_project_exploration_batch_apply_and_immutable_evidence(ctx, repo, monke
     task = get(ctx, f"ai/tasks/{task['id']}")
     assert task['status'] == 'succeeded' and task['stage']
     assert Case.objects.count() == 0
-    serialized = json.dumps(calls)
-    assert 'excluded-marker' not in serialized and 'ignored-marker' not in serialized
-    assert 'Uncommitted working tree note' in serialized
+    assert len(calls) == 1
+    assert not Path(calls[0]['working_directory']).exists()
     original = task['result']['cases'][0]['source_snapshot']
     evidence = next(iter(original['evidence'].values()))
     assert '<article>' in evidence['quote']
     assert evidence['sha256'] == hashlib.sha256((repo / 'app.py').read_bytes()).hexdigest()
-    assert original['coverage']['exploration_rounds'] == 3
+    assert original['coverage']['mode'] == 'native_agent'
+    assert original['coverage']['files_cited'] == 2
+    assert 'exploration_rounds' not in original['coverage']
     assert original['origin']['working_tree'] is True
     (repo / 'app.py').write_text('changed after exploration', encoding='utf8')
     applied = post(ctx, f"ai/tasks/{task['id']}/apply", {}, 200)
@@ -132,17 +138,15 @@ def test_unknown_citations_duplicates_and_insufficient_sources_are_rejected():
 def test_failed_generation_preserves_cases_and_can_retry(ctx, repo, monkeypatch):
     existing = case(ctx)
     calls = []
-    def generate(**kwargs):
-        data = json.loads(kwargs['content']); calls.append(data)
-        if '当前源码窗口' in data:
-            return {'action': 'finish', 'evidence_ids': [r['id'] for r in data['当前源码窗口']]}
-        return model_result(['forged'])
-    monkeypatch.setattr(runtime, 'generate_json', generate)
+    def generate(task, **kwargs):
+        calls.append(kwargs)
+        kwargs['handlers']['promotion_submit_cases'](model_result(['forged']))
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
     task = submit(ctx, repo)
     with pytest.raises(RuntimeError):
         run(ctx, task)
     assert get(ctx, f"ai/tasks/{task['id']}")['status'] == 'failed'
-    assert len([c for c in calls if '证据' in c]) == 2
+    assert len(calls) == 1
     post(ctx, f"ai/tasks/{task['id']}/apply", {}, 404)
     assert get(ctx, 'cases')['results'][0]['id'] == existing['id']
     project_model(monkeypatch)
@@ -163,10 +167,10 @@ def test_cancellation_during_model_call_discards_result(ctx, repo, monkeypatch):
     project_model(monkeypatch)
     task = submit(ctx, repo)
     sink = Sink()
-    def cancel(**kwargs):
+    def cancel(task, **kwargs):
         sink.cancelled = True
-        return {'action': 'finish', 'evidence_ids': []}
-    monkeypatch.setattr(runtime, 'generate_json', cancel)
+        return 'cancelled-thread'
+    monkeypatch.setattr(runtime, 'run_project_agent', cancel)
     run(ctx, task, sink)
     assert get(ctx, f"ai/tasks/{task['id']}")['status'] == 'cancelled'
     assert Case.objects.count() == 0
@@ -185,7 +189,7 @@ def test_revoked_access_prevents_reading_project(ctx, repo, monkeypatch):
 def test_empty_or_non_git_project_fails_without_drafts(ctx, repo, monkeypatch):
     empty = repo.parent / 'empty'; empty.mkdir()
     task = submit(ctx, empty)
-    monkeypatch.setattr(runtime, 'generate_json', lambda **kwargs: pytest.fail('Non-Git project reached model'))
+    monkeypatch.setattr(runtime, 'run_project_agent', lambda *args, **kwargs: pytest.fail('Non-Git project reached model'))
     with pytest.raises(RuntimeError, match='Git'):
         run(ctx, task)
     assert Case.objects.count() == 0
@@ -202,17 +206,51 @@ def test_missing_git_has_actionable_error(ctx, repo, monkeypatch):
 def test_cancel_api_during_exploration_prevents_apply(ctx, repo, monkeypatch):
     existing = case(ctx)
     task = submit(ctx, repo)
-    def generate(**kwargs):
+    def generate(_task, **kwargs):
         post(ctx, f"ai/tasks/{task['id']}/cancel", {}, 200)
-        data = json.loads(kwargs['content'])
-        if '当前源码窗口' in data:
-            return {'action': 'finish', 'evidence_ids': [r['id'] for r in data['当前源码窗口']]}
-        return model_result([r['id'] for r in data['证据']])
-    monkeypatch.setattr(runtime, 'generate_json', generate)
+        return 'cancelled-thread'
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
     run(ctx, task)
     assert get(ctx, f"ai/tasks/{task['id']}")['status'] == 'cancelled'
     post(ctx, f"ai/tasks/{task['id']}/apply", {}, 404)
     assert get(ctx, 'cases')['results'][0]['id'] == existing['id']
+
+
+@pytest.mark.parametrize('outcome', ['succeeded', 'failed', 'cancelled'])
+def test_activity_is_live_private_and_survives_terminal_states(ctx, repo, monkeypatch, outcome):
+    task = submit(ctx, repo)
+    def generate(_task, **kwargs):
+        events = kwargs['on_activity']
+        events('session.started', {})
+        event = {'tool_call_id': 'read1', 'name': 'read', 'tool_type': 'commandExecution', 'input': 'cat app.py'}
+        events('tool.started', event)
+        live = get(ctx, f"ai/tasks/{task['id']}")
+        assert live['activity']['items'][-1]['status'] == 'running'
+        assert live['activity']['items'][-1]['detail'] == 'cat app.py'
+        if outcome == 'cancelled':
+            post(ctx, f"ai/tasks/{task['id']}/cancel", {}, 200)
+            raise InterruptedError()
+        events('tool.failed' if outcome == 'failed' else 'tool.completed', {**event, 'result': 'DO NOT STORE RAW OUTPUT'})
+        if outcome == 'failed':
+            raise GenerationError('模型失败')
+        evidence = json.loads(kwargs['handlers']['promotion_cite_sources']({'sources': [{'path': 'app.py', 'start': 1, 'end': 2}]}))['evidence']
+        kwargs['handlers']['promotion_submit_cases'](model_result([row['id'] for row in evidence]))
+        return 'native-thread'
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
+    if outcome == 'failed':
+        with pytest.raises(RuntimeError):
+            run(ctx, task)
+    else:
+        run(ctx, task)
+    result = get(ctx, f"ai/tasks/{task['id']}")
+    assert result['status'] == outcome
+    command = next(row for row in result['activity']['items'] if row['detail'] == 'cat app.py')
+    assert command['status'] == {'succeeded': 'completed', 'failed': 'failed', 'cancelled': 'stopped'}[outcome]
+    assert 'DO NOT STORE' not in json.dumps(result)
+    assert get(ctx, 'ai/tasks')['results'][0]['activity'] == result['activity']
+    ctx['client'].force_authenticate(ctx['other'])
+    assert get(ctx, 'ai/tasks')['results'] == []
+    assert ctx['client'].get(f"{ctx['root']}/ai/tasks/{task['id']}").status_code == 404
 
 
 def test_model_configuration_error_does_not_retry_forever(monkeypatch):
@@ -220,11 +258,11 @@ def test_model_configuration_error_does_not_retry_forever(monkeypatch):
     monkeypatch.setattr(project_source, 'which', lambda _: 'git')
     monkeypatch.setattr(project_source, 'from_local', lambda *args: ({'app.py': {'text': 'def run(): pass', 'sha256': 'abc'}}, {}, {}))
     calls = []
-    def broken(*args):
-        calls.append(args)
+    def broken(**kwargs):
+        calls.append(kwargs)
         if len(calls) > 1:
             pytest.fail('Model failure retried as a read action')
-        raise ValueError('Invalid model configuration')
+        raise GenerationError('Invalid model configuration')
     with pytest.raises(RuntimeError):
         project_source.explore_project(task, broken, lambda _: None, lambda: None)
     assert len(calls) == 1

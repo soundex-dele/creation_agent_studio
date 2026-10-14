@@ -42,6 +42,16 @@
 .promotion-page summary { cursor: pointer; line-height: 1.7; padding: 8px 0; font-weight: 600; }
 .promotion-page summary span { display: inline-block; margin-left: 8px; font-size: 12px; }
 .promotion-task-section { margin-top: 32px; }
+.promotion-activity { min-width: 0; max-width: 100%; margin: 16px 0; }
+.promotion-activity-heading, .promotion-activity-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.promotion-activity-heading h3 { margin: 0; }
+.promotion-activity-list { list-style: none; margin: 12px 0; padding: 0; }
+.promotion-activity-item { min-width: 0; padding: 12px 0 12px 16px; border-left: 2px solid var(--color-border); overflow-wrap: anywhere; }
+.promotion-activity-meta strong { flex: 1 1 180px; min-width: 0; }
+.promotion-activity-meta time { font-size: 12px; font-variant-numeric: tabular-nums; }
+.promotion-activity-detail { min-width: 0; max-width: 100%; }
+.promotion-activity-detail summary { min-height: 44px; font-size: 13px; }
+.promotion-activity-detail pre { margin: 4px 0; padding: 12px; background: var(--color-bg-void); border: 1px solid var(--color-border); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; font-size: 13px; line-height: 1.7; }
 .promotion-source { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .promotion-source pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 .promotion-loading { padding: 60px 20px; text-align: center; }

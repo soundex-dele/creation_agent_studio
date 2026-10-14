@@ -34,6 +34,12 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   expect(styles(['.promotion-modal .ant-checkbox-wrapper'], width, height).display).toBe('inline-flex');
   expect(styles(['.promotion-card'], width, height)['overflow-wrap']).toBe('anywhere');
   expect(styles(['.promotion-actions'], width, height)['flex-wrap']).toBe('wrap');
+  expect(styles(['.promotion-activity'], width, height)['min-width']).toBe('0');
+  expect(styles(['.promotion-activity-meta'], width, height)['flex-wrap']).toBe('wrap');
+  expect(styles(['.promotion-activity-detail pre'], width, height)['white-space']).toBe('pre-wrap');
+  expect(styles(['.promotion-activity-detail pre'], width, height)['overflow-wrap']).toBe('anywhere');
+  expect(styles(['.promotion-activity-detail summary'], width, height)['min-height']).toBe('44px');
+  expect(styles(['.promotion-activity-list'], width, height)['overflow-y']).toBeUndefined();
 });
 it('registers a full-bleed route with a page-owned scroll container in all entry modes', () => {
   expect(read('../../pages/Apps/ProjectPromotionPage.tsx')).toContain('className="promotion-page app-scroll-page"');

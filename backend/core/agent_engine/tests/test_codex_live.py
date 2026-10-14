@@ -120,6 +120,19 @@ def test_dynamic_tools_return_a_protocol_result():
     server._send.assert_called_once_with({"id": 47, "result": {"success": True, "contentItems": [{"type": "inputText", "text": "name"}]}})
 
 
+def test_completed_command_with_nonzero_exit_is_reported_as_failed():
+    server = transport()
+    server._notifications.put({'method': 'item/completed', 'params': {'item': {
+        'id': 'read', 'type': 'commandExecution', 'command': 'cat missing.py',
+        'status': 'completed', 'exitCode': 1}}})
+    server._notifications.put({'method': 'turn/completed', 'params': {'turn': {'id': 'turn-1', 'status': 'completed'}}})
+    events = []
+    _consume_codex_turn(_AppServerThread(transport=server, thread_id='thread-1'), 'read',
+        on_event=lambda kind, payload: events.append((kind, payload)))
+    failed = next(payload for kind, payload in events if kind == 'tool.failed')
+    assert failed['tool_call_id'] == 'read' and failed['exit_code'] == 1
+
+
 def test_activity_excludes_raw_reasoning_and_keeps_steps_logs_diff_errors():
     server = transport()
     for method, payload in [

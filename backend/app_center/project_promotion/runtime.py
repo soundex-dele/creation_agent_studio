@@ -9,6 +9,8 @@ from .backend.models import AITask
 from .backend.ai import validate_result
 from .backend.access import can_access_run
 from .backend.project_source import explore_project
+from .backend.project_agent import run_project_agent
+from .backend.activity import ActivityLog
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,11 @@ def execute(payload, sink):
     last_check = 0.0
     stopped = False
     current_stage = ''
+    history = ActivityLog()
+    task_state = dict(task.data)
+    def state(stage, **extra):
+        task_state.update(stage=stage, activity=history.snapshot(), **extra)
+        return task_state
     def cancelled():
         nonlocal last_check, stopped
         if sink.cancelled:
@@ -56,21 +63,27 @@ def execute(payload, sink):
     def check():
         if cancelled():
             raise InterruptedError()
-    def progress(stage):
+    def publish(stage):
         nonlocal current_stage
         check()
-        stage = stage.replace('整理选题依据', '整理案例依据')
         current_stage = stage
-        AITask.objects.filter(pk=task.pk, status='running').update(data={'stage': stage})
+        AITask.objects.filter(pk=task.pk, status='running').update(data=state(stage))
         sink.emit('progress.updated', {'stage': stage})
-    def model(instruction, content):
+    def progress(stage):
+        stage = stage.replace('整理选题依据', '整理案例依据')
+        history.record('stage', {'text': stage})
+        publish(stage)
+    def activity(kind, value):
+        check()
+        row = history.record(kind, value)
+        if row:
+            publish(row['title'])
+    def with_retry(operation):
         original_stage = current_stage
-        encoded = json.dumps(content, ensure_ascii=False)
         for attempt in range(3):
             check()
             try:
-                result = generate_json(organization=task.organization, user=task.owner, resource_type='promotion_generation',
-                    resource_id=task.pk, instruction=BASE + instruction, content=encoded, cancelled=cancelled)
+                result = operation()
                 if attempt:
                     progress(original_stage)
                 return result
@@ -82,10 +95,14 @@ def execute(payload, sink):
                         code=exc.code) from None
                 progress(f'模型服务繁忙，正在等待自动重试（{attempt + 1}/2）')
                 retry_delay(2 ** (attempt + 1), check)
+    def model(instruction, content):
+        def generate():
+            try:
+                return generate_json(organization=task.organization, user=task.owner, resource_type='promotion_generation',
+                    resource_id=task.pk, instruction=BASE + instruction, content=json.dumps(content, ensure_ascii=False), cancelled=cancelled)
             except ValueError:
-                # Parsing a completed response is distinct from an invalid
-                # exploration action, which the explorer can ask the model to fix.
                 raise GenerationError('模型回复不是有效 JSON，请重新生成；这不表示模型配置错误。', code='invalid_json') from None
+        return with_retry(generate)
     try:
         if not can_access_run(task.owner, run):
             raise RuntimeError('应用访问权限已失效。')
@@ -94,7 +111,8 @@ def execute(payload, sink):
         if not AITask.objects.filter(pk=task.pk, status='queued').update(status='running'):
             return {'task_id': str(task.pk)}
         if task.kind == 'project':
-            result = explore_project(task, model, progress, check)
+            result = with_retry(lambda: explore_project(task, lambda **kwargs: run_project_agent(
+                task, **kwargs, progress=progress, check=check, on_activity=activity), progress, check))
         else:
             progress('根据已选资料生成草稿')
             result = validate_result(task, model(PROMPTS[task.kind], task.snapshot))
@@ -104,14 +122,23 @@ def execute(payload, sink):
                 raise InterruptedError()
             if not can_access_run(task.owner, run):
                 raise RuntimeError('应用访问权限已失效。')
+            history.finish()
+            history.record('stage', {'text': '草稿已保存，等待审核'})
             AITask.objects.filter(pk=task.pk).update(status='succeeded', result=result, snapshot=task.snapshot,
-                                                    data={'stage': '草稿已保存，等待审核'})
+                                                    data=state('草稿已保存，等待审核'))
         sink.emit('progress.updated', {'stage': '草稿已保存，等待审核', 'current': 2, 'total': 2})
         return {'task_id': str(task.pk)}
     except InterruptedError:
-        AITask.objects.filter(pk=task.pk).update(status='cancelled')
+        history.finish()
+        AITask.objects.filter(pk=task.pk).update(status='cancelled', data=state('已取消'))
         return {}
     except Exception as exc:
+        # A final Agent response can arrive inside the cancellation poll's
+        # throttle window. Preserve a cancellation already accepted by the API.
+        if AITask.objects.filter(pk=task.pk, status='cancelled').exists():
+            history.finish()
+            AITask.objects.filter(pk=task.pk).update(data=state('已取消'))
+            return {}
         code = 'generation_failed'
         message = '生成执行失败，请重试；已保存内容不受影响。'
         if isinstance(exc, GenerationError):
@@ -126,6 +153,7 @@ def execute(payload, sink):
             code = 'project_source_error'
             message = str(exc)[:2000]
         logger.warning('promotion.generation state=failed task_id=%s code=%s error_type=%s', task.pk, code, type(exc).__name__)
+        history.finish()
         AITask.objects.filter(pk=task.pk).exclude(status='cancelled').update(status='failed', error=message,
-            data={'stage': current_stage, 'error_code': code})
+            data=state(current_stage, error_code=code))
         raise RuntimeError(message) from None

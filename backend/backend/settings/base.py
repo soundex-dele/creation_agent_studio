@@ -530,6 +530,10 @@ AGENT_ENGINE_ADAPTER = config('AGENT_ENGINE_ADAPTER', default='codex')
 # Full structured application generation, separate from app-server RPC replies.
 APPLICATION_GENERATION_TIMEOUT_SECONDS = config(
     'APPLICATION_GENERATION_TIMEOUT_SECONDS', default=300, cast=int)
+# Explicit deployment opt-in: legacy Windows sandboxes require full-disk read
+# access. Keep project snapshot isolation by default on other installations.
+PROJECT_PROMOTION_ALLOW_FULL_DISK_READ = config(
+    'PROJECT_PROMOTION_ALLOW_FULL_DISK_READ', default=False, cast=bool)
 
 # Optional GraphFlow Agent Engine checkout next to this repository.
 _GRAPHFLOW_ROOT = BASE_DIR.parent.parent / 'agent-engine'

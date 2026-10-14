@@ -5,9 +5,10 @@ export type Data = Record<string, unknown>;
 export type Resource = 'cases' | 'topics' | 'channels' | 'feedback';
 export interface CopyBody { title: string; body: string; cover: string; pages: string; script: string; materials: string; shots: string; checks: string; formatted_html: string }
 export interface Version { id: string; number: number; body: CopyBody; snapshot: Data; created_at: string }
-export interface SourceSnapshot { origin?: { path?: string; commit?: string }; digest?: string; coverage?: { files_read: number; files_total: number; note: string }; evidence?: Record<string, { path: string; start: number; end: number; quote: string; sha256: string }> }
+export interface SourceSnapshot { origin?: { path?: string; commit?: string }; digest?: string; coverage?: { files_read?: number; files_cited?: number; files_total: number; note: string }; evidence?: Record<string, { path: string; start: number; end: number; quote: string; sha256: string }> }
 export interface PromotionRecord { id: string; title: string; status: string; archived: boolean; revision: number; data: Data; case_id?: string; topic_id?: string; channel_id?: string | null; platform?: string; confirmed_version_id?: string | null; latest_version?: Version | null; source_snapshot?: SourceSnapshot }
-export interface Task { id: string; kind: string; status: string; applied: boolean; error: string; request: Data; result: Data; stage?: string; created_at: string }
+export interface ActivityItem { id: string; title: string; detail: string; status: 'running' | 'completed' | 'failed' | 'stopped'; created_at: string; updated_at: string }
+export interface Task { id: string; kind: string; status: string; applied: boolean; error: string; request: Data; result: Data; stage?: string; activity?: { items: ActivityItem[]; dropped: number }; created_at: string }
 export interface Group { key: string; label: string; publications: number; metrics: Record<string, { total: number | null; samples: number }> }
 export interface Report { publications: Data[]; groups: { platforms: Group[]; cases: Group[] }; unknown_source_count: number; note: string }
 export interface Handoff { id: string; version_id: string; target_application_id: number; kind: string; url: string; status: string; target_id: string }

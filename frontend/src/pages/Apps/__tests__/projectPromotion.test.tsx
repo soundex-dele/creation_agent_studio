@@ -52,7 +52,7 @@ beforeEach(() => {
   vi.mocked(api.post).mockResolvedValue({ id: 'task1', kind: 'copy', status: 'failed', request: { kind: 'copy', channel_id: 'channel1' }, result: {}, error: '失败', created_at: '2026-10-14' });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
 
 it('opens the four modules with a bounded page root and an honest empty report', async () => {
   await render();
@@ -152,13 +152,46 @@ it('displays project exploration progress and cancels through the task API', asy
   expect(button('取消生成')).toBeUndefined();
 });
 
-it('previews source-backed cases, applies the batch, and keeps provenance visible while editing', async () => {
-  const source = { origin: { path: '/project', commit: 'abc123' }, coverage: { files_read: 2, files_total: 10, note: '静态阅读' }, evidence: { e1: { path: 'app.py', start: 1, end: 2, quote: '<script>never execute</script>', sha256: 'abcdef' } } };
+it('opens active execution history and updates tool status through polling without losing failed history', async () => {
+  vi.useFakeTimers();
+  const task: Task = { id: 'live', kind: 'project', status: 'running', applied: false, request: {}, result: {}, error: '', created_at: '2026-10-14',
+    activity: { dropped: 0, items: [{ id: 'read', title: '读取文件', detail: 'cat app.py <script>not executable</script>', status: 'running', created_at: '2026-10-14T10:00:00Z', updated_at: '2026-10-14T10:00:00Z' }] } };
+  taskRows = [task];
+  await act(async () => root.render(createElement(MemoryRouter, {}, createElement(ProjectPromotionWorkspace, { base, root: '/tenant' }))));
+  expect(container.querySelector<HTMLDetailsElement>('.promotion-task-section > details')?.open).toBe(true);
+  expect(container.querySelector('.promotion-activity')?.textContent).toContain('正在执行');
+  expect(container.querySelector('script')).toBeNull();
+  taskRows = [{ ...task, status: 'failed', error: '模型中断', activity: { dropped: 0, items: [{ ...task.activity!.items[0], status: 'failed' }] } }];
+  await act(async () => vi.advanceTimersByTimeAsync(3000));
+  expect(container.querySelector('.promotion-activity')?.textContent).toContain('失败');
+  expect(container.querySelector('.promotion-activity')?.textContent).toContain('cat app.py');
+  expect(container.querySelector<HTMLDetailsElement>('.promotion-task-section > details')?.open).toBe(true);
+  expect(button('取消生成')).toBeUndefined();
+});
+
+it('limits long histories, expands older steps, and marks unfinished cancelled tools honestly', async () => {
+  taskRows = [{ id: 'history', kind: 'project', status: 'cancelled', applied: false, request: {}, result: {}, error: '', created_at: '2026-10-14',
+    activity: { dropped: 2, items: Array.from({ length: 12 }, (_, i) => ({ id: String(i), title: `步骤 ${i}`, detail: `命令 ${i}`, status: i === 11 ? 'running' : 'completed', created_at: '2026-10-14T10:00:00Z', updated_at: '2026-10-14T10:00:00Z' })) } }];
+  await render();
+  expect(container.querySelectorAll('.promotion-activity-item')).toHaveLength(8);
+  expect(container.querySelector('.promotion-activity')?.textContent).toContain('未完成');
+  expect(container.querySelector('.promotion-activity')?.textContent).toContain('较早的 2 条记录已省略');
+  await click('展开全部 12 条记录');
+  expect(container.querySelectorAll('.promotion-activity-item')).toHaveLength(12);
+  await click('只看最近 8 条');
+  expect(container.querySelectorAll('.promotion-activity-item')).toHaveLength(8);
+});
+
+it.each([
+  [{ files_read: 2, files_total: 10, note: '静态阅读' }, '读取 2 / 10 个文本文件'],
+  [{ files_cited: 2, files_total: 10, note: '静态阅读' }, '引用 2 个文件，项目快照共 10 个文本文件'],
+])('previews source-backed cases, applies the batch, and keeps provenance visible while editing (%j)', async (coverage, coverageText) => {
+  const source = { origin: { path: '/project', commit: 'abc123' }, coverage, evidence: { e1: { path: 'app.py', start: 1, end: 2, quote: '<script>never execute</script>', sha256: 'abcdef' } } };
   const cases = [{ title: '源码排版案例', data: { problem: '排版耗时', implemented: '格式化', evidence: 'app.py:1-2' }, source_snapshot: source }, { title: '另一场景', data: {}, source_snapshot: source }];
   const task: Task = { id: 'project1', kind: 'project', status: 'succeeded', applied: false, request: {}, result: { analysis: '两条案例', cases }, error: '', created_at: '2026-10-14' };
   taskRows = [task]; await render();
   expect(container.textContent).toContain('源码排版案例');
-  expect(container.textContent).toContain('读取 2 / 10 个文本文件');
+  expect(container.textContent).toContain(coverageText);
   expect(container.textContent).toContain('app.py:1-2');
   expect(container.querySelector('script')).toBeNull();
   vi.mocked(api.post).mockImplementationOnce(async () => {

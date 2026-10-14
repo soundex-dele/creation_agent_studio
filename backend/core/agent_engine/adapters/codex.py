@@ -14,6 +14,7 @@ import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from django.conf import settings
 
@@ -132,6 +133,8 @@ def _codex_tool_payload(item):
         payload["input"] = input_value
     if result_value is not None:
         payload["result"] = result_value
+    if item_type == "commandExecution" and isinstance(raw.get("exitCode"), int):
+        payload["exit_code"] = raw["exitCode"]
     if item_type == "imageGeneration":
         # Binary image results can be enormous. Consumers archive the saved file
         # and must sanitize local paths before publishing events to a client.
@@ -300,7 +303,7 @@ def _consume_codex_turn(
                         on_event("tool.started", tool_payload)
                     else:
                         status = str(_object_value(item, "status", ""))
-                        failed = status in {"failed", "declined"} or _object_value(item, "success") is False or bool(
+                        failed = status in {"failed", "declined"} or tool_payload.get("exit_code", 0) != 0 or _object_value(item, "success") is False or bool(
                             tool_payload.get("error_message")
                         )
                         on_event(
@@ -832,6 +835,7 @@ class _AppServerCodex:
         sandbox: str,
         config: Optional[dict] = None,
         dynamic_tools=None,
+        permissions: Optional[str] = None,
     ) -> _AppServerThread:
         approval_policy, approvals_reviewer = _approval_settings(approval_mode)
         params = {
@@ -839,6 +843,7 @@ class _AppServerCodex:
             "approvalPolicy": approval_policy,
             "approvalsReviewer": approvals_reviewer,
             "sandbox": sandbox,
+            "permissions": permissions,
             "baseInstructions": base_instructions,
             "model": model,
         }
@@ -850,6 +855,8 @@ class _AppServerCodex:
             key: value for key, value in params.items() if value not in (None, "")
         }
         result = self._transport.request("thread/start", params)
+        if permissions and (result.get('activePermissionProfile') or {}).get('id') != permissions:
+            raise RuntimeError('Codex app-server did not activate the restricted read-only permissions profile')
         return _AppServerThread(
             transport=self._transport,
             thread_id=result["thread"]["id"],
@@ -1060,6 +1067,16 @@ class CodexAdapter(AgentAdapter):
             raise ValueError("组织要求工具审批，无法开启完全控制。")
         system_prompt, query = format_messages_for_query(messages)
         requested_thread_id = str(options.get("thread_id") or "").strip()
+        read_only_paths = options.get("read_only_paths")
+        read_only_full_disk = options.get("read_only_full_disk", False)
+        if not isinstance(read_only_full_disk, bool) or (read_only_full_disk and read_only_paths is None):
+            raise ValueError("Full-disk read access requires an explicit read-only session")
+        if read_only_paths is not None:
+            if not isinstance(read_only_paths, list) or not read_only_paths or any(
+                    not isinstance(path, str) or not Path(path).is_absolute() for path in read_only_paths):
+                raise ValueError("Read-only roots must be nonempty absolute paths")
+            if permission_mode == "allow_all" or requested_thread_id:
+                raise ValueError("Restricted read-only sessions require a new thread")
         conversational = [item for item in messages if item.get("role") != "system"]
         resume_messages = [
             *[item for item in messages if item.get("role") == "system"],
@@ -1074,7 +1091,27 @@ class CodexAdapter(AgentAdapter):
         input_request = None
         try:
             sandbox = _sandbox(sdk)
-            if permission_mode == "allow_all":
+            permission_profile = None
+            isolated_config = {}
+            if read_only_paths is not None:
+                if sdk is not _AppServerSdk:
+                    raise ValueError("Restricted read-only sessions require app-server transport")
+                sandbox = None
+                approval_mode = sdk.ApprovalMode.deny_all
+                permission_profile = f'promotion_readonly_{uuid4().hex}'
+                # Tool traffic from connectors/MCP bypasses command sandboxes.
+                # Disable those integrations for this private read-only task.
+                configured = client._transport.request('config/read', {'includeLayers': False, 'cwd': cwd}).get('config', {})
+                # Config override paths split on dots without TOML unquoting.
+                # A nested table preserves literal server names (including dots).
+                isolated_config = {'features.apps': False, 'web_search': 'disabled',
+                    'mcp_servers': {name: {'enabled': False} for name in configured.get('mcp_servers', {})},
+                    'plugins': {name: {'enabled': False} for name in configured.get('plugins', {})},
+                    'permissions': {permission_profile: {
+                        'filesystem': ({':root': 'read'} if read_only_full_disk else
+                            {':minimal': 'read', **{path: 'read' for path in read_only_paths}}),
+                        'network': {'enabled': False}}}}
+            elif permission_mode == "allow_all":
                 sandbox = sdk.Sandbox.full_access
                 approval_mode = sdk.ApprovalMode.deny_all
             elif permission_mode == "default" or options.get("require_tool_approval"):
@@ -1100,6 +1137,11 @@ class CodexAdapter(AgentAdapter):
                 if sdk is not _AppServerSdk or requested_thread_id:
                     raise ValueError("Thread config requires a new app-server thread")
                 thread_options["config"] = options["thread_config"]
+            if isolated_config:
+                safe_config = {key: value for key, value in thread_options.get('config', {}).items()
+                    if key.split('.')[0] not in {'features', 'apps', 'plugins', 'mcp_servers', 'web_search', 'permissions', 'default_permissions', 'sandbox_mode', 'sandbox_workspace_write'}}
+                thread_options['config'] = {**safe_config, **isolated_config}
+                thread_options['permissions'] = permission_profile
             if options.get("dynamic_tools"):
                 if sdk is not _AppServerSdk or requested_thread_id:
                     raise ValueError("Dynamic tool registration requires a new app-server thread")
