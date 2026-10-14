@@ -1,0 +1,70 @@
+.promotion-page { background: var(--color-bg-void); color: var(--color-text); }
+.promotion-container { max-width: 1320px; margin: 0 auto; padding: 32px 32px calc(40px + env(safe-area-inset-bottom)); }
+.promotion-header, .promotion-intro { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+.promotion-page h1 { margin: 8px 0; font-size: 28px; letter-spacing: -.5px; }
+.promotion-page h2 { margin: 8px 0 12px; font-size: 23px; }
+.promotion-page h3 { font-size: 17px; margin: 12px 0; overflow-wrap: anywhere; }
+.promotion-page p { line-height: 1.7; overflow-wrap: anywhere; }
+.promotion-muted { color: var(--color-text-sec); font-weight: normal; }
+.promotion-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.6px; color: var(--color-text-sec); }
+.promotion-eyebrow .anticon { margin-right: 8px; }
+.promotion-summary { display: grid; grid-template-columns: auto auto; gap: 4px 14px; align-items: center; color: var(--color-text-sec); }
+.promotion-header-side { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
+.promotion-summary strong { color: var(--color-text); font-size: 24px; font-variant-numeric: tabular-nums; }
+.promotion-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 14px; margin-bottom: 28px; }
+.promotion-nav button { display: flex; justify-content: center; align-items: center; gap: 8px; min-width: 0; min-height: 48px; padding: 10px; border: 0; border-radius: 9px; background: transparent; color: var(--color-text-sec); font: inherit; cursor: pointer; }
+.promotion-nav button[aria-current="page"], .promotion-nav button:hover { color: var(--color-text); background: var(--color-bg-void); }
+.promotion-page button:focus-visible, .promotion-page a:focus-visible, .promotion-page summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.promotion-intro { padding: 24px; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: 12px; }
+.promotion-intro > div { min-width: 0; }
+.promotion-intro .ant-btn { flex-shrink: 0; }
+.promotion-card { min-width: 0; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; background: var(--color-bg-surface); margin-bottom: 20px; overflow-wrap: anywhere; }
+.promotion-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 20px 0; }
+.promotion-grid > .promotion-card { margin-bottom: 0; display: flex; flex-direction: column; }
+.promotion-card > .promotion-actions { margin-top: auto; padding-top: 18px; }
+.promotion-card-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--color-text-sec); font-size: 12px; }
+.promotion-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.promotion-channel-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+.promotion-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 16px 0; }
+.promotion-field > label { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.promotion-field select { min-width: 0; width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); background: var(--color-bg-surface); font: inherit; }
+.promotion-field .ant-input-number { width: 100%; }
+.promotion-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 16px; }
+.promotion-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.promotion-stage-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.promotion-stage-counts button { min-height: 48px; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px; color: var(--color-text); background: var(--color-bg-surface); font: inherit; cursor: pointer; }
+.promotion-stage-counts button[aria-pressed="true"] { border-color: var(--color-primary); font-weight: 700; }
+.promotion-stage-counts strong { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.promotion-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.promotion-metrics dt, .promotion-metrics small { color: var(--color-text-sec); font-size: 12px; }
+.promotion-metrics dd { margin: 8px 0; font-size: 20px; font-variant-numeric: tabular-nums; }
+.promotion-prose { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; max-width: 100%; }
+.promotion-page summary { cursor: pointer; line-height: 1.7; padding: 8px 0; font-weight: 600; }
+.promotion-page summary span { display: inline-block; margin-left: 8px; font-size: 12px; }
+.promotion-task-section { margin-top: 32px; }
+.promotion-source { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.promotion-source pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.promotion-loading { padding: 60px 20px; text-align: center; }
+.promotion-page .ant-alert { margin-bottom: 16px; }
+.promotion-asset { padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 12px; }
+.promotion-modal .ant-modal-content { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); }
+.promotion-modal .ant-modal-body { min-height: 0; overflow-y: auto; padding-right: 4px; }
+.promotion-modal .ant-modal-header, .promotion-modal .ant-modal-footer { flex-shrink: 0; }
+.promotion-modal .ant-checkbox-wrapper { display: inline-flex; align-items: center; }
+@media (max-width: 1023px) { .promotion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) {
+  .promotion-container { padding: 18px 12px calc(28px + env(safe-area-inset-bottom)); }
+  .promotion-header, .promotion-intro { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .promotion-intro { padding: 18px; }
+  .promotion-summary { grid-template-columns: auto auto auto auto; font-size: 12px; }
+  .promotion-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .promotion-grid, .promotion-form-grid, .promotion-filters { grid-template-columns: minmax(0, 1fr); }
+  .promotion-filters { gap: 0; }
+  .promotion-stage-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .promotion-card { padding: 16px; }
+  .promotion-page .ant-btn, .promotion-modal .ant-btn, .promotion-field select { min-height: 44px; }
+  .promotion-field input, .promotion-field textarea, .promotion-field select { font-size: 16px; }
+  .promotion-modal .ant-modal { top: 12px; max-width: calc(100vw - 16px); padding-bottom: 0; }
+  .promotion-modal .ant-modal-content { max-height: calc(100dvh - 24px); }
+}
+@media (max-height: 480px) { .promotion-modal .ant-modal { top: 8px; padding-bottom: 0; } .promotion-modal .ant-modal-content { max-height: calc(100dvh - 16px); } }

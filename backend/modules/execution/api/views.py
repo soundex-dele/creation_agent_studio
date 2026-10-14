@@ -202,6 +202,9 @@ def _can_access_run(request, run):
     if root.executor_key == "repo-explainer":
         from app_center.repo_explainer.backend.access import can_access_run as repo_access
         return repo_access(request.user, root)
+    if root.executor_key == "project-promotion":
+        from app_center.project_promotion.backend.access import can_access_run as promotion_access
+        return promotion_access(request.user, root)
     if root.executor_key == "rental-growth-assistant":
         from app_center.rental_growth_assistant.backend.access import can_access_run as rental_access
         return rental_access(request.user, root)

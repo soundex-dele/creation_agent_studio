@@ -20,7 +20,7 @@ from app_center.douyin_benchmark.backend import analysis as douyin
 def test_application_uses_system_engine_without_accessing_organization_routes(monkeypatch, app, adapter, config):
     # Deliberately no providers relation: generation must not inspect organization routes.
     organization, user = object(), object()
-    owner = SimpleNamespace(organization=organization, owner=user, id="project")
+    owner = SimpleNamespace(organization=organization, owner=user, id="project", kind='analysis', input={})
     engine = Mock(adapter_name=adapter)
     engine.complete.return_value = LLMResponse(
         content='```json\n{"answer":"测试结果"}\n```', model="system-default",
@@ -148,3 +148,51 @@ def test_json_generation_uses_replacement_message_not_abandoned_draft(monkeypatc
     assert preview == raw
     thread.turn.assert_called_once()
     client.close.assert_called_once()
+
+
+@pytest.mark.parametrize('message,code,retryable', [
+    ('Selected model is at capacity. Please try a different model.', 'engine_overloaded', True),
+    ('server_overloaded', 'engine_overloaded', True),
+    ('HTTP 429 rate limit', 'rate_limited', False),
+    ('HTTP 429 insufficient_quota', 'provider_quota_exceeded', False),
+    ('401 Unauthorized', 'authentication_failed', False),
+    ('context_length_exceeded', 'context_limit', False),
+    ('Unknown failure Bearer secret-value https://example.com/?token=secret', 'engine_failed', False),
+])
+def test_generation_failure_keeps_safe_reason(monkeypatch, message, code, retryable):
+    engine = Mock(adapter_name='codex')
+    engine.complete.return_value = LLMResponse(content='', model='test', usage=TokenUsage(), success=False, error=message)
+    monkeypatch.setattr(application, 'build_agent_engine', Mock(return_value=engine))
+    monkeypatch.setattr(application, 'enforce_member_token_quota', Mock())
+    usage = Mock(); monkeypatch.setattr(application, 'record_usage', usage)
+    with pytest.raises(application.GenerationError) as caught:
+        application.generate_json(organization=object(), user=object(), resource_type='promotion_generation',
+            resource_id='task', instruction='生成', content='{}')
+    assert caught.value.code == code and caught.value.retryable is retryable
+    assert 'secret' not in str(caught.value) and 'https://' not in str(caught.value)
+    assert usage.call_args.kwargs['status'] == 'error'
+
+
+def test_capacity_transport_exception_is_classified_without_exposing_payload(monkeypatch):
+    engine = Mock(adapter_name='codex')
+    engine.complete.side_effect = RuntimeError('HTTP 503 token=secret private source')
+    monkeypatch.setattr(application, 'build_agent_engine', Mock(return_value=engine))
+    monkeypatch.setattr(application, 'enforce_member_token_quota', Mock())
+    with pytest.raises(application.GenerationError) as caught:
+        application.generate_json(organization=object(), user=object(), resource_type='promotion_generation',
+            resource_id='task', instruction='生成', content='{}')
+    assert caught.value.code == 'engine_overloaded'
+    assert 'secret' not in str(caught.value)
+
+
+def test_model_interaction_is_not_misclassified_as_capacity(monkeypatch):
+    engine = Mock(adapter_name='codex')
+    engine.complete.return_value = LLMResponse(content='', model='test', usage=TokenUsage(),
+        input_request={'kind': 'permission'}, error='server_overloaded')
+    monkeypatch.setattr(application, 'build_agent_engine', Mock(return_value=engine))
+    monkeypatch.setattr(application, 'enforce_member_token_quota', Mock())
+    monkeypatch.setattr(application, 'record_usage', Mock())
+    with pytest.raises(application.GenerationError) as caught:
+        application.generate_json(organization=object(), user=object(), resource_type='promotion_generation',
+            resource_id='task', instruction='生成', content='{}')
+    assert caught.value.code == 'input_required' and not caught.value.retryable

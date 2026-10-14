@@ -38,6 +38,7 @@ const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'
 const KitchenAssistantPage = lazy(() => import('@/pages/Apps/KitchenAssistantPage'));
 const PromptMasterPage = lazy(() => import('@/pages/Apps/PromptMasterPage'));
 const RentalGrowthPage = lazy(() => import('@/pages/Apps/RentalGrowthPage'));
+const ProjectPromotionPage = lazy(() => import('@/pages/Apps/ProjectPromotionPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
@@ -352,6 +353,10 @@ const router = createBrowserRouter([
         <ApplicationShell fullBleed>{page(<KitchenAssistantPage />)}</ApplicationShell>
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/applications/:applicationId/project-promotion',
+    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<ProjectPromotionPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
     path: '/applications/:applicationId/rental-growth-assistant',

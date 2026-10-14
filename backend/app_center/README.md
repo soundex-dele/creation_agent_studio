@@ -77,6 +77,11 @@ The **在线文档** (`documents`) dedicated workspace provides rich text editin
 autosave, per-member sharing and a private AI sidebar. See
 [`documents/README.md`](documents/README.md) for deployment and runtime details.
 
+The **项目宣传助手** (`project-promotion`) connects private case materials, editorial topics,
+four-channel content versions, manual publication tracking, and feedback review. It reuses
+brand references and supports durable handoffs to the existing writing and formatting apps.
+See [`project_promotion/README.md`](project_promotion/README.md) for setup, API and validation.
+
 These packages use the shared chat renderer and content creation agent. Users
 fill in a form, review the generated prompt, and continue editing in chat.
 

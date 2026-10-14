@@ -13,7 +13,7 @@ from .. import analysis
 def context(monkeypatch):
     organization = SimpleNamespace(providers=Mock())
     organization.providers.exists.return_value = False
-    task = SimpleNamespace(id="task", organization=organization, owner=object())
+    task = SimpleNamespace(id="task", organization=organization, owner=object(), kind='analysis', input={})
     engine = Mock(adapter_name="codex")
     engine.complete.return_value = LLMResponse(content='```json\n{"claims": []}\n```',
         usage=TokenUsage(prompt_tokens=42, completion_tokens=8, total_tokens=50), model="configured-model")
