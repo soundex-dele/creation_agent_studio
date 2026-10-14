@@ -12,6 +12,7 @@ from core.resource_access import accessible_resources
 from modules.tenancy.permissions import HasPathOrganizationRole
 from .models import RESOURCES, Workspace, Case, Topic, Channel, Version, Feedback
 from .schemas import SCHEMAS, STATUSES, PLATFORMS, CopyBody, validated
+from .materials import topic_materials, resolve_materials, set_materials, require_confirmed, sources_current, snapshot_materials
 
 
 class Conflict(APIException):
@@ -30,6 +31,8 @@ def basic(row):
         value['latest_version'] = version_data(row.versions.first())
     if isinstance(row, Case):
         value['source_snapshot'] = row.source_snapshot
+    if isinstance(row, Topic):
+        value['case_ids'] = [str(material.pk) for material in topic_materials(row)]
     return value
 
 
@@ -39,7 +42,8 @@ def version_data(row):
 
 
 def channel_snapshot(channel):
-    return dict(case=basic(channel.topic.case), topic=basic(channel.topic), platform=channel.platform)
+    sources = [basic(material) for material in topic_materials(channel.topic)]
+    return dict(case=sources[0], cases=sources, topic=basic(channel.topic), platform=channel.platform)
 
 
 class Access(APIView):
@@ -100,7 +104,9 @@ class Records(Access):
     def save(self, payload, row=None):
         kind, model = self.resource()
         allowed = {'title', 'status', 'revision', 'archived', 'data'}
-        relation = {'topics': ('case_id', Case), 'channels': ('topic_id', Topic), 'feedback': ('channel_id', Channel)}.get(kind)
+        relation = {'channels': ('topic_id', Topic), 'feedback': ('channel_id', Channel)}.get(kind)
+        if kind == 'topics':
+            allowed.update({'case_id', 'case_ids'})
         if relation:
             allowed.add(relation[0])
         if kind == 'channels':
@@ -130,12 +136,15 @@ class Records(Access):
                 if kind == 'feedback' and linked.status != 'published':
                     raise ValidationError('反馈只能关联已发布内容，来源不明时请留空。')
         if kind == 'cases' and status == 'confirmed':
-            if any(not data[field].strip() for field in ('audience', 'problem', 'solution', 'implemented', 'evidence')):
-                raise ValidationError('确认案例前请补齐目标读者、问题、解决方案、已实现能力和证据。')
+            fields = ('audience', 'problem', 'solution', 'implemented') if data['material_type'] == 'case' else ('summary', 'facts')
+            if any(not data[field].strip() for field in fields):
+                raise ValidationError('确认案例前请补齐目标读者、问题、解决方案和已实现能力。' if data['material_type'] == 'case'
+                    else '确认素材前请补齐摘要和事实资料。')
         if kind == 'topics':
-            case = self.linked(Case, extra['case_id'])
-            if status == 'confirmed' and (case.status != 'confirmed' or case.archived):
-                raise ValidationError('请先确认关联案例。')
+            materials = resolve_materials(self, payload, row)
+            extra['case_id'] = materials[0].pk
+            if status == 'confirmed':
+                require_confirmed(materials)
             if data.get('source_feedback_id'):
                 self.linked(Feedback, data['source_feedback_id'])
         if kind == 'channels':
@@ -150,9 +159,12 @@ class Records(Access):
             if status == 'published' and not data['published_at']:
                 raise ValidationError('请登记实际发布时间。')
             if status == 'published' and row and row.status != 'published':
+                if row.topic.archived or row.topic.status != 'confirmed':
+                    raise ValidationError('请先确认有效选题。')
+                require_confirmed(topic_materials(row.topic))
                 snapshot = row.confirmed_version.snapshot
-                if snapshot.get('case', {}).get('revision') != row.topic.case.revision or snapshot.get('topic', {}).get('revision') != row.topic.revision:
-                    raise Conflict('案例或选题已变化，请核对并确认新版本后发布。')
+                if not sources_current(row.topic, snapshot) or snapshot.get('topic', {}).get('revision') != row.topic.revision:
+                    raise Conflict('素材或选题已变化，请核对并确认新版本后发布。')
             if status != 'published' and (data['published_at'] or data['publication_url']):
                 raise ValidationError('请将状态改为已发布后登记发布信息。')
             if row and row.status == 'published' and status != 'published':
@@ -163,8 +175,12 @@ class Records(Access):
                 setattr(row, key, value)
             row.revision += 1
             row.save()
+            if kind == 'topics':
+                set_materials(row, materials)
             return Response(basic(row))
         row = model.objects.create(**self.ownership(), title=title, status=status, data=data, archived=archived, **extra)
+        if kind == 'topics':
+            set_materials(row, materials)
         return Response(basic(row), status=201)
 
 
@@ -205,11 +221,11 @@ class ConfirmVersion(Access):
         if channel.status == 'published' or channel.archived:
             raise ValidationError('已发布或归档的记录不能更换发布版本。')
         version = get_object_or_404(channel.versions, pk=version_id)
-        if channel.topic.status != 'confirmed' or channel.topic.case.status != 'confirmed' or channel.topic.archived or channel.topic.case.archived:
-            raise ValidationError('请先确认有效案例和选题。')
-        source = version.snapshot.get('case', {})
-        if source.get('revision') != channel.topic.case.revision:
-            raise Conflict('案例已修改，请核对资料并保存新版本后确认。')
+        if channel.topic.status != 'confirmed' or channel.topic.archived:
+            raise ValidationError('请先确认有效素材和选题。')
+        require_confirmed(topic_materials(channel.topic))
+        if not sources_current(channel.topic, version.snapshot):
+            raise Conflict('素材已修改，请核对资料并保存新版本后确认。')
         if version.snapshot.get('topic', {}).get('revision') != channel.topic.revision:
             raise Conflict('选题已修改，请核对并保存新版本后确认。')
         channel.confirmed_version = version
@@ -229,10 +245,13 @@ def report(scope):
                               key=lambda f: (f.data['observed_on'], f.created_at), reverse=True)
         latest = observations[0] if observations else None
         metrics = {key: latest.data.get(key) if latest else None for key in ('views', 'interactions', 'inquiries')}
+        materials = snapshot_materials(channel.confirmed_version.snapshot) if channel.confirmed_version_id else []
+        if not materials:
+            materials = [basic(m) for m in topic_materials(channel.topic)]
         publications.append(dict(id=str(channel.pk), title=channel.title, platform=channel.platform,
-            case_id=str(channel.topic.case_id), metrics=metrics, observed_on=latest.data['observed_on'] if latest else None))
+            case_id=materials[0]['id'], case_ids=[m['id'] for m in materials], metrics=metrics, observed_on=latest.data['observed_on'] if latest else None))
         for dimension, key, label in [('platforms', channel.platform, channel.platform),
-                                      ('cases', str(channel.topic.case_id), channel.topic.case.title)]:
+                                      *[('cases', m['id'], m['title']) for m in materials]]:
             group = groups[dimension].setdefault(key, dict(key=key, label=label, publications=0,
                  metrics={name: dict(total=None, samples=0) for name in metrics}))
             group['publications'] += 1
@@ -245,7 +264,7 @@ def report(scope):
         questions=[dict(id=str(f.pk), channel_id=str(f.channel_id) if f.channel_id else None,
                         questions=f.data['questions']) for f in feedback if f.data['questions']],
         unknown_source_count=sum(f.channel_id is None for f in feedback),
-        note='每条已发布内容采用观察日期最新的一次累计数据；空值不计入合计。样本数随指标不同，不跨渠道比较播放与阅读。私信数量为手动登记，未去重；未知来源不归因。')
+        note='每条已发布内容采用观察日期最新的一次累计数据；空值不计入合计。多素材作品分别计入关联素材，素材组之间不可相加，不代表单份素材的贡献。样本数随指标不同，不跨渠道比较播放与阅读。私信数量为手动登记，未去重；未知来源不归因。')
 
 
 class Report(Access):

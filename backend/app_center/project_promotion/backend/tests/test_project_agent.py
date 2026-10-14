@@ -7,6 +7,7 @@ import pytest
 from core.agent_engine.models import LLMResponse, TokenUsage
 from core.llm.application import GenerationError
 from .. import project_agent, project_source
+from ..catalog import EXPLORATION_FOCUSES, MATERIAL_CATALOG
 from .test_project_source import model_result
 
 
@@ -50,10 +51,8 @@ def test_one_native_session_reads_batch_and_submits_instead_of_stateless_rounds(
         assert options['read_only_full_disk'] is full_disk
         options['on_event']('tool.started', {'command': 'private command not for progress'})
         tools = options['tool_handlers']
-        evidence = json.loads(tools['promotion_cite_sources']({'sources': [
-            {'path': 'app.py', 'start': 1, 'end': 200}, {'path': 'README.md', 'start': 1, 'end': 1}]}))['evidence']
-        assert len(evidence) == 2 and 'line200' in evidence[0]['quote']
-        tools['promotion_submit_cases'](model_result([row['id'] for row in evidence]))
+        assert set(tools) == {'promotion_submit_cases'}
+        tools['promotion_submit_cases'](model_result())
         return response()
     context.engine.complete.side_effect = complete
     result = execute(context)
@@ -65,24 +64,15 @@ def test_one_native_session_reads_batch_and_submits_instead_of_stateless_rounds(
     assert context.usage.call_args.kwargs['status'] == 'success'
 
 
-@pytest.mark.parametrize('path,start,end', [('../outside.py', 1, 1), ('/app.py', 1, 1),
-    ('C:/secret.py', 1, 1), ('app.py', 0, 1), ('app.py', 201, 202), ('app.py', 2, 1)])
-def test_citations_enforce_snapshot_paths_and_line_ranges(context, path, start, end):
-    tools = project_source.ProjectTools(context.files, {}, lambda _: None, lambda: None)
-    with pytest.raises((ValueError, project_source.ValidationError)):
-        tools.cite({'sources': [{'path': path, 'start': start, 'end': end}]})
-    assert tools.evidence == {}
-
-
-def test_source_tool_uses_server_content_and_deduplicates(context):
-    tools = project_source.ProjectTools(context.files, {}, lambda _: None, lambda: None)
-    args = {'sources': [{'path': 'app.py', 'start': 81, 'end': 200}]}
-    first = json.loads(tools.cite(args))
-    assert json.loads(tools.cite(args)) == first
-    assert first['evidence'][0]['sha256'] == 'a' * 64
-    assert len(tools.evidence) == 1
-    with pytest.raises(project_source.ValidationError):
-        tools.cite({'sources': [{**args['sources'][0], 'quote': 'forged'}]})
+def test_submission_tool_requires_no_source_registration_and_checks_cancellation(context):
+    check = Mock()
+    tools = project_source.ProjectTools({}, lambda _: None, check)
+    assert [tool['name'] for tool in tools.definitions()] == ['promotion_submit_cases']
+    assert json.loads(tools.submit(model_result()))['accepted'] is True
+    check.assert_called_once()
+    check.side_effect = InterruptedError()
+    with pytest.raises(InterruptedError):
+        tools.submit(model_result())
 
 
 def test_no_submitted_result_is_not_success(context):
@@ -109,8 +99,7 @@ def test_insufficient_evidence_finishes_one_session_without_inventing_cases(cont
 def test_failed_agent_never_accepts_partial_submission(context):
     def complete(messages, **options):
         tools = options['tool_handlers']
-        evidence = json.loads(tools['promotion_cite_sources']({'sources': [{'path': 'app.py', 'start': 1, 'end': 2}]}))['evidence']
-        tools['promotion_submit_cases'](model_result([row['id'] for row in evidence]))
+        tools['promotion_submit_cases'](model_result())
         return response(success=False, error='Selected model is at capacity')
     context.engine.complete.side_effect = complete
     with pytest.raises(GenerationError) as caught:
@@ -171,3 +160,81 @@ def test_agent_forwards_activity_events_without_restarting_session(context):
         on_activity=lambda kind, payload: events.append((kind, payload)))
     assert [kind for kind, payload in events] == ['session.started', 'tool.started', 'tool.completed']
     context.engine.complete.assert_called_once()
+
+
+@pytest.mark.parametrize('mode,expected', [('overview', 610), ('deep', 1210)])
+def test_exploration_modes_use_distinct_scope_and_deadlines(context, settings, mode, expected):
+    settings.APPLICATION_GENERATION_TIMEOUT_SECONDS = 5
+    settings.PROJECT_PROMOTION_OVERVIEW_TIMEOUT_SECONDS = 610
+    settings.PROJECT_PROMOTION_DEEP_TIMEOUT_SECONDS = 1210
+    context.task.snapshot['request']['exploration_mode'] = mode
+    context.task.snapshot['request']['instruction'] = '任务调度'
+    def complete(messages, **options):
+        assert options['timeout_seconds'] == expected
+        system = messages[0]['content']
+        if mode == 'overview':
+            assert '主要模块都已归纳或明确标注资料缺口' in system
+            assert '不要逐项展开调用链' in system
+            assert project_source.DEEP_INSTRUCTION not in system
+        else:
+            assert '不要再次遍历所有无关模块' in system
+            assert project_source.OVERVIEW_INSTRUCTION not in system
+        tools = options['tool_handlers']
+        tools['promotion_submit_cases'](model_result())
+        return response()
+    context.engine.complete.side_effect = complete
+    result = execute(context)
+    assert result['cases'][0]['source_snapshot']['exploration_mode'] == mode
+
+
+def test_legacy_project_requests_default_to_whole_project_overview(context):
+    def complete(messages, **options):
+        assert project_source.OVERVIEW_INSTRUCTION in messages[0]['content']
+        assert json.loads(messages[1]['content'])['探索模式'] == 'overview'
+        options['tool_handlers']['promotion_submit_cases']({'insufficient_reason': '测试资料不足'})
+        return response()
+    context.engine.complete.side_effect = complete
+    with pytest.raises(GenerationError) as error:
+        execute(context)
+    assert error.value.code == 'insufficient_sources'
+
+
+@pytest.mark.parametrize('mode,label,limit', [('overview', '全面概览', 600), ('deep', '指定方向深挖', 1200)])
+def test_timeout_explains_mode_limit_and_cleans_snapshot(context, settings, mode, label, limit):
+    settings.PROJECT_PROMOTION_OVERVIEW_TIMEOUT_SECONDS = 600
+    settings.PROJECT_PROMOTION_DEEP_TIMEOUT_SECONDS = 1200
+    context.task.snapshot['request']['exploration_mode'] = mode
+    context.engine.complete.side_effect = TimeoutError('private provider detail')
+    with pytest.raises(GenerationError) as error:
+        execute(context)
+    assert error.value.code == 'timeout'
+    assert label in str(error.value) and f'{limit} 秒' in str(error.value)
+    assert 'private' not in str(error.value) and '缩小探索方向' not in str(error.value)
+    assert not Path(context.factory.call_args.kwargs['working_directory']).exists()
+    assert 'project_source' not in context.task.snapshot
+
+
+@pytest.mark.parametrize('focus', EXPLORATION_FOCUSES)
+@pytest.mark.parametrize('mode', ['overview', 'deep'])
+def test_selected_focus_reaches_agent_without_changing_exploration_scope(context, focus, mode):
+    context.task.snapshot['request'].update(exploration_focus=focus, exploration_mode=mode)
+    def complete(messages, **options):
+        instruction = messages[0]['content']
+        label, description = EXPLORATION_FOCUSES[focus]
+        assert f'本次探索侧重：{label}' in instruction and description in instruction
+        assert json.loads(messages[1]['content'])['探索侧重'] == focus
+        assert (project_source.OVERVIEW_INSTRUCTION if mode == 'overview' else project_source.DEEP_INSTRUCTION) in instruction
+        if focus in MATERIAL_CATALOG:
+            assert f'仅输出 material_type={focus}' in instruction
+            assert '不要附带其他分类' in instruction
+        value = model_result()
+        if focus == 'overview':
+            value['cases'] = value['cases'][:1]
+        for item in value['cases']:
+            item['data'].update(material_type=focus if focus in MATERIAL_CATALOG else 'feature', summary='摘要', facts='项目资料')
+        options['tool_handlers']['promotion_submit_cases'](value)
+        return response()
+    context.engine.complete.side_effect = complete
+    result = execute(context)
+    assert result['cases'][0]['source_snapshot']['exploration_focus'] == focus
+    assert result['cases'][0]['data']['evidence'] == ''

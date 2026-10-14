@@ -1,8 +1,10 @@
 from rest_framework import serializers as s
 from django.core.validators import URLValidator
+from .catalog import MATERIAL_TYPES
 
 PLATFORMS = ['wechat', 'xiaohongshu', 'douyin', 'moments']
-DIRECTIONS = ['demo', 'solution', 'development', 'experience']
+DIRECTIONS = ['overview', 'application_overview', 'audience', 'demo', 'solution', 'workflow', 'showcase', 'comparison',
+              'tutorial', 'architecture', 'boundaries', 'development', 'experience']
 
 
 class Strict(s.Serializer):
@@ -30,8 +32,11 @@ class Asset(Strict):
 
 
 class CaseData(Strict):
+    material_type = s.ChoiceField(choices=MATERIAL_TYPES, default='case')
+    summary = text(2000)
+    facts = text()
     case_type = s.ChoiceField(choices=['demo', 'customer'], default='demo')
-    category = s.ChoiceField(choices=['wechat', 'multichannel', 'automation'], default='wechat')
+    category = s.ChoiceField(choices=['general', 'wechat', 'multichannel', 'automation'], default='general')
     audience = text(2000)
     problem = text()
     solution = text()
@@ -48,6 +53,8 @@ class TopicData(Strict):
     direction = s.ChoiceField(choices=DIRECTIONS, default='demo')
     audience = text(2000)
     angle = text(5000)
+    thesis = text(5000)
+    outline = text()
     source_feedback_id = s.UUIDField(required=False, allow_null=True, default=None)
 
 

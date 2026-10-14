@@ -13,6 +13,9 @@ def run_project_agent(task, *, working_directory, instruction, content, tools, h
     engine = build_agent_engine(working_directory=working_directory)
     if engine.adapter_name != 'codex' or settings.CODEX_TRANSPORT != 'app-server':
         raise GenerationError('项目自主探索需要支持原生工具与只读沙箱的 Codex app-server 引擎。', code='unsupported_agent')
+    mode = task.snapshot['request'].get('exploration_mode', 'overview')
+    timeout_seconds = (settings.PROJECT_PROMOTION_DEEP_TIMEOUT_SECONDS if mode == 'deep'
+                       else settings.PROJECT_PROMOTION_OVERVIEW_TIMEOUT_SECONDS)
 
     def cancelled():
         try:
@@ -28,7 +31,7 @@ def run_project_agent(task, *, working_directory, instruction, content, tools, h
         elif kind == 'tool.started':
             progress('Agent 正在自主查找和阅读项目文件')
         elif kind == 'tool.completed':
-            progress('Agent 正在整理文件内容与案例依据')
+            progress('Agent 正在整理文件内容与素材依据')
 
     try:
         if on_activity:
@@ -39,11 +42,14 @@ def run_project_agent(task, *, working_directory, instruction, content, tools, h
         ], permission_mode='default', read_only_paths=[working_directory],
             read_only_full_disk=settings.PROJECT_PROMOTION_ALLOW_FULL_DISK_READ,
             dynamic_tools=tools, tool_handlers=handlers, on_event=event, cancelled=cancelled,
-            final_response_only=True, timeout_seconds=settings.APPLICATION_GENERATION_TIMEOUT_SECONDS)
+            final_response_only=True, timeout_seconds=timeout_seconds)
     except InterruptedError:
         raise
     except TimeoutError:
-        raise GenerationError('项目 Agent 探索超时，请缩小探索方向后重试。', code='timeout') from None
+        check()
+        label = '指定方向深挖' if mode == 'deep' else '全面概览'
+        raise GenerationError(f'项目{label}超时（本次时限 {timeout_seconds} 秒）。请查看执行过程，确认是否仍在读取资料或等待模型；'
+            '可重试，或由管理员调整此模式的探索时限。已保存素材不受影响。', code='timeout') from None
     except GenerationError:
         raise
     except Exception as exc:

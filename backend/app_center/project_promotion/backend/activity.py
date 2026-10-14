@@ -6,7 +6,7 @@ from django.utils import timezone
 MAX_ITEMS = 100
 MAX_TEXT = 2000
 LABELS = {'shell': '执行读取命令', 'read': '读取文件', 'search': '搜索代码', 'list': '查看目录',
-    'promotion_cite_sources': '登记源码引用', 'promotion_submit_cases': '提交案例'}
+    'promotion_cite_sources': '登记源码引用', 'promotion_submit_cases': '提交素材'}
 
 
 def display_text(value):
@@ -58,7 +58,7 @@ class ActivityLog:
             elif name == 'promotion_submit_cases' and isinstance(value, dict):
                 cases = value.get('cases')
                 detail = display_text(value.get('insufficient_reason') or '\n'.join(
-                    str(row.get('title', '')) for row in (cases[:6] if isinstance(cases, list) else []) if isinstance(row, dict)))
+                    str(row.get('title', '')) for row in (cases[:12] if isinstance(cases, list) else []) if isinstance(row, dict)))
         elif kind == 'agent.item' and payload.get('type') == 'agentMessage' and payload.get('completed'):
             title, detail = 'Agent 说明', display_text(payload.get('text'))
             key = f"{self.session}:message:{str(payload.get('id', ''))[:160]}"

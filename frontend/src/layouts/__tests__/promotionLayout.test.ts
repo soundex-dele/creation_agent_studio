@@ -23,9 +23,6 @@ function styles(selectors: string[], width: number, height: number) {
 it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900], [844, 390]])('bounds the page, cards and forms at %i x %i (static CSS check)', (width, height) => {
   const page = styles(['.app-scroll-page', '.promotion-page'], width, height);
   expect(page.height).toBe('100%'); expect(page['min-height']).toBe('0'); expect(page['overflow-y']).toBe('auto');
-  expect(styles(['.promotion-source'], width, height)['min-width']).toBe('0');
-  expect(styles(['.promotion-source'], width, height)['overflow-wrap']).toBe('anywhere');
-  expect(styles(['.promotion-source pre'], width, height)['white-space']).toBe('pre-wrap');
   expect(styles(['.promotion-container'], width, height).padding).toContain('env(safe-area-inset-bottom)');
   expect(styles(['.promotion-grid'], width, height)['grid-template-columns']).toBe(width <= 767 ? 'minmax(0, 1fr)' : width <= 1023 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))');
   expect(styles(['.promotion-modal .ant-modal-body'], width, height)['overflow-y']).toBe('auto');
@@ -34,6 +31,11 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   expect(styles(['.promotion-modal .ant-checkbox-wrapper'], width, height).display).toBe('inline-flex');
   expect(styles(['.promotion-card'], width, height)['overflow-wrap']).toBe('anywhere');
   expect(styles(['.promotion-actions'], width, height)['flex-wrap']).toBe('wrap');
+  expect(styles(['.promotion-material-picker'], width, height)['min-width']).toBe('0');
+  expect(styles(['.promotion-material-options'], width, height)['grid-template-columns']).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+  expect(styles(['.promotion-material-option'], width, height).display).toBe('inline-flex');
+  expect(styles(['.promotion-material-option'], width, height)['min-height']).toBe('44px');
+  expect(styles(['.promotion-material-option span'], width, height)['overflow-wrap']).toBe('anywhere');
   expect(styles(['.promotion-activity'], width, height)['min-width']).toBe('0');
   expect(styles(['.promotion-activity-meta'], width, height)['flex-wrap']).toBe('wrap');
   expect(styles(['.promotion-activity-detail pre'], width, height)['white-space']).toBe('pre-wrap');

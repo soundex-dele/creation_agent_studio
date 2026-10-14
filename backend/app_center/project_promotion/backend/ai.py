@@ -10,8 +10,10 @@ from app_center.brand_library.backend.serializers import BrandReferenceSerialize
 from modules.execution.application.start_runs import start_application_run
 from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
 from .models import AITask, Case, Topic, Channel, Version
+from .catalog import EXPLORATION_FOCUSES
 from .schemas import Strict, text, validated, CaseData, TopicData, CopyBody
 from .views import Access, Conflict, basic, channel_snapshot, report
+from .materials import resolve_materials, topic_materials, require_confirmed, set_materials, snapshot_materials, generation_context
 from apps.applications.runtime_paths import resolve_runtime_path
 from pathlib import Path
 from modules.execution.application.commands import submit_run_command
@@ -26,6 +28,9 @@ class TaskInput(Strict):
     instruction = text(30000)
     project_path = text(2000)
     case_id = s.UUIDField(required=False, allow_null=True, default=None)
+    case_ids = s.ListField(child=s.UUIDField(), min_length=1, max_length=20, required=False)
+    exploration_focus = s.ChoiceField(choices=list(EXPLORATION_FOCUSES), required=False)
+    exploration_mode = s.ChoiceField(choices=['overview', 'deep'], required=False)
     channel_id = s.UUIDField(required=False, allow_null=True, default=None)
     brand_reference = BrandReferenceSerializer(required=False, allow_null=True, default=None)
 
@@ -66,6 +71,8 @@ class Tasks(Access):
         if values['kind'] == 'case' and not values['instruction'].strip():
             raise ValidationError('请粘贴开发记录或案例资料。')
         if values['kind'] == 'project':
+            if values.get('exploration_mode') == 'deep' and not values['instruction'].strip():
+                raise ValidationError({'instruction': '请指定要深入的模块、功能或主题。'})
             try:
                 if not Path(values['project_path']).is_absolute():
                     raise ValueError('请填写后端运行机器上的项目绝对路径。')
@@ -77,14 +84,15 @@ class Tasks(Access):
         elif values['project_path']:
             raise ValidationError('只有项目探索任务支持项目路径。')
         if values['kind'] in ('topics', 'review'):
-            case = self.linked(Case, values['case_id'])
-            if case.status != 'confirmed' or case.archived:
-                raise ValidationError('请先选择已确认的案例。')
-            snapshot['case'] = basic(case)
+            materials = resolve_materials(self, values)
+            require_confirmed(materials)
+            snapshot['cases'] = [basic(material) for material in materials]
+            snapshot['case'] = snapshot['cases'][0]
         if values['kind'] == 'copy':
             channel = self.linked(Channel, values['channel_id'])
-            if channel.archived or channel.topic.archived or channel.topic.case.archived or channel.topic.status != 'confirmed' or channel.topic.case.status != 'confirmed':
-                raise ValidationError('请先确认有效案例和选题。')
+            if channel.archived or channel.topic.archived or channel.topic.status != 'confirmed':
+                raise ValidationError('请先确认有效素材和选题。')
+            require_confirmed(topic_materials(channel.topic))
             snapshot.update(channel_snapshot(channel))
             snapshot['channel_id'] = str(channel.pk)
         if values['kind'] == 'review':
@@ -94,7 +102,7 @@ class Tasks(Access):
             reference.is_valid(raise_exception=True)
             snapshot['brand'] = resolve_brand_snapshot(request=request, application=self.application(),
                 definition={'default_config': {'brand_reference': {'enabled': True}}}, reference=reference.validated_data)
-        if len(json.dumps(snapshot, ensure_ascii=False)) > 180000:
+        if len(json.dumps(generation_context(snapshot), ensure_ascii=False)) > 180000:
             raise ValidationError('资料过多，请减少素材或复盘记录后重试。')
         task = AITask.objects.create(**self.ownership(), title=values['kind'], status='queued', kind=values['kind'],
                                     request_key=key, request_hash=digest, snapshot=snapshot)
@@ -110,6 +118,7 @@ class Tasks(Access):
 
 class TopicResult(Strict):
     title = s.CharField(max_length=200)
+    case_ids = s.ListField(child=s.UUIDField(), min_length=1, max_length=20, required=False)
     data = TopicData()
 
 
@@ -130,7 +139,16 @@ def validate_result(task, value):
         result['data']['case_type'] = 'demo'
     if task.kind in ('topics', 'review'):
         allowed = {q['id'] for q in task.snapshot.get('report', {}).get('questions', [])}
+        sources = [row['id'] for row in snapshot_materials(task.snapshot)]
         for topic in result['topics']:
+            # Old single-source results remain applicable; new multi-source results must be explicit.
+            if 'case_ids' not in topic:
+                if len(sources) != 1:
+                    raise ValidationError('每个选题必须标明实际引用的素材。')
+                topic['case_ids'] = sources
+            topic['case_ids'] = list(dict.fromkeys(topic['case_ids']))
+            if not set(topic['case_ids']).issubset(sources):
+                raise ValidationError('选题引用了未选择的素材。')
             if topic['data']['source_feedback_id'] and topic['data']['source_feedback_id'] not in allowed:
                 raise ValidationError('引用了不存在的反馈。')
     if task.kind == 'copy':
@@ -158,11 +176,19 @@ class Apply(Access):
             record = Case.objects.create(**self.ownership(), title=result['title'], data=result['data'], status='draft')
             result['case_id'] = str(record.pk)
         elif task.kind in ('topics', 'review'):
-            case = self.linked(Case, task.snapshot['case']['id'])
-            if case.archived:
-                raise ValidationError('请先恢复案例。')
-            result['topic_ids'] = [str(Topic.objects.create(**self.ownership(), case=case, title=t['title'], data=t['data'], status='draft').pk)
-                                   for t in result['topics']]
+            sources = {row['id']: row for row in snapshot_materials(task.snapshot)}
+            result['topic_ids'] = []
+            for item in result['topics']:
+                identifiers = item.get('case_ids') or list(sources)
+                if not set(identifiers).issubset(sources):
+                    raise ValidationError('选题引用了未选择的素材。')
+                materials = [self.linked(Case, pk) for pk in identifiers]
+                require_confirmed(materials)
+                if any(m.revision != sources[str(m.pk)]['revision'] for m in materials):
+                    raise Conflict('来源素材已变化，请重新策划选题。')
+                topic = Topic.objects.create(**self.ownership(), case=materials[0], title=item['title'], data=item['data'], status='draft')
+                set_materials(topic, materials)
+                result['topic_ids'].append(str(topic.pk))
         else:
             channel = self.linked(Channel, task.snapshot['channel_id'])
             if channel.archived:

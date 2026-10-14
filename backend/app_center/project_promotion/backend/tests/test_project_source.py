@@ -1,4 +1,3 @@
-import hashlib
 import json
 import subprocess
 from types import SimpleNamespace
@@ -10,6 +9,7 @@ from core.llm.application import GenerationError
 from core.user_directories import user_directory
 from app_center.project_promotion import runtime
 from .. import project_source
+from ..catalog import MATERIAL_CATALOG, BROAD_FOCUSES
 from ..models import AITask, Case
 from .test_promotion import ctx, post, get, patch, case, Sink
 
@@ -39,8 +39,8 @@ def run(ctx, task, sink=None):
     return runtime.execute(dict(run_id=task['run_id'], organization_id=str(ctx['org'].pk), input={'task_id': task['id']}), sink or Sink())
 
 
-def model_result(ids):
-    return dict(analysis='Source-backed drafts; static reading only.', cases=[dict(title=title, evidence_ids=ids,
+def model_result():
+    return dict(analysis='Source-backed drafts; static reading only.', cases=[dict(title=title,
         data=dict(audience='创作者', problem='排版耗时', solution='格式化文章', implemented='输出 article 标签',
                   case_type='customer', assets=[dict(label='Invented', url='https://example.com/fake')]))
         for title in ['文章排版演示', '格式化实现记录']])
@@ -55,12 +55,12 @@ def project_model(monkeypatch):
         assert 'Uncommitted working tree note' in (path / 'notes.md').read_text(encoding='utf8')
         assert '<article>' in (path / 'app.py').read_text(encoding='utf8')
         assert '当前源码窗口' not in kwargs['content']
-        evidence = json.loads(kwargs['handlers']['promotion_cite_sources']({'sources': [
-            {'path': 'app.py', 'start': 1, 'end': 2}, {'path': 'README.md', 'start': 1, 'end': 1}]}))['evidence']
-        # The native Agent can correct its result in the same session.
+        assert set(kwargs['handlers']) == {'promotion_submit_cases'}
+        invalid = model_result()
+        invalid['cases'][0]['data']['material_type'] = 'invalid'
         with pytest.raises(ValidationError):
-            kwargs['handlers']['promotion_submit_cases'](model_result(['forged']))
-        kwargs['handlers']['promotion_submit_cases'](model_result([r['id'] for r in evidence]))
+            kwargs['handlers']['promotion_submit_cases'](invalid)
+        kwargs['handlers']['promotion_submit_cases'](model_result())
         return 'native-thread-1'
     monkeypatch.setattr(runtime, 'run_project_agent', generate)
     monkeypatch.setattr(runtime, 'generate_json', lambda **kwargs: pytest.fail('Project used stateless JSON generation'))
@@ -78,13 +78,9 @@ def test_project_exploration_batch_apply_and_immutable_evidence(ctx, repo, monke
     assert len(calls) == 1
     assert not Path(calls[0]['working_directory']).exists()
     original = task['result']['cases'][0]['source_snapshot']
-    evidence = next(iter(original['evidence'].values()))
-    assert '<article>' in evidence['quote']
-    assert evidence['sha256'] == hashlib.sha256((repo / 'app.py').read_bytes()).hexdigest()
-    assert original['coverage']['mode'] == 'native_agent'
-    assert original['coverage']['files_cited'] == 2
-    assert 'exploration_rounds' not in original['coverage']
+    assert not {'evidence', 'coverage', 'digest'} & original.keys()
     assert original['origin']['working_tree'] is True
+    assert task['result']['cases'][0]['data']['evidence'] == ''
     (repo / 'app.py').write_text('changed after exploration', encoding='utf8')
     applied = post(ctx, f"ai/tasks/{task['id']}/apply", {}, 200)
     post(ctx, f"ai/tasks/{task['id']}/apply", {}, 200)
@@ -92,6 +88,7 @@ def test_project_exploration_batch_apply_and_immutable_evidence(ctx, repo, monke
     row = get(ctx, 'cases/' + applied['result']['case_ids'][0])
     assert row['status'] == 'draft' and row['data']['case_type'] == 'demo' and row['data']['assets'] == []
     assert '未运行' in row['data']['conditions']
+    assert row['data']['evidence'] == ''
     row = patch(ctx, 'cases', row, {'title': '人工审核标题'})
     assert row['source_snapshot'] == original
     patch(ctx, 'cases', row, {'source_snapshot': {}}, 400)
@@ -113,26 +110,39 @@ def test_project_path_validation_and_payload_conflicts(ctx, repo, tmp_path):
     assert AITask.objects.count() == 1 and task['kind'] == 'project'
 
 
-@pytest.mark.parametrize('path', ['README.md', 'docs/guide.py', 'tests/test_app.py', 'api.d.ts', 'component.test.tsx', 'app.spec.js'])
-def test_docs_tests_and_interfaces_cannot_prove_implementation(path):
-    source = {'evidence': {'e1': dict(path=path, start=1, end=1, quote='planned feature', sha256='a' * 64)}}
-    with pytest.raises(ValidationError):
-        project_source.validate_project_result(model_result(['e1']), source)
-    value = model_result(['e1'])
-    for item in value['cases']:
-        item['data']['implemented'] = ''
-    assert project_source.validate_project_result(value, source)['cases'][0]['data']['implemented'] == ''
+def test_deep_exploration_requires_a_direction_and_preserves_request_keys(ctx, repo):
+    payload = dict(kind='project', project_path=str(repo), exploration_mode='deep', request_key='mode')
+    post(ctx, 'ai/tasks', payload, 400)
+    post(ctx, 'ai/tasks', {**payload, 'instruction': '   '}, 400)
+    payload['instruction'] = '展开文章排版模块'
+    task = post(ctx, 'ai/tasks', payload, 202)
+    assert task['request']['exploration_mode'] == 'deep'
+    assert post(ctx, 'ai/tasks', payload, 200)['id'] == task['id']
+    post(ctx, 'ai/tasks', {**payload, 'exploration_mode': 'overview'}, 409)
 
 
-def test_unknown_citations_duplicates_and_insufficient_sources_are_rejected():
-    source = {'evidence': {'e1': dict(path='app.py', start=1, end=1, quote='def render(): pass', sha256='a' * 64)}}
+def test_direct_submission_needs_no_citations_and_discards_generated_evidence():
+    value = model_result()
+    value['cases'][0]['data']['evidence'] = 'app.py:1-2'
+    source = {'origin': {'path': '/project'}}
+    result = project_source.validate_project_result(value, source)
+    assert result['cases'][0]['data']['implemented']
+    assert result['cases'][0]['data']['evidence'] == ''
+    assert result['cases'][0]['source_snapshot'] == source
+    result['cases'][0]['source_snapshot']['origin']['path'] = 'changed'
+    assert source['origin']['path'] == '/project'
+
+
+def test_duplicates_invalid_fields_and_insufficient_sources_are_rejected():
+    value = model_result()
+    value['cases'][0]['evidence_ids'] = ['e1']
     with pytest.raises(ValidationError):
-        project_source.validate_project_result(model_result(['forged']), source)
-    value = model_result(['e1']); value['cases'][1]['title'] = value['cases'][0]['title']
+        project_source.validate_project_result(value, {})
+    value = model_result(); value['cases'][1]['title'] = value['cases'][0]['title']
     with pytest.raises(ValidationError):
-        project_source.validate_project_result(value, source)
+        project_source.validate_project_result(value, {})
     with pytest.raises(ValueError, match='资料不足'):
-        project_source.validate_project_result({'insufficient_reason': 'No implementation found'}, source)
+        project_source.validate_project_result({'insufficient_reason': 'No project information'}, {})
 
 
 def test_failed_generation_preserves_cases_and_can_retry(ctx, repo, monkeypatch):
@@ -140,7 +150,9 @@ def test_failed_generation_preserves_cases_and_can_retry(ctx, repo, monkeypatch)
     calls = []
     def generate(task, **kwargs):
         calls.append(kwargs)
-        kwargs['handlers']['promotion_submit_cases'](model_result(['forged']))
+        value = model_result()
+        value['cases'][0]['data']['material_type'] = 'invalid'
+        kwargs['handlers']['promotion_submit_cases'](value)
     monkeypatch.setattr(runtime, 'run_project_agent', generate)
     task = submit(ctx, repo)
     with pytest.raises(RuntimeError):
@@ -233,8 +245,7 @@ def test_activity_is_live_private_and_survives_terminal_states(ctx, repo, monkey
         events('tool.failed' if outcome == 'failed' else 'tool.completed', {**event, 'result': 'DO NOT STORE RAW OUTPUT'})
         if outcome == 'failed':
             raise GenerationError('模型失败')
-        evidence = json.loads(kwargs['handlers']['promotion_cite_sources']({'sources': [{'path': 'app.py', 'start': 1, 'end': 2}]}))['evidence']
-        kwargs['handlers']['promotion_submit_cases'](model_result([row['id'] for row in evidence]))
+        kwargs['handlers']['promotion_submit_cases'](model_result())
         return 'native-thread'
     monkeypatch.setattr(runtime, 'run_project_agent', generate)
     if outcome == 'failed':
@@ -266,3 +277,84 @@ def test_model_configuration_error_does_not_retry_forever(monkeypatch):
     with pytest.raises(RuntimeError):
         project_source.explore_project(task, broken, lambda _: None, lambda: None)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('focus', ['deployment', 'security', 'roadmap', 'application_overview', 'user', 'technical', 'business', 'all'])
+def test_focus_api_roundtrip_and_idempotency(ctx, repo, monkeypatch, focus):
+    payload = dict(kind='project', project_path=str(repo), exploration_focus=focus, request_key='focused-project')
+    task = post(ctx, 'ai/tasks', payload, 202)
+    assert task['request']['exploration_focus'] == focus
+    assert post(ctx, 'ai/tasks', payload, 200)['id'] == task['id']
+    post(ctx, 'ai/tasks', {**payload, 'exploration_focus': 'unknown'}, 400)
+    post(ctx, 'ai/tasks', {**payload, 'exploration_focus': 'cost'}, 409)
+    def generate(task, **kwargs):
+        assert kwargs['content']['探索侧重'] == focus
+        value = model_result()
+        kind = focus if focus in MATERIAL_CATALOG else 'deployment'
+        for item in value['cases']:
+            item['data'].update(material_type=kind, summary='项目资料', facts='对应分类的项目事实')
+        kwargs['handlers']['promotion_submit_cases'](value)
+        return 'focused-thread'
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
+    run(ctx, task)
+    applied = post(ctx, f"ai/tasks/{task['id']}/apply", {}, 200)
+    row = get(ctx, 'cases/' + applied['result']['case_ids'][0])
+    assert row['data']['material_type'] == (focus if focus in MATERIAL_CATALOG else 'deployment')
+    assert row['source_snapshot']['exploration_focus'] == focus
+    assert patch(ctx, 'cases', row, {'status': 'confirmed'})['status'] == 'confirmed'
+
+
+@pytest.mark.parametrize('focus', MATERIAL_CATALOG)
+def test_concrete_focus_rejects_mixed_categories_and_allows_correction(focus):
+    tools = project_source.ProjectTools({'exploration_focus': focus}, lambda _: None, lambda: None)
+    definition = tools.definitions()[0]
+    data_schema = definition['inputSchema']['properties']['cases']['items']['properties']['data']
+    assert data_schema['properties']['material_type']['enum'] == [focus]
+    assert 'material_type' in data_schema['required']
+    value = model_result()
+    for item in value['cases']:
+        item['data']['material_type'] = focus
+    if focus == 'overview':
+        value['cases'] = value['cases'][:1]
+    tools.submit(value)
+    assert tools.result is not None
+    if focus == 'overview':
+        value['cases'].append({'title': '应用介绍', 'data': {'material_type': 'feature'}})
+    value['cases'][1]['data']['material_type'] = 'overview' if focus != 'overview' else 'feature'
+    with pytest.raises(ValidationError, match='本次仅允许素材分类'):
+        tools.submit(value)
+    assert tools.result is None
+    assert value['cases'][1]['data']['material_type'] != focus
+    value['cases'].pop()
+    assert json.loads(tools.submit(value))['accepted']
+    assert all(item['data']['material_type'] == focus for item in tools.result['cases'])
+    assert json.loads(tools.submit({'insufficient_reason': '所选分类暂无资料'}))['insufficient_sources']
+    assert tools.result is None
+
+
+@pytest.mark.parametrize('focus', [None, *BROAD_FOCUSES])
+def test_broad_or_legacy_focus_can_still_submit_multiple_categories(focus):
+    source = {} if focus is None else {'exploration_focus': focus}
+    tools = project_source.ProjectTools(source, lambda _: None, lambda: None)
+    value = model_result()
+    value['cases'][0]['data']['material_type'] = 'overview'
+    value['cases'][1]['data']['material_type'] = 'feature'
+    assert json.loads(tools.submit(value))['case_count'] == 2
+    assert [item['data']['material_type'] for item in tools.result['cases']] == ['overview', 'feature']
+
+
+def test_project_overview_and_application_overviews_are_distinct_scopes():
+    value = {'analysis': '一个项目包含两个应用', 'cases': [
+        {'title': '创作平台整体介绍', 'data': {'material_type': 'overview'}},
+        {'title': '项目宣传助手介绍', 'data': {'material_type': 'application_overview'}},
+        {'title': '公众号写作助手介绍', 'data': {'material_type': 'application_overview'}},
+    ]}
+    result = project_source.validate_project_result(value, {'exploration_focus': 'all'})
+    assert [row['data']['material_type'] for row in result['cases']] == ['overview', 'application_overview', 'application_overview']
+    # A concrete selection cannot silently promote or demote the other scope.
+    for focus in ['overview', 'application_overview']:
+        with pytest.raises(ValidationError, match='本次仅允许素材分类'):
+            project_source.validate_project_result(value, {'exploration_focus': focus})
+    value['cases'][1]['data']['material_type'] = 'overview'
+    with pytest.raises(ValidationError, match='项目概览应汇总整个项目'):
+        project_source.validate_project_result(value, {'exploration_focus': 'all'})

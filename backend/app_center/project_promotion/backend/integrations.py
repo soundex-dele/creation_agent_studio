@@ -10,6 +10,7 @@ from core.resource_access import accessible_resources
 from .models import Channel, Handoff, Version
 from .schemas import CopyBody, validated
 from .views import Access, Conflict, version_data
+from .materials import generation_context
 
 SLUGS = ['write-image-text-copy', 'write-short-video-copy', 'wechat-viral-article', 'gzh-design']
 
@@ -49,7 +50,7 @@ class Handoffs(Access):
         old = self.scope(Handoff).filter(version=version, target_application=target).first()
         if old:
             return Response(handoff_data(old))
-        source = json.dumps(dict(body=version.body, source=version.snapshot), ensure_ascii=False)
+        source = json.dumps(dict(body=version.body, source=generation_context(version.snapshot)), ensure_ascii=False)
         if len(source) > 75000:
             raise ValidationError('所选版本资料过长，请减少素材后交接。')
         requirements = '仅依据来源事实，保留已实现与未来设想的区别，不虚构效果，不加私信或销售引导。'

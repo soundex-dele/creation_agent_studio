@@ -530,6 +530,12 @@ AGENT_ENGINE_ADAPTER = config('AGENT_ENGINE_ADAPTER', default='codex')
 # Full structured application generation, separate from app-server RPC replies.
 APPLICATION_GENERATION_TIMEOUT_SECONDS = config(
     'APPLICATION_GENERATION_TIMEOUT_SECONDS', default=300, cast=int)
+# Breadth-first project mapping and explicitly requested implementation tracing.
+# Keep ordinary structured-copy generation independent of project exploration.
+PROJECT_PROMOTION_OVERVIEW_TIMEOUT_SECONDS = config(
+    'PROJECT_PROMOTION_OVERVIEW_TIMEOUT_SECONDS', default=600, cast=int)
+PROJECT_PROMOTION_DEEP_TIMEOUT_SECONDS = config(
+    'PROJECT_PROMOTION_DEEP_TIMEOUT_SECONDS', default=1200, cast=int)
 # Explicit deployment opt-in: legacy Windows sandboxes require full-disk read
 # access. Keep project snapshot isolation by default on other installations.
 PROJECT_PROMOTION_ALLOW_FULL_DISK_READ = config(

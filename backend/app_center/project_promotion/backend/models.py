@@ -28,6 +28,15 @@ class Case(PrivateRecord):
 
 class Topic(PrivateRecord):
     case = models.ForeignKey(Case, on_delete=models.PROTECT, related_name='topics')
+    materials = models.ManyToManyField(Case, through='TopicMaterial', related_name='referencing_topics')
+
+
+class TopicMaterial(TenantOwnedModel):
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE)
+    material = models.ForeignKey(Case, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['topic', 'material'], name='promotion_topic_material')]
 
 
 class Channel(PrivateRecord):
