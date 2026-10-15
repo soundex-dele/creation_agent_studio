@@ -11,9 +11,9 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-PNG = ROOT / "backend/app_center/html_to_png"
-ANIMATION = ROOT / "backend/app_center/animation_studio/engine"
-DTK = ROOT / "backend/app_center/douyin_benchmark"
+PNG = ROOT / "app_center/html_to_png"
+ANIMATION = ROOT / "app_center/animation_studio/engine"
+DTK = ROOT / "app_center/douyin_benchmark"
 DTK_VENV = ROOT / "backend/.venv-dtk"
 CATALOG = ROOT / "deploy/application_dependencies.json"
 CODEX_VERSION = "0.155.0"  # Keep aligned with backend/Dockerfile.
@@ -224,7 +224,7 @@ def main(argv=None):
                 execute(command)
     if git:
         execute([git, "submodule", "update", "--init", "--recursive"])
-    for required in ("backend/app_center/creation_master/react/package.json", "teaching_data/README.md"):
+    for required in ("app_center/creation_master/react/package.json", "teaching_data/README.md"):
         if not args.dry_run and not (ROOT / required).is_file():
             raise RuntimeError(f"Missing submodule file: {required}. Initialize the pinned submodules first.")
 
@@ -233,7 +233,7 @@ def main(argv=None):
     profile = "development" if args.development else "production"
     execute(pip + ["install", "-r", ROOT / f"backend/requirements/{profile}.txt"])
     if args.with_creation_master:
-        execute(pip + ["install", "-r", ROOT / "backend/app_center/creation_master/requirements.txt"])
+        execute(pip + ["install", "-r", ROOT / "app_center/creation_master/requirements.txt"])
     execute(pip + ["check"])
     if "dtk" in runtimes:
         install_dtk(execute)

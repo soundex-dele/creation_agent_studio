@@ -33,10 +33,6 @@ CHAT_SKILL_APPS = {
     "wechat-viral-topics": {
         "skill_slug": "wechat-viral-article",
     },
-    "tool-share-topic-expert": {
-        "skill_slug": "tool-share-topic-planner",
-        "agent_config_overrides": {"model_config": {"adapter": "codex"}},
-    },
 }
 
 
@@ -57,14 +53,14 @@ def test_sync_installs_all_packages_and_activates_deployments():
         "article-html-illustrator", "case-library",
         "creation-master", "gzh-design", "html-cover-generator",
         "wechat-html-optimizer", "wechat-viral-article",
-        "wechat-viral-topics", "tool-share-topic-expert",
+        "wechat-viral-topics",
     }
     for application in applications.filter(
         slug__in=(
             "article-html-illustrator", "case-library",
             "creation-master", "gzh-design", "html-cover-generator",
             "wechat-html-optimizer", "wechat-viral-article",
-            "wechat-viral-topics", "tool-share-topic-expert",
+            "wechat-viral-topics",
         )
     ):
         assert application.revisions.count() == 1

@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    print(f"Application Center root: {BACKEND_ROOT / 'app_center'}")
+    print(f"Application Center root: {BACKEND_ROOT.parent / 'app_center'}")
     print(f"Python: {sys.executable}")
 
     try:

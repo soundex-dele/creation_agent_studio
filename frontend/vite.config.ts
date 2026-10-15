@@ -1,24 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { applicationAliases, applicationPackages } from './applicationPackages'
 
 // Shell override lets two development frontends reach different local backends.
 const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8080'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), applicationPackages()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
+      ...applicationAliases,
       '@': path.resolve(__dirname, './src'),
       '@creation-master': process.env.VITE_EXCLUDE_CREATION_MASTER === 'true'
         ? path.resolve(__dirname, './src/stubs/creation-master')
-        : path.resolve(__dirname, '../backend/app_center/creation_master/react/src'),
+        : path.resolve(__dirname, '../app_center/creation_master/react/src'),
       'antd': path.resolve(__dirname, './node_modules/antd'),
       '@ant-design/icons': path.resolve(__dirname, './node_modules/@ant-design/icons'),
-      '@wechat-assistant': path.resolve(__dirname, '../backend/app_center/wechat_assistant/react/src'),
-      '@creation-toolbox': path.resolve(__dirname, '../backend/app_center/creation_toolbox/react/src'),
+      '@wechat-assistant': path.resolve(__dirname, '../app_center/wechat_assistant/react/src'),
+      '@creation-toolbox': path.resolve(__dirname, '../app_center/creation_toolbox/react/src'),
       '@phosphor-icons/react': path.resolve(__dirname, './node_modules/@phosphor-icons/react'),
       'lucide-react': path.resolve(__dirname, './node_modules/lucide-react/dist/esm/lucide-react.js'),
     },

@@ -49,10 +49,11 @@ class BackendManifest(BaseModel):
     urlconf: str | None = None
     executor_entrypoint: str | None = None
     definition_factory: str | None = None
+    extensions: str | None = None
 
     @field_validator(
         "django_app", "install_hook", "urlconf", "executor_entrypoint",
-        "definition_factory",
+        "definition_factory", "extensions",
     )
     @classmethod
     def valid_dotted_path(cls, value: str | None) -> str | None:
@@ -119,6 +120,10 @@ class SpecManifest(BaseModel):
         frontend_ids = [frontend.id for frontend in self.frontends]
         if len(frontend_ids) != len(set(frontend_ids)):
             raise ValueError("frontend ids must be unique")
+        renderer_keys = [frontend.renderer_key for frontend in self.frontends
+                         if frontend.type == "react" and frontend.entrypoint]
+        if len(renderer_keys) != len(set(renderer_keys)):
+            raise ValueError("registered frontend renderer keys must be unique")
         return self
 
 

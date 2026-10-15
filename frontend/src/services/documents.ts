@@ -13,11 +13,7 @@ export interface DocumentShare extends DocumentMember { role: 'viewer' | 'editor
 export type DocumentBody = Pick<OnlineDocument, 'title' | 'content'>;
 export interface DocumentAIContext { version: number; selection: string; selection_from: number; selection_to: number }
 
-export function documentError(error: unknown): string {
-  const data = (error as { response?: { data?: Record<string, unknown> } })?.response?.data;
-  if (data) return Object.values(data).map((value) => Array.isArray(value) ? value.join('；') : String(value)).join('；');
-  return error instanceof Error ? error.message : '操作失败，请稍后重试。';
-}
+export { documentError } from '@platform/errors';
 export function documentsApi(base: string) {
   return {
     list: (scope: string, search: string, page: number, signal?: AbortSignal) => api.get<DocumentPage>(base, { scope, search, page }, { signal }),

@@ -36,10 +36,10 @@ class Command(BaseCommand):
             )
             self.dispatch_due()
             try:
-                from app_center.douyin_benchmark.backend.subscriptions import dispatch_due
-                dispatch_due()
+                from apps.applications.app_center.extensions import dispatch_scheduled
+                dispatch_scheduled()
             except Exception:
-                logger.exception("douyin.subscription scheduler pass failed")
+                logger.exception("application scheduler pass failed")
             if options["once"]:
                 return
             time.sleep(options["poll_interval"])

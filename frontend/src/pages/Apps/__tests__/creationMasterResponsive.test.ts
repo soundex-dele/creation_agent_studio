@@ -6,11 +6,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import postcss, { type Container } from 'postcss';
 import { describe, expect, it } from 'vitest';
-import { CreationMasterApp, type CreationMasterAppProps } from '../../../../../backend/app_center/creation_master/react/src/main';
+import { CreationMasterApp, type CreationMasterAppProps } from '../../../../../app_center/creation_master/react/src/main';
 
 const styles = postcss.parse(readFileSync(resolve(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../../backend/app_center/creation_master/react/src/styles.css',
+  '../../../../../app_center/creation_master/react/src/styles.css',
 ), 'utf8'));
 
 function declarationsAt(width: number, selector: string) {

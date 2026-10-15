@@ -74,7 +74,7 @@
 | --- | --- |
 | 设置页面 | `frontend/src/pages/Settings/SettingsPage.tsx` |
 | 应用入口注册 | `frontend/src/lib/applicationCatalog.ts`、`frontend/src/router/index.tsx` |
-| 应用包注册与同步 | `backend/app_center/` 下的 `application.yaml`、`sync_app_center` 管理命令 |
+| 应用包注册与同步 | `app_center/` 下的 `application.yaml`、`sync_app_center` 管理命令 |
 | 共享聊天界面 | `frontend/src/components/Chat/ChatContainer.tsx`、`MessageInput.tsx`、`MessageList.tsx` |
 | 对话状态与请求 | `frontend/src/stores/useConversationStore.ts`、`frontend/src/services/api.ts` |
 | Run 流式连接与恢复 | `frontend/src/services/runStream.ts`、`frontend/src/entities/run/` |

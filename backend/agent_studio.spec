@@ -3,6 +3,7 @@
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs
@@ -10,6 +11,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, coll
 
 BACKEND_ROOT = Path(SPECPATH)
 PROJECT_ROOT = BACKEND_ROOT.parent
+sys.path[:0] = [str(BACKEND_ROOT), str(PROJECT_ROOT)]
 
 # License mode is a distributor-controlled build setting. Embed it in a
 # runtime hook instead of placing an editable switch next to the executable.
@@ -49,7 +51,7 @@ def tree_data(source: Path, destination: str, *, excluded_parts=()):
 
 datas = tree_data(PROJECT_ROOT / "frontend" / "dist", "frontend_dist")
 datas += tree_data(
-    BACKEND_ROOT / "app_center",
+    PROJECT_ROOT / "app_center",
     "app_center",
     excluded_parts={"creation_master", "__pycache__"},
 )
@@ -82,8 +84,9 @@ def runtime_module(name):
 hiddenimports = []
 for package in ("backend", "apps", "core", "modules"):
     hiddenimports += collect_submodules(package, filter=runtime_module)
-for package in ("app_center.batch_transcribe", "app_center.wechat_assistant", "app_center.disk_cleaner"):
-    hiddenimports += collect_submodules(package, filter=runtime_module)
+for directory in sorted((PROJECT_ROOT / "app_center").iterdir()):
+    if directory.name != "creation_master" and (directory / "application.yaml").is_file():
+        hiddenimports += collect_submodules(f"app_center.{directory.name}", filter=runtime_module)
 hiddenimports += collect_submodules("whitenoise", filter=runtime_module)
 hiddenimports += collect_submodules("websockets.asyncio", filter=runtime_module)
 hiddenimports += ["pystray._win32"]
@@ -97,7 +100,7 @@ else:
 
 a = Analysis(
     [str(BACKEND_ROOT / "desktop_launcher.py")],
-    pathex=[str(BACKEND_ROOT)],
+    pathex=[str(BACKEND_ROOT), str(PROJECT_ROOT)],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

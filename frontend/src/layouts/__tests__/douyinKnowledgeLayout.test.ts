@@ -3,7 +3,7 @@ import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const source = read('../../pages/Apps/douyin/CreationKnowledge.css');
+const source = read('../../../../app_center/douyin_benchmark/frontend/pages/douyin/CreationKnowledge.css');
 describe('Creative knowledge scroll and responsive contract (static)', () => {
   it.each([320, 375, 390, 767, 768, 1280])('keeps cards shrinkable and reflows at %spx', width => {
     const columns: Record<string, string> = {};
@@ -20,7 +20,7 @@ describe('Creative knowledge scroll and responsive contract (static)', () => {
     expect(columns['.douyin-knowledge-filters']).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)');
   });
   it('inherits the shell scroll owner and bounds drawer content at short heights', () => {
-    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+    expect(read('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
     expect(source).toContain('.ant-drawer-body { min-height: 0; overflow-y: auto; }');
     expect(source).toContain('@media (max-height: 500px)');
     expect(source).toContain('env(safe-area-inset-bottom)');
@@ -29,7 +29,7 @@ describe('Creative knowledge scroll and responsive contract (static)', () => {
     expect(source).not.toMatch(/\slabel\s*\{/);
   });
   it('attaches sharing and organization selection to the existing responsive layout', () => {
-    const integration = read('../../pages/Apps/douyin/OrganizationKnowledge.tsx');
+    const integration = read('../../../../app_center/douyin_benchmark/frontend/pages/douyin/OrganizationKnowledge.tsx');
     expect(integration).toContain('className="douyin-knowledge-drawer"');
     expect(integration).toContain('className="douyin-knowledge-grid"');
     expect(integration).toContain('className="douyin-knowledge-selected"');

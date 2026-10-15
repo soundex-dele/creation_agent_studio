@@ -60,9 +60,4 @@ export function researchApi(base: string) {
     original: (id: string, source: string) => api.get<Blob>(`${project(id)}/sources/${source}/content`, undefined, { responseType: 'blob', timeout: 120000 }),
   };
 }
-export function saveResearchBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a'); link.href = url;
-  link.download = filename.replace(/[<>:"/\\|?*]/g, '_'); link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+export { saveResearchBlob } from '@platform/download';

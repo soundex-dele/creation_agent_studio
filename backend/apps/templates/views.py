@@ -67,13 +67,9 @@ class TemplateViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def douyin_applications(self, request):
-        from apps.applications.models import Application
-        from core.resource_access import accessible_resources
+        from apps.applications.app_center.extensions import case_targets
         organization = resolve_organization(request)
-        targets = accessible_resources(Application.objects.for_organization(
-            organization.pk if organization else None).filter(
-                slug='douyin-benchmark', kind='custom', is_active=True), request.user, operation='run')
-        return Response([{'id': row.pk, 'name': row.name} for row in targets.order_by('id')])
+        return Response(case_targets('douyin', request.user, organization.pk if organization else None))
 
     @action(detail=False, methods=['get'])
     def my_templates(self, request):

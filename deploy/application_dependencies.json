@@ -47,6 +47,10 @@
         "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
       ]
     },
+    "cowork": {
+      "name": "对话",
+      "runtimes": []
+    },
     "creation-master": {
       "name": "创作大师",
       "runtimes": [
@@ -65,9 +69,25 @@
         "Whisper 模型在首次转录时下载，离线部署需预先缓存模型。"
       ]
     },
+    "disk-cleaner": {
+      "name": "磁盘清理大师",
+      "runtimes": []
+    },
     "documents": {
       "name": "在线文档",
       "runtimes": []
+    },
+    "douyin-benchmark": {
+      "name": "抖音对标助手",
+      "runtimes": [
+        "ffmpeg",
+        "dtk"
+      ],
+      "notes": [
+        "自动安装 backend/.venv-dtk 独立 Python 3.12/3.13 环境并校验固定版本 DTK 源码；主项目 Python 不兼容时通过 uv 下载 Python 3.13。",
+        "使用 openai-whisper 读取本地 ~/.cache/whisper/base.pt，可通过 DOUYIN_WHISPER_ROOT / DOUYIN_WHISPER_MODEL 配置，不自动下载模型。在应用采集设置保存本人 User-Agent 与 Cookie。自定义 DOUYIN_DTK_PYTHON 时需自行维护对应环境，或取消覆盖以使用默认环境。",
+        "视觉拆解需配置支持图片输入的组织模型。"
+      ]
     },
     "gzh-design": {
       "name": "公众号排版引擎",
@@ -147,6 +167,22 @@
       "name": "口袋打捞队",
       "runtimes": []
     },
+    "project-promotion": {
+      "name": "项目宣传助手",
+      "runtimes": []
+    },
+    "prompt-master": {
+      "name": "提示词大师",
+      "runtimes": []
+    },
+    "rental-growth-assistant": {
+      "name": "租房获客助手",
+      "runtimes": []
+    },
+    "repo-explainer": {
+      "name": "仓库解读助手",
+      "runtimes": []
+    },
     "research-assistant": {
       "name": "资料研究助手",
       "runtimes": []
@@ -217,18 +253,6 @@
       ],
       "notes": [
         "完整 Skill 目录及其脚本依赖需在 CODEX_SKILLS_DIRECTORY 单独部署。"
-      ]
-    },
-    "douyin-benchmark": {
-      "name": "抖音对标助手",
-      "runtimes": [
-        "ffmpeg",
-        "dtk"
-      ],
-      "notes": [
-        "自动安装 backend/.venv-dtk 独立 Python 3.12/3.13 环境并校验固定版本 DTK 源码；主项目 Python 不兼容时通过 uv 下载 Python 3.13。",
-        "使用 openai-whisper 读取本地 ~/.cache/whisper/base.pt，可通过 DOUYIN_WHISPER_ROOT / DOUYIN_WHISPER_MODEL 配置，不自动下载模型。在应用采集设置保存本人 User-Agent 与 Cookie。自定义 DOUYIN_DTK_PYTHON 时需自行维护对应环境，或取消覆盖以使用默认环境。",
-        "视觉拆解需配置支持图片输入的组织模型。"
       ]
     }
   }

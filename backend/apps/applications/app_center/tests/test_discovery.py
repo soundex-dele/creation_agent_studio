@@ -26,7 +26,7 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
     assert {
         "article-html-illustrator", "case-library",
         "gzh-design", "html-cover-generator", "wechat-html-optimizer",
-        "wechat-viral-article", "tool-share-topic-expert",
+        "wechat-viral-article", "wechat-viral-topics",
     } <= package_ids
     chat_packages = {
         package.manifest.metadata.id: package
@@ -34,7 +34,7 @@ def test_all_bundled_packages_are_discovered_and_runtime_is_registered():
         if package.manifest.metadata.id in {
             "article-html-illustrator", "gzh-design", "html-cover-generator",
             "wechat-html-optimizer", "wechat-viral-article",
-            "tool-share-topic-expert",
+            "wechat-viral-topics",
         }
     }
     for package in chat_packages.values():

@@ -1,3 +1,4 @@
+import applicationModules from 'virtual:application-packages';
 import type { AppItem } from '@/types';
 
 type ApplicationLink = Pick<AppItem, 'id' | 'rendererKey' | 'applicationId' | 'kind'>;
@@ -12,12 +13,12 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
 
 /** Platform-owned renderer keys. Manifests select a key; they cannot inject JS. */
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
+  ...Object.fromEntries(applicationModules.map(module => [module.rendererKey, module.launch])),
   'repo-explainer': (app, entry) => withEntry(`/applications/${app.applicationId}/repo-explainer`, entry),
   'disk-cleaner': (app, entry) => withEntry(`/applications/${app.applicationId}/disk-cleaner`, entry),
   'prompt-master': (app, entry) => withEntry(`/applications/${app.applicationId}/prompt-master`, entry),
   'pocket-salvager': (app, entry) => withEntry(`/applications/${app.applicationId}/pocket-salvager`, entry),
   sokoban: (app, entry) => withEntry(`/applications/${app.applicationId}/sokoban`, entry),
-  'douyin-benchmark': (app, entry) => withEntry(`/applications/${app.applicationId}/douyin-benchmark`, entry),
   'research-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/research-assistant`, entry),
   'meeting-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/meeting-assistant`, entry),
   'ai-drawing': (app, entry) => withEntry(`/applications/${app.applicationId}/ai-drawing`, entry),
@@ -25,7 +26,6 @@ export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>>
   'brand-library': (app, entry) => withEntry(`/applications/${app.applicationId}/brand-library`, entry),
   'my-drive': (app, entry) => withEntry(`/applications/${app.applicationId}/my-drive`, entry),
   documents: (app, entry) => withEntry(`/applications/${app.applicationId}/documents`, entry),
-  'kitchen-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/kitchen-assistant`, entry),
   'rental-growth-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/rental-growth-assistant`, entry),
   'project-promotion': (app, entry) => withEntry(`/applications/${app.applicationId}/project-promotion`, entry),
   'ideas-todos': (app, entry) => withEntry(`/applications/${app.applicationId}/ideas-todos`, entry),

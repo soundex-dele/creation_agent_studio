@@ -1,0 +1,59 @@
+{
+  "backend/apps/applications/form_presets.py": [
+    "app_center.brand_library.backend.context"
+  ],
+  "backend/apps/applications/serializers.py": [
+    "app_center.brand_library.backend.serializers"
+  ],
+  "backend/apps/applications/views.py": [
+    "app_center.brand_library.backend.context"
+  ],
+  "backend/apps/conversations/execution.py": [
+    "app_center.documents.backend.access"
+  ],
+  "backend/apps/conversations/views.py": [
+    "app_center.documents.backend.access"
+  ],
+  "backend/apps/workflows/form_context.py": [
+    "app_center.brand_library.backend.context",
+    "app_center.brand_library.backend.serializers"
+  ],
+  "backend/modules/execution/api/run_access.py": [
+    "app_center.ai_drawing.backend.access",
+    "app_center.animation_studio.backend.access",
+    "app_center.documents.backend.access",
+    "app_center.documents.backend.models",
+    "app_center.meeting_assistant.backend.access",
+    "app_center.project_promotion.backend.access",
+    "app_center.rental_growth_assistant.backend.access",
+    "app_center.repo_explainer.backend.access",
+    "app_center.research_assistant.backend.access"
+  ],
+  "frontend_legacy_renderers": [
+    "repo-explainer",
+    "disk-cleaner",
+    "prompt-master",
+    "pocket-salvager",
+    "sokoban",
+    "research-assistant",
+    "meeting-assistant",
+    "ai-drawing",
+    "animation-studio",
+    "brand-library",
+    "my-drive",
+    "documents",
+    "rental-growth-assistant",
+    "project-promotion",
+    "ideas-todos",
+    "my-computer",
+    "cowork",
+    "case-library",
+    "study-with-method",
+    "creation-master",
+    "wechat-assistant",
+    "creation-toolbox",
+    "chat",
+    "generic-task",
+    "html-to-png"
+  ]
+}

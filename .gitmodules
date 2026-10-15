@@ -1,5 +1,5 @@
 [submodule "backend/app_center/creation_master"]
-	path = backend/app_center/creation_master
+	path = app_center/creation_master
 	url = https://github.com/soundex-dele/creation-master.git
 [submodule "teaching_data"]
 	path = teaching_data

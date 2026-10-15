@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from '@platform/http';
 import type { AnimationAspect, AnimationAsset, AnimationGeneration, AnimationRun } from './animationStudio';
 
 export interface SceneStyle { color: string; background: string; font: string }

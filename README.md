@@ -1,11 +1,14 @@
 # Agent Studio
 
+应用源码位于根目录 `app_center/`，平台前后端通过公开能力接口承载应用。
+目录结构、接入契约和迁移说明见 [应用包开发说明](docs/APPLICATION_PACKAGES.md)。
+
 中文项目介绍见 [项目概览](docs/PROJECT_OVERVIEW.md)，涵盖项目定位、主要应用、技术架构、目录结构和运行方式。
 
 ## Bundled submodules
 
 Creation Master is mounted as the complete
-`backend/app_center/creation_master` Git submodule. Clone all application source,
+`app_center/creation_master` Git submodule. Clone all application source,
 including Creation Master's own nested dependencies, with:
 
 ```bash
@@ -124,12 +127,12 @@ Linux 仅选择动画制作并指定 `--system-deps` 时，也会安装 Playwrig
 请使用实际运行后端/worker 的用户执行，Chromium 缓存属于该用户。可通过
 `PLAYWRIGHT_BROWSERS_PATH` 指定共享缓存，但安装与运行时必须保持一致且可读。
 旧 `.env` 中的 `PLAYWRIGHT_NODE_MODULES` 若指向其他机器，应清除或改为当前仓库
-`backend/app_center/html_to_png/node_modules` 的绝对路径。
+`app_center/html_to_png/node_modules` 的绝对路径。
 
 脚本可重复执行，失败会立即停止；`npm ci` 会重建目标目录的 `node_modules`，请在服务
 停止时执行。它不改写 `.env`、不执行数据库迁移、不启动服务。完成后继续下方启动步骤，
 已有虚拟环境无需再次创建或手动安装依赖。模型登录、完整外部 Skill 目录及各 Skill 自身依赖
-仍按 [App Center 说明](backend/app_center/README.md) 配置。此脚本用于宿主机部署；
+仍按 [App Center 说明](app_center/README.md) 配置。此脚本用于宿主机部署；
 Docker Compose 的容器依赖由 Dockerfile 安装，宿主机安装不会改变容器。
 
 后端：

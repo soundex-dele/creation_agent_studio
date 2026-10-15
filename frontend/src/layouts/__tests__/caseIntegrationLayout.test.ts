@@ -18,10 +18,10 @@ describe('Case integration CSS/scroll contract (static, not rendered verificatio
       });
     }
     expect(read('../../pages/Templates/TemplateDetailPage.tsx')).toContain('`${rootClass} template-detail-state`');
-    expect(read('../../pages/Apps/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
+    expect(read('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
   });
   it.each([320, 375, 390, 767, 768, 1280])('wraps actions and keeps touch targets usable at %spx', width => {
-    const css = postcss.parse(read('../../pages/Apps/douyin/CaseIntegration.css'));
+    const css = postcss.parse(read('../../../../app_center/douyin_benchmark/frontend/pages/douyin/CaseIntegration.css'));
     let height = ''; let wrap = '';
     css.walkRules(rule => {
       if (rule.parent?.type === 'atrule' && rule.parent.name === 'media') {
@@ -34,7 +34,7 @@ describe('Case integration CSS/scroll contract (static, not rendered verificatio
     expect(wrap).toBe('wrap'); expect(height).toBe(width <= 767 ? '44px' : '32px');
   });
   it('bounds long previews by available viewport height and scopes field styling', () => {
-    const css = read('../../pages/Apps/douyin/CaseIntegration.css');
+    const css = read('../../../../app_center/douyin_benchmark/frontend/pages/douyin/CaseIntegration.css');
     expect(css).toContain('max-height: 35dvh'); expect(css).toContain('overflow-y: auto');
     expect(css).toContain('overflow-wrap: anywhere'); expect(css).not.toMatch(/\slabel\s*\{/);
   });

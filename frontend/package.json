@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0 && npm run lint:applications",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "generate:api-schema": "python ../backend/manage.py generate_swagger ../contracts/swagger.json --overwrite --format json && swagger2openapi ../contracts/swagger.json -o ../contracts/openapi.json",
     "generate:api-types": "openapi-typescript ../contracts/openapi.json -o src/api/generated.ts",
-    "generate:api": "npm run generate:api-schema && npm run generate:api-types"
+    "generate:api": "npm run generate:api-schema && npm run generate:api-types",
+    "lint:applications": "eslint \"../app_center/*/frontend/**/*.{ts,tsx}\" --config .eslintrc.cjs --resolve-plugins-relative-to . --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
@@ -61,6 +62,7 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5.3.3",
     "vite": "^7.3.6",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.1"
   }
 }

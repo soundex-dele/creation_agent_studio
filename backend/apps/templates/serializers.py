@@ -57,14 +57,14 @@ class TemplateDetailSerializer(serializers.ModelSerializer):
 
     def get_source_navigation(self, obj):
         request = self.context.get('request')
-        if obj.source_kind != 'douyin' or not request or request.user.pk != obj.created_by_id:
+        if not request or request.user.pk != obj.created_by_id:
             return None
         from apps.enterprise.permissions import resolve_organization
         organization = resolve_organization(request)
         if not organization or organization.pk != obj.organization_id:
             return {'available': False}
-        from app_center.douyin_benchmark.backend.cases import source_navigation
-        return source_navigation(obj, request.user)
+        from apps.applications.app_center.extensions import case_navigation
+        return case_navigation(obj, request.user)
 
     category = TemplateCategorySerializer(read_only=True)
     created_by_username = serializers.CharField(

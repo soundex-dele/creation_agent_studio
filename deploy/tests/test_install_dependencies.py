@@ -177,7 +177,7 @@ class InstallerTests(unittest.TestCase):
     def test_catalog_covers_every_bundled_application_and_known_runtimes(self):
         catalog = json.loads(installer.CATALOG.read_text(encoding="utf-8"))["applications"]
         # Manifest package IDs follow the same slug convention as their directories.
-        manifests = (installer.ROOT / "backend/app_center").glob("*/application.yaml")
+        manifests = (installer.ROOT / "app_center").glob("*/application.yaml")
         self.assertEqual(set(catalog), {path.parent.name.replace("_", "-") for path in manifests})
         for app in catalog.values():
             self.assertTrue(set(app["runtimes"]) <= {"ffmpeg", "png", "animation", "dtk"})

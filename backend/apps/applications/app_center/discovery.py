@@ -61,6 +61,7 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
         return [], [error]
 
     seen_ids: dict[str, Path] = {}
+    seen_renderers: dict[str, Path] = {}
     for directory in sorted(root.iterdir(), key=lambda item: item.name):
         if not directory.is_dir() or directory.name.startswith((".", "_")):
             continue
@@ -74,7 +75,7 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
             module_prefix = f"app_center.{directory.name}."
             for field_name in (
                 "django_app", "install_hook", "urlconf", "executor_entrypoint",
-                "definition_factory",
+                "definition_factory", "extensions",
             ):
                 dotted_path = getattr(manifest.spec.backend, field_name)
                 if dotted_path and not dotted_path.startswith(module_prefix):
@@ -83,15 +84,18 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
                         f"spec.backend.{field_name} must resolve inside {module_prefix}",
                     )
             for frontend in manifest.spec.frontends:
-                relative_path = frontend.entrypoint or frontend.directory
-                if not relative_path:
-                    continue
-                candidate = (directory / relative_path).resolve()
-                if directory not in candidate.parents or not candidate.exists():
-                    raise AppCenterError(
-                        manifest_path,
-                        f"frontend {frontend.id!r} path must exist inside the package",
-                    )
+                for relative_path in (frontend.entrypoint, frontend.directory):
+                    if not relative_path:
+                        continue
+                    candidate = (directory / relative_path).resolve()
+                    if directory not in candidate.parents or not candidate.exists():
+                        raise AppCenterError(
+                            manifest_path,
+                            f"frontend {frontend.id!r} path must exist inside the package",
+                        )
+                if frontend.type == "react" and frontend.entrypoint:
+                    if frontend.renderer_key in seen_renderers:
+                        raise AppCenterError(manifest_path, f"duplicate frontend renderer {frontend.renderer_key!r}")
             package_id = manifest.metadata.id
             if package_id in seen_ids:
                 raise AppCenterError(
@@ -99,6 +103,9 @@ def discover_packages(root: Path, *, strict: bool = True) -> tuple[list[Discover
                     f"duplicate package id {package_id!r}; first declared by {seen_ids[package_id]}",
                 )
             seen_ids[package_id] = manifest_path
+            for frontend in manifest.spec.frontends:
+                if frontend.type == "react" and frontend.entrypoint:
+                    seen_renderers[frontend.renderer_key] = manifest_path
             packages.append(DiscoveredPackage(directory, manifest_path, manifest, digest))
         except AppCenterError as exc:
             errors.append(exc)

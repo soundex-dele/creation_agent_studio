@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from '@platform/http';
 import type { TemplateCategory, TemplateDetail, TemplateSummary } from '@/types/template';
 
 export interface CasePage { count: number; results: TemplateSummary[] }

@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { describe, expect, it } from 'vitest';
+import applications from 'virtual:application-packages';
 
-const readSource = (relativePath: string) => readFileSync(
-  new URL(relativePath, import.meta.url),
-  'utf8',
-);
+const readSource = (relativePath: string) => {
+  const owners: Record<string, string> = { KitchenAssistantPage: 'kitchen_assistant', DouyinBenchmarkPage: 'douyin_benchmark' };
+  const page = relativePath.match(/^\.\.\/\.\.\/pages\/Apps\/(KitchenAssistantPage|DouyinBenchmarkPage)(\..+)$/);
+  const source = page ? `../../../../app_center/${owners[page[1]]}/frontend/pages/${page[1]}${page[2]}` : relativePath;
+  return readFileSync(new URL(source, import.meta.url), 'utf8');
+};
 
 // Inspect the actual CSS declarations at each breakpoint. This guards the
 // shell/page scroll contract; jsdom cannot measure layout or simulate panning.
@@ -218,7 +221,14 @@ describe('mobile page scrolling', () => {
       const source = readSource(`../../pages/Apps/${page}.tsx`);
       const routes = readSource('../../router/index.tsx');
       expect(source).toContain(`className="${rootClass} app-scroll-page"`);
-      expect(routes).toContain(`<ApplicationShell fullBleed>{page(<${page} />)}</ApplicationShell>`);
+      const packageRoute = applications.flatMap(app => app.routes).find(route =>
+        route.path.endsWith(page === 'KitchenAssistantPage' ? '/kitchen-assistant' : page === 'DouyinBenchmarkPage' ? '/douyin-benchmark' : '/__none__'));
+      if (packageRoute) {
+        expect(packageRoute.fullBleed).toBe(true);
+        expect(routes).toContain('<ApplicationShell fullBleed={fullBleed}>');
+      } else {
+        expect(routes).toContain(`<ApplicationShell fullBleed>{page(<${page} />)}</ApplicationShell>`);
+      }
     });
 
     it.each([320, 375, 390, 767, 768, 844, 1440])('retains parent-bounded scrolling at %ipx', (width) => {
@@ -268,8 +278,8 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1023, 1024, 1440])('bounds the Douyin sidebar and content in normal and short viewports at %ipx', width => {
-    const source = readSource('../../pages/Apps/DouyinBenchmarkPage.tsx');
-    const css = readSource('../../pages/Apps/DouyinBenchmarkPage.css');
+    const source = readSource('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.tsx');
+    const css = readSource('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.css');
     expect(source).toContain('className="douyin-app"');
     expect(source).toContain('className="douyin-sidebar"');
     expect(source).toContain('className="douyin-host app-scroll-page"');
@@ -297,8 +307,8 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('reflows Douyin filters and work cards without changing the scroll owner at %ipx', width => {
-    const css = readSource('../../pages/Apps/DouyinBenchmarkPage.css');
-    const workspace = readSource('../../pages/Apps/douyin/DouyinWorkspace.tsx');
+    const css = readSource('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.css');
+    const workspace = readSource('../../../../app_center/douyin_benchmark/frontend/pages/douyin/DouyinWorkspace.tsx');
     expect(workspace).toContain('className="douyin-work-filters"');
     expect(workspace).toContain('className="douyin-work-cover"');
     for (const height of [320, 900]) {
@@ -372,7 +382,7 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('reserves kitchen bottom navigation outside the scroll pane at %ipx', (width) => {
-    const styles = readSource('../../pages/Apps/KitchenAssistantPage.css');
+    const styles = readSource('../../../../app_center/kitchen_assistant/frontend/pages/KitchenAssistantPage.css');
     const workspace = declarationsAt([styles], ['.kitchen-workspace'], width);
     const page = declarationsAt([globalStyles, styles], ['.app-scroll-page', '.kitchen-page'], width);
     const navigation = declarationsAt([styles], ['.kitchen-bottom-navigation'], width);
@@ -397,7 +407,7 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767])('separates mobile kitchen actions from search and gives them room at %ipx', width => {
-    const styles = readSource('../../pages/Apps/KitchenAssistantPage.css');
+    const styles = readSource('../../../../app_center/kitchen_assistant/frontend/pages/KitchenAssistantPage.css');
     const actions = declarationsAt([styles], ['.kitchen-actions', '.kitchen-recipe-actions'], width);
     const primary = declarationsAt([styles], ['.kitchen-recipe-actions > .ant-btn-primary'], width);
     const hero = declarationsAt([styles], ['.kitchen-hero .kitchen-actions'], width);

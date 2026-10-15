@@ -6,7 +6,7 @@ COPY frontend/ /app/frontend/
 # Vite resolves bundled application frontends directly from App Center. Copying
 # the parent directory keeps optional, uninitialized submodules optional while
 # still including every in-repository application frontend.
-COPY backend/app_center/ /app/backend/app_center/
+COPY app_center/ /app/app_center/
 WORKDIR /app/frontend
 RUN /app/node_modules/.bin/tsc && /app/node_modules/.bin/vite build
 

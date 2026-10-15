@@ -17,7 +17,8 @@ if sys.version_info < (3, 12) or sys.version_info >= (3, 14):
     raise SystemExit("DTK v5 需要 Python 3.12/3.13，请使用 backend/.venv-dtk/bin/python")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(SOURCE))
-from core.douyin_media_urls import prioritize_video_urls
+import backend  # initialize application package paths
+from app_center.douyin_benchmark.media_urls import prioritize_video_urls
 try:
     import httpx
     from dtk.core.errors import DtkError

@@ -3,6 +3,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.applications.app_center.discovery import AppCenterError, discover_packages
+from apps.applications.app_center.extensions import contributions
 
 
 class Command(BaseCommand):
@@ -17,6 +18,10 @@ class Command(BaseCommand):
             f"{config.__class__.__module__}.{config.__class__.__name__}"
             for config in apps.get_app_configs()
         }
+        try:
+            contributions()
+        except (ImportError, AttributeError, ValueError) as exc:
+            raise CommandError(f"Cannot load application extensions: {exc}") from exc
         for package in packages:
             django_app = package.manifest.spec.backend.django_app
             if django_app and django_app not in loaded_configs:

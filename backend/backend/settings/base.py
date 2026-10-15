@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 from decouple import config
+from backend.paths import BUNDLE_ROOT, expose_app_center
 
 from apps.applications.app_center.discovery import (
     app_center_registry_hash,
@@ -14,9 +15,9 @@ from apps.applications.app_center.discovery import (
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-APP_CENTER_ROOT = Path(config(
-    'APP_CENTER_ROOT', default=str(BASE_DIR / 'app_center')
-)).resolve()
+APP_CENTER_ROOT = expose_app_center(config(
+    'APP_CENTER_ROOT', default=str(BUNDLE_ROOT / 'app_center')
+))
 TEACHING_DATA_ROOT = Path(config(
     'TEACHING_DATA_ROOT', default=str(BASE_DIR.parent / 'teaching_data')
 )).resolve()

@@ -419,6 +419,18 @@ def private_run_tree(request, api_actor, api_organization):
             source_type="application", source_id=str(uuid.uuid4()),
             definition_snapshot={}, input_data={"task_id": str(uuid.uuid4())},
         )
+        if request.param == "kitchen-assistant":
+            from app_center.kitchen_assistant.backend.models import KitchenState, KitchenAITask
+            category = ApplicationCategory.objects.create(name="Kitchen privacy", slug="kitchen-privacy")
+            application = Application.objects.create(organization=api_organization, category=category,
+                created_by=api_actor, name="Kitchen", slug="kitchen-assistant", kind="custom",
+                visibility="organization")
+            state = KitchenState.objects.create(organization=api_organization, application=application, owner=api_actor)
+            task = KitchenAITask.objects.create(organization=api_organization, state=state, run=root,
+                kind="question", instruction="test", request_key="privacy", request_hash="hash", revision=0)
+            root.source_id = str(application.pk)
+            root.input = {"task_id": str(task.pk)}
+            root.save(update_fields=["source_id", "input"])
         child = create_run(
             organization=api_organization, owner=api_actor, parent=root,
             executor_kind=Run.ExecutorKind.AGENT, executor_key="agent-completion",

@@ -99,6 +99,7 @@ def reindex_document(document, actor):
     last_revision = (document.indexing_run.definition_snapshot.get('revision', 0)
                      if document.indexing_run_id else 0)
     revision = max(document.active_revision, document.pending_revision, last_revision) + 1
+    from apps.applications.app_center.extensions import knowledge_context
     run = create_run(
         organization=document.organization,
         owner=actor,
@@ -114,7 +115,7 @@ def reindex_document(document, actor):
             "embedding_provider": document.knowledge_base.embedding_provider,
             "embedding_model": document.knowledge_base.embedding_model,
         },
-        input_data={"object_key": document.source_object_key,
+        input_data={"object_key": document.source_object_key, **knowledge_context(document),
                     **({"research_project_id": document.metadata["research_project_id"]}
                        if document.metadata.get("research_project_id") else {})},
         max_attempts=3,

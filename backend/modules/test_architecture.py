@@ -8,42 +8,33 @@ REPOSITORY_ROOT = BACKEND_ROOT.parent
 
 # Domain integrations are explicit exceptions. Any new modules -> apps edge
 # must be reviewed here instead of silently growing another dependency path.
-ALLOWED_DOMAIN_IMPORTS = {
-    "modules/catalog/api/serializers.py": {"apps.applications.models"},
-    "modules/catalog/api/views.py": {
-        "apps.applications.models",
-        "apps.enterprise.models",
-    },
-    "modules/execution/api/streaming.py": {"apps.enterprise.models"},
-    "modules/execution/api/permissions.py": {"apps.enterprise.models"},
-    "modules/execution/api/views.py": {
-        "apps.agents.models",
-        "apps.conversations.models",
-        "apps.enterprise.models",
-        "apps.projects.services.workspace_paths",
-    },
-    "modules/execution/application/projections.py": {"apps.conversations.models"},
-    "modules/execution/application/start_runs.py": {
-        "apps.agents.models",
-        "apps.applications.models",
-    },
-    "modules/execution/runtime/builtin.py": {"apps.conversations.models"},
-    "modules/execution/runtime/supervisor.py": {
-        "apps.conversations.models",
-        "apps.enterprise.models",
-    },
-    "modules/tenancy/middleware.py": {"apps.enterprise.tenancy"},
-    "modules/tenancy/permissions.py": {
-        "apps.enterprise.models",
-        "apps.enterprise.tenancy",
-    },
-    "modules/tenancy/single_tenant_urls.py": {
-        "apps.applications.app_center.urls",
-        "apps.automations.urls",
-        "apps.enterprise.tenancy",
-        "apps.knowledge.urls",
-    },
-}
+ALLOWED_DOMAIN_IMPORTS = {'modules/catalog/api/serializers.py': {'apps.applications.models'},
+ 'modules/catalog/api/views.py': {'apps.applications.models', 'apps.enterprise.models'},
+ 'modules/execution/api/permissions.py': {'apps.enterprise.models'},
+ 'modules/execution/api/run_access.py': {'apps.agents.models',
+                                         'apps.applications.app_center.extensions'},
+ 'modules/execution/api/serializers.py': {'apps.conversations.models'},
+ 'modules/execution/api/streaming.py': {'apps.enterprise.models'},
+ 'modules/execution/api/views.py': {'apps.conversations.models',
+                                    'apps.enterprise.models',
+                                    'apps.projects.services.workspace_paths'},
+ 'modules/execution/application/projections.py': {'apps.conversations.models'},
+ 'modules/execution/application/start_runs.py': {'apps.applications.models', 'apps.agents.models'},
+ 'modules/execution/infrastructure/coordinator.py': {'apps.applications.runtime_paths'},
+ 'modules/execution/runtime/builtin.py': {'apps.applications.form_presets',
+                                          'apps.conversations.models'},
+ 'modules/execution/runtime/supervisor.py': {'apps.conversations.models', 'apps.enterprise.models'},
+ 'modules/platform_api/cases.py': {'apps.templates.access', 'apps.templates.models'},
+ 'modules/platform_api/identity.py': {'apps.applications.models', 'apps.enterprise.models'},
+ 'modules/platform_api/knowledge.py': {'apps.knowledge.models',
+                                       'apps.knowledge.retrieval',
+                                       'apps.knowledge.services'},
+ 'modules/tenancy/middleware.py': {'apps.enterprise.tenancy'},
+ 'modules/tenancy/permissions.py': {'apps.enterprise.tenancy', 'apps.enterprise.models'},
+ 'modules/tenancy/single_tenant_urls.py': {'apps.applications.app_center.urls',
+                                           'apps.automations.urls',
+                                           'apps.enterprise.tenancy',
+                                           'apps.knowledge.urls'}}
 
 
 def _domain_imports(path):

@@ -184,105 +184,8 @@ def _run_tree_ids(organization_id, root_id):
 
 
 def _can_access_run(request, run):
-    root = run
-    while root.parent_id:
-        root = Run.objects.get(pk=root.parent_id)
-    if root.executor_key == 'knowledge-index':
-        from apps.knowledge.models import KnowledgeDocument
-        document = KnowledgeDocument.objects.filter(pk=root.source_id, knowledge_base__scope='douyin_creation').first()
-        if document or (root.input or {}).get('douyin_knowledge_card_id'):
-            if document is None:
-                return False
-            from app_center.douyin_benchmark.backend.access import can_access_knowledge_index
-            return can_access_knowledge_index(request.user, root, document)
-    # These applications keep their sessions/state private to the initiating
-    # user. Generic Run endpoints must preserve that boundary for the tree.
-    if root.executor_key in {"kitchen-assistant", "prompt-master"}:
-        return root.owner_id == request.user.id
-    if root.executor_key == "repo-explainer":
-        from app_center.repo_explainer.backend.access import can_access_run as repo_access
-        return repo_access(request.user, root)
-    if root.executor_key == "project-promotion":
-        from app_center.project_promotion.backend.access import can_access_run as promotion_access
-        return promotion_access(request.user, root)
-    if root.executor_key == "rental-growth-assistant":
-        from app_center.rental_growth_assistant.backend.access import can_access_run as rental_access
-        return rental_access(request.user, root)
-    if root.executor_key == "research-assistant" or (root.input or {}).get("research_project_id"):
-        from django.apps import apps
-        if not apps.is_installed("app_center.research_assistant.backend"):
-            return False
-        from app_center.research_assistant.backend.access import can_access_run as research_access
-        return research_access(request.user, root)
-    if root.executor_key == "douyin-benchmark":
-        from app_center.douyin_benchmark.backend.access import can_access_run as douyin_access
-        return douyin_access(request.user, root)
-    if root.executor_key == "meeting-assistant":
-        if root.owner_id != request.user.id:
-            return False
-        from django.http import Http404
-        from rest_framework.exceptions import APIException
-        from app_center.meeting_assistant.backend.access import recording_for
-        try:
-            recording_for(request.user, root.organization_id, root.source_id,
-                          (root.input or {}).get("record_id"))
-        except (Http404, APIException, ValueError):
-            return False
-        return True
-    if root.executor_key in ("ai-drawing", "animation-studio"):
-        if root.owner_id != request.user.id:
-            return False
-        from django.http import Http404
-        from rest_framework.exceptions import APIException
-        if root.executor_key == "animation-studio":
-            from app_center.animation_studio.backend.access import application_for
-        else:
-            from app_center.ai_drawing.backend.access import application_for
-        try:
-            application_for(request.user, root.organization_id, root.source_id)
-        except (Http404, APIException, ValueError):
-            return False
-        return True
-    if (root.input or {}).get("document_id"):
-        if root.owner_id != request.user.id:
-            return False
-        from django.apps import apps
-        from django.http import Http404
-        from rest_framework.exceptions import APIException
-        if not apps.is_installed("app_center.documents.backend"):
-            return False
-        from app_center.documents.backend.models import Document
-        from app_center.documents.backend.access import document_for
-        doc = Document.objects.filter(pk=root.input["document_id"]).first()
-        if doc is None:
-            return False
-        try:
-            document_for(request.user, root.organization_id, doc.application_id, doc.pk)
-        except (Http404, APIException):
-            return False
-        return True
-    # Conversation APIs are owner-only, including for administrators. Apply
-    # the same boundary to Run history and every endpoint exposing its data.
-    # Workflow roots also expose their steps' conversations; checking the root
-    # protects descendants even when they have no conversation_id of their own.
-    # Access to a shared supervisor does not grant access to others' chats.
-    if root.source_type == "workflow" or RunSerializer._conversation_id(root):
-        return root.owner_id == request.user.id
-    if root.source_type != "supervisor":
-        return True
-    if request.user.is_superuser or root.owner_id == request.user.id:
-        return True
-    from apps.agents.models import Agent
-    from core.resource_access import can_access_resource
-
-    supervisor = Agent.objects.select_related("supervisor_profile").filter(
-        pk=root.source_id,
-        organization_id=root.organization_id,
-        kind=Agent.Kind.SUPERVISOR,
-    ).first()
-    if supervisor is None:
-        return False
-    return can_access_resource(supervisor, request.user, operation="run")
+    from .run_access import can_access_run
+    return can_access_run(request.user, run)
 
 
 class OrganizationRunView(ProblemDetailsAPIView):
@@ -705,7 +608,8 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
             )
         ttl_seconds = int(getattr(settings, "ARTIFACT_ACCESS_TTL_SECONDS", 300))
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
-        private_research = artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")
+        from .run_access import has_application_access_policy
+        private_research = has_application_access_policy(artifact.run) or artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")
         access_url = None if private_research else external_artifact_access_url(
             request=request,
             artifact=artifact,
@@ -768,7 +672,8 @@ class RunArtifactContentView(ProblemDetailsAPIView):
             run_id=run_id,
             content_hash=claims.get("content_hash"),
         ).first()
-        if artifact and (artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")):
+        from .run_access import has_application_access_policy
+        if artifact and (has_application_access_policy(artifact.run) or artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")):
             if not _can_access_run(request, artifact.run):
                 artifact = None
         if artifact is None:

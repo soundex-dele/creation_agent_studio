@@ -54,18 +54,9 @@ def _load_event_batch(*, user, organization_id, run_id, after, limit):
             run = Run.objects.for_organization(organization_id).filter(pk=run_id).first()
             if run is None:
                 raise StreamAccessLost
-            if run.executor_key == "repo-explainer":
-                from app_center.repo_explainer.backend.access import can_access_run as repo_access
-                if not repo_access(user, run):
-                    raise StreamAccessLost
-            if run.executor_key == "project-promotion":
-                from app_center.project_promotion.backend.access import can_access_run as promotion_access
-                if not promotion_access(user, run):
-                    raise StreamAccessLost
-            if run.executor_key == "rental-growth-assistant":
-                from app_center.rental_growth_assistant.backend.access import can_access_run
-                if not can_access_run(user, run):
-                    raise StreamAccessLost
+            from .run_access import can_access_run
+            if not can_access_run(user, run):
+                raise StreamAccessLost
             return list(
                 RunEvent.objects.for_organization(organization_id)
                 .filter(run_id=run_id, sequence__gt=after)

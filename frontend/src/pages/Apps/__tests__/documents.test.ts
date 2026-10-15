@@ -96,7 +96,7 @@ describe('document saving state machine', () => {
 
 describe('real Tiptap document schema', () => {
   it('round trips the exact backend fixture with current editor defaults', () => {
-    const fixture = JSON.parse(readFileSync('../backend/app_center/documents/backend/tests/fixtures/editor.json', 'utf8'));
+    const fixture = JSON.parse(readFileSync('../app_center/documents/backend/tests/fixtures/editor.json', 'utf8'));
     const editor = new Editor({ extensions: [StarterKit.configure({ underline: false }), TableKit, Markdown], content: fixture });
     expect(editor.getJSON()).toEqual(fixture);
     editor.destroy();

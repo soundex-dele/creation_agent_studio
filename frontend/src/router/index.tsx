@@ -1,3 +1,4 @@
+import applicationModules from 'virtual:application-packages';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
@@ -35,14 +36,12 @@ const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWith
 const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
 const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
 const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
-const KitchenAssistantPage = lazy(() => import('@/pages/Apps/KitchenAssistantPage'));
 const PromptMasterPage = lazy(() => import('@/pages/Apps/PromptMasterPage'));
 const RentalGrowthPage = lazy(() => import('@/pages/Apps/RentalGrowthPage'));
 const ProjectPromotionPage = lazy(() => import('@/pages/Apps/ProjectPromotionPage'));
 const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
 const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
 const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
-const DouyinBenchmarkPage = lazy(() => import('@/pages/Apps/DouyinBenchmarkPage'));
 const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
 const RepoExplainerPage = lazy(() => import('@/pages/Apps/RepoExplainerPage'));
 const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
@@ -90,6 +89,9 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
+  ...applicationModules.flatMap(application => application.routes.map(({ path, component: Component, fullBleed }) => ({
+    path, element: <ProtectedRoute><ApplicationShell fullBleed={fullBleed}>{page(<Component />)}</ApplicationShell></ProtectedRoute>,
+  }))),
   {
     path: '/applications/:applicationId/repo-explainer',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<RepoExplainerPage />)}</ApplicationShell></ProtectedRoute>,
@@ -303,10 +305,6 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<MeetingAssistantPage />)}</ApplicationShell></ProtectedRoute>,
   },
   {
-    path: '/applications/:applicationId/douyin-benchmark',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<DouyinBenchmarkPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
     path: '/applications/:applicationId/research-assistant',
     element: <ProtectedRoute><ApplicationShell fullBleed>{page(<ResearchAssistantPage />)}</ApplicationShell></ProtectedRoute>,
   },
@@ -343,14 +341,6 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ApplicationShell fullBleed>{page(<BrandLibraryPage />)}</ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/kitchen-assistant',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>{page(<KitchenAssistantPage />)}</ApplicationShell>
       </ProtectedRoute>
     ),
   },
