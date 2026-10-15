@@ -30,6 +30,7 @@ export function ProjectPromotionWorkspace({ base, root }: { base: string; root: 
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false); const busyRef = useRef(false);
   const [editor, setEditor] = useState<{ kind: Resource; row?: PromotionRecord; initial?: Data }>();
   const [preparing, setPreparing] = useState<{ topicId: string; platform: string }>();
+  const [exploring, setExploring] = useState(false); const [explorationError, setExplorationError] = useState('');
   const [channelError, setChannelError] = useState<{ topicId: string; message: string }>();
   const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [page, setPage] = useState(1); const [archived, setArchived] = useState(false);
   const [caseIds, setCaseIds] = useState<string[]>([]); const [materialFilter, setMaterialFilter] = useState(''); const [categories, setCategories] = useState<string[]>(['overview']); const [instruction, setInstruction] = useState(''); const [brand, setBrand] = useState<BrandSelection | null>(null);
@@ -79,6 +80,23 @@ export function ProjectPromotionWorkspace({ base, root }: { base: string; root: 
       });
     }, e => setChannelError({ topicId: topic.id, message: promotionError(e) }));
     setPreparing(undefined);
+  }
+  async function exploreTopics() {
+    if (busyRef.current || !usableSelection) return;
+    setExplorationError('');
+    if (!destinations.some(d => d.slug === 'topic-explorer')) {
+      setExplorationError('当前没有可运行的「选题探索」应用，请在应用中心安装或联系管理员开通。');
+      return;
+    }
+    setExploring(true);
+    await action(async () => {
+      await openApplicationWindowWhenReady(async () => {
+        const handoff = await api.explore({ case_ids: caseIds, platform: topicOptions.platform,
+          audience: topicOptions.audience, direction: directions[topicOptions.direction] || '', requirements: instruction });
+        return handoff.url;
+      });
+    }, e => setExplorationError(promotionError(e)));
+    setExploring(false);
   }
   async function start(value: Data) {
     const input = value.kind === 'project' || value.kind === 'case' ? { ...value, brand_reference: null } : value;
@@ -131,7 +149,11 @@ export function ProjectPromotionWorkspace({ base, root }: { base: string; root: 
         </div>}
         <Field label={tab === 'cases' ? '开发记录或资料原文' : '本次方向与补充要求（可选）'}>{id => <Input.TextArea id={id} rows={4} maxLength={30000} value={tab === 'cases' ? materialInstruction : instruction} onChange={e => tab === 'cases' ? setMaterialInstruction(e.target.value) : setInstruction(e.target.value)} />}</Field>
         {tab !== 'cases' && <BrandReferencePicker root={root} config={brandConfig} value={brand} onChange={setBrand} />}
-        <Button loading={busy} disabled={tab === 'cases' ? !materialInstruction.trim() : !usableSelection} onClick={() => void start(taskInput(tab === 'cases' ? 'case' : 'topics', tab === 'cases' ? {} : { case_ids: caseIds }))}>{tab === 'cases' ? '整理为素材草稿' : '生成选题建议'}</Button>
+        <div className="promotion-actions">
+          <Button loading={busy && !exploring} disabled={busy || (tab === 'cases' ? !materialInstruction.trim() : !usableSelection)} onClick={() => void start(taskInput(tab === 'cases' ? 'case' : 'topics', tab === 'cases' ? {} : { case_ids: caseIds }))}>{tab === 'cases' ? '整理为素材草稿' : '生成选题建议'}</Button>
+          {tab === 'topics' && <Button loading={exploring} disabled={busy || !usableSelection} onClick={() => void exploreTopics()}>探索选题</Button>}
+        </div>
+        {tab === 'topics' && <><p className="promotion-muted">探索选题：带入所选素材和当前范围，在独立应用中通过提问找到合适的方向。</p>{explorationError && <Alert type="error" showIcon message={explorationError} />}</>}
       </details>
       <div className="promotion-filters"><Field label="搜索名称">{id => <Input id={id} value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />}</Field><Field label="显示记录">{id => <Choice id={id} value={archived ? 'archived' : 'active'} options={{ active: '使用中', archived: '已归档' }} onChange={v => { setArchived(v === 'archived'); setPage(1); }} />}</Field><Field label="状态筛选">{id => <Choice id={id} value={status} empty="全部状态" options={{ draft: '待审核', confirmed: '已确认' }} onChange={v => { setStatus(v); setPage(1); }} />}</Field>{tab === 'cases' && <Field label="素材类型筛选">{id => <Choice id={id} value={materialFilter} empty="全部类型" options={materialTypes} onChange={v => { setMaterialFilter(v); setPage(1); }} />}</Field>}</div>
       {!selected.length && <Empty description={search || status ? '没有匹配的记录' : '从新增一条记录开始，也可以先用 AI 整理草稿。'} />}

@@ -10,7 +10,7 @@ DIRECTIONS = ['overview', 'application_overview', 'audience', 'demo', 'solution'
 class Strict(s.Serializer):
     def to_internal_value(self, data):
         if not isinstance(data, dict) or set(data) - set(self.fields):
-            raise s.ValidationError('包含不支持的字段。')
+            raise s.ValidationError({'non_field_errors': ['包含不支持的字段。']})
         return super().to_internal_value(data)
 
 

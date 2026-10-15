@@ -56,3 +56,12 @@ it('registers a full-bleed route with a page-owned scroll container in all entry
   const app = { id: 'project-promotion', applicationId: 88, kind: 'custom' as const, rendererKey: 'project-promotion' };
   for (const entry of ['home', 'apps'] as const) expect(applicationPath(app, entry)).toBe(`/applications/88/project-promotion?entry=${entry}`);
 });
+
+it('keeps topic exploration in the wrapping action row and reuses the bounded chat form', () => {
+  const page = read('../../pages/Apps/ProjectPromotionPage.tsx');
+  expect(page).toMatch(/className="promotion-actions">\s*<Button[\s\S]*?探索选题<\/Button>/);
+  expect(read('../../pages/Apps/ChatApplicationRuntimePage.tsx')).toContain('className="chat-app-builder"');
+  const chat = read('../../pages/Apps/ChatApplicationRuntimePage.css');
+  expect(chat).toMatch(/\.chat-app-page\s*\{[^}]*height: 100%/);
+  expect(chat).toMatch(/\.chat-app-builder\s*\{[^}]*overflow-y: auto/);
+});

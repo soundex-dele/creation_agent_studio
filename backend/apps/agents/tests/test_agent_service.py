@@ -219,6 +219,8 @@ class DurableAgentAdapterTest(TestCase):
         mock_factory.return_value = engine
         payload = self._payload(self.organization.id)
         payload["input"].update(permission_mode="allow_all", collaboration_mode="plan")
+        # This test exercises answer resumption under an already authorized mode.
+        payload["allow_all_paths"] = True
         payload["checkpoint"] = {"metadata": {"checkpoint": {
             "messages": [{"role": "user", "content": "Build the app"}],
             "agent_thread": {"provider": "codex", "id": "thread-1"},

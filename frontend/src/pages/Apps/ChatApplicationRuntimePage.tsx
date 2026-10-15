@@ -149,12 +149,12 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
     return () => controller.abort();
   }, [manualRunId, workflowStepKey, runtime, slug]);
 
-  const setAnswer = (question: GuidedQuestion, value: AnswerValue | null) => {
+  const setAnswer = (question: GuidedQuestion, value: AnswerValue | null | undefined) => {
     invalidatePreview();
     setExplicitFields((current) => [...new Set([...current, question.key])]);
     setOverrides((current) => ({
       ...current,
-      [question.key]: value === null ? '' : value,
+      [question.key]: value == null ? '' : value,
     }));
   };
 
@@ -228,7 +228,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
 
   return (
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
-      {repoUrl && <Alert type={repoDraft.error ? 'error' : 'info'} message={repoDraft.error || (repoDraft.saving ? '正在保存制作草稿…' : repoDraft.ready ? promotionUrl ? '已带入宣传选题、素材或文案。带入的字段会自动保存，请核对后开始创作。' : '已带入仓库文案，表单修改会自动保存。请核对后开始制作。' : '正在读取制作草稿…')}
+      {repoUrl && <Alert type={repoDraft.error ? 'error' : 'info'} message={repoDraft.error || (repoDraft.saving ? '正在保存制作草稿…' : repoDraft.ready ? promotionUrl ? slug === 'topic-explorer' ? '已带入素材和当前范围，表单修改会自动保存。未知范围可以留空，在对话中逐步探索。' : '已带入宣传选题、素材或文案。带入的字段会自动保存，请核对后开始创作。' : '已带入仓库文案，表单修改会自动保存。请核对后开始制作。' : '正在读取制作草稿…')}
         action={repoDraft.hasConflict ? <><Button onClick={() => void repoDraft.resolveConflict(true).catch(() => undefined)}>保留本地并保存</Button><Button onClick={() => void repoDraft.resolveConflict(false).catch(() => undefined)}>采用服务器版本</Button></> : repoDraft.error ? <Button onClick={() => void repoDraft.retry().catch(() => undefined)}>重试</Button> : undefined} />}
       {showApplicationHeader && (
         <header className="chat-app-header">

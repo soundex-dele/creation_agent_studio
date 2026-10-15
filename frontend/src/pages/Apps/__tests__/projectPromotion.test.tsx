@@ -23,6 +23,7 @@ const destinations = [
   { id: 10, slug: 'wechat-viral-article', name: '公众号爆款写作' },
   { id: 11, slug: 'write-image-text-copy', name: '图文文案' },
   { id: 12, slug: 'write-short-video-copy', name: '短视频文案' },
+  { id: 13, slug: 'topic-explorer', name: '选题探索' },
 ];
 function handoff(platform: string, slug = 'wechat-viral-article', conversation = ''): Handoff {
   const target = destinations.find(d => d.slug === slug)!;
@@ -164,6 +165,59 @@ async function choose(label: string, value: string) {
   const el = field(label);
   await act(async () => { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); });
 }
+
+it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('explores selected materials with explicit scope in %s', async presentation => {
+  rows.cases = [story, { ...story, id: 'case2', title: '第二份素材' }];
+  await render('topics', presentation);
+  expect(button('探索选题').disabled).toBe(true);
+  await checkMaterial(story.title); await checkMaterial('第二份素材');
+  await choose('目标读者（可选）', '实际使用者');
+  await choose('发布渠道（可选）', 'xiaohongshu');
+  await choose('介绍角度（可选）', 'workflow');
+  await input('本次方向与补充要求（可选）', '不做功能清单');
+  const transfer = { ...handoff('xiaohongshu', 'topic-explorer'), topic_id: null };
+  vi.mocked(api.post).mockResolvedValueOnce(transfer);
+  await click('探索选题');
+  expect(api.post).toHaveBeenCalledExactlyOnceWith('/promotion/handoffs', {
+    case_ids: ['case1', 'case2'], platform: 'xiaohongshu', audience: '实际使用者', direction: '完整流程', requirements: '不做功能清单',
+  });
+  expect(popup.location.replace).toHaveBeenCalledWith(`${transfer.url}&entry=apps&standalone=1`);
+  expect(popup.opener).toBeNull();
+  expect(button('生成选题建议')).toBeDefined();
+});
+
+it('keeps material selection after exploration failure, prevents duplicates and retries', async () => {
+  await render('topics'); await checkMaterial(story.title);
+  let reject!: (reason: Error) => void;
+  vi.mocked(api.post).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await act(async () => { button('探索选题').click(); button('探索选题').click(); });
+  expect(api.post).toHaveBeenCalledTimes(1);
+  expect(button('探索选题').disabled).toBe(true);
+  await act(async () => reject(new Error('网络失败')));
+  expect(container.textContent).toContain('网络失败');
+  expect(popup.close).toHaveBeenCalledOnce();
+  expect(button('探索选题').disabled).toBe(false);
+  vi.mocked(api.post).mockResolvedValueOnce({ ...handoff('', 'topic-explorer'), topic_id: null });
+  await click('探索选题');
+  expect(vi.mocked(api.post).mock.calls[0][1]).toEqual(vi.mocked(api.post).mock.calls[1][1]);
+});
+
+it('reports missing exploration app and blocked windows without creating a handoff', async () => {
+  const original = vi.mocked(api.get).getMockImplementation()!;
+  vi.mocked(api.get).mockImplementation(async url => url.endsWith('/integrations') ? destinations.filter(d => d.slug !== 'topic-explorer') : original(url));
+  await render('topics'); await checkMaterial(story.title); await click('探索选题');
+  expect(container.textContent).toContain('没有可运行的「选题探索」');
+  expect(api.post).not.toHaveBeenCalled(); expect(window.open).not.toHaveBeenCalled();
+});
+
+it('retains exploration input when the browser blocks the new window', async () => {
+  await render('topics'); await checkMaterial(story.title);
+  vi.mocked(window.open).mockReturnValueOnce(null);
+  await click('探索选题');
+  expect(container.textContent).toContain('请允许弹出窗口后重试');
+  expect(api.post).not.toHaveBeenCalled();
+  expect(button('探索选题').disabled).toBe(false);
+});
 
 async function checkMaterial(title: string) {
   const label = [...document.querySelectorAll<HTMLLabelElement>('.promotion-material-option')].find(el => el.textContent?.startsWith(title));

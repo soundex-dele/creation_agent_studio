@@ -96,6 +96,7 @@ AI 阅读项目后直接通过素材提交工具提交结果，不登记引用�
 - `GET/POST /cases|topics`；`GET/PATCH /{resource}/{uuid}`。列表每页 50 条，用 `page` 分页；PATCH 必须带当前 `revision`，冲突返回 409。归档可恢复。
 - `GET/POST /ai/tasks`；`GET /ai/tasks/{uuid}`；`POST /ai/tasks/{uuid}/apply|cancel`。提交包含最长 160 字符的 `request_key`，同键同载荷返回原任务，同键不同载荷返回 409。应用草稿操作幂等。项目探索使用 `kind=project`、`project_path`、可选 `exploration_mode=overview|deep` 和 `instruction`（深挖模式必填）。全面概览使用 `material_types` 数组（1–21 项有效素材类型，去重并按分类顺序保存）；深挖忽略分类约束。旧版 `exploration_focus` 仅作兼容，概览时优先使用新数组。返回 `stage` 进度；案例的 `source_snapshot` 只读。
 - `GET /integrations`；`GET/POST /handoffs`；`GET/PATCH /handoffs/{uuid}`。选题交接 POST 接受 `{topic_id, platform}`，由服务器匹配可运行的目标应用，返回带稿 URL；不启动模型生成，不创建渠道或正文版本。
+- 素材探索交接 POST 接受 `{case_ids, platform?, content_type?, goal?, direction?, audience?, requirements?}`，固定进入 `topic-explorer`。只接受当前用户可访问的已确认、未归档素材，最多 20 份；素材和范围合计最多 75000 字符。草稿包含全部七个字符串字段，允许后续补填及清空。相同素材版本和初始范围复用草稿与会话，变更来源则创建新交接。`source_type=materials` 时 `topic_id` 和 `version_id` 均为 null；探索结果在聊天中交付。
 
 历史渠道、版本、反馈及旧交接接口保留兼容存量记录，当前界面不加载或展示这些模块；旧 `tab=channels|feedback` 地址回到素材库。
 

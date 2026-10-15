@@ -88,6 +88,9 @@ class Workspace(TenantOwnedModel):
 
 
 class Handoff(PrivateRecord):
+    source_type = models.CharField(max_length=20, default='version', choices=[
+        ('version', '文案版本'), ('topic', '选题'), ('materials', '素材探索'),
+    ])
     version = models.ForeignKey(Version, null=True, blank=True, on_delete=models.PROTECT)
     topic = models.ForeignKey(Topic, null=True, blank=True, on_delete=models.PROTECT)
     platform = models.CharField(max_length=20, default='')
@@ -98,8 +101,9 @@ class Handoff(PrivateRecord):
 
     class Meta(PrivateRecord.Meta):
         constraints = [models.CheckConstraint(
-            condition=(models.Q(version__isnull=False, topic__isnull=True)
-                       | models.Q(version__isnull=True, topic__isnull=False)),
+            condition=(models.Q(source_type='version', version__isnull=False, topic__isnull=True)
+                       | models.Q(source_type='topic', version__isnull=True, topic__isnull=False)
+                       | models.Q(source_type='materials', version__isnull=True, topic__isnull=True)),
             name='promotion_handoff_source',
         )]
 

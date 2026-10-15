@@ -7,7 +7,8 @@ export interface SourceSnapshot { origin?: { path?: string; commit?: string }; d
 export interface PromotionRecord { id: string; title: string; status: string; archived: boolean; revision: number; data: Data; case_id?: string; case_ids?: string[]; topic_id?: string; channel_id?: string | null; platform?: string; source_snapshot?: SourceSnapshot }
 export interface ActivityItem { id: string; title: string; detail: string; status: 'running' | 'completed' | 'failed' | 'stopped'; created_at: string; updated_at: string }
 export interface Task { id: string; kind: string; status: string; applied: boolean; error: string; request: Data; result: Data; stage?: string; activity?: { items: ActivityItem[]; dropped: number }; created_at: string }
-export interface Handoff { id: string; topic_id: string; platform: string; version_id: string | null; target_application_id: number; kind: string; url: string; status: string; target_id: string }
+export interface Handoff { id: string; topic_id: string | null; source_type?: 'version' | 'topic' | 'materials'; platform: string; version_id: string | null; target_application_id: number; kind: string; url: string; status: string; target_id: string }
+export interface ExplorationInput { case_ids: string[]; platform?: string; content_type?: string; goal?: string; direction?: string; audience?: string; requirements?: string }
 export interface Destination { id: number; name: string; slug: string }
 export const resources: Resource[] = ['cases', 'topics'];
 export const platforms: Record<string, string> = { wechat: '公众号', xiaohongshu: '小红书', douyin: '抖音', moments: '朋友圈' };
@@ -114,6 +115,7 @@ export function promotionApi(base: string) {
     destinations: () => api.get<Destination[]>(`${base}/integrations`),
     handoffs: () => api.get<Handoff[]>(`${base}/handoffs`),
     prepare: (topic: PromotionRecord, platform: string) => api.post<Handoff>(`${base}/handoffs`, { topic_id: topic.id, platform }),
+    explore: (input: ExplorationInput) => api.post<Handoff>(`${base}/handoffs`, input),
   };
 }
 export type PromotionApi = ReturnType<typeof promotionApi>;

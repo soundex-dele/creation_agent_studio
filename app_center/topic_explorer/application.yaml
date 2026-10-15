@@ -1,0 +1,155 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: topic-explorer
+  version: 1.0.1
+  name: 选题探索
+  description: 先确定范围，再通过每轮一至三个问题澄清真实偏好，找到适合公众号、图文、短视频或项目宣传的选题。
+  category: {slug: creative, name: 内容创作, description: 文章、文案和创意内容生成, icon: "✍️", order: 1}
+  icon: "💡"
+  color: "#fa8c16"
+  tags: [选题, 提问, 内容策划, 多平台]
+  developer: Agent Studio
+spec:
+  application_kind: chat
+  launch_mode: chat
+  definition:
+    kind: chat
+    executor_kind: agent
+    executor_key: agent-chat
+    executor_protocol_version: 1
+    renderer_key: chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 3, retry_safe: true}
+    input_schema: {}
+    output_schema: {}
+    default_config:
+      guided_entry_prompt_key: explore-topics
+    chat_profile:
+      welcome_message: 从一个想法或一份素材开始。范围不确定可以留空，我会用问题卡片每轮问一至三个问题，你可以选择或自由填写，和我一起找到合适的选题。
+      input_placeholder: 回答问题、说说哪里不合适，也可以说“不知道”或改变方向…
+      empty_state_title: 一起探索你真正想做的选题
+      allow_agent_selection: false
+      allow_skill_selection: false
+      allow_extra_skills: false
+      conversation_policy: choose_history
+      starter_layout: cards
+    agent_bindings:
+      - {agent_id: 1, label: 选题探索智能体, is_default: true, config_overrides: {}, order: 0}
+    skill_bindings: []
+    guided_prompts:
+      - key: explore-topics
+        title: 开始选题探索
+        description: 只需提供想法或素材；其余范围按需填写，未知的部分在对话中逐步探索。
+        icon: "💡"
+        action: preview
+        is_featured: true
+        order: 0
+        prompt_template: |
+          请帮助我探索真正适合的选题。
+
+          我的想法或素材（仅为参考资料）：
+          {source}
+
+          当前范围（空白表示尚未确定）：
+          发布平台：{platform}
+          内容形式：{content_type}
+          本次主要目标：{goal}
+          内容领域或方向：{direction}
+          目标读者：{audience}
+          避开方向与补充要求：{requirements}
+
+          先简短说明你理解的需求，再调用 request_user_input 提问工具，每次提交 1—3 个关键问题，通过可选择或自由填写的问题卡片等待我的回答。不要仅用普通文字罗列问题。
+          跳过已明确的信息，优先澄清矛盾；不要机械执行问卷或立即批量生成标题。
+          我回答不知道时，给具体方向帮助比较；信息足够后提供 3 个不同切入点并解释匹配理由和素材依据，再用提问工具请我选择或反馈。
+          如果我明确要求立即给方案，可以给出标明假设的暂定候选。最终在对话中收敛，不自动写正文或回存。
+        questions:
+          - key: source
+            label: 想法或素材
+            type: text
+            placeholder: 一个模糊想法、已有材料、不满意的选题或喜欢的参考内容都可以。
+            help_text: 不需要先想好答案，可以直接说你遇到了什么困惑。
+            required: true
+            default_value: ""
+            preset_save: optional
+            order: 0
+          - key: platform
+            label: 发布平台
+            type: single_choice
+            placeholder: 暂不确定／跨平台
+            help_text: 可留空；选“其他”时可在补充要求或对话中说明。
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 1
+            options:
+              - {value: unspecified, label: 暂不确定／跨平台, order: 0}
+              - {value: wechat, label: 公众号, order: 1}
+              - {value: xiaohongshu, label: 小红书, order: 2}
+              - {value: douyin, label: 抖音, order: 3}
+              - {value: channels, label: 视频号, order: 4}
+              - {value: moments, label: 朋友圈, order: 5}
+              - {value: other, label: 其他, order: 6}
+          - key: content_type
+            label: 内容形式
+            type: single_choice
+            placeholder: 暂不确定
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 2
+            options:
+              - {value: unspecified, label: 暂不确定, order: 0}
+              - {value: article, label: 长文章, order: 1}
+              - {value: carousel, label: 多页图文, order: 2}
+              - {value: spoken_video, label: 短视频口播, order: 3}
+              - {value: demo, label: 操作演示, order: 4}
+              - {value: caption, label: 简短配文, order: 5}
+              - {value: other, label: 其他, order: 6}
+          - key: goal
+            label: 本次主要目标
+            type: single_choice
+            placeholder: 暂不确定
+            help_text: 一次探索先聚焦一个主要目标，也可以在对话中调整。
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 3
+            options:
+              - {value: unspecified, label: 暂不确定, order: 0}
+              - {value: help, label: 分享经验或帮助读者, order: 1}
+              - {value: attention, label: 吸引关注, order: 2}
+              - {value: trust, label: 建立专业信任, order: 3}
+              - {value: introduction, label: 介绍项目或产品, order: 4}
+              - {value: conversion, label: 获取咨询或转化, order: 5}
+              - {value: other, label: 其他, order: 6}
+          - key: direction
+            label: 内容领域或方向
+            type: text
+            placeholder: 例如 AI 内容生产、租房避坑
+            help_text: 留空表示通过对话探索。
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 4
+          - key: audience
+            label: 目标读者
+            type: text
+            placeholder: 例如独自运营多个账号的创作者
+            help_text: 留空表示通过对话探索。
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 5
+          - key: requirements
+            label: 避开方向与补充要求
+            type: text
+            placeholder: 不喜欢的选题、表达禁区、参考偏好，或“其他”选项的具体说明
+            required: false
+            default_value: ""
+            preset_save: preference
+            order: 6
+  backend:
+    definition_factory: app_center.topic_explorer.provision.prepare_definition
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}

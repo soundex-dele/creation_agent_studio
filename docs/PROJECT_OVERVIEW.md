@@ -1,12 +1,14 @@
 # Agent Studio 项目介绍
 
-> 基于 2026 年 10 月 12 日的仓库源码、应用清单及配置整理。本文介绍项目定位与实现结构，不代表所有外部服务和应用能力均已在当前机器完成配置或运行验证。
+> 基于 2026 年 10 月 15 日的仓库源码、应用清单及配置整理。本文介绍项目定位与实现结构，不代表所有外部服务和应用能力均已在当前机器完成配置或运行验证。
 
 ## 1. 项目概述
 
 Agent Studio 是一个集智能体对话、内容创作、知识管理、工作流和日常工具于一体的 AI 工作平台。用户可以直接使用应用中心里的场景应用，也可以围绕项目文件夹与 AI 持续协作，将多个应用组合成工作流，或通过自动化触发任务。
 
-平台为应用提供统一的账号权限、模型执行、任务记录、实时输出和文件产物管理。具体场景由独立应用包承载，涵盖公众号与短视频创作、资料研究、会议整理、租房运营、学习辅助等领域。
+平台与应用的关系类似操作系统与应用程序：平台提供统一的身份权限、任务执行、模型调用、知识检索和文件产物能力，应用使用这些能力实现自己的业务。平台界面负责应用入口、导航和公共布局；应用包维护场景页面、业务规则、数据模型及运行逻辑，涵盖公众号与短视频创作、资料研究、会议整理、租房运营、学习辅助等领域。
+
+这是模块化单体中的职责划分。平台与应用共享构建和发布流程，应用包集中在仓库根目录 `app_center/`，与平台前端、后端平级。
 
 项目支持本地运行、服务器部署和桌面打包，并提供 Android / iOS 移动端外壳。当前配置默认启用单租户模式；需要组织隔离的部署可以显式启用多租户模式。
 
@@ -29,9 +31,9 @@ Agent Studio 是一个集智能体对话、内容创作、知识管理、工作�
 
 ### 应用中心
 
-应用以 `application.yaml` 声明名称、类别、界面和执行配置，通过校验、数据库迁移和同步命令接入平台。应用既可以提供引导表单并衔接聊天，也可以拥有专用工作台和业务数据表。
+应用以 `application.yaml` 声明名称、类别、界面和执行配置，通过校验、数据库迁移和同步命令接入平台。应用既可以使用平台通用表单和聊天界面，也可以拥有专用工作台和业务数据表。完成边界迁移的应用在清单中声明前端注册入口及后端扩展入口，由平台统一接入。
 
-截至本文整理时，`app_center` 的直接子目录中共有 **35 个带应用清单的应用包**。这是源码包数量，实际可见和可运行的应用还取决于同步、部署、权限及依赖配置。主要应用包括：
+`app_center/` 收录数十个应用包，具体目录以源码清单为准；实际可见和可运行的应用还取决于同步、部署、权限及依赖配置。主要应用包括：
 
 | 方向 | 代表应用 | 能力说明 |
 | --- | --- | --- |
@@ -70,36 +72,85 @@ Agent Studio 是一个集智能体对话、内容创作、知识管理、工作�
 
 ## 3. 技术架构
 
-项目采用 **React 前端 + Django 模块化单体后端 + 独立执行进程**。API 服务、任务协调器、自动化调度器和连接器可以作为不同进程运行，共享领域模型与持久化数据。
+项目采用 **React 前端 + Django 模块化单体后端 + 独立执行进程**。架构分为应用层、平台公开接口和平台基础能力：应用表达业务需求，平台负责公共机制与执行保障。API 服务、任务协调器、自动化调度器和连接器可以作为不同进程运行，共享领域模型与持久化数据。
 
 ```mermaid
 flowchart TB
-    WEB[Web 前端 / 移动端 WebView] --> API[Django REST API / ASGI]
-    API --> DOMAIN[会话、应用、工作流、知识库等业务模块]
-    DOMAIN --> CATALOG[Catalog：草稿、修订与部署]
-    DOMAIN --> RUN[Execution：统一 Run 任务]
+    CLIENT[Web / 桌面入口 / 移动端 WebView] --> HOST[平台应用宿主：导航、鉴权、ApplicationShell]
+    subgraph APPS[应用层：根目录 app_center]
+        MANIFEST[application.yaml：界面、执行与扩展声明]
+        APP_UI[应用前端：页面、组件、业务交互]
+        APP_BACKEND[应用后端：API、数据模型、业务规则、runtime]
+    end
+    MANIFEST -. 注册 .-> HOST
+    HOST --> APP_UI
+    APP_UI --> FRONT_API[前端公开接口：@platform/*]
+    FRONT_API --> HTTP[Django REST API / ASGI]
+    HTTP --> APP_BACKEND
+    APP_BACKEND --> BACK_API[后端公开接口：modules.platform_api]
+    MANIFEST -. 声明 .-> EXT[平台扩展注册：访问策略、知识上下文、案例导航、调度]
+    EXT -. 调用应用提供的钩子 .-> APP_BACKEND
+    subgraph PLATFORM[平台基础能力]
+        IDENTITY[身份、组织、资源权限与审计]
+        CATALOG[Catalog：定义、修订与部署]
+        RUN[Execution：统一 Run、事件、命令与租约]
+        SERVICES[模型调用、知识检索、案例服务与文件产物]
+    end
+    BACK_API --> IDENTITY
+    BACK_API --> RUN
+    BACK_API --> SERVICES
     CATALOG --> RUN
-    SCHEDULER[自动化调度器] --> RUN
-    RUN --> WORKERS[Coordinator / 各执行池]
-    WORKERS --> ENGINE[模型引擎、技能与媒体工具]
-    WORKERS --> EVENTS[事件、交互命令与产物记录]
-    RUN --> DB[(SQLite / PostgreSQL)]
-    EVENTS --> DB
-    EVENTS --> STORAGE[受控文件存储]
-    EVENTS -. 实时事件流 SSE .-> WEB
-    REDIS[(Redis：通知、缓存与心跳)] -. 唤醒与通知 .-> API
-    REDIS -. 唤醒与通知 .-> WORKERS
+    RUN --> EXT
+    SERVICES --> EXT
+    SCHEDULER[平台自动化调度器] --> RUN
+    SCHEDULER --> EXT
+    RUN --> WORKERS[Coordinator / 执行池 / 模型与媒体工具]
+    PLATFORM --> DATA[(数据库、受控文件存储)]
+    REDIS[(Redis：通知、缓存与心跳)] -. 唤醒与通知 .-> WORKERS
+    RUN -. SSE 事件流 .-> FRONT_API
 ```
 
-### 三个关键模块
+### 平台基础能力
 
-| 模块 | 职责 |
+| 能力 | 平台负责什么 | 应用负责什么 |
+| --- | --- | --- |
+| 界面宿主与前端公共能力 | 导航、鉴权、`ApplicationShell`、通用聊天/表单/任务渲染器、HTTP、任务事件及通用展示工具 | 声明路由和启动链接，实现业务页面、交互、样式及滚动容器 |
+| 身份、组织与权限 | 账号、成员、资源授权、Tenancy 组织范围查询、租户上下文及数据库隔离辅助能力 | 说明业务资源的所有权与共享规则，通过扩展策略约束关联任务 |
+| Catalog 定义管理 | 管理 Agent、Skill、Application 的草稿、不可变修订及部署，运行时使用已部署的定义版本 | 声明应用信息、界面入口、执行配置和依赖 |
+| Execution 统一执行 | Run、执行尝试、队列、租约、幂等、事件、交互命令及取消/重试机制 | 提交业务输入、执行领域逻辑、处理业务结果与历史任务兼容 |
+| 模型、知识与案例 | 复用模型调用与计费路径，提供知识索引/检索和案例服务 | 维护提示词、采集分析规则、资料归属及案例来源上下文 |
+| 文件、产物与运行支撑 | 受控存储、产物记录与访问、审计观测、工作流和自动化调度机制 | 定义业务文件、成果格式及需要执行的业务步骤 |
+
+### 应用包与依赖边界
+
+一个应用包集中维护 `application.yaml`、`frontend/`、`backend/`、`runtime.py` 及所需资源和测试；具体目录按应用需要设置。厨房的菜谱、采购和烹饪规则，抖音的采集、对标分析和内容创作规则，都属于各自应用。
+
+前端应用通过 `@platform/*` 使用公开能力，后端通过 `modules.platform_api` 使用身份、租户、执行、模型、知识库、案例和产物接口。公开接口复用平台原有实现，保留事务、计费、幂等和租约保护。当前部分身份、知识库及案例接口显式公开必要的 Django 模型，以维持原有外键和事务语义。
+
+应用依赖自身代码和公开接口；跨应用业务协作使用明确的公开服务或平台导航。日期、错误展示、下载等通用工具由平台维护。平台核心通过扩展契约调用应用提供的逻辑，避免直接依赖具体应用的业务模块。
+
+当前所有原有应用源码包已迁至根目录，**厨房助手和抖音对标已完成首批前后端归拢与公开接口接入**。其他应用仍保留兼容入口，部分页面和集成逻辑尚在平台目录中。依赖检查通过 `application_boundary_baseline.json` 冻结旧依赖，只允许随迁移减少；不能把目录搬迁等同于所有应用均已完成解耦。
+
+### 声明注册与业务扩展
+
+前端清单指向应用注册入口，入口导出 renderer key、原有路由、懒加载页面、启动链接和布局配置。Vite 与 Vitest 使用同一发现规则生成静态注册表，平台统一套用鉴权和 `ApplicationShell`。已有 React/Qt 变体继续由清单声明其目录。
+
+后端清单声明扩展 provider，平台通过统一契约加载可选钩子：
+
+| 扩展点 | 应用提供的业务信息 |
 | --- | --- |
-| Catalog | 管理 Agent、Skill、Application 的草稿（Draft）、不可变修订（Revision）和部署（Deployment），运行时使用已部署的定义版本 |
-| Execution | 统一管理 Run、执行尝试、租约、队列、事件、交互命令、幂等记录和产物 |
-| Tenancy | 提供组织范围查询、租户上下文和数据库隔离辅助能力 |
+| 任务访问策略 `run_access` | 当前用户能否访问任务所属业务资源，包括历史任务的识别规则 |
+| 知识上下文 `knowledge_context` | 创建知识索引任务时需要携带的业务上下文 |
+| 案例导航 `case_navigation` / `case_targets` | 案例来源的回跳位置和当前用户可访问的目标 |
+| 到期调度 `dispatch_scheduled` | 应用已有的到期业务处理，任务仍提交给统一执行引擎 |
+
+这些入口来自随平台发布的受信任源码包，前后端统一构建和发布；当前不提供插件热安装或应用独立部署。
+
+### 统一执行与权限保障
 
 Agent、Conversation、Application、Workflow 和媒体执行都使用 `modules.execution.Run`。普通业务数据编辑仍由各应用 API 处理，并非每个操作都创建任务。
+
+任务查询、事件流、命令及产物访问共用任务树权限策略，子任务沿相同组织的任务树检查根任务。持续事件流重新检查权限，受应用策略保护的产物通过需要再次鉴权的内容地址访问。适用的策略必须全部允许；策略加载或执行失败、关联资源失效时拒绝访问。应用在事务中写入执行结果时，通过平台 `active_run` 检查当前执行尝试和有效租约。
 
 任务可以处于排队、运行、等待输入、等待子任务、成功、失败和取消等状态。数据库保存运行事实；Redis 用于通知、缓存及心跳，不是执行状态的最终来源。前端通过统一 Run 事件投影与 SSE 客户端处理增量输出、断线续接和历史恢复。
 
@@ -136,21 +187,36 @@ Agent、Conversation、Application、Workflow 和媒体执行都使用 `modules.
 
 ```text
 creation_agent_studio/
-├── frontend/                  # Web 前端
+├── app_center/                # 应用包：业务源码、清单、资源与测试
+│   ├── kitchen_assistant/     # 首批完成边界迁移的应用
+│   │   ├── application.yaml   # 应用、前端入口与后端扩展声明
+│   │   ├── frontend/          # 页面、组件、样式、客户端与前端测试
+│   │   ├── backend/           # 业务 API、模型、迁移与后端测试
+│   │   ├── runtime.py         # 使用平台执行能力的业务入口
+│   │   └── extensions.py      # 向平台提供业务扩展钩子
+│   ├── douyin_benchmark/      # 同样集中维护前后端业务与扩展
+│   ├── creation_master/       # 保留独立工程结构的 Git 子模块
+│   └── ...                    # 其余应用按依赖顺序迁移内部边界
+├── frontend/                  # 平台 Web 界面、应用宿主与公共能力
+│   ├── applicationPackages.ts # 从清单生成前端静态注册表
 │   └── src/
-│       ├── router/            # 路由与应用页面入口
-│       ├── pages/             # 产品页面与场景工作台
-│       ├── layouts/           # 应用布局
+│       ├── platform/          # @platform/* 公开接口
+│       ├── router/            # 平台路由与声明式应用路由接入
+│       ├── pages/             # 平台页面及尚未迁出的应用页面
+│       ├── layouts/           # MainLayout / ApplicationShell 等公共布局
 │       ├── entities/run/      # 统一任务事件投影
 │       ├── features/run-stream/ # 实时任务状态编排
 │       ├── services/          # API 与事件流客户端
 │       └── api/generated.ts   # 自动生成的接口类型
-├── backend/
+├── backend/                   # 平台后端、公共能力与执行引擎
 │   ├── backend/               # Django 配置、URL、ASGI 入口
-│   ├── apps/                  # 智能体、会话、工作流、知识库等业务域
-│   ├── modules/               # catalog、execution、tenancy
-│   ├── app_center/            # 应用清单、运行逻辑与应用数据模块
-│   ├── core/                  # 模型调用、存储等公共能力
+│   ├── apps/                  # 智能体、会话、工作流、知识库与应用发现等平台域
+│   ├── modules/
+│   │   ├── platform_api/      # 面向应用的后端公开接口
+│   │   ├── catalog/           # 定义、修订与部署
+│   │   ├── execution/         # 唯一 Run 执行引擎
+│   │   └── tenancy/           # 租户上下文与隔离能力
+│   ├── core/                  # 模型调用、存储等公共能力的内部实现
 │   ├── requirements/          # Python 依赖清单
 │   ├── scripts/               # 校验、同步与运维脚本
 │   ├── third_party/           # 第三方集成源码
@@ -161,6 +227,8 @@ creation_agent_studio/
 ├── teaching_data/             # 课程与答题卡数据子模块
 ├── deploy/                    # 部署配置与应用依赖映射
 ├── docs/                      # 部署、协议及专题文档
+├── pytest.ini                 # 平台后端与根目录应用的统一测试配置
+├── conftest.py                # 共享测试钩子与 fixtures
 ├── install-dependencies.ps1   # Windows 依赖安装
 ├── install-dependencies.sh    # Linux / macOS 依赖安装
 ├── deploy.ps1                 # Windows 本地启动
@@ -168,6 +236,8 @@ creation_agent_studio/
 ```
 
 仓库包含创作大师、教学数据和抖音采集组件等 Git 子模块。首次获取源码应使用递归克隆，已有检出可执行 `git submodule update --init --recursive` 补齐锁定版本及嵌套依赖。
+
+应用源码位置与运行数据位置分别管理。源码默认从根目录 `app_center/` 发现，也可通过 `APP_CENTER_ROOT` 显式配置；平台统一处理源码运行和桌面包的导入路径。目录迁移保持 Python 模块名、Django app label、表名及迁移历史不变，数据库、上传文件和工作目录继续使用原存储位置。
 
 ## 6. 本地运行与部署
 
@@ -231,7 +301,9 @@ Linux / macOS 提供对应的 `install-dependencies.sh` 与 `deploy.sh`；完整
 
 ## 8. 开发与维护入口
 
-前端以 `services/api.ts` 为统一 REST 入口，以 `services/runStream.ts` 处理任务事件流，接口类型由后端契约生成。新增长任务应接入既有 Run 模型；新增应用应遵循 App Center 的清单、迁移和同步机制。
+应用开发与后续迁移以 [平台与应用包规范](APPLICATION_PACKAGES.md) 为主入口，厨房助手和抖音对标可作为代码示例。应用前端通过 `@platform/http`、`@platform/runtime` 等接口使用平台 HTTP 与任务能力；平台内部仍复用 `services/api.ts`、`services/runStream.ts` 等实现，接口类型由后端契约生成。后端业务通过 `modules.platform_api` 接入既有 Run、模型与数据服务。
+
+新增应用应声明注册入口，避免在平台核心增加应用名称分支。后续迁移按依赖先后、同层按应用标识排序，每批归拢业务源码和测试、接入公开接口，再删除旧注册分支及对应依赖基线。通用聊天、表单与任务渲染器继续由平台维护。
 
 常用检查命令如下，需先安装相应开发依赖：
 
@@ -241,18 +313,25 @@ npm.cmd --prefix frontend run test
 npm.cmd --prefix frontend run lint
 npm.cmd --prefix frontend run build
 
-# 后端测试：始终使用项目虚拟环境
-.\backend\venv\Scripts\python.exe -m pytest -c backend\pytest.ini backend
+# 后端与应用测试：使用根目录配置，覆盖 app_center 和共享 fixtures
+.\backend\venv\Scripts\python.exe -X utf8 -m pytest
+
+# 平台与应用的依赖边界检查
+.\backend\venv\Scripts\python.exe -X utf8 -m pytest backend/modules/test_application_boundaries.py
+npm.cmd --prefix frontend run lint:applications
 
 # 应用清单检查
-.\backend\venv\Scripts\python.exe backend\manage.py validate_app_center
+.\backend\venv\Scripts\python.exe -X utf8 backend\manage.py validate_app_center
 ```
 
-本文整理执行了源码、清单和配置检查，未运行上述全量测试、启动服务或验证外部平台连接。移动布局和真实设备行为也不能由静态文档检查推断。
+发布时使用匹配的前后端版本，校验清单并执行所需数据库迁移及应用同步。迁移验收需覆盖应用发现、启动路径、工作流、权限、事件流及布局约束；回退恢复配套代码与部署修订，保留用户数据。具体步骤见应用包规范。
+
+本次文档更新核对了源码、清单和配置，未重新运行上述全量测试、启动服务或验证外部平台连接。移动布局和真实设备行为也不能由静态文档检查推断。
 
 ## 9. 延伸阅读
 
 - [项目 README](../README.md)：安装、启动及整体说明。
+- [平台与应用包规范](APPLICATION_PACKAGES.md)：公开能力、清单注册、扩展契约、依赖边界及后续迁移步骤。
 - [架构分析](../ARCHITECTURE_ANALYSIS.md)：统一执行模型、版本管理与架构取舍；阅读时注意分析日期。
 - [企业部署与运维](../ENTERPRISE.md)：组织权限、治理和生产运行。
 - [部署指南](DEPLOYMENT.md)：容器、本地启动和远程访问配置。
