@@ -11,6 +11,7 @@ import type { Project } from '@/stores/useProjectStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import useMediaQuery from '@/hooks/useMediaQuery';
+import { workingDirectoryLabel } from '@/lib/workingDirectoryLabel';
 import { createUnifiedChatApi, coworkError } from '@/services/cowork';
 import FolderPickerModal from '@/pages/Apps/FolderPickerModal';
 import './ChatPage.css';
@@ -207,8 +208,8 @@ function ChatWorkspace() {
     || Boolean(conversationId && !ownsConversation)
     || Boolean(!conversationId && requestedProject && !selectedProject);
   const workspacePath = selectedProject?.working_directory || (ownsConversation ? current?.working_directory : undefined);
-  const workspaceName = selectedProject?.title || (projectId ? '项目工作目录'
-    : ownsConversation && current?.scope === 'default' && workspacePath ? workspacePath : '默认会话目录');
+  const workspaceName = workspacePath ? workingDirectoryLabel(workspacePath, { folderOnly: true })
+    : selectedProject?.title || (projectId ? '项目工作目录' : '默认会话目录');
   const refresh = useCallback(() => setRevision(value => value + 1), []);
 
   useEffect(() => {

@@ -274,7 +274,8 @@ it('continues showing legacy directory controls after messages and converts a pr
     working_directory: '/work/legacy', created_at: '', updated_at: '' };
   await act(async () => chatStore.getState().setCurrentConversation(old));
   expect(host.querySelector<HTMLButtonElement>('.cowork-workspace-strip button')?.disabled).toBe(false);
-  expect(host.querySelector('.cowork-workspace-name')?.textContent).toBe('/work/legacy');
+  expect(host.querySelector('.cowork-workspace-name')?.textContent).toBe('legacy');
+  expect(host.querySelector('.cowork-workspace-control')?.getAttribute('title')).toBe('/work/legacy');
   vi.mocked(api.post).mockResolvedValueOnce({ ...old, working_directory: '/work/project' });
   await act(async () => chat.workspaceControl!.onChange({ projectId: 4 }));
   expect(api.post).toHaveBeenLastCalledWith('/conversations/old/workspace/?scope=unified', {
