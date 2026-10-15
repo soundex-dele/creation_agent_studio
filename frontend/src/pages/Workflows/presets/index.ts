@@ -9,6 +9,9 @@ import {
   buildShortVideoParallelWorkflow, SHORT_VIDEO_PARALLEL_APPS, SHORT_VIDEO_PARALLEL_PRESET,
 } from './shortVideoParallel';
 import { buildContentSuiteWorkflow, CONTENT_SUITE_APPS, CONTENT_SUITE_PRESET } from './contentSuite';
+import {
+  buildArticleContentSuiteWorkflow, ARTICLE_CONTENT_SUITE_APPS, ARTICLE_CONTENT_SUITE_PRESET,
+} from './articleContentSuite';
 
 interface WorkflowPreset {
   id: string;
@@ -52,6 +55,14 @@ export const workflowPresets: readonly WorkflowPreset[] = [
     applicationSlugs: CONTENT_SUITE_APPS,
     build: buildContentSuiteWorkflow,
     loadError: '总预设加载失败，请确认公众号写作、图文文案、短视频文案、文章 HTML 配图、HTML 封面、Markdown 转 HTML、HTML 分页图文、HTML 批量转 PNG 和文案转剪映应用均已安装并可访问。',
+  },
+  {
+    id: ARTICLE_CONTENT_SUITE_PRESET,
+    name: '已有文章转排版、图文与短视频预设',
+    description: '粘贴已有文章，跳过选题与写作，复用总预设生成公众号排版图文、图文作品、短视频文案及剪映 builder 脚本。',
+    applicationSlugs: ARTICLE_CONTENT_SUITE_APPS,
+    build: buildArticleContentSuiteWorkflow,
+    loadError: '文章预设加载失败，请确认总预设所需应用均已安装并可访问。',
   },
 ];
 
