@@ -140,7 +140,9 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip wheel
 python -m pip install -r requirements/development.txt
-python manage.py migrate
+# 仅首次离线初始化（尚未启动 API/worker）时临时直连 SQLite：
+SQLITE_SERVICE_ENABLED=False python manage.py migrate
+python manage.py run_execution_coordinator --worker-pool all &
 python manage.py runserver 0.0.0.0:8080
 ```
 
@@ -149,8 +151,14 @@ Windows 使用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。开发环境不
 项目已通过 Daphne 将 `runserver` 注册为 ASGI 服务，以支持 Run 的异步 SSE
 事件流；不要改用同步 WSGI 服务器承载 `/api/v1/runs/.../stream`。
 
-开发环境默认使用 SQLite。SQLite 只允许一个 coordinator 进程；使用 `all`
-在同一进程内轮询所有执行池：
+开发环境默认使用 SQLite。数据服务集成在 worker 主进程内，API、连接器和任务子进程
+通过本机连接访问同一个事务队列。`runserver` 不启动数据服务，须先启动 worker。
+推荐使用 `deploy.ps1` / `deploy.sh`：脚本先启动 worker 内的数据服务，完成迁移后才开放
+任务调度。桌面启动器采用相同顺序，退出时最后停止 worker。
+详见 [SQLite 数据服务说明](backend/core/sqlite_service/README.md)。
+
+SQLite 只允许一个 coordinator 进程；使用 `all` 在同一进程内轮询所有执行池。
+如果未使用上面的后台启动方式，可在独立终端运行：
 
 ```bash
 cd backend

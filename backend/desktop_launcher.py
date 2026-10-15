@@ -62,6 +62,7 @@ def configure_environment() -> tuple[Path, Path]:
     values = {
         "DJANGO_SETTINGS_MODULE": "backend.settings.desktop",
         "DATABASE_ENGINE": "sqlite",
+        "SQLITE_SERVICE_ENABLED": "True",
         "REDIS_ENABLED": "False",
         "SQLITE_PATH": str(data_root / "agent-studio.sqlite3"),
         "MEDIA_ROOT": str(data_root / "media"),
@@ -104,7 +105,10 @@ def _run_server() -> None:
 
 
 def _run_coordinator() -> None:
-    _run_management_command("run_execution_coordinator", "--worker-pool", "all")
+    args = ["--worker-pool", "all"]
+    if gate := os.environ.get('SQLITE_WORKER_STARTUP_GATE'):
+        args.extend(['--startup-gate', gate])
+    _run_management_command("run_execution_coordinator", *args)
 
 
 def _run_scheduler() -> None:
@@ -192,12 +196,18 @@ def _run_tray(children: list[subprocess.Popen]) -> None:
     )
 
     def stop_if_service_exits():
-        children[0].wait()
-        icon.stop()
+        while not stopped.wait(0.5):
+            if any(child.poll() is not None for child in children):
+                icon.stop()
+                return
 
+    stopped = threading.Event()
     threading.Thread(target=stop_if_service_exits, daemon=True).start()
     open_application()
-    icon.run()
+    try:
+        icon.run()
+    finally:
+        stopped.set()
 
 
 def _stop_children(children: list[subprocess.Popen]) -> None:
@@ -210,32 +220,44 @@ def _stop_children(children: list[subprocess.Popen]) -> None:
                 child.wait(timeout=5)
             except (OSError, subprocess.TimeoutExpired):
                 pass
-    for child in children:
+    # The first child owns the database service and must stop last.
+    for child in reversed(children):
         if child.poll() is None:
             child.terminate()
-    for child in children:
         try:
             child.wait(timeout=5)
         except subprocess.TimeoutExpired:
             child.kill()
+            child.wait(timeout=5)
 
 
 def main() -> int:
     multiprocessing.freeze_support()
-    configure_environment()
+    _, data_root = configure_environment()
 
     if len(sys.argv) == 3 and sys.argv[1] == "--internal":
         _internal_mode(sys.argv[2])
         return 0
 
-    _run_management_command("migrate", "--noinput")
-    _run_management_command("sync_app_center")
-
-    children = [_spawn("server"), _spawn("coordinator"), _spawn("scheduler"), _spawn("remote-connector"), _spawn("wechat-connector")]
-    if os.name == "nt":
-        children.append(_spawn("disk-cleaner"))
+    gate = data_root / 'logs' / f'worker-bootstrap-{os.getpid()}-{secrets.token_hex(8)}.ready'
+    previous_gate = os.environ.get('SQLITE_WORKER_STARTUP_GATE')
+    os.environ['SQLITE_WORKER_STARTUP_GATE'] = str(gate)
+    children = []
     try:
-        if not _wait_until_ready(children[0]):
+        children.append(_spawn('coordinator'))
+        _run_management_command('run_sqlite_service', '--wait', '30')
+        if children[0].poll() is not None:
+            raise RuntimeError('SQLite worker exited during startup')
+        _run_management_command("migrate", "--noinput")
+        _run_management_command("sync_app_center")
+        gate.touch()
+        server = _spawn('server')
+        children.append(server)
+        for mode in ('scheduler', 'remote-connector', 'wechat-connector'):
+            children.append(_spawn(mode))
+        if os.name == 'nt':
+            children.append(_spawn('disk-cleaner'))
+        if not _wait_until_ready(server):
             raise RuntimeError("The local Agent Studio server did not start")
         _run_tray(children)
         return 0
@@ -243,6 +265,11 @@ def main() -> int:
         return 0
     finally:
         _stop_children(children)
+        gate.unlink(missing_ok=True)
+        if previous_gate is None:
+            os.environ.pop('SQLITE_WORKER_STARTUP_GATE', None)
+        else:
+            os.environ['SQLITE_WORKER_STARTUP_GATE'] = previous_gate
 
 
 def _show_startup_error(error: Exception) -> None:

@@ -127,7 +127,7 @@ class WorkflowApiTest(TestCase):
         )
         expected_workspace = (
             Path(settings.AGENT_WORKSPACE_ROOT)
-            / "organizations" / str(self.organization.id)
+            / "users" / str(self.user.id)
             / "workflows" / str(run.id)
         ).resolve()
         self.assertEqual(Path(run.input["working_directory"]), expected_workspace)

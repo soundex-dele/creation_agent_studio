@@ -176,15 +176,8 @@ else:
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 if DATABASE_ENGINE in {'sqlite', 'sqlite3'}:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': Path(config('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3'))),
-            'OPTIONS': {
-                'timeout': config('SQLITE_BUSY_TIMEOUT_SECONDS', default=5, cast=int),
-            },
-        }
-    }
+    from .sqlite import sqlite_database
+    DATABASES = {'default': sqlite_database(BASE_DIR)}
 elif DATABASE_ENGINE in {'postgres', 'postgresql'}:
     DATABASES = {
         'default': {

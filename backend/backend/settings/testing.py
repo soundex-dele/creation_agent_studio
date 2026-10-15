@@ -2,6 +2,15 @@
 
 from .development import *  # noqa: F403
 
+# Unit tests retain isolated in-memory databases. The service integration tests
+# explicitly create file databases and real service/client processes.
+if DATABASES['default']['ENGINE'] == 'core.sqlite_service':
+    DATABASES = {'default': {
+        **DATABASES['default'],
+        'ENGINE': 'django.db.backends.sqlite3',
+        'OPTIONS': {'timeout': 5},
+    }}
+
 
 # Static files and the interactive debug toolbar are not part of API tests.
 # Removing both also prevents tests that temporarily toggle DEBUG from making

@@ -15,6 +15,9 @@ def load_sqlite_vec(db=None):
     if raw is None:
         db.ensure_connection()
         raw = db.connection
+    if hasattr(raw, 'load_sqlite_vec'):
+        raw.load_sqlite_vec()
+        return
     connection_id = id(raw)
     if connection_id in _SQLITE_VEC_CONNECTION_IDS:
         return

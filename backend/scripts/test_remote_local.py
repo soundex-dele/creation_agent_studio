@@ -104,6 +104,9 @@ def main():
     common = {
         **os.environ, 'DJANGO_SETTINGS_MODULE': 'backend.settings.development',
         'DATABASE_ENGINE': 'sqlite', 'REDIS_ENABLED': 'False', 'REMOTE_RELAY_REDIS_URL': args.redis_url,
+        # This isolated relay/PTY smoke test doesn't start an execution worker.
+        # The dedicated test_sqlite_service runner covers the service profile.
+        'SQLITE_SERVICE_ENABLED': 'False',
         'SINGLE_TENANT_MODE': 'False', 'LICENSE_AUTH_ENABLED': 'False',
         'ALLOWED_HOSTS': 'localhost,127.0.0.1', 'OTEL_ENABLED': 'False',
         'SENTRY_DSN': '', 'API_RATE_THROTTLING_ENABLED': 'False', 'PYTHONUNBUFFERED': '1',

@@ -135,9 +135,13 @@ stop_services() {
   fi
 
   log "Stopping services."
-  for pid in "${SERVICE_PIDS[@]}"; do
+  # Stop database clients before their data service (which starts first).
+  local index
+  for ((index=${#SERVICE_PIDS[@]}-1; index>=0; index--)); do
+    pid="${SERVICE_PIDS[${index}]}"
     if kill -0 "${pid}" 2>/dev/null; then
       kill "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
     fi
   done
   wait "${SERVICE_PIDS[@]}" 2>/dev/null || true
@@ -177,6 +181,28 @@ NPM_BIN="$(command -v npm)" || fail "npm is not installed or is not available on
 
 trap stop_services EXIT INT TERM
 
+DATABASE_PROFILE="$(cd "${BACKEND_DIR}" && "${PYTHON_BIN}" -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings.development'); from django.conf import settings; print(settings.DATABASES['default']['ENGINE'])")"
+WORKER_STARTED=0
+WORKER_GATE="${BACKEND_DIR}/logs/worker-bootstrap-$$-$(date +%s).ready"
+if [[ "${DATABASE_PROFILE}" == "core.sqlite_service" ]]; then
+  case "${EXECUTION_WORKERS_ENABLED}" in
+    True|true|1|yes)
+      mkdir -p "${BACKEND_DIR}/logs"
+      start_service "worker" \
+        bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all --startup-gate "$3"' \
+        _ "${BACKEND_DIR}" "${PYTHON_BIN}" "${WORKER_GATE}"
+      WORKER_STARTED=1
+      ;;
+    *)
+      start_service "sqlite-service" \
+        bash -c 'cd "$1" && exec "$2" manage.py run_sqlite_service' \
+        _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+      ;;
+  esac
+  "${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" run_sqlite_service --wait 30
+  kill -0 "${SERVICE_PIDS[0]}" 2>/dev/null || fail "SQLite data service exited during startup."
+fi
+
 log "Applying database migrations."
 "${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" migrate --noinput
 
@@ -185,6 +211,9 @@ log "Applying database migrations."
 create_superuser
 
 "${PYTHON_BIN}" "${BACKEND_DIR}/manage.py" sync_app_center
+if (( WORKER_STARTED )); then
+  touch "${WORKER_GATE}"
+fi
 start_service "frontend" \
   bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0 --port "$3" --strictPort' \
   _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}"
@@ -195,9 +224,11 @@ start_service "backend" \
 
 case "${EXECUTION_WORKERS_ENABLED}" in
   True|true|1|yes)
-    start_service "worker" \
-      bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all' \
-      _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+    if (( ! WORKER_STARTED )); then
+      start_service "worker" \
+        bash -c 'cd "$1" && exec "$2" manage.py run_execution_coordinator --worker-pool all' \
+        _ "${BACKEND_DIR}" "${PYTHON_BIN}"
+    fi
     start_service "scheduler" \
       bash -c 'cd "$1" && exec "$2" manage.py run_automation_scheduler' \
       _ "${BACKEND_DIR}" "${PYTHON_BIN}"

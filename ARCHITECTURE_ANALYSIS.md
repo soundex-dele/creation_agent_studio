@@ -230,7 +230,7 @@ Scheduler 逐条使用 `select_for_update` 领取定时触发器，并用“触�
 本轮已按风险和依赖顺序完成核心演进，没有保留旧执行实现。以下是仍然存在的明确边界：
 
 1. Django 是模块化单体，Catalog、Execution、Tenancy 与产品 App 仍有少量必要集成边；这些边已由架构测试精确锁定，但还不是可独立部署的服务边界。
-2. SQLite 只用于单进程本地开发和测试；多 Worker、RLS、`skip_locked` 与生产一致性验证必须使用 PostgreSQL。生产配置默认且仅支持 PostgreSQL 部署形态。
+2. SQLite Local 使用单个 coordinator；其主进程承载本机数据服务，API 和并行任务子进程通过自定义 Django 后端访问服务，由服务按完整事务串行调度。数据服务随 worker 启停，启动器在迁移完成前阻止任务领取。多 coordinator、RLS、`skip_locked` 与生产一致性验证仍使用 PostgreSQL。实现与恢复约束见 [SQLite 数据服务说明](backend/core/sqlite_service/README.md)。
 3. GraphFlow 只有在其 SDK 返回 `input_request`/`pending_question` 时才能进入 durable suspend；SDK 本身不暴露交互请求时，平台无法从最终 completion 反向推断问题。
 4. OpenTelemetry 当前覆盖 Django HTTP、Run 创建和 Attempt 生命周期；Provider 细分 span 与 metrics 尚可继续扩充。
 5. Evaluation 当前支持 Agent/Application 作为可执行目标；Skill 的质量验证仍需由外部评测或后续静态 Skill evaluator 产生通过记录。

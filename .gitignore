@@ -59,3 +59,7 @@ contracts/swagger.json
 .idea/
 .DS_Store
 Thumbs.db
+# SQLite service endpoint contains a local authentication token.
+*.service.json
+*.service.json.tmp
+*.service.lock

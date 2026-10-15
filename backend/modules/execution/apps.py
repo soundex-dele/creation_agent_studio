@@ -12,6 +12,25 @@ logger = logging.getLogger(__name__)
 def configure_sqlite_connection(sender, connection, **kwargs):
     if connection.vendor != "sqlite":
         return
+    if connection.settings_dict["ENGINE"] == "core.sqlite_service":
+        # The service configures native handles. Clients never open the file.
+        return
+    # Explicit direct mode is for offline maintenance/tests only. Do not let an
+    # accidentally misconfigured API/worker bypass a running service's queue.
+    from core.sqlite_service.client import service_lock
+    from modules.execution.infrastructure.coordinator_lock import CoordinatorAlreadyRunning
+    from django.core.exceptions import ImproperlyConfigured
+
+    database_name = str(connection.settings_dict.get('NAME') or '')
+    if database_name and not connection.is_in_memory_db():
+        lock = service_lock(database_name)
+        if lock.path.exists():
+            try:
+                lock.acquire()
+            except CoordinatorAlreadyRunning as exc:
+                raise ImproperlyConfigured('A SQLite data service is running; direct database access is disabled.') from exc
+            else:
+                lock.release()  # Stale runtime files don't block offline maintenance.
 
     timeout_ms = int(getattr(settings, "SQLITE_BUSY_TIMEOUT_MS", 5000))
     synchronous = str(getattr(settings, "SQLITE_SYNCHRONOUS", "FULL")).upper()

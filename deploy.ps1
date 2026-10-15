@@ -108,7 +108,7 @@ try {
     Write-Host "Backend: http://${backendHost}:$backendPort; frontend: http://localhost:$frontendPort"
     Write-Host "Execution workers: $workerEnabled; remote connector: $(Test-Enabled $hostEnabled)"
     if ($DryRun) {
-        Write-Host 'Plan: migrate; ensure administrator; sync study-with-method, my-computer, wechat-assistant.'
+        Write-Host 'Plan: start worker-owned SQLite data service; migrate; ensure administrator; sync study-with-method, my-computer, wechat-assistant; release worker startup gate.'
         Write-Host 'Then start Vite, Django, enabled workers/remote connector, and the WeChat connector.'
         return
     }
@@ -119,6 +119,23 @@ try {
     }
     Push-Location $backendDir
     $locationPushed = $true
+    $logDir = Join-Path $backendDir ("logs\deploy-{0}-{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID)
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    Write-Host "Service logs: $logDir"
+    $databaseProfile = & $pythonBin -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings.development'); from django.conf import settings; print(settings.DATABASES['default']['ENGINE'])"
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to determine database profile.' }
+    $workerStarted = $false
+    $workerGate = Join-Path $logDir 'worker-bootstrap.ready'
+    if ($databaseProfile -contains 'core.sqlite_service') {
+        if ($workerEnabled) {
+            Start-ManagedService 'worker' $pythonBin @('manage.py', 'run_execution_coordinator', '--worker-pool', 'all', '--startup-gate', $workerGate) $backendDir
+            $workerStarted = $true
+        } else {
+            Start-ManagedService 'sqlite-service' $pythonBin @('manage.py', 'run_sqlite_service') $backendDir
+        }
+        Invoke-Manage @('run_sqlite_service', '--wait', '30')
+        if ($services[0].Process.HasExited) { throw 'SQLite data service exited during startup.' }
+    }
     Invoke-Manage @('migrate', '--noinput')
 
     $query = @'
@@ -151,15 +168,15 @@ print('STUDIO_SUPERUSER_EXISTS=' + str(get_user_model().objects.filter(**filters
     foreach ($package in @('study-with-method', 'my-computer', 'wechat-assistant')) {
         Invoke-Manage @('sync_app_center', '--package', $package)
     }
+    if ($workerStarted) { New-Item -ItemType File -Path $workerGate | Out-Null }
 
-    $logDir = Join-Path $backendDir ("logs\deploy-{0}-{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID)
-    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    Write-Host "Service logs: $logDir"
     # Launch Node directly to avoid npm.cmd/cmd.exe quoting and extra process layers.
     Start-ManagedService 'frontend' $nodeBin @($viteEntry, '--host', '0.0.0.0', '--port', $frontendPort, '--strictPort') $frontendDir
     Start-ManagedService 'backend' $pythonBin @('manage.py', 'runserver', "${backendHost}:$backendPort", '--noreload') $backendDir
     if ($workerEnabled) {
-        Start-ManagedService 'worker' $pythonBin @('manage.py', 'run_execution_coordinator', '--worker-pool', 'all') $backendDir
+        if (-not $workerStarted) {
+            Start-ManagedService 'worker' $pythonBin @('manage.py', 'run_execution_coordinator', '--worker-pool', 'all') $backendDir
+        }
         Start-ManagedService 'scheduler' $pythonBin @('manage.py', 'run_automation_scheduler') $backendDir
     }
     if (Test-Enabled $hostEnabled) {
@@ -176,7 +193,8 @@ print('STUDIO_SUPERUSER_EXISTS=' + str(get_user_model().objects.filter(**filters
         Start-Sleep -Seconds 1
     }
 } finally {
-    foreach ($service in $services) {
+    for ($serviceIndex = $services.Count - 1; $serviceIndex -ge 0; $serviceIndex--) {
+        $service = $services[$serviceIndex]
         try {
             if (-not $service.Process.HasExited) {
                 Write-Host "Stopping $($service.Name)."
