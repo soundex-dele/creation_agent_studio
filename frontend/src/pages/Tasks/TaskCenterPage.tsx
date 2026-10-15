@@ -68,11 +68,7 @@ const fallbackTypeMeta = {
   label: '任务', icon: <UnorderedListOutlined />, tone: 'neutral',
 };
 
-const taskMeta = (run: RunResource) => {
-  const meta = typeMeta[taskType(run)] || fallbackTypeMeta;
-  return run.conversation_scope === 'cowork' && taskType(run) === 'conversation'
-    ? { ...meta, label: 'CoWork 对话' } : meta;
-};
+const taskMeta = (run: RunResource) => typeMeta[taskType(run)] || fallbackTypeMeta;
 
 function TaskStatusBadge({ status }: { status: string }) {
   const meta = statusMeta[status] || { label: status, color: 'default', tone: 'neutral' };

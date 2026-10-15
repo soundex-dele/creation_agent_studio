@@ -57,7 +57,7 @@ afterEach(async () => {
 });
 
 describe('task center activity links', () => {
-  it('shows CoWork in conversation tasks and opens the matching CoWork conversation', async () => {
+  it('shows legacy CoWork tasks as conversations and opens the matching conversation', async () => {
     const cowork: RunResource = {
       ...run('cowork-run'), source_type: 'conversation', task_type: 'conversation',
       task_title: '整理项目文件', conversation_id: '42', conversation_scope: 'cowork',
@@ -74,15 +74,17 @@ describe('task center activity links', () => {
     expect(conversationTab.textContent).toContain('2');
     await act(async () => conversationTab.click());
     const row = container.querySelector<HTMLElement>('[data-row-key="cowork-run"]')!;
-    expect(row.textContent).toContain('CoWork 对话');
+    expect(row.textContent).toContain('对话');
+    expect(row.textContent).not.toContain('CoWork');
     const openButton = [...row.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === '打开')!;
     await act(async () => openButton.click());
     expect(open).toHaveBeenCalledWith('/chat?conversation=42&entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
     await act(async () => row.querySelector<HTMLButtonElement>('.task-title-button')!.click());
     expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('打开对话');
+    expect(document.querySelector('.task-detail-drawer')?.textContent).not.toContain('CoWork');
     const searchInput = container.querySelector<HTMLInputElement>('[aria-label="搜索任务或父级名称"]')!;
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, 'cowork');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, '整理项目文件');
       searchInput.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(container.querySelector('[data-row-key="cowork-run"]')).not.toBeNull();
