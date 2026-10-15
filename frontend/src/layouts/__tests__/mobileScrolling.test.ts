@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 import applications from 'virtual:application-packages';
 
 const readSource = (relativePath: string) => {
-  const owners: Record<string, string> = { KitchenAssistantPage: 'kitchen_assistant', DouyinBenchmarkPage: 'douyin_benchmark' };
-  const page = relativePath.match(/^\.\.\/\.\.\/pages\/Apps\/(KitchenAssistantPage|DouyinBenchmarkPage)(\..+)$/);
-  const source = page ? `../../../../app_center/${owners[page[1]]}/frontend/pages/${page[1]}${page[2]}` : relativePath;
+  const owners: Record<string, string> = {"AIDrawingPage": "ai_drawing", "AnimationStudioPage": "animation_studio", "BrandLibraryPage": "brand_library", "CoWorkPage": "cowork", "CreationMasterPage": "creation_master", "CreationToolboxPage": "creation_toolbox", "DiskCleanerPage": "disk_cleaner", "DocumentsPage": "documents", "IdeasTodosPage": "ideas_todos", "MeetingAssistantPage": "meeting_assistant", "MyComputerPage": "my_computer", "RemoteFilesPage": "my_computer", "RemoteTerminalPage": "my_computer", "MyDrivePage": "my_drive", "PocketSalvagerPage": "pocket_salvager", "ProjectPromotionPage": "project_promotion", "PromptMasterPage": "prompt_master", "RentalGrowthPage": "rental_growth_assistant", "RepoExplainerPage": "repo_explainer", "ResearchAssistantPage": "research_assistant", "SokobanPage": "sokoban", "StudyWithMethodPage": "study_with_method", "WechatAssistantPage": "wechat_assistant", "TemplateDetailPage": "case_library", "TemplatesPage": "case_library", "KitchenAssistantPage": "kitchen_assistant", "DouyinBenchmarkPage": "douyin_benchmark"};
+  const page = relativePath.match(/^\.\.\/\.\.\/pages\/Apps\/(\w+Page)(\..+)$/);
+  const source = page && owners[page[1]] ? `../../../../app_center/${owners[page[1]]}/frontend/pages/${page[1]}${page[2]}` : relativePath;
   return readFileSync(new URL(source, import.meta.url), 'utf8');
 };
 
@@ -31,10 +31,35 @@ function declarationsAt(sources: string[], selectors: string[], width: number, h
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 1440])('preserves migrated workspace scroll owners at %ipx', width => {
+    for (const height of [320, 900]) {
+      for (const [packageName, page, selector, overflow] of [
+        ['animation_studio', 'AnimationStudioPage', '.animation-workspace', 'hidden'],
+        ['documents', 'DocumentsPage', '.documents-workspace', width <= 991 ? 'auto' : 'hidden'],
+        ['my_drive', 'MyDrivePage', '.drive-workspace', 'auto'],
+        ['study_with_method', 'StudyWithMethodPage', '.swm-page', 'auto'],
+        ['sokoban', 'SokobanPage', '.sokoban-page', 'hidden'],
+        ['pocket_salvager', 'PocketSalvagerPage', '.salvager-page', 'hidden'],
+      ]) {
+        const css = readSource(`../../../../app_center/${packageName}/frontend/pages/${page}.css`);
+        const root = declarationsAt([css], [selector], width, height);
+        expect(root.height, selector).toBe('100%');
+        expect(root['min-height'], selector).toBe('0');
+        expect(root['overflow-y'] ?? root.overflow, selector).toBe(overflow);
+      }
+      const meetings = readSource('../../../../app_center/meeting_assistant/frontend/pages/MeetingAssistantPage.css');
+      expect(declarationsAt([meetings], ['.meeting-workspace'], width, height).height).toBe('100%');
+      expect(declarationsAt([meetings], ['.meeting-main'], width, height)['overflow-y']).toBe('auto');
+      const computer = readSource('../../../../app_center/my_computer/frontend/pages/MyComputerPage.css');
+      expect(declarationsAt([computer], ['.my-computer-content'], width, height).height).toBe('100%');
+      expect(declarationsAt([computer], ['.my-computer-content'], width, height)['overflow-y']).toBe('auto');
+    }
+  });
+
   it.each([320, 375, 390, 767, 768, 1440])('keeps repository workflow actions and source editing reachable at %ipx', width => {
-    const repoCss = readSource('../../pages/Apps/RepoExplainerPage.css');
+    const repoCss = readSource('../../../../app_center/repo_explainer/frontend/pages/RepoExplainerPage.css');
     const editorCss = readSource('../../pages/Workflows/Workflows.css');
-    expect(readSource('../../pages/Apps/RepoExplainerPage.tsx')).toContain('repo-actions repo-workflow-actions');
+    expect(readSource('../../../../app_center/repo_explainer/frontend/pages/RepoExplainerPage.tsx')).toContain('repo-actions repo-workflow-actions');
     expect(readSource('../../pages/Workflows/WorkflowEditorPage.tsx')).toContain('htmlFor="workflow-topic-material"');
     expect(readSource('../../router/index.tsx')).toContain('<MainLayout hideSidebar>{page(<WorkflowEditorPage />)}</MainLayout>');
     for (const height of [320, 900]) {
@@ -62,10 +87,10 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('keeps prompt master document scrolling bounded at %ipx', width => {
-    const page = readSource('../../pages/Apps/PromptMasterPage.tsx');
-    const css = readSource('../../pages/Apps/PromptMasterPage.css');
+    const page = readSource('../../../../app_center/prompt_master/frontend/pages/PromptMasterPage.tsx');
+    const css = readSource('../../../../app_center/prompt_master/frontend/pages/PromptMasterPage.css');
     expect(page).toContain('className="prompt-master-page app-scroll-page"');
-    expect(readSource('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<PromptMasterPage />)}</ApplicationShell>');
+    expect(applications.find(app => app.rendererKey === 'prompt-master')?.routes[0].fullBleed).toBe(true);
     for (const height of [320, 900]) {
       const root = declarationsAt([globalStyles, css], ['.app-scroll-page', '.prompt-master-page'], width, height);
       expect(root.height).toBe('100%');
@@ -83,7 +108,7 @@ describe('mobile page scrolling', () => {
     const page = readSource('../../pages/Chat/ChatPage.tsx');
     const styles = [readSource('../../pages/Chat/ChatPage.css'), readSource('../../components/Chat/ChatContainer.css')];
     const route = readSource('../../router/index.tsx');
-    expect(route).toContain("path: '/apps/cowork'");
+    expect(applications.find(app => app.rendererKey === 'cowork')?.routes[0]).toMatchObject({ path: '/apps/cowork', shell: 'none' });
     expect(route).toMatch(/<ApplicationShell fullBleed>\s*\{page\(<ChatPage \/>\)\}\s*<\/ApplicationShell>/);
     expect(readSource('../MainLayout.tsx')).toContain('hideSidebar || isConversationPage || embedded');
     expect(page).toContain('className="cowork-page"');
@@ -214,6 +239,10 @@ describe('mobile page scrolling', () => {
     ['KitchenAssistantPage', 'kitchen-page'],
     ['ResearchAssistantPage', 'research-host'],
     ['BrandLibraryPage', 'brand-library-page'],
+    ['DiskCleanerPage', 'disk-cleaner-page'],
+    ['IdeasTodosPage', 'ideas-todos-page'],
+    ['ProjectPromotionPage', 'promotion-page'],
+    ['RentalGrowthPage', 'rental-page'],
   ])('%s full-bleed scroll owner', (page, rootClass) => {
     const pageStyles = readSource(`../../pages/Apps/${page}.css`);
 
@@ -221,14 +250,14 @@ describe('mobile page scrolling', () => {
       const source = readSource(`../../pages/Apps/${page}.tsx`);
       const routes = readSource('../../router/index.tsx');
       expect(source).toContain(`className="${rootClass} app-scroll-page"`);
-      const packageRoute = applications.flatMap(app => app.routes).find(route =>
-        route.path.endsWith(page === 'KitchenAssistantPage' ? '/kitchen-assistant' : page === 'DouyinBenchmarkPage' ? '/douyin-benchmark' : '/__none__'));
-      if (packageRoute) {
-        expect(packageRoute.fullBleed).toBe(true);
-        expect(routes).toContain('<ApplicationShell fullBleed={fullBleed}>');
-      } else {
-        expect(routes).toContain(`<ApplicationShell fullBleed>{page(<${page} />)}</ApplicationShell>`);
-      }
+      const keys: Record<string, string> = {
+        KitchenAssistantPage: 'kitchen-assistant', DouyinBenchmarkPage: 'douyin-benchmark',
+        ResearchAssistantPage: 'research-assistant', BrandLibraryPage: 'brand-library',
+        DiskCleanerPage: 'disk-cleaner', IdeasTodosPage: 'ideas-todos',
+        ProjectPromotionPage: 'project-promotion', RentalGrowthPage: 'rental-growth-assistant',
+      };
+      expect(applications.find(app => app.rendererKey === keys[page])?.routes[0].fullBleed).toBe(true);
+      expect(routes).toContain('<ApplicationShell fullBleed={fullBleed}>');
     });
 
     it.each([320, 375, 390, 767, 768, 844, 1440])('retains parent-bounded scrolling at %ipx', (width) => {
@@ -247,12 +276,11 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('keeps Ideas & Todos cards, filters and editor bounded at %ipx', width => {
-    const source = readSource('../../pages/Apps/IdeasTodosPage.tsx');
-    const css = readSource('../../pages/Apps/IdeasTodosPage.css');
+    const source = readSource('../../../../app_center/ideas_todos/frontend/pages/IdeasTodosPage.tsx');
+    const css = readSource('../../../../app_center/ideas_todos/frontend/pages/IdeasTodosPage.css');
     expect(source).toContain('className="ideas-todos-page app-scroll-page"');
     expect(source).toContain('resolveApplicationPresentation(searchParams)');
-    expect(readSource('../../router/index.tsx').replace(/\s+/g, ''))
-      .toContain('<ApplicationShellfullBleed>{page(<IdeasTodosPage/>)}</ApplicationShell>');
+    expect(applications.find(app => app.rendererKey === 'ideas-todos')?.routes[0].fullBleed).toBe(true);
     for (const height of [320, 900]) {
       const root = declarationsAt([globalStyles, css], ['.app-scroll-page', '.ideas-todos-page'], width, height);
       expect(root.height).toBe('100%');
@@ -330,10 +358,10 @@ describe('mobile page scrolling', () => {
   });
 
   it.each([320, 375, 390, 767, 768, 844, 1440])('preserves drawing and conversion scrollports at %ipx, including short embeds', width => {
-    const drawing = readSource('../../pages/Apps/AIDrawingPage.css');
-    const conversion = readSource('../../pages/Apps/DurableApplicationRuntimePage.css');
-    expect(readSource('../../pages/Apps/AIDrawingPage.tsx')).toContain('className="drawing-workspace"');
-    expect(readSource('../../pages/Apps/DurableApplicationRuntimePage.tsx')).toContain('"conversion-page app-scroll-page"');
+    const drawing = readSource('../../../../app_center/ai_drawing/frontend/pages/AIDrawingPage.css');
+    const conversion = readSource('../../../../app_center/html_to_png/frontend/pages/HtmlToPngView.css');
+    expect(readSource('../../../../app_center/ai_drawing/frontend/pages/AIDrawingPage.tsx')).toContain('className="drawing-workspace"');
+    expect(readSource('../../../../app_center/html_to_png/frontend/pages/HtmlToPngView.tsx')).toContain('"conversion-page app-scroll-page"');
     for (const height of [320, 900]) {
       for (const [styles, selectors] of [
         [drawing, ['.drawing-workspace']],
@@ -365,7 +393,7 @@ describe('mobile page scrolling', () => {
       expect(rules['overflow-y']).toBe('auto');
     }
     if (width <= 767) {
-      const brand = readSource('../../pages/Apps/BrandLibraryPage.css');
+      const brand = readSource('../../../../app_center/brand_library/frontend/pages/BrandLibraryPage.css');
       expect(declarationsAt([brand], ['.brand-library-columns'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
       expect(declarationsAt([brand], ['.brand-library-fields'], width)['grid-template-columns']).toBe('minmax(0, 1fr)');
     }

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from modules.tenancy.models import TenantOwnedModel
+from modules.platform_api.tenancy import TenantOwnedModel
 
 
 def _safe_name(name: str) -> str:

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from rest_framework import serializers
 
-from core.storage import signed_media_url
+from modules.platform_api.storage import signed_media_url
 
 from .models import (
     Copywriting,

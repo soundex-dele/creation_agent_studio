@@ -1,9 +1,10 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const styles = read('../../pages/Apps/SokobanPage.css');
+const styles = read('../../../../app_center/sokoban/frontend/pages/SokobanPage.css');
 
 // CSS contract checks, not a browser layout simulation. Query the application's
 // available area, which can be much shorter than the device screen in a shell.
@@ -26,14 +27,13 @@ function declarations(selector: string, width: number, height: number) {
 
 describe('Sokoban fixed-screen layout contract', () => {
   it('uses the full-bleed shell and replaces the old document scroll container', () => {
-    const workspace = read('../../pages/Apps/sokoban/Workspace.tsx');
-    const page = read('../../pages/Apps/SokobanPage.tsx');
-    const routes = read('../../router/index.tsx');
+    const workspace = read('../../../../app_center/sokoban/frontend/pages/sokoban/Workspace.tsx');
+    const page = read('../../../../app_center/sokoban/frontend/pages/SokobanPage.tsx');
     for (const source of [workspace, page]) {
       expect(source).toContain('className="sokoban-page"');
       expect(source).not.toContain('app-scroll-page');
     }
-    expect(routes).toContain('<ApplicationShell fullBleed>{page(<SokobanPage />)}</ApplicationShell>');
+    expect(applications.find(app => app.rendererKey === 'sokoban')?.routes.some(route => route.fullBleed)).toBe(true);
     expect(workspace).not.toMatch(/onTouchMove|onWheel|document\.addEventListener/);
     expect(styles).not.toMatch(/100(?:d)?vh|overflow(?:-y)?:\s*(auto|scroll)|touch-action:\s*none/);
   });
@@ -73,7 +73,7 @@ describe('Sokoban fixed-screen layout contract', () => {
   });
 
   it('fits all rectangular maps by both dimensions, with no cropped or stretched tiles', () => {
-    const board = read('../../pages/Apps/sokoban/Board.tsx');
+    const board = read('../../../../app_center/sokoban/frontend/pages/sokoban/Board.tsx');
     expect(board).toContain('preserveAspectRatio="xMidYMid meet"');
     expect(board).toContain('viewBox=');
     expect(declarations('.sokoban-board', 375, 527)['max-height']).toBe('100%');

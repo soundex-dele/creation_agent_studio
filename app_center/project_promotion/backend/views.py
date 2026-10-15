@@ -6,10 +6,10 @@ from rest_framework import serializers as s
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .models import RESOURCES, Workspace, Case, Topic, Channel, Version, Feedback
 from .schemas import SCHEMAS, STATUSES, PLATFORMS, CopyBody, validated
 from .materials import topic_materials, resolve_materials, set_materials, require_confirmed, sources_current, snapshot_materials

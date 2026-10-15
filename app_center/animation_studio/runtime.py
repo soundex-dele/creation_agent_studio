@@ -1,6 +1,6 @@
 """Two durable operations: build an HTML preview, or render an immutable version."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import io
 import json
 import logging
@@ -15,11 +15,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from django.conf import settings
-from core.agent_engine.adapters.codex import CodexAdapter
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from modules.execution.models import Run
-from modules.execution.infrastructure.artifacts import get_artifact_storage, open_artifact
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.models import CodexAdapter
+from modules.platform_api.governance import enforce_member_token_quota, record_usage
+from modules.platform_api.execution import Run
+from modules.platform_api.artifacts import get_artifact_storage, open_artifact
+from modules.platform_api.tenancy import tenant_database_context
 from .backend.access import application_for, assets_for, generation_for
 from .backend.serializers import AnimationInputSerializer
 from .backend.media import probe

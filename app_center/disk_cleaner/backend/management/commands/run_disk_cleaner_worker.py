@@ -5,7 +5,7 @@ import logging
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import OperationalError, close_old_connections
-from modules.execution.infrastructure.coordinator_lock import CoordinatorFileLock, CoordinatorAlreadyRunning
+from modules.platform_api.coordination import CoordinatorFileLock, CoordinatorAlreadyRunning
 from ... import filesystem as fs
 from ...worker import interrupt_previous, process_next
 

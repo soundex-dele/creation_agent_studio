@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
-import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
+import { resolveApplicationPresentation } from '@platform/presentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 describe('Douyin document workspace layout contract', () => {
   it('bounds generation previews inside the existing page scroll owner', () => {

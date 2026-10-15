@@ -9,9 +9,9 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from apps.applications.models import Application
-from apps.enterprise.models import Organization
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Organization
+from modules.platform_api.tenancy import tenant_database_context
 from app_center.brand_library.backend.serializers import (
     ExampleSerializer, ProductSerializer, ProfileSerializer,
 )

@@ -1,12 +1,12 @@
 """Durable media adapter. All private result writes are version/lease fenced."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 from contextlib import contextmanager
 from django.db import transaction
 from django.utils import timezone
-from modules.tenancy.database import tenant_database_context
-from modules.execution.models import Run, RunLease
-from core.transcription import transcribe_segments
+from modules.platform_api.tenancy import tenant_database_context
+from modules.platform_api.execution import active_run
+from modules.platform_api.transcription import transcribe_segments
 from .backend.access import recording_for
 from .backend.models import Recording, ActionItem
 from .backend.storage import object_path
@@ -20,12 +20,9 @@ def current_record(payload, sink):
             pk=payload["input"]["record_id"], organization_id=payload["organization_id"],
             active_run_id=payload["run_id"], version=payload["input"]["version"],
         ).first()
-        run = Run.objects.select_for_update().filter(pk=payload["run_id"], status="running",
-            organization_id=payload["organization_id"], current_attempt_id=payload["attempt_id"]).first()
-        if sink.cancelled or not record or not run or not RunLease.objects.filter(
-            attempt_id=payload["attempt_id"], expires_at__gt=timezone.now(), released_at__isnull=True,
-        ).exists():
-            raise InterruptedError("任务已取消、过期或记录已更新。")
+        run = active_run(payload, sink)
+        if not record:
+            raise InterruptedError("Recording has changed or the task is no longer active.")
         if run.owner_id != record.owner_id or str(run.source_id) != str(record.application_id):
             raise PermissionError("任务与录音不匹配。")
         recording_for(record.owner, record.organization_id, record.application_id, record.pk)

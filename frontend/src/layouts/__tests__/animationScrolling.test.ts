@@ -1,8 +1,9 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { describe, it, expect } from 'vitest';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const css = read('../../pages/Apps/AnimationStudioPage.css') + read('../../pages/Apps/animation/StudioEditor.css') + read('../../pages/Apps/animation/AnimationTaskDetails.css');
+const css = read('../../../../app_center/animation_studio/frontend/pages/AnimationStudioPage.css') + read('../../../../app_center/animation_studio/frontend/pages/animation/StudioEditor.css') + read('../../../../app_center/animation_studio/frontend/pages/animation/AnimationTaskDetails.css');
 function declarations(selectors: string[], width: number, height = 900) {
   const values: Record<string, string> = {};
   const visit = (container: Container) => container.nodes?.forEach(node => {
@@ -23,8 +24,8 @@ describe('animation workspace scroll contract', () => {
     expect(declarations(['.studio-select-popup .ant-select-item-option-content'], width)['overflow-wrap']).toBe('anywhere');
     expect(declarations(['.studio-workspace .studio-file-picker'], width)['grid-template-columns']).toBe(width <= 767 ? '40px minmax(0, 1fr)' : '48px minmax(0, 1fr) auto');
     expect(declarations(['.studio-file-copy'], width)['min-width']).toBe('0');
-    expect(read('../../pages/Apps/animation/StudioPanels.tsx')).not.toContain('<select');
-    expect(read('../../pages/Apps/animation/AnimationStudioEditor.tsx')).not.toContain('<select');
+    expect(read('../../../../app_center/animation_studio/frontend/pages/animation/StudioPanels.tsx')).not.toContain('<select');
+    expect(read('../../../../app_center/animation_studio/frontend/pages/animation/AnimationStudioEditor.tsx')).not.toContain('<select');
   });
   it.each([[320, 568], [375, 667], [390, 844], [767, 600], [768, 600], [844, 320], [1440, 900]])('bounds long task details while keeping modal actions reachable at %i × %i', (width, height) => {
     const styles = (selectors: string[]) => declarations(selectors, width, height);
@@ -48,7 +49,7 @@ describe('animation workspace scroll contract', () => {
     expect(styles(['.studio-card', '.studio-scene-editor'])['min-width']).toBe('0');
     expect(styles(['.studio-project-toolbar'])['flex-wrap']).toBe('wrap');
     expect(styles(['.studio-page-heading'])['flex-shrink']).toBe('0');
-    const editor = read('../../pages/Apps/animation/AnimationStudioEditor.tsx');
+    const editor = read('../../../../app_center/animation_studio/frontend/pages/animation/AnimationStudioEditor.tsx');
     expect(editor).toContain('className="studio-storyboard-layout"');
     expect(editor).toContain('className="studio-card studio-scene-editor"');
     if (height <= 500) expect(styles(['.studio-page-heading p']).display).toBe('none');
@@ -79,11 +80,11 @@ describe('animation workspace scroll contract', () => {
     expect(styles(['.studio-notices'])['max-height']).toBe('25%');
     expect(styles(['.studio-notices'])['overflow-y']).toBe('auto');
     expect(styles(['.studio-navigation button'])['min-height']).toBe('44px');
-    expect(read('../../pages/Apps/animation/StudioEditor.css')).not.toMatch(/\b100(?:d|s|l)?vh\b/);
+    expect(read('../../../../app_center/animation_studio/frontend/pages/animation/StudioEditor.css')).not.toMatch(/\b100(?:d|s|l)?vh\b/);
   });
 
   it('attaches sidebar, bounded content and retained panels without legacy pane selectors', () => {
-    const editor = read('../../pages/Apps/animation/AnimationStudioEditor.tsx');
+    const editor = read('../../../../app_center/animation_studio/frontend/pages/animation/AnimationStudioEditor.tsx');
     expect(editor).toContain('className="studio-body"');
     expect(editor).toContain('className="studio-content"');
     expect(editor).toContain('className="studio-sidebar"');
@@ -97,9 +98,9 @@ describe('animation workspace scroll contract', () => {
   });
 
   it('attaches a bounded pane workspace to ApplicationShell fullBleed', () => {
-    expect(read('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<AnimationStudioPage />)}</ApplicationShell>');
-    expect(read('../../pages/Apps/AnimationStudioPage.tsx')).toContain('className="animation-workspace"');
-    expect(read('../../pages/Apps/AnimationStudioPage.tsx')).toContain('resolveApplicationPresentation(params)');
+    expect(applications.find(app => app.rendererKey === 'animation-studio')?.routes.some(route => route.fullBleed)).toBe(true);
+    expect(read('../../../../app_center/animation_studio/frontend/pages/AnimationStudioPage.tsx')).toContain('className="animation-workspace"');
+    expect(read('../../../../app_center/animation_studio/frontend/pages/AnimationStudioPage.tsx')).toContain('resolveApplicationPresentation(params)');
   });
   it.each([320, 375, 390, 767, 768, 844, 1440])('keeps pane heights bounded at %ipx including short parent viewports', width => {
     const root = declarations(['.animation-workspace'], width);
@@ -111,7 +112,7 @@ describe('animation workspace scroll contract', () => {
     expect(declarations(['.animation-preview-heading > div:first-child'], width)['min-width']).toBe('0');
     const studioBody = declarations(['.studio-body'], width);
     expect(studioBody['min-height']).toBe('0'); expect(studioBody.flex).toBe('1');
-    expect(read('../../pages/Apps/animation/AnimationStudioEditor.tsx')).toContain('className="animation-workspace studio-workspace"');
+    expect(read('../../../../app_center/animation_studio/frontend/pages/animation/AnimationStudioEditor.tsx')).toContain('className="animation-workspace studio-workspace"');
     for (const pane of ['.studio-projects', '.studio-editor-pane', '.studio-preview-pane']) {
       const styles = declarations([pane], width);
       expect(styles['overflow-y']).toBe('auto'); expect(styles['min-height']).toBe('0'); expect(styles.height).not.toBe('auto');

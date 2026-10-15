@@ -1,7 +1,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
-from modules.tenancy.models import TenantOwnedModel
+from modules.platform_api.tenancy import TenantOwnedModel
 
 
 class PrivateRecord(TenantOwnedModel):

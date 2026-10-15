@@ -1,8 +1,8 @@
 """An interview-oriented agent, separate from the shared content writer."""
 from copy import deepcopy
 
-from apps.agents.models import Agent, AgentCategory
-from modules.catalog.models import AgentDraft
+from modules.platform_api.agents import Agent, AgentCategory
+from modules.platform_api.catalog import AgentDraft
 
 
 SYSTEM_PROMPT = """你是选题探索智能体，帮助用户发现真正想表达、适合目标读者且有依据的选题，服务公众号、图文、短视频和项目宣传。

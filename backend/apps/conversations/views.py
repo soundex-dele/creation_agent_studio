@@ -78,10 +78,8 @@ class ConversationViewSet(viewsets.ViewSet):
             pk=pk,
             user=request.user,
         )
-        from django.apps import apps
-        if apps.is_installed("app_center.documents.backend"):
-            from app_center.documents.backend.access import check_conversation_access
-            check_conversation_access(conversation, request.user)
+        from apps.applications.app_center.extensions import check_conversation_access
+        check_conversation_access(conversation, request.user)
         return conversation
 
     @action(detail=False, methods=["get"], url_path="composer-options")
@@ -103,11 +101,8 @@ class ConversationViewSet(viewsets.ViewSet):
             organization=organization,
             scope__in=('default', 'cowork') if scope == 'unified' else (scope,),
         )
-        from django.apps import apps
-        if apps.is_installed("app_center.documents.backend"):
-            # Document sessions are accessed through document permissions, not
-            # the general chat history (which may survive revoked sharing).
-            queryset = queryset.filter(document_session__isnull=True)
+        from apps.applications.app_center.extensions import conversation_queryset
+        queryset = conversation_queryset(queryset)
         application_id = request.query_params.get("application_id")
         project_id = request.query_params.get("project_id")
         agent_id = request.query_params.get("agent_id")

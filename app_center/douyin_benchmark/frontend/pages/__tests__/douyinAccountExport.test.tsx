@@ -7,7 +7,7 @@ import { douyinApi, type DouyinTask } from '@applications/douyin_benchmark/front
 import { api } from '@platform/http';
 import { saveResearchBlob } from '@platform/download';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn() } }));
 vi.mock('@platform/download', () => ({ saveResearchBlob: vi.fn() }));
 const account = { id: 'a1', name: '知识/账号:*', source_url: '', group: '', notes: '', profile: {}, updated_at: '' };
 const task: DouyinTask = { id: '12345678-task', kind: 'account', status: 'succeeded', stage: 'completed',

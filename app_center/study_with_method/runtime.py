@@ -1,6 +1,6 @@
 """Durable fallback executor for structured tutoring operations."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 
 from .backend.strategies import get_subject_strategy
 

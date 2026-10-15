@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.agents.models import Agent
 from apps.applications.models import Application
-from app_center.chat_skill_app import provision_content_creation_agent
+from modules.platform_api.chat_skills import provision_content_creation_agent
 from app_center.project_promotion.backend.integrations import ExplorationInput
 from modules.catalog.guided_prompts import compose_guided_prompt
 from modules.catalog.models import AgentDraft

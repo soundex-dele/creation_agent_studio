@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
-import CoWorkPage from '@/pages/Apps/CoWorkPage';
+import CoWorkPage from '@applications/cowork/frontend/pages/CoWorkPage';
 
 it('replaces the legacy entry and preserves every launch and selection parameter', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

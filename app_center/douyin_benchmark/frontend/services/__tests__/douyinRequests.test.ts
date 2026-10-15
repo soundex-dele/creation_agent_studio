@@ -3,7 +3,7 @@ import { api } from '@platform/http';
 import { douyinApi } from '../douyinBenchmark';
 import { researchApi } from '../douyinResearch';
 
-vi.mock('@platform/http', () => ({ api: { post: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { post: vi.fn() } }));
 beforeEach(() => { vi.mocked(api.post).mockReset().mockResolvedValue({}); });
 afterEach(() => { vi.unstubAllGlobals(); });
 const keyAt = (index: number) => vi.mocked(api.post).mock.calls[index][2]?.headers?.['Idempotency-Key'];

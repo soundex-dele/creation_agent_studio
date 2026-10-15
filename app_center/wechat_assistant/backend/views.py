@@ -7,11 +7,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.agents.models import Agent
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.agents import Agent
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .models import Binding
 from .protocol import seal, unseal
 from .serializers import BindingSerializer, ConfigurationSerializer, VerifySerializer, AgentOptionSerializer, TaskSerializer

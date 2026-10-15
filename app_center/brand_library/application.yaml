@@ -26,7 +26,15 @@ spec:
     default_config: {launch_mode: dedicated}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.brand_library.extensions.provider
     django_app: app_center.brand_library.backend.apps.BrandLibraryConfig
     urlconf: app_center.brand_library.backend.urls
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: brand-library
+      platforms: [web]

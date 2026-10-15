@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from apps.workflows.artifacts import workspace_file
+from modules.platform_api.artifacts import workspace_file
 
 
 def load_manifest(config):

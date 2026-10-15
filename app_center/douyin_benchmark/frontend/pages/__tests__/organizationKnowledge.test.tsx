@@ -9,7 +9,7 @@ import type { KnowledgeCard, KnowledgeShare, OrganizationKnowledgeSnapshot } fro
 import { KnowledgeShareDrawer, OrganizationKnowledgePicker, OrganizationKnowledgeReferences } from '../douyin/OrganizationKnowledge';
 import { CreationCenter } from '../douyin/CreationCenter';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const base = '/organizations/org/applications/1/douyin-benchmark';
 const card: KnowledgeCard = { id: 'card1', revision: 2, title: '明确受众', text: '参考观点', application_notes: '', tags: [], category: 'content', basis: 'author_view', evidence: [], source_missing: false, index_status: 'ready', index_error: '', created_at: '', updated_at: '' };
 const chunk: OrganizationKnowledgeSnapshot = { chunk_id: 7, revision: 3, document_id: 2, knowledge_base_id: 1, knowledge_base_name: '团队资料', title: '受众研究', snippet: '核对受众的真实需求', score: 1, page_number: 2, section_path: ['方法'], citation: '受众研究#chunk-0', provenance: { basis: 'author_view' } };

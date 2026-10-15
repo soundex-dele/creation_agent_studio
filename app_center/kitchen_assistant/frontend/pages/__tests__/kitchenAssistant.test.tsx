@@ -13,7 +13,7 @@ import type {
 import recipes from "../../../assets/recipes.json";
 import { KitchenWorkspace } from "../KitchenAssistantPage";
 import { applicationPath } from "@platform/catalog";
-vi.mock("@platform/http", () => ({
+vi.mock("@/services/api", () => ({
   api: { get: vi.fn(), patch: vi.fn(), post: vi.fn(), delete: vi.fn() },
 }));
 let root: Root;

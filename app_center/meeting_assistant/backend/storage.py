@@ -1,6 +1,6 @@
 """Private audio storage; never use public MEDIA_URL for recordings."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import os
 from pathlib import Path
 from django.conf import settings

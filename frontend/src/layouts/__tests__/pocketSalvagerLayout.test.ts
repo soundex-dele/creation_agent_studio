@@ -1,8 +1,9 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { describe, expect, it } from 'vitest';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const styles = read('../../pages/Apps/PocketSalvagerPage.css');
+const styles = read('../../../../app_center/pocket_salvager/frontend/pages/PocketSalvagerPage.css');
 // Static contracts only: jsdom cannot establish real layout or touch scrolling.
 function declarations(selector: string, width: number, height: number) {
   const result: Record<string, string> = {};
@@ -16,9 +17,9 @@ function declarations(selector: string, width: number, height: number) {
 }
 describe('Pocket Salvager bounded playfield', () => {
   it('attaches the game to a full-bleed application shell', () => {
-    expect(read('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<PocketSalvagerPage />)}</ApplicationShell>');
-    expect(read('../../pages/Apps/pocket-salvager/Workspace.tsx')).toContain('className="salvager-page"');
-    expect(read('../../pages/Apps/PocketSalvagerPage.tsx')).toContain('resolveApplicationPresentation(params).showApplicationHeader');
+    expect(applications.find(app => app.rendererKey === 'pocket-salvager')?.routes.some(route => route.fullBleed)).toBe(true);
+    expect(read('../../../../app_center/pocket_salvager/frontend/pages/pocket-salvager/Workspace.tsx')).toContain('className="salvager-page"');
+    expect(read('../../../../app_center/pocket_salvager/frontend/pages/PocketSalvagerPage.tsx')).toContain('resolveApplicationPresentation(params).showApplicationHeader');
   });
   it.each([320, 375, 390, 767, 768, 844, 1440])('keeps menus scrollable without growing the playfield at width %i', width => {
     for (const height of [240, 375, 700]) {

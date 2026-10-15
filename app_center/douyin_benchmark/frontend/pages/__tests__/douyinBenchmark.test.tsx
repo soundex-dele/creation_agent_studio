@@ -11,7 +11,7 @@ import { DouyinWorkspace } from '../douyin/DouyinWorkspace';
 import { AnalysisResult } from '../douyin/AnalysisResult';
 import { ScriptEditor } from '../douyin/ScriptEditor';
 import { RewritePanel } from '../douyin/RewritePanel';
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const account = { id: 'a1', source_url: 'https://www.douyin.com/user/test', name: '知识账号', group: '', notes: '', profile: {}, updated_at: '2026-09-29' };
 const work = { id: 'w1', title: '如何读书', likes: 0, comments: null, collects: null, shares: null, ratio: null, published_at: null, duration: 60, url: 'https://www.douyin.com/?modal_id=7536599534051626299', video_url: 'https://v3.douyinvod.com/real-file.mp4', cover: '', kind: 'video' };
 const script = { title: '读书的新角度', cover: '从问题开始', narration: '今天讨论一个问题。', scenes: [{ time: '0–5秒', visual: '固定机位', spoken: '今天讨论一个问题。' }], checklist: ['准备提词器'] };

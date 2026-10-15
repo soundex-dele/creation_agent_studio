@@ -1,10 +1,11 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { expect, it } from 'vitest';
 import { applicationPath } from '../../lib/applicationCatalog';
 import { resolveApplicationPresentation } from '../../lib/applicationPresentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const css = postcss.parse(read('../../styles/global.css') + read('../../pages/Apps/ProjectPromotionPage.css'));
+const css = postcss.parse(read('../../styles/global.css') + read('../../../../app_center/project_promotion/frontend/pages/ProjectPromotionPage.css'));
 function styles(selectors: string[], width: number, height: number) {
   const result: Record<string, string> = {};
   function visit(container: Container) {
@@ -49,8 +50,8 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   expect(styles(['.promotion-activity-list'], width, height)['overflow-y']).toBeUndefined();
 });
 it('registers a full-bleed route with a page-owned scroll container in all entry modes', () => {
-  expect(read('../../pages/Apps/ProjectPromotionPage.tsx')).toContain('className="promotion-page app-scroll-page"');
-  expect(read('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<ProjectPromotionPage />)}</ApplicationShell>');
+  expect(read('../../../../app_center/project_promotion/frontend/pages/ProjectPromotionPage.tsx')).toContain('className="promotion-page app-scroll-page"');
+  expect(applications.find(app => app.rendererKey === 'project-promotion')?.routes.some(route => route.fullBleed)).toBe(true);
   expect(resolveApplicationPresentation(new URLSearchParams('entry=home')).showPlatformChrome).toBe(true);
   for (const entry of ['entry=apps', 'standalone=1', 'embedded=1']) expect(resolveApplicationPresentation(new URLSearchParams(entry)).showPlatformChrome).toBe(false);
   const app = { id: 'project-promotion', applicationId: 88, kind: 'custom' as const, rendererKey: 'project-promotion' };
@@ -58,7 +59,7 @@ it('registers a full-bleed route with a page-owned scroll container in all entry
 });
 
 it('keeps topic exploration in the wrapping action row and reuses the bounded chat form', () => {
-  const page = read('../../pages/Apps/ProjectPromotionPage.tsx');
+  const page = read('../../../../app_center/project_promotion/frontend/pages/ProjectPromotionPage.tsx');
   expect(page).toMatch(/className="promotion-actions">\s*<Button[\s\S]*?探索选题<\/Button>/);
   expect(read('../../pages/Apps/ChatApplicationRuntimePage.tsx')).toContain('className="chat-app-builder"');
   const chat = read('../../pages/Apps/ChatApplicationRuntimePage.css');

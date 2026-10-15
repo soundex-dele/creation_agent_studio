@@ -104,3 +104,10 @@ spec:
   install:
     scope: per-organization
     activate: true
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: html-to-png
+      platforms: [web]

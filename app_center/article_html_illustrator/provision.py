@@ -1,4 +1,4 @@
-from app_center.chat_skill_app import provision_chat_skill_definition
+from modules.platform_api.chat_skills import provision_chat_skill_definition
 
 
 def prepare_definition(*, organization, application, definition):

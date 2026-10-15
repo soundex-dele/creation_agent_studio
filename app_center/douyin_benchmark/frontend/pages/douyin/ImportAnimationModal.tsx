@@ -3,7 +3,7 @@ import { Alert, Modal, Select, Spin } from 'antd';
 import { openApplicationWindowWhenReady } from '@platform/presentation';
 import { useOrganizationStore } from '@platform/organization';
 import { scriptToAnimation, type AnimationDestination } from '@applications/douyin_benchmark/frontend/services/douyinAnimation';
-import { projectApi } from '@platform/animationProjects';
+import { projectApi } from '@applications/animation_studio/frontend/public/services/animationProjects';
 import { tenantApiRoot } from '@platform/tenant';
 import { documentError } from '@platform/errors';
 import type { DouyinClient, Script } from '@applications/douyin_benchmark/frontend/services/douyinBenchmark';

@@ -6,9 +6,9 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
-from apps.enterprise.models import Membership
-from modules.execution.models import Run
-from modules.execution.infrastructure.artifacts import get_artifact_storage
+from modules.platform_api.identity import Membership
+from modules.platform_api.execution import Run
+from modules.platform_api.artifacts import get_artifact_storage
 from .views import BaseView
 from .access import runs_for
 from .models import AnimationProject, AnimationVersion, AnimationPreset, AnimationSpeechConfig, AnimationAsset
@@ -139,7 +139,7 @@ class ProjectActionView(BaseView):
             run = get_object_or_404(Run.objects.for_organization(app.organization_id), pk=request.data.get("run_id"),
                 owner=request.user, source_id=str(app.id), executor_key="animation-studio", input__project_id=str(p.id), status="succeeded")
             artifact = get_object_or_404(run.artifacts, kind="animation-document")
-            from modules.execution.infrastructure.artifacts import open_artifact
+            from modules.platform_api.artifacts import open_artifact
             import json
             with open_artifact(artifact) as handle: doc = validate_document(json.load(handle), complete=True)
             document_assets(request.user, app, doc)
@@ -154,7 +154,7 @@ class ProjectTasksView(BaseView):
     def post(self, request, project_id, **kwargs):
         app = self.application(); p = project_for(request.user, app, project_id)
         expected = revision(request.data)
-        from modules.execution.models import IdempotencyRecord
+        from modules.platform_api.execution import IdempotencyRecord
         replay = IdempotencyRecord.objects.for_organization(app.organization_id).filter(actor=request.user,
             operation="application.run.create", key=request.headers.get("Idempotency-Key", ""), status="completed").first()
         if replay:

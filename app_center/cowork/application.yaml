@@ -27,3 +27,10 @@ spec:
     dependencies: {agents: [], skills: []}
   database: {mode: none}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: cowork
+      platforms: [web]

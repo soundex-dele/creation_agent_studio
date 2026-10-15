@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from django.db import close_old_connections
 from django.utils import timezone
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.tenancy import tenant_database_context
 
 from . import filesystem as fs
 from .access import application_for

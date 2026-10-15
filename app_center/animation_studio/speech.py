@@ -4,13 +4,13 @@ Protocol: https://www.volcengine.com/docs/6561/1598757
 Only the official endpoint is used; credentials never enter task snapshots.
 """
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import base64
 import json
 import uuid
 import requests
 from .backend.models import AnimationSpeechConfig
-from apps.enterprise.services import resolve_secret
+from modules.platform_api.governance import resolve_secret
 
 ENDPOINT = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
 

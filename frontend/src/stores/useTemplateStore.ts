@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
 import { casesApi } from '@/services/cases';
-import { documentError } from '@/services/documents';
+import { documentError } from '@platform/errors';
 import type {
   TemplateCategory,
   TemplateDetail,

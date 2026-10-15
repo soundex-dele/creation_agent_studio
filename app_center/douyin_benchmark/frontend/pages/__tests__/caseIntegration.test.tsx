@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@platform/http';
 import { douyinApi } from '@applications/douyin_benchmark/frontend/services/douyinBenchmark';
 import { SaveCaseButton, CasePicker } from '../douyin/CaseIntegration';
-import CaseCreationAction from '@/pages/Templates/CaseCreationAction';
+import CaseCreationAction from '@applications/case_library/frontend/pages/CaseCreationAction';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 let container: HTMLDivElement; let root: Root;
 const preview = { case_id: null, task_id: 't1', title: '来源作品', category: null, summary: '摘要', tags: [], source_content: '完整转写', analysis_sections: [{ title: '初步推测', content: '拆解结论' }] };
 beforeEach(() => {

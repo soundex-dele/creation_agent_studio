@@ -1,9 +1,9 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 
-from apps.applications.models import Application
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import resolve_path_organization
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import resolve_path_organization
 
 
 def application_for(request, organization_id, application_id):

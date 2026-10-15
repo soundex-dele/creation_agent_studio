@@ -11,44 +11,15 @@ const withEntry = (path: string, entry: EntryPoint, params?: URLSearchParams) =>
   return `${path}?${query.toString()}`;
 };
 
-/** Platform-owned renderer keys. Manifests select a key; they cannot inject JS. */
+/** Trusted package launchers plus the platform's shared chat/task renderers. */
 export const applicationRendererRegistry: Readonly<Record<string, RouteBuilder>> = {
   ...Object.fromEntries(applicationModules.map(module => [module.rendererKey, module.launch])),
-  'repo-explainer': (app, entry) => withEntry(`/applications/${app.applicationId}/repo-explainer`, entry),
-  'disk-cleaner': (app, entry) => withEntry(`/applications/${app.applicationId}/disk-cleaner`, entry),
-  'prompt-master': (app, entry) => withEntry(`/applications/${app.applicationId}/prompt-master`, entry),
-  'pocket-salvager': (app, entry) => withEntry(`/applications/${app.applicationId}/pocket-salvager`, entry),
-  sokoban: (app, entry) => withEntry(`/applications/${app.applicationId}/sokoban`, entry),
-  'research-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/research-assistant`, entry),
-  'meeting-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/meeting-assistant`, entry),
-  'ai-drawing': (app, entry) => withEntry(`/applications/${app.applicationId}/ai-drawing`, entry),
-  'animation-studio': (app, entry) => withEntry(`/applications/${app.applicationId}/animation-studio`, entry),
-  'brand-library': (app, entry) => withEntry(`/applications/${app.applicationId}/brand-library`, entry),
-  'my-drive': (app, entry) => withEntry(`/applications/${app.applicationId}/my-drive`, entry),
-  documents: (app, entry) => withEntry(`/applications/${app.applicationId}/documents`, entry),
-  'rental-growth-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/rental-growth-assistant`, entry),
-  'project-promotion': (app, entry) => withEntry(`/applications/${app.applicationId}/project-promotion`, entry),
-  'ideas-todos': (app, entry) => withEntry(`/applications/${app.applicationId}/ideas-todos`, entry),
-  'my-computer': (_app, entry) => withEntry('/apps/my-computer', entry),
-  cowork: (_app, entry) => withEntry('/chat', entry),
-  'case-library': (_app, entry) => withEntry('/apps/case-library', entry),
-  'study-with-method': (app, entry) => withEntry(
-    `/applications/${app.applicationId}/study-with-method`, entry,
-  ),
-  'creation-master': (app, entry) => withEntry(
-    `/applications/${app.applicationId}/creation-master`, entry,
-  ),
-  'wechat-assistant': (app, entry) => withEntry(`/applications/${app.applicationId}/wechat-assistant`, entry),
-  'creation-toolbox': (app, entry) => withEntry(
-    `/applications/${app.applicationId}/creation-toolbox`, entry,
-  ),
   chat: (app, entry) => withEntry(
     `/applications/${app.applicationId}/chat`,
     entry,
     new URLSearchParams({ slug: app.id }),
   ),
   'generic-task': (app, entry) => withEntry(`/applications/${app.applicationId}/run`, entry),
-  'html-to-png': (app, entry) => withEntry(`/applications/${app.applicationId}/run`, entry),
 };
 
 export function applicationPath(app: ApplicationLink, entry: EntryPoint = 'apps'): string {

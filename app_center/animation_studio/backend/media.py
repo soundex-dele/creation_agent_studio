@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import json
 import math
 import subprocess
@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 from rest_framework.exceptions import ValidationError
-from app_center.ai_drawing.backend.images import inspect_image
+from modules.platform_api.images import inspect_image
 
 
 @log_operation

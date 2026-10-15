@@ -6,10 +6,10 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 describe('Case integration CSS/scroll contract (static, not rendered verification)', () => {
   it('attaches bounded page scrolling only for embedded case views, including loading/error states', () => {
     for (const page of ['TemplatesPage', 'TemplateDetailPage']) {
-      const source = read(`../../pages/Templates/${page}.tsx`);
+      const source = read(`../../../../app_center/case_library/frontend/pages/${page}.tsx`);
       expect(source).toContain('app-scroll-page case-library-embedded');
       expect(source).toContain('embedded');
-      const css = read(`../../pages/Templates/${page}.css`);
+      const css = read(`../../../../app_center/case_library/frontend/pages/${page}.css`);
       expect(css).toContain('env(safe-area-inset-bottom)');
       postcss.parse(css).walkRules(rule => {
         if (rule.selectors.some(s => /\.(templates-page|template-detail-page|template-detail-state)(?:\.|$)/.test(s))) {
@@ -17,7 +17,7 @@ describe('Case integration CSS/scroll contract (static, not rendered verificatio
         }
       });
     }
-    expect(read('../../pages/Templates/TemplateDetailPage.tsx')).toContain('`${rootClass} template-detail-state`');
+    expect(read('../../../../app_center/case_library/frontend/pages/TemplateDetailPage.tsx')).toContain('`${rootClass} template-detail-state`');
     expect(read('../../../../app_center/douyin_benchmark/frontend/pages/DouyinBenchmarkPage.tsx')).toContain('douyin-host app-scroll-page');
   });
   it.each([320, 375, 390, 767, 768, 1280])('wraps actions and keeps touch targets usable at %spx', width => {

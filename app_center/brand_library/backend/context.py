@@ -1,13 +1,13 @@
 """Resolve private brand data only when a user explicitly requests a reference."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 from copy import deepcopy
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
-from apps.enterprise.permissions import resolve_organization
-from core.resource_access import accessible_resources
-from apps.applications.models import Application
-from modules.catalog.guided_prompts import compose_guided_prompt
+from modules.platform_api.identity import resolve_organization
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.identity import Application
+from modules.platform_api.catalog import compose_guided_prompt
 from .serializers import SECTION_FIELDS, MODULE_LABELS
 from .views import private_profiles
 

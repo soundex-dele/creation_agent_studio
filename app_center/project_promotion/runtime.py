@@ -1,10 +1,10 @@
 import json
 import time
 from django.db import transaction
-from core.llm.application import generate_json, GenerationError
+from modules.platform_api.models import generate_json, GenerationError
 from rest_framework.exceptions import ValidationError, Throttled
 import logging
-from modules.execution.models import Run
+from modules.platform_api.execution import Run
 from .backend.models import AITask
 from .backend.ai import validate_result
 from .backend.access import can_access_run

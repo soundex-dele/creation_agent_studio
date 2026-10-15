@@ -1,3 +1,4 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { expect, it } from 'vitest';
@@ -5,7 +6,7 @@ import { applicationPath } from '@/lib/applicationCatalog';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const css = postcss.parse(read('../../styles/global.css') + read('../../pages/Apps/DiskCleanerPage.css'));
+const css = postcss.parse(read('../../styles/global.css') + read('../../../../app_center/disk_cleaner/frontend/pages/DiskCleanerPage.css'));
 function styles(selectors: string[], width: number, height: number) {
   const result: Record<string, string> = {};
   function visit(container: Container) {
@@ -39,8 +40,8 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
 );
 
 it.each(['entry=home', 'entry=apps', 'standalone=1', 'embedded=1'])('attaches the full-bleed page for %s', query => {
-  expect(read('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<DiskCleanerPage />)}</ApplicationShell>');
-  const page = read('../../pages/Apps/DiskCleanerPage.tsx');
+  expect(applications.find(app => app.rendererKey === 'disk-cleaner')?.routes.some(route => route.fullBleed)).toBe(true);
+  const page = read('../../../../app_center/disk_cleaner/frontend/pages/DiskCleanerPage.tsx');
   expect(page).toContain('className="disk-cleaner-page app-scroll-page"');
   expect(page).toContain('resolveApplicationPresentation(params).showApplicationHeader');
   const presentation = resolveApplicationPresentation(new URLSearchParams(query));

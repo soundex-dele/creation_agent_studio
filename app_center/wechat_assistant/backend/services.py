@@ -1,6 +1,6 @@
 """Tenant-local persistence and dispatch. Network I/O belongs to the connector."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import hashlib
 import uuid
 from datetime import timedelta
@@ -13,11 +13,11 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, Throttled, ValidationError
 
-from apps.conversations.execution import ConversationRunActive, create_conversation_run, resolve_agent, ensure_supervisor_access
-from apps.conversations.models import Conversation
-from apps.enterprise.models import Membership
-from core.resource_access import can_access_resource
-from modules.execution.models import Run
+from modules.platform_api.conversation_execution import ConversationRunActive, create_conversation_run, resolve_agent, ensure_supervisor_access
+from modules.platform_api.conversations import Conversation
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import can_access_resource
+from modules.platform_api.execution import Run
 from .models import Binding, IncomingMessage, OutgoingMessage
 from .protocol import seal
 from .menu import clear_menu, dispatch_menu

@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import os
 import logging
 from pathlib import Path

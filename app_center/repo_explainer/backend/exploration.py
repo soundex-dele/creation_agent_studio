@@ -4,7 +4,7 @@ import re
 
 from .content import text, strings
 from .retrieval import chunks
-from .sources import limits
+from modules.platform_api.repository_sources import limits
 
 
 EXPLORATION_INSTRUCTION = '''你正在为仓库策划5个有源码依据的选题，自主决定探索路径与结束时机。

@@ -1,4 +1,4 @@
-import type { RepoDetail, RepoReport } from '@/services/repoExplainer';
+import type { RepoDetail, RepoReport } from '@applications/repo_explainer/frontend/services/repoExplainer';
 import type { RepoWorkflowSource } from '../../repoWorkflowSource';
 
 export const repoSource: RepoWorkflowSource = {

@@ -1,3 +1,4 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
@@ -37,7 +38,6 @@ describe('Creative knowledge scroll and responsive contract (static)', () => {
     expect(source).toContain('.douyin-knowledge-picker .ant-select-selection-overflow-item { max-width: 100%; }');
     expect(source).toContain('white-space: normal;');
     expect(integration).not.toMatch(/100d?vh|preventDefault|touch-action/);
-    const shell = read('../../router/index.tsx');
-    expect(shell).toContain('<ApplicationShell fullBleed>{page(<DouyinBenchmarkPage />)}</ApplicationShell>');
+    expect(applications.find(app => app.rendererKey === 'douyin-benchmark')?.routes.some(route => route.fullBleed)).toBe(true);
   });
 });

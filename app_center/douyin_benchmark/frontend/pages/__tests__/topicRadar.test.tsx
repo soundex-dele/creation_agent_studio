@@ -8,7 +8,7 @@ import type { ResearchTask, RadarSource } from '@applications/douyin_benchmark/f
 import { TopicRadar } from '../douyin/TopicRadar';
 import { DouyinHome } from '../DouyinBenchmarkPage';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const source: RadarSource = { id: 'hot:1', kind: 'hot', title: '科学问题', rank: 3, heat: 0, url: 'https://www.douyin.com/search/test', captured_at: '2026-10-10T00:00:00Z' };
 const hot: ResearchTask = { id: 'scan1', kind: 'radar_hotlist', status: 'succeeded', stage: 'completed', error: '', progress: {}, sources: [], output: { radar_items: [source], radar_request: { kind: 'radar_hotlist' } }, work_id: null, run_id: 'run1', created_at: source.captured_at };
 let container: HTMLDivElement; let root: Root;

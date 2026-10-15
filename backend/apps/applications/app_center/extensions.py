@@ -85,3 +85,33 @@ def dispatch_scheduled():
                 hook()
             except Exception:
                 logger.exception('Application scheduler pass failed')
+
+
+def check_conversation_access(conversation, user):
+    # Permission failures propagate; never continue with partially checked access.
+    for provider in contributions():
+        hook = provider.conversation_access
+        if hook:
+            hook(conversation, user)
+
+
+def conversation_queryset(queryset):
+    for provider in contributions():
+        if provider.conversation_queryset:
+            queryset = provider.conversation_queryset(queryset)
+    return queryset
+
+
+def prepare_conversation_message(conversation, user, message, context):
+    for provider in contributions():
+        if provider.prepare_conversation_message:
+            message = provider.prepare_conversation_message(conversation, user, message, context)
+    return message
+
+
+def call_unique_contribution(name, *args, **kwargs):
+    from rest_framework.exceptions import ValidationError
+    hooks = [getattr(provider, name) for provider in contributions() if getattr(provider, name)]
+    if len(hooks) != 1:
+        raise ValidationError({'non_field_errors': [f'Expected one provider for {name}; found {len(hooks)}.']})
+    return hooks[0](*args, **kwargs)

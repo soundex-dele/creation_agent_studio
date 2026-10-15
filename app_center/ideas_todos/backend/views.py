@@ -5,10 +5,10 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination
 
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import HasPathOrganizationRole
 
 from .serializers import IdeaSerializer, ListFilters, MemoListFilters, MemoSerializer, TodoSerializer
 

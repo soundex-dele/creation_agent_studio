@@ -110,7 +110,7 @@ class ApplicationViewSet(viewsets.ReadOnlyModelViewSet):
         if prompt is None:
             return Response({'detail': '引导问题不存在。'}, status=404)
         from .form_presets import compose_effective, resolve_preset
-        from app_center.brand_library.backend.context import resolve_brand_snapshot
+        from modules.platform_api.branding import resolve_brand_snapshot
         data = serializer.validated_data
         preset = brand = None
         if data.get('workflow_context'):

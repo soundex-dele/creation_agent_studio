@@ -1,10 +1,11 @@
+import applications from 'virtual:application-packages';
 import { readFileSync } from 'node:fs';
 import postcss, { type Container } from 'postcss';
 import { expect, it } from 'vitest';
 import { applicationPath } from '../../lib/applicationCatalog';
 import { resolveApplicationPresentation } from '../../lib/applicationPresentation';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const css = postcss.parse(read('../../styles/global.css') + read('../../pages/Apps/RentalGrowthPage.css'));
+const css = postcss.parse(read('../../styles/global.css') + read('../../../../app_center/rental_growth_assistant/frontend/pages/RentalGrowthPage.css'));
 function styles(selectors: string[], width: number, height: number) {
   const result: Record<string, string> = {};
   function visit(container: Container) {
@@ -38,8 +39,8 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   expect(messages['overflow-wrap']).toBe('anywhere');
 });
 it('attaches the scroll owner inside ApplicationShell for every entry presentation', () => {
-  expect(read('../../pages/Apps/RentalGrowthPage.tsx')).toContain('className="rental-page app-scroll-page"');
-  expect(read('../../router/index.tsx')).toContain('<ApplicationShell fullBleed>{page(<RentalGrowthPage />)}</ApplicationShell>');
+  expect(read('../../../../app_center/rental_growth_assistant/frontend/pages/RentalGrowthPage.tsx')).toContain('className="rental-page app-scroll-page"');
+  expect(applications.find(app => app.rendererKey === 'rental-growth-assistant')?.routes.some(route => route.fullBleed)).toBe(true);
   expect(resolveApplicationPresentation(new URLSearchParams('entry=home'))).toMatchObject({ showPlatformChrome: true, showApplicationHeader: false });
   expect(resolveApplicationPresentation(new URLSearchParams('entry=apps'))).toMatchObject({ showPlatformChrome: false, showApplicationHeader: true });
   for (const query of ['standalone=1', 'embedded=1']) expect(resolveApplicationPresentation(new URLSearchParams(query))).toMatchObject({ showPlatformChrome: false, showApplicationHeader: false });
@@ -48,7 +49,7 @@ it('attaches the scroll owner inside ApplicationShell for every entry presentati
   expect(applicationPath(app, 'apps')).toBe('/applications/88/rental-growth-assistant?entry=apps');
 });
 it('uses existing semantic text tokens for light and dark contrast', () => {
-  const source = read('../../pages/Apps/RentalGrowthPage.css');
+  const source = read('../../../../app_center/rental_growth_assistant/frontend/pages/RentalGrowthPage.css');
   expect(source).not.toContain('var(--color-text-secondary)');
   css.walkRules(rule => { if (rule.selectors.some(selector => /(?:page|modal|filters) label$/.test(selector))) expect(rule.nodes.some(node => node.type === 'decl' && node.prop === 'display' && node.value === 'grid')).toBe(false); });
   const contrast = (first: string, second: string) => {

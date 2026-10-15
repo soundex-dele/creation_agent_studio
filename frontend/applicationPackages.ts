@@ -49,5 +49,7 @@ export const applicationAliases = {
   '@platform': path.join(frontendRoot, 'src/platform'),
   '@applications': appRoot,
   'vitest': path.join(frontendRoot, 'node_modules/vitest'),
+  '@tiptap/core': path.join(frontendRoot, 'node_modules/@tiptap/core'),
+  'yaml': path.join(frontendRoot, 'node_modules/yaml'),
   'postcss': path.join(frontendRoot, 'node_modules/postcss'),
 };

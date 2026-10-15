@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 
 import uuid
 from datetime import timedelta
@@ -13,11 +13,11 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from apps.agents.models import Agent
-from apps.agents.high_school_tutors import TUTOR_DEFINITION_BY_SUBJECT
-from apps.conversations.models import Conversation, Message
-from apps.conversations.services import attach_existing_image
-from modules.execution.application.start_runs import start_agent_run
+from modules.platform_api.agents import Agent
+from modules.platform_api.agents import TUTOR_DEFINITION_BY_SUBJECT
+from modules.platform_api.conversations import Conversation, Message
+from modules.platform_api.conversations import attach_existing_image
+from modules.platform_api.execution import start_agent_run
 
 from .models import (
     AnswerCard,

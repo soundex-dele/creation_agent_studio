@@ -32,8 +32,16 @@ spec:
     default_config: {launch_mode: dedicated}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.repo_explainer.extensions.provider
     django_app: app_center.repo_explainer.backend.apps.RepoExplainerConfig
     urlconf: app_center.repo_explainer.backend.urls
     executor_entrypoint: app_center.repo_explainer.runtime.execute
   database: {mode: django-migrations, schema_version: 2, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: repo-explainer
+      platforms: [web]

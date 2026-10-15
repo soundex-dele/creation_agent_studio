@@ -3,7 +3,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from modules.tenancy.models import TenantOwnedQuerySet
+from modules.platform_api.tenancy import TenantOwnedQuerySet
 
 
 class Binding(models.Model):

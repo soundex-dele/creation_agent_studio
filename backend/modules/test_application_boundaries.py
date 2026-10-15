@@ -1,11 +1,12 @@
-"""Executable ownership rules for the first migrated application packages."""
+"""Executable ownership rules for the all bundled application packages."""
 import ast
 import json
 import re
+import yaml
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATED = ('kitchen_assistant', 'douyin_benchmark')
+MIGRATED = tuple(sorted(path.parent.name for path in (ROOT / 'app_center').glob('*/application.yaml')))
 
 
 def imports(path):
@@ -29,7 +30,7 @@ def test_migrated_backends_only_import_public_platform_capabilities():
             for module in imports(path):
                 if module.startswith(('core.', 'apps.', 'modules.')) and not module.startswith('modules.platform_api.'):
                     violations.append(f'{path.relative_to(ROOT)}: {module}')
-                if module.startswith('app_center.') and not module.startswith(f'app_center.{package}.') and module != 'app_center.brand_library.public':
+                if module.startswith('app_center.') and not module.startswith(f'app_center.{package}.') and not module.endswith('.public'):
                     violations.append(f'{path.relative_to(ROOT)}: {module}')
     assert not violations, '\n'.join(violations)
 
@@ -56,7 +57,7 @@ def test_migrated_frontends_cannot_reach_platform_or_other_app_internals():
             if path.suffix not in ('.ts', '.tsx') or '__tests__' in path.parts:
                 continue
             for module in re.findall(r'''(?:from\s+|import\s*\(\s*|import\s*)['"]([^'"]+)''', path.read_text(encoding='utf-8')):
-                if module.startswith('@/') or (module.startswith('@applications/') and not module.startswith(f'@applications/{package}/')):
+                if module.startswith('@/') or (module.startswith('@applications/') and not module.startswith(f'@applications/{package}/') and '/frontend/public/' not in module):
                     violations.append(f'{path.relative_to(ROOT)}: {module}')
                 if module.startswith('.') and not (path.parent / module).resolve().is_relative_to(directory.parent):
                     violations.append(f'{path.relative_to(ROOT)}: {module}')
@@ -68,3 +69,20 @@ def test_legacy_frontend_renderer_table_can_only_shrink():
     source = (ROOT / 'frontend/src/lib/applicationCatalog.ts').read_text(encoding='utf-8')
     keys = {quoted or bare for quoted, bare in re.findall(r"^  (?:'([^']+)'|(\w+)):", source, re.M)}
     assert keys <= set(baseline['frontend_legacy_renderers'])
+
+
+def test_every_dedicated_renderer_is_registered_by_its_own_manifest():
+    for manifest in (ROOT / 'app_center').glob('*/application.yaml'):
+        spec = yaml.safe_load(manifest.read_text(encoding='utf-8'))['spec']
+        renderer = spec['definition'].get('renderer_key')
+        if renderer in (None, 'chat', 'generic-task'):
+            continue
+        assert any(frontend.get('renderer_key') == renderer and frontend.get('entrypoint')
+                   for frontend in spec.get('frontends', [])), str(manifest)
+
+
+def test_application_frontends_use_the_shared_identifier_helpers():
+    for package in MIGRATED:
+        for path in (ROOT / 'app_center' / package / 'frontend').rglob('*'):
+            if path.suffix in ('.ts', '.tsx') and '__tests__' not in path.parts:
+                assert not re.search(r'crypto\??\.randomUUID\s*\(', path.read_text(encoding='utf-8')), str(path)

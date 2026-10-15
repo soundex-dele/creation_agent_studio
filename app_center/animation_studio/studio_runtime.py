@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import copy
 import json
 import math
@@ -10,10 +10,10 @@ from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from core.agent_engine.adapters.codex import CodexAdapter
-from core.transcription import transcribe_segments
-from modules.execution.infrastructure.artifacts import get_artifact_storage
+from modules.platform_api.governance import enforce_member_token_quota, record_usage
+from modules.platform_api.models import CodexAdapter
+from modules.platform_api.transcription import transcribe_segments
+from modules.platform_api.artifacts import get_artifact_storage
 from .backend.documents import validate_document, asset_ids, scene
 from .json_output import decode_json_object
 from .backend.projects import project_for, document_assets

@@ -47,8 +47,16 @@ spec:
     default_config: {launch_mode: dedicated, timeout_seconds: 1200}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.animation_studio.extensions.provider
     django_app: app_center.animation_studio.backend.apps.AnimationStudioConfig
     urlconf: app_center.animation_studio.backend.urls
     executor_entrypoint: app_center.animation_studio.runtime.execute
   database: {mode: django-migrations, schema_version: 2, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: animation-studio
+      platforms: [web]

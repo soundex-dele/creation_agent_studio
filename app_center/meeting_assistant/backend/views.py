@@ -9,13 +9,13 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from apps.enterprise.models import Membership
-from modules.tenancy.permissions import HasPathOrganizationRole
-from modules.execution.api.serializers import RunSerializer
-from modules.execution.application.errors import DeploymentUnavailable, InvalidExecutionDefinition, IdempotencyKeyReused
-from app_center.ideas_todos.backend.serializers import TodoSerializer
-from app_center.documents.backend.serializers import DocumentSerializer
-from app_center.documents.backend.content import plain_text
+from modules.platform_api.identity import Membership
+from modules.platform_api.tenancy import HasPathOrganizationRole
+from modules.platform_api.execution import RunSerializer
+from modules.platform_api.execution import DeploymentUnavailable, InvalidExecutionDefinition, IdempotencyKeyReused
+from app_center.ideas_todos.public import TodoSerializer
+from app_center.documents.public import DocumentSerializer
+from app_center.documents.public import plain_text
 from .access import application_for, recording_for
 from .models import Recording, DocumentExport
 from .serializers import UploadSerializer, RecordingSerializer, RecordingSummarySerializer, MetadataSerializer, TranscriptSerializer, ActionSerializer, action_revision

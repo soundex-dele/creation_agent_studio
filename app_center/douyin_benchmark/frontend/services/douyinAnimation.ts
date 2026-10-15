@@ -1,4 +1,4 @@
-import { newDocument, newScene, type StudioDocument } from '@platform/animationProjects';
+import { newDocument, newScene, type StudioDocument } from '@applications/animation_studio/frontend/public/services/animationProjects';
 import { productionFormats, type Script } from './douyinBenchmark';
 
 export interface AnimationDestination { id: number; name: string }

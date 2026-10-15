@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@platform/http';
 import { DouyinHome } from '../DouyinBenchmarkPage';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const accounts = ['a1', 'a2'].map((id, i) => ({ id, name: `账号${i + 1}`, is_owned: true, source_url: `https://www.douyin.com/user/${id}`, profile: {}, group: '', notes: '' }));
 const profiles = accounts.map((a, i) => ({ id: `p${i + 1}`, account: a.id, name: a.name, positioning: '生活科普', audience: '新手', conditions: '', active_version: `v${i + 1}`, active_version_number: i + 1 }));
 const idea = { id: 'i1', title: '为什么晚上更容易饿', notes: '解释作息与饮食', tags: [], status: 'create', revision: 1, source_task: null };

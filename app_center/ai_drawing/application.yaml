@@ -34,8 +34,16 @@ spec:
     default_config: {launch_mode: dedicated, timeout_seconds: 600}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.ai_drawing.extensions.provider
     django_app: app_center.ai_drawing.backend.apps.AIDrawingConfig
     urlconf: app_center.ai_drawing.backend.urls
     executor_entrypoint: app_center.ai_drawing.runtime.execute
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: ai-drawing
+      platforms: [web]

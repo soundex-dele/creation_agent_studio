@@ -1,12 +1,12 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import logging
 from django.db import transaction
 from rest_framework.exceptions import APIException, ValidationError
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.commands import submit_run_command
-from modules.execution.application.errors import CommandNotAllowed
-from modules.execution.models import IdempotencyRecord
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import submit_run_command
+from modules.platform_api.execution import CommandNotAllowed
+from modules.platform_api.execution import IdempotencyRecord
 from .storage import object_path
 
 ACTIVE = {"queued", "running", "waiting_input", "waiting_children", "cancelling"}

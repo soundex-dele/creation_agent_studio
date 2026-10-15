@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import hashlib
 import json
 from urllib.parse import urlsplit
@@ -12,14 +12,12 @@ from django.utils import timezone
 from django.http.request import validate_host
 from rest_framework.exceptions import ValidationError
 
-from apps.enterprise.models import QuotaPolicy
-from apps.knowledge.models import KnowledgeDocument
-from apps.knowledge.services import create_document
-from modules.execution.application.commands import submit_run_command
-from modules.execution.application.errors import CommandNotAllowed
-from modules.execution.models import Run, RunCommand
-from modules.execution.infrastructure.artifacts import delete_artifact_object
-from apps.knowledge.index_backend import delete_document_index
+from modules.platform_api.identity import QuotaPolicy
+from modules.platform_api.knowledge import KnowledgeDocument
+from modules.platform_api.knowledge import create_document
+from modules.platform_api.execution import Run
+from modules.platform_api.artifacts import delete_artifact_object
+from modules.platform_api.knowledge import delete_document_index
 from .content import editor_markdown, markdown, document_content
 from .models import ResearchSource, ResearchExport
 
@@ -77,14 +75,14 @@ def ingest(project, user, values):
             raise ValidationError("文章超过文本大小上限。")
         origin = {"type": "text"}
     elif values["origin_type"] == "document":
-        from app_center.documents.backend.access import document_for
+        from app_center.documents.public import document_for
         doc = document_for(user, project.organization_id, values["application_id"], values["origin_id"], lock=True)
         filename, content, mime = doc.title + ".md", editor_markdown(doc.content).encode(), "text/markdown"
         origin = {"type": "document", "id": str(doc.id), "application_id": doc.application_id, "version": doc.version}
     else:
-        from app_center.my_drive.backend.access import application_for, space_for
-        from app_center.my_drive.backend.services import entries
-        from app_center.my_drive.backend.storage import object_path
+        from app_center.my_drive.public import application_for, space_for
+        from app_center.my_drive.public import entries
+        from app_center.my_drive.public import object_path
         application = application_for(user, project.organization_id, values["application_id"])
         entry = get_object_or_404(entries(space_for(user, project.organization_id), application).select_for_update(),
                                  pk=values["origin_id"], kind="file", trash_batch=None, purge_pending=False)
@@ -126,14 +124,8 @@ def ingest(project, user, values):
 
 @log_operation
 def cancel(run, user, reason):
-    if run and run.status not in {"succeeded", "failed", "cancelled", "cancelling"}:
-        try:
-            submit_run_command(run_id=run.id, organization_id=run.organization_id, actor=user,
-                command_type=RunCommand.Type.CANCEL, idempotency_key=f"research-cancel:{run.id}", payload={"reason": reason})
-        except CommandNotAllowed:
-            run.refresh_from_db()
-            if run.status not in {"succeeded", "failed", "cancelled"}:
-                raise
+    from modules.platform_api.execution import cancel_run
+    cancel_run(run, user, reason, idempotency_key=f'research-cancel:{run.id}' if run else None)
 
 
 @log_operation
@@ -179,17 +171,17 @@ def export_result(result, user, values, key, origin):
     output = result.run.output_summary
     title = output["title"][:200]
     if values["target"] == "document":
-        from app_center.documents.backend.access import application_for
-        from app_center.documents.backend.content import validate_content, plain_text
-        from app_center.documents.backend.models import Document
+        from app_center.documents.public import application_for
+        from app_center.documents.public import validate_content, plain_text
+        from app_center.documents.public import Document
         application = application_for(user, result.project.organization_id, values["application_id"])
         content = validate_content(document_content(output, origin, result.project, result))
         doc = Document.objects.create(organization=result.project.organization, application=application,
                                      owner=user, title=title, content=content, plain_text=plain_text(content))
         response = {"id": str(doc.id), "application_id": application.id, "target": "document"}
     else:
-        from app_center.my_drive.backend.access import application_for, space_for
-        from app_center.my_drive.backend.services import create_upload, write_chunk, complete_upload
+        from app_center.my_drive.public import application_for, space_for
+        from app_center.my_drive.public import create_upload, write_chunk, complete_upload
         application = application_for(user, result.project.organization_id, values["application_id"])
         space = space_for(user, result.project.organization_id)
         raw = markdown(output, origin, result.project, result).encode()

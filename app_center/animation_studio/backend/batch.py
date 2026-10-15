@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import copy
 import csv
 import io
@@ -11,10 +11,10 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from modules.execution.models import Run
-from modules.execution.application.runs import create_run
-from modules.execution.application.commands import submit_run_command
-from modules.execution.infrastructure.artifacts import open_artifact
+from modules.platform_api.execution import Run
+from modules.platform_api.execution import create_run
+from modules.platform_api.execution import submit_run_command
+from modules.platform_api.artifacts import open_artifact
 from .views import BaseView
 from .models import AnimationBatch, AnimationPreset, AnimationProject, AnimationVersion
 from .documents import builtins, validate_document

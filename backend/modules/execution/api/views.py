@@ -609,8 +609,8 @@ class OrganizationRunArtifactAccessView(ProblemDetailsAPIView):
         ttl_seconds = int(getattr(settings, "ARTIFACT_ACCESS_TTL_SECONDS", 300))
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
         from .run_access import has_application_access_policy
-        private_research = has_application_access_policy(artifact.run) or artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")
-        access_url = None if private_research else external_artifact_access_url(
+        application_protected = has_application_access_policy(artifact.run)
+        access_url = None if application_protected else external_artifact_access_url(
             request=request,
             artifact=artifact,
             expires_at=expires_at,
@@ -673,7 +673,7 @@ class RunArtifactContentView(ProblemDetailsAPIView):
             content_hash=claims.get("content_hash"),
         ).first()
         from .run_access import has_application_access_policy
-        if artifact and (has_application_access_policy(artifact.run) or artifact.run.executor_key == "research-assistant" or (artifact.run.input or {}).get("research_project_id")):
+        if artifact and has_application_access_policy(artifact.run):
             if not _can_access_run(request, artifact.run):
                 artifact = None
         if artifact is None:

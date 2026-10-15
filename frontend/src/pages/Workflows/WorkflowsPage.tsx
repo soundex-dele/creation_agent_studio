@@ -10,7 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
 import WorkflowBrandPicker, { emptyWorkflowBrand, workflowBrandRequest, workflowNodeBrand } from '@/components/WorkflowBrandPicker';
-import { inheritedBrandFields, type BrandConfig } from '@/services/brandLibrary';
+import { inheritedBrandFields, type BrandConfig } from '@applications/brand_library/frontend/public/services/brandLibrary';
 import { formAnswers, formErrorMessage } from '@/lib/formPresets';
 import type { FormPresetSnapshot } from '@/types';
 import { api } from '@/services/api';

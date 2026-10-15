@@ -1,4 +1,4 @@
-import { repoApi, type RepoDetail, type RepoReport } from '@/services/repoExplainer';
+import { repoApi, type RepoDetail, type RepoReport } from '@applications/repo_explainer/frontend/public/services/repoExplainer';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { CONTENT_SUITE_PRESET } from './presets/contentSuite';
 

@@ -8,7 +8,7 @@ import { api } from '@platform/http';
 import { useOrganizationStore } from '@platform/organization';
 import { douyinApi, type Script } from '@applications/douyin_benchmark/frontend/services/douyinBenchmark';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 const script: Script = { title: '我的视频', cover: '封面短句', narration: '完整口播', checklist: ['准备道具'], scenes: [{ time: '0–10秒', visual: '书本翻页', spoken: '镜头口播' }] };
 const client = douyinApi('/organizations/org/applications/22/douyin-benchmark');
 let host: HTMLDivElement; let root: Root;

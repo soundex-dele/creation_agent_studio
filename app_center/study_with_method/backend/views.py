@@ -13,12 +13,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from modules.tenancy.permissions import HasPathOrganization
-from apps.agents.high_school_tutors import TUTOR_DEFINITION_BY_SUBJECT
-from apps.agents.models import Agent
-from apps.conversations.models import Conversation
-from apps.conversations.serializers import ConversationListSerializer
-from modules.catalog.models import AgentDeployment
+from modules.platform_api.tenancy import HasPathOrganization
+from modules.platform_api.agents import TUTOR_DEFINITION_BY_SUBJECT
+from modules.platform_api.agents import Agent
+from modules.platform_api.conversations import Conversation
+from modules.platform_api.conversations import ConversationListSerializer
+from modules.platform_api.catalog import AgentDeployment
 
 from .models import (
     DiagnosticAssessment,

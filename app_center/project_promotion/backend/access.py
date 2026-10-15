@@ -1,6 +1,6 @@
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
 from .models import AITask
 
 

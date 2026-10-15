@@ -7,9 +7,9 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.agents.models import Agent
-from apps.conversations.execution import ensure_supervisor_access
-from core.resource_access import accessible_resources
+from modules.platform_api.agents import Agent
+from modules.platform_api.conversation_execution import ensure_supervisor_access
+from modules.platform_api.identity import accessible_resources
 from .entry_commands import ENTRY_MENU, dispatch_entries
 
 PAGE_SIZE = 10

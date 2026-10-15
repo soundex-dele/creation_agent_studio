@@ -8,8 +8,8 @@ from apps.applications.form_presets import check_values, find_prompt, resolve_pr
 from apps.applications.models import Application
 from apps.applications.serializers import application_definition
 from apps.enterprise.permissions import resolve_organization
-from app_center.brand_library.backend.context import resolve_brand_snapshot
-from app_center.brand_library.backend.serializers import BrandReferenceSerializer
+from modules.platform_api.branding import resolve_brand_snapshot
+from modules.platform_api.branding import BrandReferenceSerializer
 from core.resource_access import can_access_resource
 from modules.execution.models import Run
 

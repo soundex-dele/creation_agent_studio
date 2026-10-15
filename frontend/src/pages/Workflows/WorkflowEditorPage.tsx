@@ -27,7 +27,7 @@ import { findWorkflowPreset } from './presets';
 import WorkflowFixedValueInput, { fixedWorkflowValue } from './WorkflowFixedValueInput';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { repoError } from '@/services/repoExplainer';
+import { repoError } from '@applications/repo_explainer/frontend/public/services/repoExplainer';
 import { loadRepoWorkflowMaterial, parseRepoWorkflowSource, repoWorkflowReturnPath } from './repoWorkflowSource';
 
 const WorkflowGraphEditor = lazy(() => import('./WorkflowGraphEditor'));

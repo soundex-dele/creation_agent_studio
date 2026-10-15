@@ -4,9 +4,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers as s
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from apps.applications.models import Application
-from apps.conversations.models import Conversation
-from core.resource_access import accessible_resources
+from modules.platform_api.identity import Application
+from modules.platform_api.conversations import Conversation
+from modules.platform_api.identity import accessible_resources
 from .models import Topic, Channel, Handoff, Version
 from .schemas import PLATFORMS, CopyBody, Strict, text, validated
 from .views import Access, Conflict, basic, version_data

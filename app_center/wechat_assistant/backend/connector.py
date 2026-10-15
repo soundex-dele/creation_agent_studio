@@ -1,6 +1,6 @@
 """Recoverable per-account connector; never hold a DB transaction during HTTP."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import logging
 
 import uuid
@@ -12,9 +12,9 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.enterprise.models import Organization
-from modules.execution.application.errors import DeploymentUnavailable, InvalidExecutionDefinition
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.identity import Organization
+from modules.platform_api.execution import DeploymentUnavailable, InvalidExecutionDefinition
+from modules.platform_api.tenancy import tenant_database_context
 from .models import Binding, IncomingMessage, OutgoingMessage
 from .protocol import BASE_URL, WechatClient, WechatError, seal, unseal, trusted_base
 from .menu import clear_menu

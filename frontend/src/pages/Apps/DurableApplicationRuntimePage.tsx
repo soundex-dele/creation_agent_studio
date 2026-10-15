@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -11,7 +11,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { Image, Layers } from 'lucide-react';
+import applicationModules from 'virtual:application-packages';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import {
@@ -27,7 +27,6 @@ import {
   type RunResource,
 } from '@/services/applicationRuntime';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
-import HtmlToPngInput from './HtmlToPngInput';
 import './DurableApplicationRuntimePage.css';
 import RunArtifacts from '@/components/Applications/RunArtifacts';
 
@@ -40,12 +39,13 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
   const [inputText, setInputText] = useState('{}');
   const [run, setRun] = useState<RunResource | null>(null);
   const [starting, setStarting] = useState(false);
+  const pendingRequest = useRef<{ fingerprint: string; key: string }>();
   const projection = useRunStream({
     organizationId: descriptor.organization_id,
     runId: run?.id ?? null,
   });
   const progress = projection.state.progress;
-  const isHtmlToPng = descriptor.definition.renderer_key === 'html-to-png';
+  const TaskView = applicationModules.find(module => module.rendererKey === descriptor.definition.renderer_key)?.taskView;
   const current = Number(progress?.current ?? 0);
   const total = Number(progress?.total ?? 0);
   const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
@@ -68,7 +68,12 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
     }
     setStarting(true);
     try {
-      setRun(await runtime.startRun(input, createIdempotencyKey('application')));
+      const fingerprint = JSON.stringify([descriptor.organization_id, descriptor.application_id, input]);
+      if (pendingRequest.current?.fingerprint !== fingerprint) {
+        pendingRequest.current = { fingerprint, key: createIdempotencyKey('application') };
+      }
+      setRun(await runtime.startRun(input, pendingRequest.current.key));
+      pendingRequest.current = undefined;
     } catch (error) {
       message.error(error instanceof Error ? error.message : '启动失败');
     } finally {
@@ -85,16 +90,18 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
     });
   };
 
+  if (TaskView) return <TaskView descriptor={descriptor} showApplicationHeader={showApplicationHeader}
+    run={run} starting={starting} projection={projection} total={total} percent={percent} start={start} cancel={cancel} />;
   return (
-    <div className={isHtmlToPng ? "conversion-page app-scroll-page" : "runtime-console"}>
-      {isHtmlToPng ? showApplicationHeader && <header className="conversion-header"><span className="conversion-app-icon"><Image size={28} aria-hidden="true" /></span><div><span className="conversion-eyebrow">让排版成为可分享的图片</span><h1>{descriptor.name}</h1><p>选择目录，设置画面，一次完成批量转换。</p></div><span className="conversion-format">HTML <span aria-hidden="true">→</span> PNG</span></header> : showApplicationHeader && (
+    <div className="runtime-console">
+      {showApplicationHeader && (
         <div>
           <Typography.Title level={2} style={{ margin: '12px 0 20px' }}>
             {descriptor.name}
           </Typography.Title>
         </div>
       )}
-      {isHtmlToPng ? <HtmlToPngInput loading={starting} onStart={start} /> : <Card>
+      <Card>
         <Typography.Paragraph type="secondary">
           Revision {descriptor.revision_no} ·{' '}
           {String(descriptor.definition.executor_key ?? '')}
@@ -113,16 +120,14 @@ function RuntimeConsole({ descriptor, showApplicationHeader }: {
             {projection.state.status ?? run.status}
           </Tag>}
         </Space>
-      </Card>}
+      </Card>
       {projection.error && <Alert type="warning" showIcon message="事件流正在重连"
         description={projection.error.message} />}
-      {isHtmlToPng && !run && <section className="conversion-result-empty"><Layers size={26} aria-hidden="true" /><div><h2>转换结果</h2><p>开始转换后，在这里查看进度、预览图片并下载文件。</p></div></section>}
-      {run && <Card className={isHtmlToPng ? "conversion-result" : undefined} title={isHtmlToPng ? "转换进度" : `Run ${run.id}`} extra={isHtmlToPng && <Tag>{({ queued: "等待转换", running: "正在转换", cancelling: "正在取消", cancelled: "已取消", failed: "转换失败", succeeded: "转换完成" } as Record<string, string>)[projection.state.status ?? run.status] || "处理中"}</Tag>}>
+      {run && <Card title={`Run ${run.id}`}>
         {total > 0 && <Progress percent={percent} status={(projection.state.status ?? run?.status) === 'failed' ? 'exception' : undefined} />}
         <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
-          {projection.state.output || (isHtmlToPng ? '转换消息将在这里显示。' : '等待输出…')}
+          {projection.state.output || '等待输出…'}
         </Typography.Paragraph>
-        {isHtmlToPng && <Button danger disabled={['succeeded', 'failed', 'cancelled', 'cancelling'].includes(projection.state.status ?? run.status)} onClick={cancel}>取消当前转换</Button>}
       </Card>}
       {run && <RunArtifacts key={`${descriptor.organization_id}:${run.id}`}
         organizationId={descriptor.organization_id} runId={run.id}

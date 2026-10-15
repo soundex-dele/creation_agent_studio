@@ -51,6 +51,12 @@ spec:
     scope: per-organization
     activate: true
   frontends:
+    - id: platform-web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: creation-toolbox
+      platforms: [web]
     - id: web
       type: react
       renderer_key: creation-toolbox

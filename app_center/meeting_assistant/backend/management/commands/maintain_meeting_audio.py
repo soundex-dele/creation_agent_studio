@@ -1,8 +1,8 @@
 """Reclaim orphaned private audio after uploads/deletions interrupted by a crash."""
 import time
 from django.core.management.base import BaseCommand
-from apps.enterprise.models import Organization
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.identity import Organization
+from modules.platform_api.tenancy import tenant_database_context
 from ...models import Recording
 from ...storage import object_path
 

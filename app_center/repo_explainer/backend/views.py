@@ -8,17 +8,17 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import HasPathOrganizationRole
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
-from modules.execution.infrastructure.artifacts import get_artifact_storage
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import HasPathOrganizationRole
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
+from modules.platform_api.artifacts import get_artifact_storage
 from .access import application_for, project_for
 from .models import Project, Snapshot, Task, Content, Version, Handoff
 from .topics import topic_material, validate_topic_document
-from .sources import fingerprint, limits
+from modules.platform_api.repository_sources import fingerprint, limits
 from .content import validate_document, markdown, animation, jianying
 from .serializers import ProjectInput, ImportInput, TaskInput, SaveInput, HandoffInput, HandoffSaveInput
 
@@ -170,7 +170,7 @@ class ImportView(BaseView):
             import hashlib
             origin.update(filename=upload.name, sha256=hashlib.sha256(raw).hexdigest())
         if values['kind'] == 'local':
-            from apps.applications.runtime_paths import resolve_runtime_path
+            from modules.platform_api.runtime_paths import resolve_runtime_path
             origin['path'] = str(resolve_runtime_path(values['path'], request.user))
         key, digest = key_for(request), fingerprint(origin)
         existing = previous(p, key, digest)
@@ -220,9 +220,10 @@ class TaskView(BaseView):
         return Response(task_data(get_object_or_404(self.project().tasks, pk=task_id)))
 
     def post(self, request, task_id, **kwargs):
-        from app_center.research_assistant.backend.services import cancel
+        from modules.platform_api.execution import cancel_run
         task = get_object_or_404(self.project().tasks, pk=task_id)
-        cancel(task.run, request.user, 'user_cancelled')
+        cancel_run(task.run, request.user, 'user_cancelled',
+                   idempotency_key=f'research-cancel:{task.run_id}')
         task.refresh_from_db()
         if task.kind == 'import' and task.run and task.run.status == 'cancelled' and task.options.get('upload_key'):
             get_artifact_storage().delete(task.options['upload_key'])
@@ -305,8 +306,8 @@ class HandoffsView(BaseView):
         h = Handoff.objects.create(project=p, version=version, target_application=target, kind=kind, draft=draft,
                                    request_key=key, request_hash=digest)
         if kind == 'animation':
-            from app_center.animation_studio.backend.models import AnimationProject
-            from app_center.animation_studio.backend.projects import document_assets
+            from app_center.animation_studio.public import AnimationProject
+            from app_center.animation_studio.public import document_assets
             document_assets(request.user, target, draft)
             work = AnimationProject.objects.create(organization=p.organization, application=target,
                 owner=request.user, title=version.document['title'], draft=draft)
@@ -343,7 +344,7 @@ class HandoffView(BaseView):
                 raise ValidationError('剪映表单字段格式无效。')
             h.draft = {**h.draft, **data['draft']}
         if data.get('conversation_id'):
-            from apps.conversations.models import Conversation
+            from modules.platform_api.conversations import Conversation
             conversation = get_object_or_404(Conversation, pk=data['conversation_id'], user=request.user, chat_application__application_id=h.target_application_id, organization=h.project.organization)
             h.target_id = str(conversation.pk)
         h.revision += 1

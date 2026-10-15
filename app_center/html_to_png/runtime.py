@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 
 import json
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from decouple import config as environment_config
 
-from apps.workflows.artifacts import workspace_file
+from modules.platform_api.artifacts import workspace_file
 from .workflow_files import insert_illustrations, load_manifest
 
 

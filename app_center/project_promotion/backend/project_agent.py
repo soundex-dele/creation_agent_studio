@@ -2,9 +2,9 @@
 import json
 
 from django.conf import settings
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from core.llm.application import GenerationError, engine_failure
-from core.llm.factory import build_agent_engine
+from modules.platform_api.governance import enforce_member_token_quota, record_usage
+from modules.platform_api.models import GenerationError, engine_failure
+from modules.platform_api.models import build_agent_engine
 
 
 def run_project_agent(task, *, working_directory, instruction, content, tools, handlers, progress, check, on_activity=None):

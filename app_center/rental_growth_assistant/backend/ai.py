@@ -7,9 +7,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers as s
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.commands import submit_run_command
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition, CommandNotAllowed
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import submit_run_command
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition, CommandNotAllowed
 from .views import Access, Conflict
 from .models import AITask, Content, ContentVersion, Lead, Property, Persona
 from .schemas import StrictSerializer, ContentData, Requirements, CopyBody, PLATFORMS, TYPES, ids, text, validated

@@ -9,9 +9,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import yaml
-from core.llm.factory import build_agent_engine
-from core.llm.application import engine_failure
-from modules.catalog.guided_prompts import compose_guided_prompt
+from modules.platform_api.models import build_agent_engine
+from modules.platform_api.models import engine_failure
+from modules.platform_api.catalog import compose_guided_prompt
 from .provision import SYSTEM_PROMPT
 
 

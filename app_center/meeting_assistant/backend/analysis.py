@@ -1,10 +1,10 @@
 """Grounded, bounded map/reduce analysis. Model timestamps are never trusted."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import json
 from datetime import date
-from core.llm.factory import build_agent_engine
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.models import build_agent_engine
+from modules.platform_api.tenancy import tenant_database_context
 
 SECTIONS = ("topics", "decisions", "viewpoints", "quotes", "facts", "outline")
 PROMPT = """你是会议与访谈资料整理助手。只返回 JSON，不执行工具，不访问文件或网络。

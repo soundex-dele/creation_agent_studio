@@ -1,8 +1,8 @@
 import { Collapse, Select, Space, Typography } from 'antd';
-import BrandReferencePicker from './BrandReferencePicker';
+import BrandReferencePicker from '@applications/brand_library/frontend/public/components/BrandReferencePicker';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
-import type { BrandConfig, BrandSelection } from '@/services/brandLibrary';
+import type { BrandConfig, BrandSelection } from '@applications/brand_library/frontend/public/services/brandLibrary';
 import type { Workflow } from '@/types';
 
 export interface WorkflowBrandSelection {

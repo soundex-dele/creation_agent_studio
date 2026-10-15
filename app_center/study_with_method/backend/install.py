@@ -1,9 +1,9 @@
 """Idempotent application installation and high-school math seed data."""
 
-from apps.agents.models import Agent, AgentCategory
-from apps.agents.high_school_tutors import TUTOR_DEFINITIONS
-from modules.catalog.models import AgentDraft, AgentDeployment
-from modules.catalog.services import publish_agent, switch_agent_deployment
+from modules.platform_api.agents import Agent, AgentCategory
+from modules.platform_api.agents import TUTOR_DEFINITIONS
+from modules.platform_api.catalog import AgentDraft, AgentDeployment
+from modules.platform_api.catalog import publish_agent, switch_agent_deployment
 
 from .models import CurriculumNode, GradeStage, StudyWorkspace, Subject
 from .catalog import SUBJECT_CATALOG

@@ -26,6 +26,62 @@ def test_knowledge_context_never_silently_overwrites_another_application(monkeyp
         extensions.knowledge_context(object())
 
 
+def test_conversation_access_failures_do_not_fall_through(monkeypatch):
+    from modules.platform_api.extensions import ApplicationContributions
+    from rest_framework.exceptions import PermissionDenied
+    denied = Mock(side_effect=PermissionDenied('revoked document sharing'))
+    monkeypatch.setattr(extensions, 'contributions', lambda: [ApplicationContributions(conversation_access=denied)])
+    with pytest.raises(PermissionDenied):
+        extensions.check_conversation_access(object(), object())
+    monkeypatch.setattr(extensions, 'contributions', Mock(side_effect=ImportError('provider unavailable')))
+    with pytest.raises(ImportError):
+        extensions.check_conversation_access(object(), object())
+
+
+def test_brand_reference_requires_exactly_one_provider(monkeypatch):
+    from modules.platform_api.extensions import ApplicationContributions
+    from modules.platform_api.branding import BrandReferenceSerializer
+    from rest_framework.exceptions import ValidationError
+    provider = ApplicationContributions(validate_brand_reference=lambda data: {'validated': data},
+                                        brand_reference_fields=lambda: {})
+    for providers in ([], [provider, provider]):
+        monkeypatch.setattr(extensions, 'contributions', lambda: providers)
+        with pytest.raises(ValidationError):
+            BrandReferenceSerializer(data={'profile_id': 'bad'}).is_valid(raise_exception=True)
+    monkeypatch.setattr(extensions, 'contributions', lambda: [provider])
+    serializer = BrandReferenceSerializer(data={'profile_id': 'example'})
+    assert serializer.is_valid()
+    assert serializer.validated_data == {'validated': {'profile_id': 'example'}}
+
+
+def test_every_private_application_registers_its_own_access_policy():
+    from importlib import import_module
+    from django.conf import settings
+    from apps.applications.app_center.discovery import discover_packages
+    expected = {'ai-drawing', 'animation-studio', 'documents', 'douyin-benchmark',
+                'meeting-assistant', 'project-promotion', 'prompt-master',
+                'rental-growth-assistant', 'repo-explainer', 'research-assistant'}
+    packages, _ = discover_packages(settings.APP_CENTER_ROOT)
+    found = set()
+    for package in packages:
+        if package.manifest.metadata.id not in expected:
+            continue
+        module, attr = package.manifest.spec.backend.extensions.rsplit('.', 1)
+        assert callable(getattr(import_module(module), attr).run_access)
+        found.add(package.manifest.metadata.id)
+    assert found == expected
+
+
+def test_brand_reference_preserves_its_public_field_schema():
+    from modules.platform_api.branding import BrandReferenceSerializer
+    from rest_framework import serializers
+    fields = BrandReferenceSerializer().fields
+    assert set(fields) == {'profile_id', 'modules', 'product_ids', 'example_ids'}
+    assert isinstance(fields['profile_id'], serializers.UUIDField)
+    assert fields['modules'].max_length == 5
+    assert fields['product_ids'].max_length == 100
+
+
 def test_scheduler_failure_does_not_skip_other_applications(monkeypatch):
     succeeding = Mock()
     monkeypatch.setattr(extensions, 'contributions', lambda: [

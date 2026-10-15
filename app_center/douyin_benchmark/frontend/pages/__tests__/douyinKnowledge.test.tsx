@@ -9,7 +9,7 @@ import type { KnowledgeCard, KnowledgeSnapshot } from '@applications/douyin_benc
 import { ExtractKnowledge, KnowledgeCandidates, KnowledgeLibrary, KnowledgePicker, KnowledgeReferences } from '../douyin/CreationKnowledge';
 import { CreationCenter } from '../douyin/CreationCenter';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const card: KnowledgeCard = {
   id: 'card1', revision: 1, title: '明确受众', text: '围绕真实问题组织内容', application_notes: '口播选题', tags: ['口播'], category: 'content', basis: 'author_view',
   evidence: [{ ref: 'source:s1', task_id: 'source', work_id: 'w1', account_id: 'a1', account_name: '对标账号', title: '原作品', url: 'https://www.douyin.com/video/123', kind: 'segment', text: '先明确受众的问题', start: 0, end: 4 }],

@@ -2,10 +2,10 @@
 import json
 
 from django.db import transaction
-from apps.applications.models import Application
-from core.llm.application import generate_json
-from core.resource_access import accessible_resources
-from modules.execution.models import Run
+from modules.platform_api.identity import Application
+from modules.platform_api.models import generate_json
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.execution import Run
 from .backend.models import PromptSession, PromptTask, PromptVersion
 from .backend.serializers import validate_output
 

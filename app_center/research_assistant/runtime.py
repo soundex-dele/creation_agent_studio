@@ -1,14 +1,14 @@
 """Read every selected chunk, then synthesize a strictly cited, structured result."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import json
 
-from apps.enterprise.services import enforce_member_token_quota, record_usage
-from apps.knowledge.models import KnowledgeChunk
-from apps.knowledge.providers import embed_texts
-from core.llm.application import generate_json
-from apps.knowledge.retrieval import search
-from modules.execution.models import Run
+from modules.platform_api.governance import enforce_member_token_quota, record_usage
+from modules.platform_api.knowledge import KnowledgeChunk
+from modules.platform_api.knowledge import embed_texts
+from modules.platform_api.models import generate_json
+from modules.platform_api.knowledge import search
+from modules.platform_api.execution import Run
 from .backend.access import project_for
 from .backend.content import KINDS, SECTIONS, validate_output
 from .backend.models import ResearchResult, ResearchSource

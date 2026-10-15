@@ -5,8 +5,8 @@ from django.utils import timezone
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import ValidationError
-from apps.enterprise.models import Membership
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Membership
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .models import BrandProfile
 from .serializers import ProfileSerializer, ProductSerializer, ExampleSerializer
 

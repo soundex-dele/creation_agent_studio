@@ -140,7 +140,7 @@ def video_copy(doc):
 
 
 def animation(doc):
-    from app_center.animation_studio.backend.documents import empty_document, validate_document as validate_animation
+    from app_center.animation_studio.public import empty_document, validate_document as validate_animation
     source, duration = video_copy(doc)
     if duration > 120:
         raise ValueError('动画超过 120 秒，请另存精简稿后导入。')

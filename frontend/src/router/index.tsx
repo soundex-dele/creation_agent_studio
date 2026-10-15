@@ -1,6 +1,6 @@
 import applicationModules from 'virtual:application-packages';
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
 import { resolveApplicationPresentation } from '@/lib/applicationPresentation';
 import { ProtectedRoute, PublicRoute } from './guards';
@@ -10,19 +10,13 @@ const TaskCenterPage = lazy(() => import('@/pages/Tasks/TaskCenterPage'));
 const BuildPage = lazy(() => import('@/pages/Hubs/BuildPage'));
 const ResourceLibraryPage = lazy(() => import('@/pages/Hubs/ResourceLibraryPage'));
 const ChatPage = lazy(() => import('@/pages/Chat/ChatPage'));
-const CoWorkPage = lazy(() => import('@/pages/Apps/CoWorkPage'));
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage'));
 const SsoCallbackPage = lazy(() => import('@/pages/Auth/SsoCallbackPage'));
 const AgentsPage = lazy(() => import('@/pages/Agents/AgentsPage'));
 const AgentDetailPage = lazy(() => import('@/pages/Agents/AgentDetailPage'));
-const TemplatesPage = lazy(() => import('@/pages/Templates/TemplatesPage'));
-const TemplateDetailPage = lazy(() => import('@/pages/Templates/TemplateDetailPage'));
 const AppsPage = lazy(() => import('@/pages/Apps/AppsPage'));
-const SokobanPage = lazy(() => import('@/pages/Apps/SokobanPage'));
-const PocketSalvagerPage = lazy(() => import('@/pages/Apps/PocketSalvagerPage'));
 const AppDetailPage = lazy(() => import('@/pages/Apps/AppDetailPage'));
-const MyComputerPage = lazy(() => import('@/pages/Apps/MyComputerPage'));
 const DurableApplicationRuntimePage = lazy(() => import('@/pages/Apps/DurableApplicationRuntimePage'));
 const ChatApplicationRuntimePage = lazy(() => import('@/pages/Apps/ChatApplicationRuntimePage'));
 const WorkspacePage = lazy(() => import('@/pages/Workspace/WorkspacePage'));
@@ -32,23 +26,6 @@ const WorkflowRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowRunnerPa
 const WorkflowManualRunnerPage = lazy(() => import('@/pages/Workflows/WorkflowManualRunnerPage'));
 const SkillsPage = lazy(() => import('@/pages/Skills/SkillsPage'));
 const EnterprisePage = lazy(() => import('@/pages/Enterprise/EnterprisePage'));
-const StudyWithMethodPage = lazy(() => import('@/pages/StudyWithMethod/StudyWithMethodPage'));
-const CreationMasterPage = lazy(() => import('@/pages/Apps/CreationMasterPage'));
-const WechatAssistantPage = lazy(() => import('@/pages/Apps/WechatAssistantPage'));
-const CreationToolboxPage = lazy(() => import('@/pages/Apps/CreationToolboxPage'));
-const PromptMasterPage = lazy(() => import('@/pages/Apps/PromptMasterPage'));
-const RentalGrowthPage = lazy(() => import('@/pages/Apps/RentalGrowthPage'));
-const ProjectPromotionPage = lazy(() => import('@/pages/Apps/ProjectPromotionPage'));
-const IdeasTodosPage = lazy(() => import('@/pages/Apps/IdeasTodosPage'));
-const BrandLibraryPage = lazy(() => import('@/pages/Apps/BrandLibraryPage'));
-const DocumentsPage = lazy(() => import('@/pages/Apps/DocumentsPage'));
-const ResearchAssistantPage = lazy(() => import('@/pages/Apps/ResearchAssistantPage'));
-const RepoExplainerPage = lazy(() => import('@/pages/Apps/RepoExplainerPage'));
-const MeetingAssistantPage = lazy(() => import('@/pages/Apps/MeetingAssistantPage'));
-const AIDrawingPage = lazy(() => import('@/pages/Apps/AIDrawingPage'));
-const AnimationStudioPage = lazy(() => import('@/pages/Apps/AnimationStudioPage'));
-const MyDrivePage = lazy(() => import('@/pages/Apps/MyDrivePage'));
-const DiskCleanerPage = lazy(() => import('@/pages/Apps/DiskCleanerPage'));
 const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/pages/Settings/SettingsPage'));
 const AccountManagementPage = lazy(() => import('@/pages/Settings/AccountManagementPage'));
@@ -63,11 +40,6 @@ const AutomationDetailPage = lazy(() => import('@/pages/Automations/AutomationDe
 const page = (element: ReactNode) => (
   <Suspense fallback={<div style={{ padding: 32 }}>正在加载…</div>}>{element}</Suspense>
 );
-
-const LegacyTemplateRedirect = () => {
-  const { id } = useParams<{ id: string }>();
-  return <Navigate to={id ? `/apps/case-library/${id}` : '/apps/case-library'} replace />;
-};
 
 const ApplicationShell = ({ children, fullBleed = false }: {
   children: ReactNode;
@@ -89,30 +61,11 @@ const ApplicationShell = ({ children, fullBleed = false }: {
 };
 
 const router = createBrowserRouter([
-  ...applicationModules.flatMap(application => application.routes.map(({ path, component: Component, fullBleed }) => ({
-    path, element: <ProtectedRoute><ApplicationShell fullBleed={fullBleed}>{page(<Component />)}</ApplicationShell></ProtectedRoute>,
+  ...applicationModules.flatMap(application => application.routes.map(({ path, component: Component, fullBleed, shell, hideSidebar }) => ({
+    path, element: <ProtectedRoute>{shell === 'none' ? page(<Component />)
+      : shell === 'main' ? <MainLayout fullBleed={fullBleed} hideSidebar={hideSidebar}>{page(<Component />)}</MainLayout>
+        : <ApplicationShell fullBleed={fullBleed}>{page(<Component />)}</ApplicationShell>}</ProtectedRoute>,
   }))),
-  {
-    path: '/applications/:applicationId/repo-explainer',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<RepoExplainerPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/disk-cleaner',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<DiskCleanerPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/prompt-master',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<PromptMasterPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/apps/cowork',
-    element: <ProtectedRoute>{page(<CoWorkPage />)}</ProtectedRoute>,
-  },
-  ...['/apps/my-computer', '/apps/my-computer/:deviceId', '/apps/my-computer/:deviceId/conversations/:conversationId',
-    '/apps/my-computer/:deviceId/terminals', '/apps/my-computer/:deviceId/terminals/:sessionId', '/apps/my-computer/:deviceId/files'].map(path => ({
-    path,
-    element: <ProtectedRoute><MainLayout hideSidebar fullBleed>{page(<MyComputerPage />)}</MainLayout></ProtectedRoute>,
-  })),
   {
     path: '/',
     element: (
@@ -183,48 +136,12 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: '/templates',
-    element: (
-      <ProtectedRoute>
-        <LegacyTemplateRedirect />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/templates/:id',
-    element: (
-      <ProtectedRoute>
-        <LegacyTemplateRedirect />
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: '/apps',
     element: (
       <ProtectedRoute>
         <MainLayout hideSidebar>
           {page(<AppsPage />)}
         </MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/apps/case-library',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell>
-          {page(<TemplatesPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/apps/case-library/:id',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell>
-          {page(<TemplateDetailPage />)}
-        </ApplicationShell>
       </ProtectedRoute>
     ),
   },
@@ -249,115 +166,11 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: '/applications/:applicationId/sokoban',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<SokobanPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  ...['/apps/pocket-salvager', '/applications/:applicationId/pocket-salvager'].map(path => ({
-    path,
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<PocketSalvagerPage />)}</ApplicationShell></ProtectedRoute>,
-  })),
-  {
     path: '/applications/:applicationId/run',
     element: (
       <ProtectedRoute>
         <ApplicationShell>
           {page(<DurableApplicationRuntimePage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/study-with-method',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<StudyWithMethodPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/creation-master',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<CreationMasterPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/wechat-assistant',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<WechatAssistantPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/creation-toolbox',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<CreationToolboxPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/meeting-assistant',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<MeetingAssistantPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/research-assistant',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<ResearchAssistantPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/documents',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<DocumentsPage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/animation-studio',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<AnimationStudioPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/ai-drawing',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<AIDrawingPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/my-drive',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<MyDrivePage />)}
-        </ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/brand-library',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>{page(<BrandLibraryPage />)}</ApplicationShell>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/applications/:applicationId/project-promotion',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<ProjectPromotionPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/rental-growth-assistant',
-    element: <ProtectedRoute><ApplicationShell fullBleed>{page(<RentalGrowthPage />)}</ApplicationShell></ProtectedRoute>,
-  },
-  {
-    path: '/applications/:applicationId/ideas-todos',
-    element: (
-      <ProtectedRoute>
-        <ApplicationShell fullBleed>
-          {page(<IdeasTodosPage />)}
         </ApplicationShell>
       </ProtectedRoute>
     ),

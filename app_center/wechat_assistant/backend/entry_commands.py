@@ -1,14 +1,14 @@
 """WeChat commands backed by the existing private ideas/todos application."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import re
 from datetime import timedelta
 
 from django.db.models import F
 from django.utils import timezone
 
-from apps.applications.models import Application
-from core.resource_access import accessible_resources
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import accessible_resources
 
 ENTRY_MENU = {"6": "添加想法", "7": "添加待办", "8": "查询想法", "9": "查询待办"}
 INPUT_STATES = {"add_idea": "添加想法", "add_todo": "添加待办"}
@@ -50,7 +50,7 @@ def dispatch_entries(binding, incoming, text=None):
     if application is None:
         return reply("“随手记”应用尚未启用或你没有使用权限，请在应用中心检查。")
 
-    from app_center.ideas_todos.backend.serializers import IdeaSerializer, TodoSerializer
+    from app_center.ideas_todos.public import IdeaSerializer, TodoSerializer
 
     is_idea = command.endswith("想法")
     label = "想法" if is_idea else "待办"

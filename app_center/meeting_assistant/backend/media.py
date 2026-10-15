@@ -8,7 +8,7 @@ from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from app_center.my_drive.backend.media import byte_range, stream_file, stream_file_async
+from modules.platform_api.media import byte_range, stream_file, stream_file_async
 from .views import BaseView
 from .access import recording_for
 from .storage import object_path

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 
 from core.agent_engine.models import LLMResponse, TokenUsage
 from modules.execution.runtime import builtin
-from app_center.batch_transcribe import runtime as batch_transcribe
+from app_center.creation_master.backend import transcription as batch_transcribe
 from app_center.creation_master.backend import runtime as creation_master
 from apps.agents.execution import execute_agent_completion
 from apps.conversations.models import Conversation, Message

@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import UserRateThrottle
 
-from apps.enterprise.models import Membership
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Membership
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .access import application_for, space_for
 from .models import DriveUpload
 from .serializers import ActionInput, EntrySerializer, FolderInput, UploadInput, UploadSerializer

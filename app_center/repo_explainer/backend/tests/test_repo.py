@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 from apps.applications.models import Application
 from apps.enterprise.models import Membership
 from ..models import Project, Task, Snapshot, Content, Handoff
-from ..sources import from_zip, from_local, github_source
+from modules.platform_api.repository_sources import from_zip, from_local, github_source
 from ..content import animation, validate_document
 from ... import runtime
 
@@ -376,7 +376,7 @@ def test_cross_organization_target_rejected(ctx, monkeypatch):
 
 def test_local_detects_mid_copy_change(ctx, monkeypatch):
     from core.user_directories import user_directory
-    from .. import sources
+    from modules.platform_api import repository_sources as sources
     root = user_directory(ctx.owner) / 'changing'; root.mkdir()
     for args in [('init',), ('config', 'user.name', 'Test'), ('config', 'user.email', 'test@example.com')]:
         subprocess.run(['git', '-C', str(root), *args], check=True, capture_output=True)
@@ -481,7 +481,7 @@ def test_github_fixed_sha_and_no_redirects(monkeypatch):
             if 'codeload' in url: return Response(archive({'root/README.md': 'tool'}))
             return Response(json.dumps({'sha': sha} if '/commits/' in url else {'default_branch': 'main'}).encode())
         def close(self): pass
-    monkeypatch.setattr('app_center.repo_explainer.backend.sources.requests.Session', Session)
+    monkeypatch.setattr('modules.platform_api.repository_sources.requests.Session', Session)
     files, _, origin = github_source('https://github.com/example/tool', '', lambda: None)
     assert origin['commit'] == sha
     assert urls[-1].endswith('/zip/' + sha)

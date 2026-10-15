@@ -15,8 +15,8 @@ import ChatContainer from '@/components/Chat/ChatContainer';
 import FormPresetPicker from '@/components/FormPresetPicker';
 import { formAnswers, formErrorMessage, presetReference } from '@/lib/formPresets';
 import type { FormPresetSnapshot } from '@/types';
-import BrandReferencePicker from '@/components/BrandReferencePicker';
-import { inheritedBrandFields, type BrandConfig, type BrandSelection } from '@/services/brandLibrary';
+import BrandReferencePicker from '@applications/brand_library/frontend/public/components/BrandReferencePicker';
+import { inheritedBrandFields, type BrandConfig, type BrandSelection } from '@applications/brand_library/frontend/public/services/brandLibrary';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -31,7 +31,7 @@ import type {
   GuidedQuestion,
 } from '@/types';
 import './ChatApplicationRuntimePage.css';
-import { useRepoHandoff } from './repo/useRepoHandoff';
+import { useRepoHandoff } from '@applications/repo_explainer/frontend/public/pages/repo/useRepoHandoff';
 
 type AnswerValue = string | string[] | number;
 

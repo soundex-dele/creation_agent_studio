@@ -32,8 +32,16 @@ spec:
       brand_reference: {enabled: true, default_modules: [positioning, voice], fields: {}}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.project_promotion.extensions.provider
     django_app: app_center.project_promotion.backend.apps.ProjectPromotionConfig
     urlconf: app_center.project_promotion.backend.urls
     executor_entrypoint: app_center.project_promotion.runtime.execute
   database: {mode: django-migrations, schema_version: 5, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: project-promotion
+      platforms: [web]

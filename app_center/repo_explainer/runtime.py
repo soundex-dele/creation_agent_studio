@@ -2,12 +2,12 @@
 import json
 import time
 from django.db import transaction
-from core.llm.application import generate_json
-from modules.execution.models import Run
-from modules.execution.infrastructure.artifacts import get_artifact_storage
+from modules.platform_api.models import generate_json
+from modules.platform_api.execution import Run
+from modules.platform_api.artifacts import get_artifact_storage
 from .backend.access import project_for
 from .backend.models import Task, Content, Version
-from .backend.sources import from_local, from_zip, github_source, fingerprint, limits
+from modules.platform_api.repository_sources import from_local, from_zip, github_source, fingerprint, limits
 from .backend.content import validate_document, text, strings
 from .backend.copywriting import load_copy_skill, copy_instruction
 from .backend.retrieval import retrieve

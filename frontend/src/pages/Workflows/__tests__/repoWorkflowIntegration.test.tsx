@@ -5,7 +5,7 @@ import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 import type { ApplicationRuntime, Workflow } from '@/types';
-import RepoExplainerPage from '@/pages/Apps/RepoExplainerPage';
+import RepoExplainerPage from '@applications/repo_explainer/frontend/pages/RepoExplainerPage';
 import WorkflowEditorPage from '../WorkflowEditorPage';
 import WorkflowsPage from '../WorkflowsPage';
 import { CONTENT_SUITE_APPS, buildContentSuiteWorkflow } from '../presets/contentSuite';

@@ -1,6 +1,6 @@
 """Bounded retrieval over an immutable snapshot, without executing repository code."""
 import re
-from .sources import limits
+from modules.platform_api.repository_sources import limits
 from .content import strings
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 
 from collections import defaultdict
 from datetime import date, timedelta

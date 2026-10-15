@@ -33,8 +33,16 @@ spec:
     default_config: {launch_mode: dedicated}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.meeting_assistant.extensions.provider
     django_app: app_center.meeting_assistant.backend.apps.MeetingAssistantConfig
     urlconf: app_center.meeting_assistant.backend.urls
     executor_entrypoint: app_center.meeting_assistant.runtime.execute_meeting
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: meeting-assistant
+      platforms: [web]

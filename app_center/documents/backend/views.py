@@ -8,13 +8,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.conversations.models import Conversation
-from apps.conversations.serializers import ConversationDetailSerializer
-from apps.conversations.execution import create_conversation_run, ConversationRunActive
-from apps.enterprise.models import Membership
-from modules.tenancy.permissions import HasPathOrganizationRole
-from modules.execution.api.serializers import RunSerializer
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
+from modules.platform_api.conversations import Conversation
+from modules.platform_api.conversations import ConversationDetailSerializer
+from modules.platform_api.conversation_execution import create_conversation_run, ConversationRunActive
+from modules.platform_api.identity import Membership
+from modules.platform_api.tenancy import HasPathOrganizationRole
+from modules.platform_api.execution import RunSerializer
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
 from .access import application_for, document_for, visible_documents
 from .content import plain_text
 from .models import Document, DocumentGrant, DocumentSession
@@ -201,7 +201,7 @@ class DocumentAssistant(BaseView):
         return Response(RunSerializer(run).data, status=202)
 
 
-from modules.execution.api.views import OrganizationRunCommandsView
+from modules.platform_api.execution_views import OrganizationRunCommandsView
 
 
 class DocumentRunCommands(OrganizationRunCommandsView):
@@ -210,7 +210,7 @@ class DocumentRunCommands(OrganizationRunCommandsView):
 
     def post(self, request, organization_id, application_id, pk, run_id):
         from django.shortcuts import get_object_or_404
-        from modules.execution.models import Run
+        from modules.platform_api.execution import Run
         doc = document_for(request.user, organization_id, application_id, pk)
         get_object_or_404(Run, pk=run_id, organization_id=organization_id, owner=request.user, input__document_id=str(doc.pk))
         return super().post(request, organization_id, run_id)

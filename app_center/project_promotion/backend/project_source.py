@@ -6,8 +6,8 @@ from shutil import which
 from tempfile import TemporaryDirectory
 from rest_framework import serializers as s
 from rest_framework.exceptions import ValidationError
-from app_center.repo_explainer.backend.sources import from_local
-from core.llm.application import GenerationError
+from modules.platform_api.repository_sources import from_local
+from modules.platform_api.models import GenerationError
 from .schemas import Strict, CaseData, text, validated
 from .catalog import MATERIAL_TYPES, MATERIAL_GUIDE, focus_instruction, allowed_material_types, OVERVIEW_SCOPE_INSTRUCTION
 

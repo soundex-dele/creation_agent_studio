@@ -13,15 +13,15 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from apps.knowledge.models import KnowledgeBase
-from apps.knowledge.services import reindex_document
-from core.resource_access import accessible_resources
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
-from modules.execution.infrastructure.artifacts import get_artifact_storage, ArtifactObjectUnavailable
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.knowledge import KnowledgeBase
+from modules.platform_api.knowledge import reindex_document
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
+from modules.platform_api.artifacts import get_artifact_storage, ArtifactObjectUnavailable
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .access import application_for, project_for
 from .content import markdown
 from .models import ResearchProject, ResearchResult
@@ -275,13 +275,13 @@ class ImportsView(BaseView):
             raise ValidationError("请选择来源应用。") from None
         search = request.query_params.get("search", "")[:200]
         if request.query_params.get("target") == "document":
-            from app_center.documents.backend.access import visible_documents
+            from app_center.documents.public import visible_documents
             qs = visible_documents(request.user, app.organization_id, target_id).filter(title__icontains=search).order_by("-updated_at", "pk")
             return self.page(qs, lambda d: {"id": str(d.id), "title": d.title, "kind": "file", "version": d.version})
         if request.query_params.get("target") != "drive":
             raise ValidationError("未知来源类型。")
-        from app_center.my_drive.backend.access import application_for as drive_app, space_for
-        from app_center.my_drive.backend.services import entries, folder_for
+        from app_center.my_drive.public import application_for as drive_app, space_for
+        from app_center.my_drive.public import entries, folder_for
         target = drive_app(request.user, app.organization_id, target_id)
         qs = entries(space_for(request.user, app.organization_id), target).filter(trash_batch=None, purge_pending=False)
         if search:

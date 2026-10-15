@@ -26,7 +26,15 @@ spec:
     default_config: {launch_mode: dedicated}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.documents.extensions.provider
     django_app: app_center.documents.backend.apps.DocumentsConfig
     urlconf: app_center.documents.backend.urls
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: documents
+      platforms: [web]

@@ -1,6 +1,6 @@
 """Codex image generation executed by the durable media worker."""
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import logging
 import os
 import shutil
@@ -13,12 +13,12 @@ from django.conf import settings
 from django.http import Http404
 from rest_framework.exceptions import APIException
 
-from core.agent_engine.adapters.codex import CodexAdapter
-from modules.execution.infrastructure.artifacts import get_artifact_storage, open_artifact
-from modules.execution.models import Run
-from modules.tenancy.database import tenant_database_context
+from modules.platform_api.models import CodexAdapter
+from modules.platform_api.artifacts import get_artifact_storage, open_artifact
+from modules.platform_api.execution import Run
+from modules.platform_api.tenancy import tenant_database_context
 from .backend.access import application_for, reference_for, source_for
-from .backend.images import MAX_IMAGE_BYTES, inspect_image
+from modules.platform_api.images import MAX_IMAGE_BYTES, inspect_image
 from .backend.serializers import GenerateSerializer
 
 logger = logging.getLogger(__name__)

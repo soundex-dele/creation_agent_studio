@@ -90,7 +90,7 @@ def compose_effective(*, prompt, answers, application_id, preset=None, brand=Non
     effective.update({k: v for k, v in answers.items() if k in explicit})
     sources = {q['key']: ('manual' if q['key'] in explicit else 'template' if q['key'] in values else 'default') for q in prompt.get('questions', [])}
     if brand:
-        from app_center.brand_library.backend.context import compose_with_brand_snapshot
+        from modules.platform_api.branding import compose_with_brand_snapshot
         result = compose_with_brand_snapshot(prompt=prompt, answers=effective, snapshot=brand, explicit_fields=explicit, application_id=application_id)
         for key in result['brand_reference']['inherited_fields']:
             sources[key] = 'brand'

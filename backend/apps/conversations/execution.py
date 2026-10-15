@@ -226,10 +226,8 @@ def _create_run_once(
         if not allow_all_runtime_paths(actor):
             raise ValidationError({"permission_mode": "只有具备全路径权限的管理员可以开启完全控制。"})
     original_message = message
-    from django.apps import apps
-    if apps.is_installed("app_center.documents.backend"):
-        from app_center.documents.backend.access import prepare_document_message
-        message = prepare_document_message(conversation, actor, message, document_context)
+    from apps.applications.app_center.extensions import prepare_conversation_message
+    message = prepare_conversation_message(conversation, actor, message, document_context)
     if conversation.application_id and not accessible_resources(
         Application.objects.filter(
             Q(organization=organization) | Q(organization__isnull=True),

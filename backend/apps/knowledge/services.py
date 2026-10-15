@@ -115,9 +115,7 @@ def reindex_document(document, actor):
             "embedding_provider": document.knowledge_base.embedding_provider,
             "embedding_model": document.knowledge_base.embedding_model,
         },
-        input_data={"object_key": document.source_object_key, **knowledge_context(document),
-                    **({"research_project_id": document.metadata["research_project_id"]}
-                       if document.metadata.get("research_project_id") else {})},
+        input_data={"object_key": document.source_object_key, **knowledge_context(document)},
         max_attempts=3,
         retry_safe=True,
     )

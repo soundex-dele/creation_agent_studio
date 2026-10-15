@@ -10,7 +10,7 @@ import { ResearchHub } from '../douyin/ResearchHub';
 import { ResearchResult } from '../douyin/ResearchResult';
 import { TrendPanel } from '../douyin/ResearchLibrary';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const account = { id: 'a1', name: '科普账号', source_url: 'https://www.douyin.com/user/test', group: '', is_owned: true, notes: '', profile: {} };
 const work = { platform_id: '123', cover: '', duration: 60, ratio: null, outstanding: false, has_upload: false, id: 'w1', title: '一个科学问题', account_id: 'a1', account_name: '科普账号', is_owned: true, description: '作品描述', likes: 0, comments: null, collects: 2, shares: null, kind: 'video', published_at: '2026-09-28T10:00:00Z', captured_at: '2026-09-30T10:00:00Z', url: 'https://www.douyin.com/?modal_id=123' };
 const task: ResearchTask = { id: 'r1', kind: 'radar', status: 'succeeded', stage: 'completed', error: '', progress: {}, output: { topics: [{ title: '科学常识', angle: '用日常案例解释', refs: ['w1'] }], baseline: true }, sources: [work], work_id: null, run_id: 'run1', created_at: '2026-09-30T10:00:00Z' };

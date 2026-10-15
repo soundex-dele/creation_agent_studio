@@ -10,13 +10,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.applications.models import Application
-from apps.enterprise.models import Membership
-from core.resource_access import accessible_resources
-from modules.tenancy.permissions import HasPathOrganizationRole
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.commands import submit_run_command
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition, CommandNotAllowed
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import Membership
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.tenancy import HasPathOrganizationRole
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import submit_run_command
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition, CommandNotAllowed
 from .catalog import catalog, SCENES
 from .models import PromptSession, PromptVersion, PromptTask
 from .serializers import SessionInput, TaskInput, VersionInput, validate_answers

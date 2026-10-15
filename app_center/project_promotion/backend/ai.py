@@ -5,19 +5,19 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers as s
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from app_center.brand_library.backend.context import resolve_brand_snapshot
-from app_center.brand_library.backend.serializers import BrandReferenceSerializer
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
+from app_center.brand_library.public import resolve_brand_snapshot
+from app_center.brand_library.public import BrandReferenceSerializer
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
 from .models import AITask, Case, Topic, Channel, Version
 from .catalog import EXPLORATION_FOCUSES, MATERIAL_TYPES
 from .schemas import Strict, text, validated, CaseData, TopicData, CopyBody, DIRECTIONS, PLATFORMS
 from .views import Access, Conflict, basic, channel_snapshot, report
 from .materials import resolve_materials, topic_materials, require_confirmed, set_materials, snapshot_materials, generation_context
-from apps.applications.runtime_paths import resolve_runtime_path
+from modules.platform_api.runtime_paths import resolve_runtime_path
 from pathlib import Path
-from modules.execution.application.commands import submit_run_command
-from modules.execution.application.errors import CommandNotAllowed
+from modules.platform_api.execution import submit_run_command
+from modules.platform_api.execution import CommandNotAllowed
 
 ACTIVE = {'queued', 'running', 'waiting_input', 'waiting_children', 'cancelling'}
 

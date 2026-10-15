@@ -30,3 +30,10 @@ spec:
     urlconf: app_center.my_drive.backend.urls
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: my-drive
+      platforms: [web]

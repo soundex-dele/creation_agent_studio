@@ -16,8 +16,8 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from modules.tenancy.permissions import HasPathOrganizationRole
-from apps.enterprise.models import Membership
+from modules.platform_api.tenancy import HasPathOrganizationRole
+from modules.platform_api.identity import Membership
 
 from .models import (
     Copywriting,

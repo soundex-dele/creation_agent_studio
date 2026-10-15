@@ -7,14 +7,14 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.enterprise.models import Membership
-from modules.execution.api.serializers import RunSerializer, RunArtifactSerializer
-from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
-from modules.execution.application.start_runs import start_application_run
-from modules.execution.infrastructure.artifacts import get_artifact_storage, ArtifactObjectUnavailable
-from modules.tenancy.permissions import HasPathOrganizationRole
+from modules.platform_api.identity import Membership
+from modules.platform_api.execution import RunSerializer, RunArtifactSerializer
+from modules.platform_api.execution import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
+from modules.platform_api.execution import start_application_run
+from modules.platform_api.artifacts import get_artifact_storage, ArtifactObjectUnavailable
+from modules.platform_api.tenancy import HasPathOrganizationRole
 from .access import application_for, drawings_for, reference_for, source_for
-from .images import inspect_image, MAX_IMAGE_BYTES
+from modules.platform_api.images import inspect_image, MAX_IMAGE_BYTES
 from .models import DrawingReference
 from .serializers import GenerateSerializer
 

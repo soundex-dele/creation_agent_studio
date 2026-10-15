@@ -32,8 +32,16 @@ spec:
     default_config: {launch_mode: dedicated}
     dependencies: {agents: [], skills: []}
   backend:
+    extensions: app_center.research_assistant.extensions.provider
     django_app: app_center.research_assistant.backend.apps.ResearchAssistantConfig
     urlconf: app_center.research_assistant.backend.urls
     executor_entrypoint: app_center.research_assistant.runtime.execute
   database: {mode: django-migrations, schema_version: 1, tenant_scoped: true}
   install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: research-assistant
+      platforms: [web]

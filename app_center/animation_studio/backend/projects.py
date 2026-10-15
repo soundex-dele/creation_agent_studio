@@ -1,5 +1,5 @@
 
-from core.observability import log_operation
+from modules.platform_api.observability import log_operation
 import copy
 from django.db import transaction
 from django.utils import timezone

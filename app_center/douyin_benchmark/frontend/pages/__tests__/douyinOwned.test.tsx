@@ -9,7 +9,7 @@ import { researchTaskStatus } from '@applications/douyin_benchmark/frontend/serv
 import { makeVoicePrompt } from '../../lib/douyinVoicePrompt';
 import type { CreatorProfile, ResearchTask, VoiceContent, VoiceVersion } from '@applications/douyin_benchmark/frontend/services/douyinResearch';
 
-vi.mock('@platform/http', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const content: VoiceContent = { current_positioning: '旧定位', positioning: '实验科普', audience: '好奇的观众', content_pillars: '日常实验', content_boundaries: '不编造', rules: '先讲困惑', examples: '我做过一个小实验。', avoid: '空话', prompt: '用我的实验经历解释问题，不编造事实。' };
 const accounts = ['a1', 'a2'].map((id, i) => ({ id, name: i ? '我的美食号' : '我的科普号', is_owned: true, source_url: `https://www.douyin.com/user/${id}`, profile: {}, notes: '', group: '' }));
 let profiles: CreatorProfile[]; let tasks: ResearchTask[]; let versions: VoiceVersion[];

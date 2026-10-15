@@ -3,10 +3,10 @@ import json
 from copy import deepcopy
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
-from apps.applications.models import Application
-from core.resource_access import accessible_resources
-from core.llm.application import generate_json
-from modules.execution.models import Run
+from modules.platform_api.identity import Application
+from modules.platform_api.identity import accessible_resources
+from modules.platform_api.models import generate_json
+from modules.platform_api.execution import Run
 from .backend.models import AITask, Content, ContentVersion
 from .backend.schemas import ContentData, validated
 from .backend.ai import validate_result

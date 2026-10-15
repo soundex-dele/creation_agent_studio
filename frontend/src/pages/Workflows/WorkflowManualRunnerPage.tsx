@@ -8,7 +8,7 @@ import {
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import WorkflowBrandPicker, { emptyWorkflowBrand, workflowBrandRequest } from '@/components/WorkflowBrandPicker';
-import type { BrandConfig } from '@/services/brandLibrary';
+import type { BrandConfig } from '@applications/brand_library/frontend/public/services/brandLibrary';
 import { formErrorMessage } from '@/lib/formPresets';
 import { api } from '@/services/api';
 import type { RunResource } from '@/services/applicationRuntime';
