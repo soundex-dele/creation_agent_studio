@@ -35,10 +35,24 @@ EXPLORATION_FOCUSES = {**BROAD_FOCUSES, **MATERIAL_CATALOG}
 
 
 def allowed_material_types(focus):
+    if isinstance(focus, dict):
+        if focus.get('exploration_mode') == 'deep':
+            return list(MATERIAL_TYPES)
+        if 'material_types' in focus:
+            return focus['material_types']
+        focus = focus.get('exploration_focus', 'all')
     return [focus] if focus in MATERIAL_CATALOG else list(MATERIAL_TYPES)
 
 
 def focus_instruction(focus):
+    if isinstance(focus, dict):
+        if focus.get('exploration_mode') == 'deep':
+            return '按用户指定方向深入探索，根据实际资料选择合适的素材分类，不受概览时所选分类限制。'
+        if 'material_types' in focus:
+            selected = allowed_material_types(focus)
+            descriptions = '；'.join(f'{key} {MATERIAL_CATALOG[key][0]}：{MATERIAL_CATALOG[key][1]}' for key in selected)
+            return f'本次素材分类：{descriptions}。仅输出所选分类的素材，不用其他分类替代，也不要将无关内容换标签充数。资料不足时说明缺口，不强行凑齐分类；没有相关资料时提交 insufficient_reason。全面概览仍覆盖主要模块，项目全貌写入 analysis。'
+        focus = focus.get('exploration_focus', 'all')
     label, description = EXPLORATION_FOCUSES.get(focus, BROAD_FOCUSES['all'])
     text = f'本次探索侧重：{label}。{description}。'
     if focus in MATERIAL_CATALOG:

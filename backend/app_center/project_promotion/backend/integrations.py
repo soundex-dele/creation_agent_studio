@@ -7,12 +7,19 @@ from rest_framework.response import Response
 from apps.applications.models import Application
 from apps.conversations.models import Conversation
 from core.resource_access import accessible_resources
-from .models import Channel, Handoff, Version
-from .schemas import CopyBody, validated
-from .views import Access, Conflict, version_data
-from .materials import generation_context
+from .models import Topic, Channel, Handoff, Version
+from .schemas import PLATFORMS, CopyBody, validated
+from .views import Access, Conflict, basic, version_data
+from .materials import generation_context, require_confirmed, topic_materials
 
 SLUGS = ['write-image-text-copy', 'write-short-video-copy', 'wechat-viral-article', 'gzh-design']
+CHANNEL_APPS = {
+    'wechat': ('wechat-viral-article', '公众号爆款写作', {'task': 'full-article'}),
+    'xiaohongshu': ('write-image-text-copy', '图文文案', {'task': 'full', 'platform': 'xiaohongshu'}),
+    'douyin': ('write-short-video-copy', '短视频文案', {'task': 'storyboard', 'platform': 'douyin'}),
+    'moments': ('write-image-text-copy', '图文文案', {'task': 'photo-caption', 'platform': 'general'}),
+}
+REQUIREMENTS = '仅依据来源事实，保留已实现与未来设想的区别，不虚构效果，不加私信或销售引导。'
 
 
 def destination(view, identifier=None):
@@ -23,11 +30,12 @@ def destination(view, identifier=None):
 
 def handoff_data(row):
     slug = row.target_application.slug
-    return dict(id=str(row.pk), version_id=str(row.version_id), target_application_id=row.target_application_id,
+    return dict(id=str(row.pk), version_id=str(row.version_id) if row.version_id else None,
+        topic_id=str(row.topic_id or row.version.channel.topic_id),
+        platform=row.platform or row.version.channel.platform, target_application_id=row.target_application_id,
         kind=slug, target_id=str(row.conversation_id) if row.conversation_id else '', draft=row.draft, revision=row.revision,
         status='制作草稿已保存', created_at=row.created_at.isoformat(),
-        url=f'/applications/{row.target_application_id}/chat?slug={slug}&promotionApplication={row.application_id}&promotionHandoff={row.pk}' + (f'&conversation={row.conversation_id}' if row.conversation_id else ''),
-        return_url=f'/applications/{row.application_id}/project-promotion')
+        url=f'/applications/{row.target_application_id}/chat?slug={slug}&promotionApplication={row.application_id}&promotionHandoff={row.pk}' + (f'&conversation={row.conversation_id}' if row.conversation_id else ''))
 
 
 class Integrations(Access):
@@ -38,11 +46,13 @@ class Integrations(Access):
 
 class Handoffs(Access):
     def get(self, request, **kwargs):
-        return Response([handoff_data(row) for row in self.scope(Handoff).select_related('target_application')])
+        return Response([handoff_data(row) for row in self.scope(Handoff).select_related('target_application', 'version__channel')])
 
     @transaction.atomic
     def post(self, request, **kwargs):
         self.lock()
+        if 'topic_id' in request.data:
+            return self.from_topic(request.data)
         channel = self.linked(Channel, request.data.get('channel_id'))
         version = get_object_or_404(channel.versions, pk=s.UUIDField().run_validation(request.data.get('version_id')))
         target = destination(self, s.IntegerField().run_validation(request.data.get('target_id')))
@@ -53,17 +63,46 @@ class Handoffs(Access):
         source = json.dumps(dict(body=version.body, source=generation_context(version.snapshot)), ensure_ascii=False)
         if len(source) > 75000:
             raise ValidationError('所选版本资料过长，请减少素材后交接。')
-        requirements = '仅依据来源事实，保留已实现与未来设想的区别，不虚构效果，不加私信或销售引导。'
-        draft = dict(source=source, requirements=requirements)
+        draft = dict(source=source, requirements=REQUIREMENTS)
         if target.slug == 'gzh-design':
-            draft = dict(source=version.body['body'], requirements=requirements)
+            draft = dict(source=version.body['body'], requirements=REQUIREMENTS)
         h = Handoff.objects.create(**self.ownership(), title=channel.title, version=version, target_application=target, draft=draft)
+        return Response(handoff_data(h), status=201)
+
+    def from_topic(self, payload):
+        if set(payload) - {'topic_id', 'platform'}:
+            raise ValidationError('选题交接仅接受 topic_id 和 platform。')
+        topic = self.linked(Topic, payload.get('topic_id'))
+        if topic.archived or topic.status != 'confirmed':
+            raise ValidationError('请先编辑并确认有效选题，再进入创作应用。')
+        require_confirmed(topic_materials(topic))
+        platform = s.ChoiceField(choices=PLATFORMS).run_validation(payload.get('platform'))
+        slug, name, defaults = CHANNEL_APPS[platform]
+        target = destination(self).filter(slug=slug).first()
+        if target is None:
+            raise ValidationError(f'当前没有可运行的「{name}」应用，请在应用中心安装或联系管理员开通。')
+        snapshot = dict(cases=[basic(material) for material in topic_materials(topic)], topic=basic(topic), platform=platform)
+        # Retry/reopen the same source without replacing user edits or its conversation.
+        old = self.scope(Handoff).filter(topic=topic, platform=platform, target_application=target, snapshot=snapshot).first()
+        if old:
+            return Response(handoff_data(old))
+        source = json.dumps(generation_context(snapshot), ensure_ascii=False)
+        if len(source) > 75000:
+            raise ValidationError('选题资料过长，请减少素材后交接。')
+        requirements = REQUIREMENTS
+        if platform == 'moments':
+            requirements += '发布渠道为朋友圈，请生成适合朋友圈的自然配文，不制作多页图文。'
+        draft = dict(source=source, requirements=requirements, **defaults)
+        if topic.data.get('audience'):
+            draft['audience'] = topic.data['audience']
+        h = Handoff.objects.create(**self.ownership(), title=topic.title, topic=topic, platform=platform,
+            snapshot=snapshot, target_application=target, draft=draft)
         return Response(handoff_data(h), status=201)
 
 
 class HandoffDetail(Access):
     def item(self):
-        row = get_object_or_404(self.scope(Handoff).select_related('target_application'), pk=self.kwargs['handoff_id'])
+        row = get_object_or_404(self.scope(Handoff).select_related('target_application', 'version__channel'), pk=self.kwargs['handoff_id'])
         destination(self, row.target_application_id)
         return row
 
@@ -101,6 +140,8 @@ class HandoffResults(HandoffDetail):
     def post(self, request, **kwargs):
         self.lock()
         row = self.item()
+        if not row.version_id:
+            raise ValidationError('请在目标应用中继续创作，无需回存。')
         if not row.conversation_id:
             raise ValidationError('请先在创作应用中完成生成。')
         conversation = get_object_or_404(Conversation, pk=row.conversation_id, user=request.user, organization_id=row.organization_id)

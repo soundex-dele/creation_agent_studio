@@ -88,10 +88,20 @@ class Workspace(TenantOwnedModel):
 
 
 class Handoff(PrivateRecord):
-    version = models.ForeignKey(Version, on_delete=models.PROTECT)
+    version = models.ForeignKey(Version, null=True, blank=True, on_delete=models.PROTECT)
+    topic = models.ForeignKey(Topic, null=True, blank=True, on_delete=models.PROTECT)
+    platform = models.CharField(max_length=20, default='')
+    snapshot = models.JSONField(default=dict)
     target_application = models.ForeignKey('applications.Application', on_delete=models.PROTECT, related_name='+')
     draft = models.JSONField(default=dict)
     conversation = models.ForeignKey('conversations.Conversation', null=True, on_delete=models.SET_NULL)
+
+    class Meta(PrivateRecord.Meta):
+        constraints = [models.CheckConstraint(
+            condition=(models.Q(version__isnull=False, topic__isnull=True)
+                       | models.Q(version__isnull=True, topic__isnull=False)),
+            name='promotion_handoff_source',
+        )]
 
 
 RESOURCES = {'cases': Case, 'topics': Topic, 'channels': Channel, 'feedback': Feedback}

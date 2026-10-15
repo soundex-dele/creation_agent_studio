@@ -288,7 +288,7 @@ def test_focus_api_roundtrip_and_idempotency(ctx, repo, monkeypatch, focus):
     post(ctx, 'ai/tasks', {**payload, 'exploration_focus': 'unknown'}, 400)
     post(ctx, 'ai/tasks', {**payload, 'exploration_focus': 'cost'}, 409)
     def generate(task, **kwargs):
-        assert kwargs['content']['探索侧重'] == focus
+        assert kwargs['content']['素材分类'] == project_source.allowed_material_types(focus)
         value = model_result()
         kind = focus if focus in MATERIAL_CATALOG else 'deployment'
         for item in value['cases']:
@@ -341,6 +341,47 @@ def test_broad_or_legacy_focus_can_still_submit_multiple_categories(focus):
     value['cases'][1]['data']['material_type'] = 'feature'
     assert json.loads(tools.submit(value))['case_count'] == 2
     assert [item['data']['material_type'] for item in tools.result['cases']] == ['overview', 'feature']
+
+
+def test_multi_category_request_roundtrip_validation_and_idempotency(ctx, repo, monkeypatch):
+    payload = dict(kind='project', project_path=str(repo), exploration_mode='overview',
+                   material_types=['deployment', 'security'], request_key='categories')
+    task = post(ctx, 'ai/tasks', payload, 202)
+    assert task['request']['material_types'] == ['deployment', 'security']
+    assert post(ctx, 'ai/tasks', {**payload, 'material_types': ['security', 'deployment', 'security']}, 200)['id'] == task['id']
+    post(ctx, 'ai/tasks', {**payload, 'material_types': ['deployment']}, 409)
+    for invalid in [[], ['all'], ['unknown'], 'deployment']:
+        post(ctx, 'ai/tasks', {**payload, 'material_types': invalid}, 400)
+
+    def generate(task, **kwargs):
+        assert kwargs['content']['素材分类'] == ['deployment', 'security']
+        assert '本次素材分类' in kwargs['instruction']
+        assert '综合视角' not in kwargs['instruction']
+        schema = kwargs['tools'][0]['inputSchema']['properties']['cases']['items']['properties']['data']
+        assert schema['properties']['material_type']['enum'] == ['deployment', 'security']
+        value = model_result()
+        for item, category in zip(value['cases'], ['deployment', 'feature']):
+            item['data']['material_type'] = category
+        with pytest.raises(ValidationError, match='deployment, security'):
+            kwargs['handlers']['promotion_submit_cases'](value)
+        value['cases'][1]['data']['material_type'] = 'security'
+        kwargs['handlers']['promotion_submit_cases'](value)
+        return 'multi-category-thread'
+
+    monkeypatch.setattr(runtime, 'run_project_agent', generate)
+    run(ctx, task)
+    applied = post(ctx, f"ai/tasks/{task['id']}/apply", {}, 200)
+    rows = [get(ctx, 'cases/' + identifier) for identifier in applied['result']['case_ids']]
+    assert [row['data']['material_type'] for row in rows] == ['deployment', 'security']
+    assert all(row['source_snapshot']['material_types'] == ['deployment', 'security'] for row in rows)
+
+
+def test_deep_exploration_ignores_overview_category_constraints(ctx, repo):
+    payload = dict(kind='project', project_path=str(repo), exploration_mode='deep', instruction='部署流程',
+                   material_types=['deployment'], exploration_focus='security', request_key='deep-categories')
+    task = post(ctx, 'ai/tasks', payload, 202)
+    assert 'material_types' not in task['request'] and 'exploration_focus' not in task['request']
+    assert post(ctx, 'ai/tasks', {**payload, 'material_types': ['feature']}, 200)['id'] == task['id']
 
 
 def test_project_overview_and_application_overviews_are_distinct_scopes():

@@ -78,8 +78,8 @@ autosave, per-member sharing and a private AI sidebar. See
 [`documents/README.md`](documents/README.md) for deployment and runtime details.
 
 The **项目宣传助手** (`project-promotion`) connects private project facts and case materials, multi-source editorial topics,
-four-channel content versions, manual publication tracking, and feedback review. It reuses
-brand references and supports durable handoffs to the existing writing and formatting apps.
+and direct creative-app entry for WeChat articles, image-text copy, short-video scripts and Moments captions. It reuses
+brand references for topic planning and preserves writing drafts and conversations in the target apps.
 See [`project_promotion/README.md`](project_promotion/README.md) for setup, API and validation.
 
 These packages use the shared chat renderer and content creation agent. Users

@@ -2,19 +2,21 @@ import { api } from './api';
 import { createIdempotencyKey } from '@/lib/idempotencyKey';
 
 export type Data = Record<string, unknown>;
-export type Resource = 'cases' | 'topics' | 'channels' | 'feedback';
-export interface CopyBody { title: string; body: string; cover: string; pages: string; script: string; materials: string; shots: string; checks: string; formatted_html: string }
-export interface Version { id: string; number: number; body: CopyBody; snapshot: Data; created_at: string }
+export type Resource = 'cases' | 'topics';
 export interface SourceSnapshot { origin?: { path?: string; commit?: string }; digest?: string; coverage?: { files_read?: number; files_cited?: number; files_total: number; note: string }; evidence?: Record<string, { path: string; start: number; end: number; quote: string; sha256: string }> }
-export interface PromotionRecord { id: string; title: string; status: string; archived: boolean; revision: number; data: Data; case_id?: string; case_ids?: string[]; topic_id?: string; channel_id?: string | null; platform?: string; confirmed_version_id?: string | null; latest_version?: Version | null; source_snapshot?: SourceSnapshot }
+export interface PromotionRecord { id: string; title: string; status: string; archived: boolean; revision: number; data: Data; case_id?: string; case_ids?: string[]; topic_id?: string; channel_id?: string | null; platform?: string; source_snapshot?: SourceSnapshot }
 export interface ActivityItem { id: string; title: string; detail: string; status: 'running' | 'completed' | 'failed' | 'stopped'; created_at: string; updated_at: string }
 export interface Task { id: string; kind: string; status: string; applied: boolean; error: string; request: Data; result: Data; stage?: string; activity?: { items: ActivityItem[]; dropped: number }; created_at: string }
-export interface Group { key: string; label: string; publications: number; metrics: Record<string, { total: number | null; samples: number }> }
-export interface Report { publications: Data[]; groups: { platforms: Group[]; cases: Group[] }; unknown_source_count: number; note: string }
-export interface Handoff { id: string; version_id: string; target_application_id: number; kind: string; url: string; status: string; target_id: string }
+export interface Handoff { id: string; topic_id: string; platform: string; version_id: string | null; target_application_id: number; kind: string; url: string; status: string; target_id: string }
 export interface Destination { id: number; name: string; slug: string }
-export const resources: Resource[] = ['cases', 'topics', 'channels', 'feedback'];
+export const resources: Resource[] = ['cases', 'topics'];
 export const platforms: Record<string, string> = { wechat: '公众号', xiaohongshu: '小红书', douyin: '抖音', moments: '朋友圈' };
+export const channelApplications: Record<string, { slug: string; name: string }> = {
+  wechat: { slug: 'wechat-viral-article', name: '公众号爆款写作' },
+  xiaohongshu: { slug: 'write-image-text-copy', name: '图文文案' },
+  douyin: { slug: 'write-short-video-copy', name: '短视频文案' },
+  moments: { slug: 'write-image-text-copy', name: '图文文案' },
+};
 export const materialTypes: Record<string, string> = {
   "overview": "项目概览",
   "application_overview": "应用概览",
@@ -72,11 +74,14 @@ export const explorationFocusDescriptions: Record<string, string> = {
   "roadmap": "已有计划、TODO 或规划声明，明确尚未实现，不承诺交付日期"
 };
 export const explorationFocuses = { ...broadExplorationFocuses, ...materialTypes };
+export function explorationCategoriesLabel(request: Data) {
+  if (Array.isArray(request.material_types)) return request.material_types.map(key => materialTypes[String(key)] || String(key)).join('、');
+  return explorationFocuses[string(request.exploration_focus) || 'all'] || '综合介绍';
+}
 export const materialType = (row: PromotionRecord) => string(row.data.material_type) || 'case';
 export const sourceIds = (row: PromotionRecord) => row.case_ids?.length ? row.case_ids : row.case_id ? [row.case_id] : [];
 export const directions: Record<string, string> = { overview: '项目介绍', application_overview: '应用介绍', audience: '适用人群', demo: '功能演示', solution: '问题解决', workflow: '完整流程', showcase: '成果展示', comparison: '对比取舍', tutorial: '上手技巧', architecture: '技术解读', boundaries: '使用边界', development: '开发演进', experience: '实践复盘' };
-export const statuses: Record<string, string> = { draft: '待制作', confirmed: '已确认', ready: '待发布', published: '已发布', paused: '暂缓', recorded: '已记录' };
-export const bodyLabels: Record<keyof CopyBody, string> = { title: '标题', body: '正文／发布配文', cover: '封面文字', pages: '逐页文案', script: '演示脚本', materials: '所需素材', shots: '拍摄清单', checks: '待核实事项', formatted_html: '排版 HTML（仅保存与下载）' };
+export const statuses: Record<string, string> = { draft: '待审核草稿', confirmed: '已确认' };
 export const string = (value: unknown) => value == null ? '' : String(value);
 export const activeTask = (task: Task) => ['queued', 'running', 'waiting_input', 'waiting_children', 'cancelling'].includes(task.status);
 export function promotionError(error: unknown): string {
@@ -95,10 +100,8 @@ export function promotionApi(base: string) {
   }
   return {
     all,
-    record: (kind: Resource, id: string) => api.get<PromotionRecord>(`${base}/${kind}/${id}`),
     create: (kind: Resource, data: Data) => api.post<PromotionRecord>(`${base}/${kind}`, data),
     update: (kind: Resource, row: PromotionRecord, data: Data) => api.patch<PromotionRecord>(`${base}/${kind}/${row.id}`, { ...data, revision: row.revision }),
-    report: () => api.get<Report>(`${base}/report`),
     start: async (value: Data) => {
       const signature = JSON.stringify(value);
       if (pending?.signature !== signature) pending = { signature, key: createIdempotencyKey('promotion') };
@@ -108,15 +111,9 @@ export function promotionApi(base: string) {
     },
     apply: (id: string) => api.post<Task>(`${base}/ai/tasks/${id}/apply`),
     cancel: (id: string) => api.post<Task>(`${base}/ai/tasks/${id}/cancel`),
-    versions: (id: string) => api.get<Version[]>(`${base}/channels/${id}/versions`),
-    saveVersion: (row: PromotionRecord, body: CopyBody, baseVersion?: string) => api.post<Version>(`${base}/channels/${row.id}/versions`, { revision: row.revision, body, ...(baseVersion ? { base_version_id: baseVersion } : {}) }),
-    confirm: (row: PromotionRecord, id: string) => api.post<PromotionRecord>(`${base}/channels/${row.id}/versions/${id}/confirm`, { revision: row.revision }),
-    download: (row: PromotionRecord, id: string, format = 'md') => api.get<Blob>(`${base}/channels/${row.id}/versions/${id}/download`, { format }, { responseType: 'blob' }),
     destinations: () => api.get<Destination[]>(`${base}/integrations`),
     handoffs: () => api.get<Handoff[]>(`${base}/handoffs`),
-    handoff: (row: PromotionRecord, version: string, target: number) => api.post<Handoff>(`${base}/handoffs`, { channel_id: row.id, version_id: version, target_id: target }),
-    results: (id: string) => api.get<{ id: number; content: string; created_at: string }[]>(`${base}/handoffs/${id}/results`),
-    importResult: (id: string, message: number) => api.post<Version>(`${base}/handoffs/${id}/results`, { message_id: message }),
+    prepare: (topic: PromotionRecord, platform: string) => api.post<Handoff>(`${base}/handoffs`, { topic_id: topic.id, platform }),
   };
 }
 export type PromotionApi = ReturnType<typeof promotionApi>;

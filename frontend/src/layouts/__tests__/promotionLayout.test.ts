@@ -24,6 +24,8 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   const page = styles(['.app-scroll-page', '.promotion-page'], width, height);
   expect(page.height).toBe('100%'); expect(page['min-height']).toBe('0'); expect(page['overflow-y']).toBe('auto');
   expect(styles(['.promotion-container'], width, height).padding).toContain('env(safe-area-inset-bottom)');
+  expect(styles(['.promotion-nav'], width, height)['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');
+  expect(styles(['.promotion-channel-links'], width, height)['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');
   expect(styles(['.promotion-grid'], width, height)['grid-template-columns']).toBe(width <= 767 ? 'minmax(0, 1fr)' : width <= 1023 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))');
   expect(styles(['.promotion-modal .ant-modal-body'], width, height)['overflow-y']).toBe('auto');
   expect(styles(['.promotion-modal .ant-modal-body'], width, height)['min-height']).toBe('0');
@@ -36,6 +38,9 @@ it.each([[320, 640], [375, 812], [390, 844], [767, 900], [768, 900], [1440, 900]
   expect(styles(['.promotion-material-option'], width, height).display).toBe('inline-flex');
   expect(styles(['.promotion-material-option'], width, height)['min-height']).toBe('44px');
   expect(styles(['.promotion-material-option span'], width, height)['overflow-wrap']).toBe('anywhere');
+  expect(styles(['.promotion-form-grid'], width, height)['grid-template-columns']).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))');
+  expect(styles(['.promotion-field'], width, height)['min-width']).toBe('0');
+  expect(styles(['.promotion-field select'], width, height)['min-height']).toBe(width <= 767 ? '44px' : '40px');
   expect(styles(['.promotion-activity'], width, height)['min-width']).toBe('0');
   expect(styles(['.promotion-activity-meta'], width, height)['flex-wrap']).toBe('wrap');
   expect(styles(['.promotion-activity-detail pre'], width, height)['white-space']).toBe('pre-wrap');

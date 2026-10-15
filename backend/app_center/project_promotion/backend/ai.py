@@ -10,8 +10,8 @@ from app_center.brand_library.backend.serializers import BrandReferenceSerialize
 from modules.execution.application.start_runs import start_application_run
 from modules.execution.application.errors import DeploymentUnavailable, IdempotencyKeyReused, InvalidExecutionDefinition
 from .models import AITask, Case, Topic, Channel, Version
-from .catalog import EXPLORATION_FOCUSES
-from .schemas import Strict, text, validated, CaseData, TopicData, CopyBody
+from .catalog import EXPLORATION_FOCUSES, MATERIAL_TYPES
+from .schemas import Strict, text, validated, CaseData, TopicData, CopyBody, DIRECTIONS, PLATFORMS
 from .views import Access, Conflict, basic, channel_snapshot, report
 from .materials import resolve_materials, topic_materials, require_confirmed, set_materials, snapshot_materials, generation_context
 from apps.applications.runtime_paths import resolve_runtime_path
@@ -22,6 +22,13 @@ from modules.execution.application.errors import CommandNotAllowed
 ACTIVE = {'queued', 'running', 'waiting_input', 'waiting_children', 'cancelling'}
 
 
+class TopicOptions(Strict):
+    direction = s.ChoiceField(choices=DIRECTIONS, allow_blank=True, required=False)
+    audience = s.CharField(max_length=200, allow_blank=True, required=False)
+    platform = s.ChoiceField(choices=PLATFORMS, allow_blank=True, required=False)
+    count = s.IntegerField(min_value=1, max_value=12, required=False)
+
+
 class TaskInput(Strict):
     kind = s.ChoiceField(choices=['case', 'project', 'topics', 'copy', 'review'])
     request_key = s.CharField(max_length=160)
@@ -30,9 +37,29 @@ class TaskInput(Strict):
     case_id = s.UUIDField(required=False, allow_null=True, default=None)
     case_ids = s.ListField(child=s.UUIDField(), min_length=1, max_length=20, required=False)
     exploration_focus = s.ChoiceField(choices=list(EXPLORATION_FOCUSES), required=False)
+    material_types = s.ListField(child=s.ChoiceField(choices=MATERIAL_TYPES), min_length=1, max_length=len(MATERIAL_TYPES), required=False)
     exploration_mode = s.ChoiceField(choices=['overview', 'deep'], required=False)
     channel_id = s.UUIDField(required=False, allow_null=True, default=None)
     brand_reference = BrandReferenceSerializer(required=False, allow_null=True, default=None)
+    topic_options = TopicOptions(required=False)
+
+    def to_internal_value(self, data):
+        # Older clients/retries may still carry a brand selection into material extraction.
+        if isinstance(data, dict) and data.get('kind') in ('case', 'project'):
+            data = {**data, 'brand_reference': None}
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        if 'material_types' in attrs:
+            if attrs['kind'] != 'project':
+                raise ValidationError({'material_types': '素材分类仅用于项目探索。'})
+            attrs['material_types'] = [key for key in MATERIAL_TYPES if key in attrs['material_types']]
+        if attrs.get('exploration_mode') == 'deep':
+            attrs.pop('material_types', None)
+            attrs.pop('exploration_focus', None)
+        if 'topic_options' in attrs and attrs['kind'] not in ('topics', 'review'):
+            raise ValidationError({'topic_options': '选题选项仅用于生成选题或反馈复盘。'})
+        return attrs
 
 
 def task_data(task):
@@ -138,6 +165,9 @@ def validate_result(task, value):
         # AI extraction always starts as a demo; the user verifies customer status.
         result['data']['case_type'] = 'demo'
     if task.kind in ('topics', 'review'):
+        count = task.snapshot.get('request', {}).get('topic_options', {}).get('count')
+        if count and len(result['topics']) > count:
+            raise ValidationError('生成选题数量超过本次选择的上限。')
         allowed = {q['id'] for q in task.snapshot.get('report', {}).get('questions', [])}
         sources = [row['id'] for row in snapshot_materials(task.snapshot)]
         for topic in result['topics']:

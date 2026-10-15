@@ -2,13 +2,13 @@ api_version: agent-studio/v1
 kind: ApplicationPackage
 metadata:
   id: project-promotion
-  version: 1.3.0
+  version: 1.4.0
   name: 项目宣传助手
-  description: 从项目中挖掘多类型事实素材，组合素材策划选题，再到多平台创作、发布和反馈复盘。
+  description: 从项目中挖掘多类型事实素材，组合素材策划选题，带入公众号、图文和短视频应用继续创作。
   category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
   icon: "宣"
   color: "#28746C"
-  tags: [宣传, 项目素材, 选题, 内容创作, 发布, 复盘]
+  tags: [宣传, 项目素材, 选题, 内容创作]
   developer: Agent Studio
 spec:
   application_kind: custom

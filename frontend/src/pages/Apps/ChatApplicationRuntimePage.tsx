@@ -228,8 +228,7 @@ function ChatApplicationWorkspace({ organizationId }: { organizationId: string |
 
   return (
     <div className={`chat-app-page ${embedded ? 'chat-app-page--embedded' : ''}`}>
-      {promotionUrl && <a href={`/applications/${promotionApplicationId}/project-promotion`}>返回项目宣传助手，审核并回存生成结果</a>}
-      {repoUrl && <Alert type={repoDraft.error ? 'error' : 'info'} message={repoDraft.error || (repoDraft.saving ? '正在保存制作草稿…' : repoDraft.ready ? promotionUrl ? '已带入宣传文案。来源和补充要求会自动保存，其余参数请核对。' : '已带入仓库文案，表单修改会自动保存。请核对后开始制作。' : '正在读取制作草稿…')}
+      {repoUrl && <Alert type={repoDraft.error ? 'error' : 'info'} message={repoDraft.error || (repoDraft.saving ? '正在保存制作草稿…' : repoDraft.ready ? promotionUrl ? '已带入宣传选题、素材或文案。带入的字段会自动保存，请核对后开始创作。' : '已带入仓库文案，表单修改会自动保存。请核对后开始制作。' : '正在读取制作草稿…')}
         action={repoDraft.hasConflict ? <><Button onClick={() => void repoDraft.resolveConflict(true).catch(() => undefined)}>保留本地并保存</Button><Button onClick={() => void repoDraft.resolveConflict(false).catch(() => undefined)}>采用服务器版本</Button></> : repoDraft.error ? <Button onClick={() => void repoDraft.retry().catch(() => undefined)}>重试</Button> : undefined} />}
       {showApplicationHeader && (
         <header className="chat-app-header">

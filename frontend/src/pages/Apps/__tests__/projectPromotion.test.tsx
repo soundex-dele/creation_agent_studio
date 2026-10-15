@@ -6,18 +6,29 @@ import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 import { ProjectPromotionWorkspace } from '../ProjectPromotionPage';
-import { promotionApi, materialTypes, explorationFocusDescriptions, type PromotionRecord, type CopyBody, type Version, type Task } from '@/services/projectPromotion';
+import { promotionApi, materialTypes, explorationFocusDescriptions, type Handoff, type PromotionRecord, type Task } from '@/services/projectPromotion';
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock('react-router-dom', async importOriginal => ({ ...await importOriginal<typeof import('react-router-dom')>(), useNavigate: () => navigate }));
 vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
 let root: Root; let container: HTMLDivElement;
 const base = '/promotion';
 const story: PromotionRecord = { id: 'case1', title: '排版演示', status: 'confirmed', revision: 0, archived: false, data: { audience: '创作者', problem: '排版耗时', case_type: 'demo', assets: [] } };
 const idea: PromotionRecord = { ...story, id: 'topic1', title: '从文章到排版', case_id: story.id, data: { direction: 'demo', angle: '演示流程' } };
-const body: CopyBody = { title: '排版演示', body: '真实功能文案', cover: '封面', pages: '', script: '', materials: '截图', shots: '', checks: '', formatted_html: '' };
-const version: Version = { id: 'v1', number: 1, body, snapshot: { case: story }, created_at: '2026-10-14' };
-const channel: PromotionRecord = { ...story, id: 'channel1', title: '公众号内容', status: 'ready', topic_id: idea.id, platform: 'wechat', confirmed_version_id: 'v1', latest_version: version, data: {} };
 const rows: Record<string, PromotionRecord[]> = {};
 let taskRows: Task[] = [];
+let handoffRows: Handoff[] = [];
+let popup: { opener: Window | null; closed: boolean; location: { replace: ReturnType<typeof vi.fn> }; close: ReturnType<typeof vi.fn> };
+const destinations = [
+  { id: 10, slug: 'wechat-viral-article', name: '公众号爆款写作' },
+  { id: 11, slug: 'write-image-text-copy', name: '图文文案' },
+  { id: 12, slug: 'write-short-video-copy', name: '短视频文案' },
+];
+function handoff(platform: string, slug = 'wechat-viral-article', conversation = ''): Handoff {
+  const target = destinations.find(d => d.slug === slug)!;
+  return { id: 'handoff1', topic_id: idea.id, platform, version_id: null, target_application_id: target.id, kind: slug,
+    url: `/applications/${target.id}/chat?slug=${slug}&promotionApplication=1&promotionHandoff=handoff1${conversation ? `&conversation=${conversation}` : ''}`, status: '', target_id: conversation };
+}
 const settle = async () => act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
 function button(label: string) { return [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.replace(/\s/g, '') === label.replace(/\s/g, ''))!; }
 async function click(label: string) { expect(button(label)).toBeDefined(); await act(async () => button(label).click()); await settle(); }
@@ -29,30 +40,125 @@ async function input(label: string, value: string) {
   const el = field(label);
   await act(async () => { Object.getOwnPropertyDescriptor(el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); });
 }
-async function render(tab = 'cases') {
-  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: [`/?tab=${tab}`] }, createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(ProjectPromotionWorkspace, { base, root: '/tenant' })))));
+async function selectCategories(values: string[]) {
+  const boxes = [...container.querySelectorAll<HTMLInputElement>('.promotion-material-picker input[type="checkbox"]')];
+  for (const box of boxes) if (box.checked !== values.includes(box.value)) await act(async () => box.click());
+}
+async function render(tab = 'cases', presentation = '') {
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: [`/?tab=${tab}&${presentation}`] }, createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(ProjectPromotionWorkspace, { base, root: '/tenant' })))));
   await settle();
 }
 beforeEach(() => {
-  taskRows = [];
+  taskRows = []; handoffRows = [];
+  popup = { opener: window, closed: false, location: { replace: vi.fn() }, close: vi.fn() };
+  vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} })));
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   const computed = window.getComputedStyle.bind(window); vi.spyOn(window, 'getComputedStyle').mockImplementation(el => computed(el));
-  Object.keys(rows).forEach(k => delete rows[k]); Object.assign(rows, { cases: [story], topics: [idea], channels: [channel], feedback: [] });
+  Object.keys(rows).forEach(k => delete rows[k]); Object.assign(rows, { cases: [story], topics: [idea], channels: [], feedback: [] });
   vi.mocked(api.get).mockImplementation(async (url) => {
     if (url.endsWith('/ai/tasks')) return { results: taskRows, next: null, count: taskRows.length };
     if (url.endsWith('/report')) return { publications: [], groups: { platforms: [], cases: [] }, note: '未知数据留空', unknown_source_count: 0 };
-    if (url.endsWith('/integrations') || url.endsWith('/handoffs')) return [];
-    if (url.endsWith('/versions')) return [version];
-    if (url.endsWith('/channels/channel1')) return { ...channel, revision: 1 };
+    if (url.endsWith('/integrations')) return destinations;
+    if (url.endsWith('/handoffs')) return handoffRows;
     const result = rows[url.split('/').pop()!] || [];
     return { results: result, next: null, count: result.length };
   });
-  vi.mocked(api.post).mockResolvedValue({ id: 'task1', kind: 'copy', status: 'failed', request: { kind: 'copy', channel_id: 'channel1' }, result: {}, error: '失败', created_at: '2026-10-14' });
+  vi.mocked(api.post).mockResolvedValue({ id: 'task1', kind: 'topics', status: 'failed', request: { kind: 'topics', case_ids: ['case1'] }, result: {}, error: '失败', created_at: '2026-10-14' });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+
+it.each(['cases', 'topics', 'channels', 'feedback'])('only exposes materials and topics, including legacy tab=%s', async tab => {
+  taskRows = [{ id: 'legacy', kind: 'review', status: 'succeeded', request: {}, result: {}, error: '', applied: false, created_at: '' }];
+  await render(tab);
+  expect(container.querySelector('.promotion-page.app-scroll-page')).not.toBeNull();
+  expect([...container.querySelectorAll('.promotion-nav button')].map(b => b.textContent)).toEqual(['01 · 项目素材库', '02 · 选题与创作']);
+  for (const text of ['发布看板', '反馈复盘', '回存', '已发布内容', '重新生成']) expect(container.textContent).not.toContain(text);
+  expect(vi.mocked(api.get).mock.calls.some(([url]) => /\/(channels|feedback|report)(\/|$)/.test(url))).toBe(false);
+  if (tab === 'channels' || tab === 'feedback') expect(button('新增素材')).toBeDefined();
+});
+
+it.each([
+  ['wechat', '公众号', 'wechat-viral-article', 'entry=home'],
+  ['xiaohongshu', '小红书', 'write-image-text-copy', 'entry=apps'],
+  ['douyin', '抖音', 'write-short-video-copy', 'standalone=1'],
+  ['moments', '朋友圈', 'write-image-text-copy', 'embedded=1'],
+])('prepares %s in a separate creative app window', async (platform, label, slug, presentation) => {
+  await render('topics', presentation);
+  const transfer = handoff(platform, slug);
+  vi.mocked(api.post).mockResolvedValueOnce(transfer);
+  await click(`准备${label}`);
+  expect(api.post).toHaveBeenCalledExactlyOnceWith('/promotion/handoffs', { topic_id: idea.id, platform });
+  expect(window.open).toHaveBeenCalledExactlyOnceWith('about:blank', '_blank');
+  expect(popup.opener).toBeNull();
+  expect(popup.location.replace).toHaveBeenCalledExactlyOnceWith(`${transfer.url}&entry=apps&standalone=1`);
+  expect(navigate).not.toHaveBeenCalled();
+  expect(button('新增选题')).toBeDefined();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('reopens the existing creative conversation instead of a copy editor', async () => {
+  handoffRows = [handoff('wechat', 'wechat-viral-article', '42')];
+  await render('topics');
+  vi.mocked(api.post).mockResolvedValueOnce(handoffRows[0]);
+  await click('打开公众号');
+  expect(popup.location.replace).toHaveBeenCalledWith(`${handoffRows[0].url}&entry=apps&standalone=1`);
+  expect(navigate).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('shows progress, prevents duplicate requests, and retains a retry path near the topic', async () => {
+  await render('topics');
+  let reject!: (reason: Error) => void;
+  vi.mocked(api.post).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await act(async () => { button('准备公众号').click(); button('准备公众号').click(); });
+  expect(api.post).toHaveBeenCalledTimes(1);
+  expect(window.open).toHaveBeenCalledTimes(1);
+  expect(popup.location.replace).not.toHaveBeenCalled();
+  expect(button('准备公众号').className).toContain('ant-btn-loading');
+  await act(async () => reject(new Error('网络失败，请重试')));
+  expect(button('准备公众号').closest('article')?.querySelector('[role="alert"]')?.textContent).toContain('网络失败');
+  expect(navigate).not.toHaveBeenCalled();
+  expect(popup.close).toHaveBeenCalledOnce();
+  vi.mocked(api.post).mockResolvedValueOnce(handoff('wechat'));
+  await click('准备公众号');
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/handoffs', { topic_id: idea.id, platform: 'wechat' });
+  expect(window.open).toHaveBeenCalledTimes(2);
+  expect(popup.location.replace).toHaveBeenCalledWith(`${handoff('wechat').url}&entry=apps&standalone=1`);
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+it('shows a blocked-window error without preparing a handoff and allows retry', async () => {
+  await render('topics');
+  vi.mocked(window.open).mockReturnValueOnce(null);
+  await click('准备公众号');
+  expect(api.post).not.toHaveBeenCalled();
+  expect(button('准备公众号').closest('article')?.querySelector('[role="alert"]')?.textContent).toContain('请允许弹出窗口后重试');
+  vi.mocked(api.post).mockResolvedValueOnce(handoff('wechat'));
+  await click('准备公众号');
+  expect(popup.location.replace).toHaveBeenCalledWith(`${handoff('wechat').url}&entry=apps&standalone=1`);
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+it('explains an unavailable target app without creating a channel or opening a modal', async () => {
+  const original = vi.mocked(api.get).getMockImplementation()!;
+  vi.mocked(api.get).mockImplementation(async url => url.endsWith('/integrations') ? [] : original(url));
+  await render('topics'); await click('准备公众号');
+  expect(button('准备公众号').closest('article')?.querySelector('[role="alert"]')?.textContent).toContain('公众号爆款写作');
+  expect(api.post).not.toHaveBeenCalled(); expect(navigate).not.toHaveBeenCalled();
+  expect(window.open).not.toHaveBeenCalled();
+});
+
+it('explains that draft topics need review before launching an app', async () => {
+  rows.topics = [{ ...idea, status: 'draft' }];
+  await render('topics');
+  expect(button('准备公众号').disabled).toBe(true);
+  expect(button('准备公众号').closest('article')?.textContent).toContain('编辑与审核');
+  await click('编辑与审核');
+  expect(field('状态').value).toBe('draft');
+});
 
 async function choose(label: string, value: string) {
   const el = field(label);
@@ -80,6 +186,63 @@ it('keeps factual material fields separate from case fields and filters types', 
   expect(api.post).toHaveBeenLastCalledWith('/promotion/cases', expect.objectContaining({ data: expect.objectContaining({ material_type: 'architecture', facts: '文档声明的设计' }) }));
 });
 
+it('keeps brand references out of material creation after choosing a brand for topics', async () => {
+  rows.profiles = [{ id: 'brand1', application_id: 99, name: '测试品牌' }] as unknown as PromotionRecord[];
+  await render();
+  expect(container.textContent).not.toContain('引用品牌资料');
+  expect(vi.mocked(api.get).mock.calls.some(([url]) => url.includes('/brand-library/'))).toBe(false);
+  await input('开发记录或资料原文', '已实现导出功能');
+  await click('02 · 选题与创作');
+  expect(field('本次方向与补充要求（可选）').value).toBe('');
+  await act(async () => container.querySelector<HTMLElement>('.ant-collapse-header')!.click());
+  await settle();
+  await act(async () => field('品牌或账号').dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  const option = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].find(el => el.textContent === '测试品牌');
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  await checkMaterial('排版演示');
+  await input('本次方向与补充要求（可选）', '讲清使用价值');
+  await click('生成选题建议');
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/ai/tasks', expect.objectContaining({ brand_reference: expect.objectContaining({ profile_id: 'brand1' }) }));
+  await click('01 · 项目素材库');
+  expect(container.textContent).not.toContain('引用品牌资料');
+  expect(container.querySelector('[aria-label="选题生成选项"]')).toBeNull();
+  expect(field('开发记录或资料原文').value).toBe('已实现导出功能');
+  await click('整理为素材草稿');
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/ai/tasks', expect.objectContaining({ kind: 'case', instruction: '已实现导出功能', brand_reference: null }));
+  await input('项目绝对路径', 'D:\\workspace\\demo');
+  await click('探索项目并生成素材');
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/ai/tasks', expect.objectContaining({ kind: 'project', brand_reference: null }));
+  await click('02 · 选题与创作');
+  expect(container.textContent).toContain('引用品牌资料 · 测试品牌');
+});
+
+it.each(['case', 'project'])('clears legacy brand references when regenerating a %s task', async kind => {
+  taskRows = [{ id: 'old', kind, status: 'failed', applied: false, error: '', result: {}, created_at: '2026-10-14', request: { kind, instruction: '历史素材', brand_reference: { profile_id: 'old-brand' } } }];
+  await render(); await click('重新生成');
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/ai/tasks', expect.objectContaining({ kind, brand_reference: null }));
+});
+
+it('submits optional topic preferences and restores automatic choices', async () => {
+  await render('topics'); await checkMaterial('排版演示');
+  const label = '生成选题建议';
+  await click(label);
+  expect(vi.mocked(api.post).mock.calls.slice(-1)[0]![1]).not.toHaveProperty('topic_options');
+  await choose('介绍角度（可选）', 'application_overview');
+  await choose('目标读者（可选）', '开发者与技术团队');
+  await choose('发布渠道（可选）', 'wechat');
+  await choose('选题数量', '3');
+  await input('本次方向与补充要求（可选）', '围绕编辑器介绍');
+  await click(label);
+  expect(api.post).toHaveBeenLastCalledWith('/promotion/ai/tasks', expect.objectContaining({
+    kind: 'topics', instruction: '围绕编辑器介绍',
+    topic_options: { direction: 'application_overview', audience: '开发者与技术团队', platform: 'wechat', count: 3 },
+  }));
+  for (const field of ['介绍角度（可选）', '目标读者（可选）', '发布渠道（可选）', '选题数量']) await choose(field, '');
+  await click(label);
+  expect(vi.mocked(api.post).mock.calls.slice(-1)[0]![1]).not.toHaveProperty('topic_options');
+});
+
 it('creates and edits topics with multiple materials, thesis and outline', async () => {
   rows.cases.push({ ...story, id: 'feature1', title: '任务编排', data: { material_type: 'feature' } });
   rows.topics = [{ ...idea, case_ids: ['case1', 'feature1'], data: { direction: 'workflow', thesis: '完整工作流', outline: '输入到输出' } }];
@@ -102,23 +265,27 @@ it.each(['missing', 'throwing', 'absent'])('generates topics from multiple mater
   await checkMaterial('排版演示'); await checkMaterial('任务编排');
   const draft = [...document.querySelectorAll<HTMLLabelElement>('.promotion-material-option')].find(el => el.textContent?.startsWith('待审核资料'))!;
   expect(draft.querySelector('input')!.disabled).toBe(true);
+  await choose('介绍角度（可选）', 'workflow');
+  await choose('选题数量', '3');
   vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败'));
   await click('生成选题建议');
   const first = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
   expect(first.case_ids).toEqual(['case1', 'feature1']);
+  expect(first.topic_options).toEqual({ direction: 'workflow', count: 3 });
   await click('生成选题建议');
   expect((vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>).request_key).toBe(first.request_key);
   await click('生成选题建议');
   expect((vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>).request_key).not.toBe(first.request_key);
+  vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败'));
+  await click('生成选题建议');
+  const pending = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
+  await choose('选题数量', '5');
+  await click('生成选题建议');
+  const changed = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
+  expect(changed.topic_options).toEqual({ direction: 'workflow', count: 5 });
+  expect(changed.request_key).not.toBe(pending.request_key);
 });
 
-it('opens the four modules with a bounded page root and an honest empty report', async () => {
-  await render();
-  expect(container.querySelector('.promotion-page.app-scroll-page')).not.toBeNull();
-  for (const label of ['02 · 选题与创作', '03 · 发布看板', '04 · 反馈复盘']) await click(label);
-  expect(container.textContent).toContain('暂无效果依据');
-  expect(container.textContent).not.toContain('排名');
-});
 
 it('retains case edits after a failed save and persists asset links', async () => {
   await render(); await click('新增素材'); await input('名称', '新场景'); await input('已实现能力', 'HTML 输出');
@@ -129,23 +296,10 @@ it('retains case edits after a failed save and persists asset links', async () =
   expect(api.post).toHaveBeenLastCalledWith('/promotion/cases', expect.objectContaining({ title: '新场景', data: expect.objectContaining({ implemented: 'HTML 输出', assets: [expect.objectContaining({ url: 'https://example.com/demo' })] }) }));
 });
 
-it.each(['missing', 'throwing', 'absent'])('submits and retries channel generation on phone HTTP when crypto is %s', async mode => {
-  vi.stubGlobal('crypto', mode === 'absent' ? undefined : mode === 'missing' ? {} : { randomUUID: () => { throw new Error('insecure'); } });
-  await render('channels');
-  vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败'));
-  await click('生成新草稿');
-  const first = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
-  expect(first.request_key).toEqual(expect.any(String));
-  await click('生成新草稿');
-  const retry = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
-  expect(retry.request_key).toBe(first.request_key);
-  await click('生成新草稿');
-  expect((vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>).request_key).not.toBe(first.request_key);
-});
 
 it('uses a new request key when failed payload changes for every task kind', async () => {
   const client = promotionApi(base);
-  for (const kind of ['case', 'project', 'topics', 'review', 'copy']) {
+  for (const kind of ['case', 'project', 'topics']) {
     vi.mocked(api.post).mockRejectedValueOnce(new Error('network'));
     await expect(client.start({ kind, instruction: '原始' })).rejects.toThrow('network');
     const old = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
@@ -154,31 +308,8 @@ it('uses a new request key when failed payload changes for every task kind', asy
   }
 });
 
-it('keeps unsaved version changes on failure and prevents confirming the old version', async () => {
-  await render('channels'); await click('编辑文案'); await input('正文／发布配文', '修改后的草稿');
-  expect(button('确认此版本待发布').disabled).toBe(true);
-  vi.mocked(api.post).mockRejectedValueOnce(new Error('保存失败')); await click('保存为新版本');
-  expect(field('正文／发布配文').value).toBe('修改后的草稿');
-  vi.mocked(api.post).mockResolvedValueOnce({ ...version, id: 'v2', number: 2, body: { ...body, body: '修改后的草稿' } });
-  await click('保存为新版本');
-  expect(api.post).toHaveBeenLastCalledWith('/promotion/channels/channel1/versions', expect.objectContaining({ revision: 0, body: expect.objectContaining({ body: '修改后的草稿' }) }));
-  expect(button('确认此版本待发布').disabled).toBe(false);
-});
 
-it('creates another channel separately from the already published content', async () => {
-  rows.channels = [{ ...channel, status: 'published' }]; await render('topics');
-  vi.mocked(api.post).mockResolvedValueOnce({ ...channel, id: 'xiaohongshu', platform: 'xiaohongshu', status: 'draft' });
-  await click('准备小红书');
-  expect(api.post).toHaveBeenCalledWith('/promotion/channels', { title: idea.title, topic_id: 'topic1', platform: 'xiaohongshu' });
-  expect(api.patch).not.toHaveBeenCalled();
-});
 
-it('preserves unknown feedback metrics and attribution', async () => {
-  await render('feedback'); await click('记录反馈'); await input('名称', '咨询问题'); await input('私信中反复出现的问题', '可以接入资料吗？'); await click('保存');
-  expect(api.post).toHaveBeenLastCalledWith('/promotion/feedback', expect.objectContaining({ channel_id: null, data: expect.objectContaining({ questions: '可以接入资料吗？' }) }));
-  const payload = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as { data: Record<string, unknown> };
-  expect(payload.data.views).toBeUndefined(); expect(payload.data.inquiries).toBeUndefined();
-});
 
 it.each(['missing', 'throwing', 'absent'])('retains project path and retries with the same key when crypto is %s', async mode => {
   vi.stubGlobal('crypto', mode === 'absent' ? undefined : mode === 'missing' ? {} : { randomUUID: () => { throw new Error('insecure'); } });
@@ -186,11 +317,11 @@ it.each(['missing', 'throwing', 'absent'])('retains project path and retries wit
   expect(button('探索项目并生成素材').disabled).toBe(true);
   await input('项目绝对路径', 'D:\\workspace\\demo');
   await input('探索方向（可选）', '展示文章排版');
-  await choose('探索侧重', 'deployment');
+  await selectCategories(['deployment', 'security']);
   vi.mocked(api.post).mockRejectedValueOnce(new Error('路径不可访问'));
   await click('探索项目并生成素材');
   const first = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
-  expect(first).toEqual(expect.objectContaining({ kind: 'project', exploration_mode: 'overview', exploration_focus: 'deployment', project_path: 'D:\\workspace\\demo', instruction: '展示文章排版', request_key: expect.any(String) }));
+  expect(first).toEqual(expect.objectContaining({ kind: 'project', exploration_mode: 'overview', material_types: ['deployment', 'security'], project_path: 'D:\\workspace\\demo', instruction: '展示文章排版', request_key: expect.any(String) }));
   expect(field('项目绝对路径').value).toBe('D:\\workspace\\demo');
   expect(container.textContent).toContain('路径不可访问');
   await click('探索项目并生成素材');
@@ -202,17 +333,22 @@ it.each(['missing', 'throwing', 'absent'])('retains project path and retries wit
 it('requires an explicit direction before deep exploration and changes retry keys across modes', async () => {
   await render();
   await input('项目绝对路径', '/workspace/project');
+  await selectCategories(['deployment', 'security']);
   await choose('探索模式', 'deep');
+  expect(container.querySelector('.promotion-material-picker')).toBeNull();
   expect(button('探索项目并生成素材').disabled).toBe(true);
   await input('深入方向（必填）', '任务调度与失败恢复');
   vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败'));
   await click('探索项目并生成素材');
   const deep = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
   expect(deep).toEqual(expect.objectContaining({ exploration_mode: 'deep', instruction: '任务调度与失败恢复' }));
+  expect(deep).not.toHaveProperty('material_types');
+  expect(deep).not.toHaveProperty('exploration_focus');
   await choose('探索模式', 'overview');
   await click('探索项目并生成素材');
   const overview = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
   expect(overview.exploration_mode).toBe('overview');
+  expect(overview.material_types).toEqual(['deployment', 'security']);
   expect(overview.request_key).not.toBe(deep.request_key);
 });
 
@@ -222,7 +358,7 @@ it('opens a source-backed material as a deep exploration direction without submi
   await click('深入此方向');
   expect(field('项目绝对路径').value).toBe('/workspace/original');
   expect(field('探索模式').value).toBe('deep');
-  expect(field('探索侧重').value).toBe('deployment');
+  expect(container.querySelector('.promotion-material-picker')).toBeNull();
   expect(field('深入方向（必填）').value).toContain('排版演示');
   expect(api.post).not.toHaveBeenCalled();
   await click('探索项目并生成素材');
@@ -300,47 +436,47 @@ it.each([
   expect(field('名称').value).toBe('源码排版案例');
 });
 
-it('shows material names in version history without exposing historical code excerpts', async () => {
-  const previous = vi.mocked(api.get).getMockImplementation()!;
-  vi.mocked(api.get).mockImplementation(async url => url.endsWith('/versions') ? [{ ...version, snapshot: { cases: [{ ...story, source_snapshot: { evidence: { e1: { path: 'private.py', quote: 'legacy-code-excerpt' } } } }] } }] : previous(url));
-  await render('channels');
-  await click('编辑文案');
-  const modal = document.querySelector('.promotion-modal')!;
-  expect(modal.textContent).toContain('本版本的关联素材');
-  expect(modal.textContent).toContain('排版演示 · 修订 0');
-  expect(modal.textContent).not.toContain('private.py');
-  expect(modal.textContent).not.toContain('legacy-code-excerpt');
-});
 
 
-it('offers every material category as a focus with explanations and preserves retry keys until focus changes', async () => {
+it('offers only multi-select material categories and preserves retry keys until categories change', async () => {
   await render();
-  const select = field('探索侧重') as unknown as HTMLSelectElement;
-  expect(select.value).toBe('all');
-  expect(container.textContent).toContain('当前为综合视角，可生成多种素材分类');
-  expect([...select.querySelectorAll('optgroup')].map(group => group.label)).toEqual(['综合视角', '素材分类']);
-  const categoryOptions = [...select.querySelectorAll('optgroup[label="素材分类"] option')] as HTMLOptionElement[];
-  expect(categoryOptions.map(option => [option.value, option.text])).toEqual(Object.entries(materialTypes));
-  expect(categoryOptions).toHaveLength(21);
-  for (const focus of ['overview', 'application_overview', 'deployment', 'security', 'performance', 'roadmap']) {
-    await choose('探索侧重', focus);
-    expect(container.textContent).toContain(`当前仅生成「${materialTypes[focus]}」素材`);
-    expect(container.textContent).not.toContain('当前为综合视角');
-    expect(document.getElementById(select.getAttribute('aria-describedby')!)?.textContent).toBe(explorationFocusDescriptions[focus]);
+  const picker = container.querySelector('.promotion-material-picker')!;
+  expect(picker.querySelector('legend')?.textContent).toBe('素材分类');
+  const boxes = [...picker.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  expect(boxes.map(box => [box.value, box.getAttribute('aria-label')])).toEqual(Object.entries(materialTypes));
+  expect(boxes.filter(box => box.checked).map(box => box.value)).toEqual(['overview']);
+  expect(container.textContent).not.toContain('综合视角');
+  expect(container.textContent).not.toContain('探索侧重');
+  for (const key of Object.keys(materialTypes)) {
+    expect(picker.textContent).toContain(explorationFocusDescriptions[key]);
   }
   await input('项目绝对路径', '/workspace/project');
+  await selectCategories([]);
+  expect(button('探索项目并生成素材').disabled).toBe(true);
+  expect(picker.textContent).toContain('请选择至少一种素材分类');
+  await selectCategories(['deployment', 'roadmap']);
   vi.mocked(api.post).mockRejectedValueOnce(new Error('网络失败')).mockRejectedValueOnce(new Error('网络失败'));
   await click('探索项目并生成素材');
   const first = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
-  expect(first.exploration_focus).toBe('roadmap');
+  expect(first.material_types).toEqual(['deployment', 'roadmap']);
   await click('探索项目并生成素材');
   expect((vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>).request_key).toBe(first.request_key);
-  await choose('探索侧重', 'cost');
+  await selectCategories(['deployment', 'cost']);
   await click('探索项目并生成素材');
   const next = vi.mocked(api.post).mock.calls.slice(-1)[0]![1] as Record<string, unknown>;
-  expect(next.exploration_focus).toBe('cost');
+  expect(next.material_types).toEqual(['deployment', 'cost']);
   expect(next.exploration_mode).toBe('overview');
   expect(next.request_key).not.toBe(first.request_key);
+});
+
+it.each([
+  [{ exploration_mode: 'overview', material_types: ['deployment', 'security'] }, '全面概览 · 部署运维、安全隐私'],
+  [{ exploration_mode: 'overview', exploration_focus: 'technical' }, '全面概览 · 技术实现与设计'],
+  [{ exploration_mode: 'deep', material_types: ['deployment'], exploration_focus: 'technical' }, '指定方向深挖 · 项目：'],
+])('shows current and historical project category summaries (%j)', async (request, expected) => {
+  taskRows = [{ id: 'categories-history', kind: 'project', status: 'failed', request: { ...request, project_path: '/project' }, result: {}, error: '', applied: false, created_at: '' }];
+  await render();
+  expect(container.querySelector('.promotion-task-section')?.textContent).toContain(expected);
 });
 
 it('filters and edits new material categories', async () => {
@@ -367,7 +503,7 @@ it('keeps project and application overviews separate in filters, editing and dee
   expect(container.textContent).toContain('项目宣传助手介绍');
   expect(container.textContent).not.toContain('创作平台整体介绍');
   await click('深入此方向');
-  expect(field('探索侧重').value).toBe('application_overview');
+  expect(container.querySelector('.promotion-material-picker')).toBeNull();
   expect(field('深入方向（必填）').value).toContain('项目宣传助手介绍');
   await click('编辑与审核');
   expect(field('素材类型').value).toBe('application_overview');

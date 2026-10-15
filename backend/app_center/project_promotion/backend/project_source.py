@@ -46,7 +46,7 @@ def validate_project_result(value, source):
         reason = s.CharField(max_length=2000).run_validation(value['insufficient_reason'])
         raise ValueError('项目资料不足：' + reason)
     result = validated(ProjectResult, value)
-    allowed = allowed_material_types(source.get('exploration_focus', 'all'))
+    allowed = allowed_material_types(source)
     if sum(item['data']['material_type'] == 'overview' for item in result['cases']) > 1:
         raise ValidationError('项目概览应汇总整个项目，最多一份。项目内各应用的介绍请归为应用概览；若本次只选择项目概览，请合并为项目整体介绍。')
     titles = set()
@@ -56,7 +56,7 @@ def validate_project_result(value, source):
         titles.add(item['title'])
         data = item['data']
         if data['material_type'] not in allowed:
-            raise ValidationError(f'本次仅允许素材分类 {allowed[0]}，但「{item["title"]}」使用了 {data["material_type"]}。请删除其他分类并按所选方向重新整理，不要只修改分类标签；资料不足可提交 insufficient_reason。')
+            raise ValidationError(f'本次仅允许素材分类 {", ".join(allowed)}，但「{item["title"]}」使用了 {data["material_type"]}。请删除其他分类并按所选方向重新整理，不要只修改分类标签；资料不足可提交 insufficient_reason。')
         data['case_type'] = 'demo'
         data['assets'] = []
         data['evidence'] = ''
@@ -90,9 +90,8 @@ class ProjectTools:
         return json.dumps({'accepted': True, 'case_count': len(self.result['cases'])})
 
     def definitions(self):
-        focus = self.source.get('exploration_focus', 'all')
-        allowed = allowed_material_types(focus)
-        instruction = INSTRUCTION.replace('|'.join(MATERIAL_TYPES), '|'.join(allowed)) + '\n' + focus_instruction(focus)
+        allowed = allowed_material_types(self.source)
+        instruction = INSTRUCTION.replace('|'.join(MATERIAL_TYPES), '|'.join(allowed)) + '\n' + focus_instruction(self.source)
         return [
             {'name': 'promotion_submit_cases', 'description': '探索完成后提交素材。不需要源码引用；若字段校验失败，在同一会话内修正后再次提交。' + instruction,
              'inputSchema': {'type': 'object', 'properties': {'insufficient_reason': {'type': 'string', 'maxLength': 2000}, 'analysis': {'type': 'string'}, 'cases': {'type': 'array',
@@ -123,7 +122,7 @@ OVERVIEW_INSTRUCTION = '''本次模式：全面概览。覆盖整个项目的主
 不要逐项展开调用链、数据库字段、异常分支、配置参数、测试细节或实现教程；不全量读取大型文件。
 已能说明某个模块做什么、适合谁、产出什么，就转向下一个模块，不继续追查其实现细节。
 仅有文档支持的能力在 facts 中明确标为文档声明，implemented 留空，不能为了填满该字段而深挖所有模块。
-exploration_focus 只影响介绍侧重，不缩小概览的模块覆盖范围；补充要求也不能把本模式改成深挖。
+素材分类只限定输出类型，不缩小概览的模块覆盖范围；补充要求也不能把本模式改成深挖。
 完成条件是主要模块都已归纳或明确标注资料缺口，而不是凑够几份素材。先覆盖广度，再收束输出。
 analysis 包含项目定位、主要模块覆盖清单（含待核实项）、核心工作流程、值得后续深挖的方向。
 仅当本次允许的素材分类包含 overview 时，才可输出 overview 项目概览；选了其他具体分类时，将项目全貌放在 analysis，不额外生成概览素材。
@@ -151,6 +150,11 @@ def explore_project(task, agent, progress, check):
     focus = task.snapshot['request'].get('exploration_focus', 'all')
     source = dict(origin=origin, exploration_mode=mode, exploration_focus=focus,
         ingestion={k: v for k, v in ingestion.items() if k != 'excluded'})
+    if mode == 'deep':
+        source.pop('exploration_focus')
+    elif 'material_types' in task.snapshot['request']:
+        source.pop('exploration_focus')
+        source['material_types'] = task.snapshot['request']['material_types']
     tools = ProjectTools(source, progress, check)
     with TemporaryDirectory(prefix='promotion-project-', ignore_cleanup_errors=True) as directory:
         for name, file in files.items():
@@ -160,9 +164,9 @@ def explore_project(task, agent, progress, check):
             target.write_text(file['text'], encoding='utf-8', newline='')
         progress('Agent 正在梳理整个项目的模块与能力概览' if mode == 'overview' else 'Agent 正在深入指定方向的实现与流程')
         thread_id = agent(working_directory=directory,
-            instruction=AGENT_INSTRUCTION + (DEEP_INSTRUCTION if mode == 'deep' else OVERVIEW_INSTRUCTION) + '\n' + focus_instruction(focus),
-            content={'探索模式': mode, '探索侧重': focus,
-                     '方向': task.snapshot['request']['instruction'], '品牌资料': task.snapshot.get('brand'),
+            instruction=AGENT_INSTRUCTION + (DEEP_INSTRUCTION if mode == 'deep' else OVERVIEW_INSTRUCTION) + '\n' + focus_instruction(source),
+            content={'探索模式': mode, **({} if mode == 'deep' else {'素材分类': allowed_material_types(source)}),
+                     '方向': task.snapshot['request']['instruction'],
                      '项目文本文件数': len(files)}, tools=tools.definitions(),
             handlers={'promotion_submit_cases': tools.submit})
     check()

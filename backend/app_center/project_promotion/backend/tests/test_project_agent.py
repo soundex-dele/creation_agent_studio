@@ -221,10 +221,14 @@ def test_selected_focus_reaches_agent_without_changing_exploration_scope(context
     def complete(messages, **options):
         instruction = messages[0]['content']
         label, description = EXPLORATION_FOCUSES[focus]
-        assert f'本次探索侧重：{label}' in instruction and description in instruction
-        assert json.loads(messages[1]['content'])['探索侧重'] == focus
+        if mode == 'overview':
+            assert f'本次探索侧重：{label}' in instruction and description in instruction
+            assert json.loads(messages[1]['content'])['素材分类'] == project_source.allowed_material_types(focus)
+        else:
+            assert '本次探索侧重' not in instruction
+            assert '素材分类' not in json.loads(messages[1]['content'])
         assert (project_source.OVERVIEW_INSTRUCTION if mode == 'overview' else project_source.DEEP_INSTRUCTION) in instruction
-        if focus in MATERIAL_CATALOG:
+        if mode == 'overview' and focus in MATERIAL_CATALOG:
             assert f'仅输出 material_type={focus}' in instruction
             assert '不要附带其他分类' in instruction
         value = model_result()
@@ -236,5 +240,22 @@ def test_selected_focus_reaches_agent_without_changing_exploration_scope(context
         return response()
     context.engine.complete.side_effect = complete
     result = execute(context)
-    assert result['cases'][0]['source_snapshot']['exploration_focus'] == focus
+    assert result['cases'][0]['source_snapshot'].get('exploration_focus') == (focus if mode == 'overview' else None)
     assert result['cases'][0]['data']['evidence'] == ''
+
+
+def test_deep_agent_ignores_categories_in_old_source_snapshot(context):
+    context.task.snapshot['request'].update(exploration_mode='deep', material_types=['deployment'], exploration_focus='security')
+    def complete(messages, **options):
+        assert '不受概览时所选分类限制' in messages[0]['content']
+        assert '素材分类' not in json.loads(messages[1]['content'])
+        value = model_result()
+        for item in value['cases']:
+            item['data']['material_type'] = 'workflow'
+        options['tool_handlers']['promotion_submit_cases'](value)
+        return response()
+    context.engine.complete.side_effect = complete
+    result = execute(context)
+    source = result['cases'][0]['source_snapshot']
+    assert 'material_types' not in source and 'exploration_focus' not in source
+    assert source['exploration_mode'] == 'deep'

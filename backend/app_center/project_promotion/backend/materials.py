@@ -49,6 +49,9 @@ def snapshot_materials(snapshot):
 def generation_context(snapshot):
     # Keep the legacy alias in durable snapshots, without sending/counting it twice.
     context = deepcopy({key: value for key, value in snapshot.items() if key != 'case' or not snapshot.get('cases')})
+    if context.get('request', {}).get('kind') in ('case', 'project'):
+        context.pop('brand', None)
+        context['request'].pop('brand_reference', None)
     for row in snapshot_materials(context):
         source = row.pop('source_snapshot', None)
         if source and source.get('evidence'):

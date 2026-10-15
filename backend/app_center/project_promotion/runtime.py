@@ -117,7 +117,10 @@ def execute(payload, sink):
                 task, **kwargs, progress=progress, check=check, on_activity=activity), progress, check))
         else:
             progress('根据已选资料生成草稿')
-            result = validate_result(task, model(PROMPTS[task.kind], generation_context(task.snapshot)))
+            instruction = PROMPTS[task.kind]
+            if task.kind in ('topics', 'review'):
+                instruction += '\n遵循 request.topic_options 中的本次选题偏好：direction 指定介绍角度，audience 指定目标读者，platform 指定发布渠道（wechat=公众号、xiaohongshu=小红书、douyin=抖音、moments=朋友圈）。未选择的项目根据素材判断；渠道仅影响选题表达，不创建渠道任务。count 指定选题数量上限，覆盖默认数量要求；未指定时生成1至8个。资料不足时少于上限，不凑数，不为满足偏好虚构事实；在 analysis 中说明不足。品牌资料只补充定位与表达，不能替代已选项目素材或当作项目已实现能力。'
+            result = validate_result(task, model(instruction, generation_context(task.snapshot)))
         with transaction.atomic():
             current = AITask.objects.select_for_update().get(pk=task.pk)
             if cancelled() or current.status == 'cancelled':
