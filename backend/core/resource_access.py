@@ -159,6 +159,19 @@ def accessible_resources(queryset, user, *, operation="discover"):
     return queryset.filter(rule).distinct()
 
 
+def active_member_applications(user, organization_ids, *, slug):
+    """Applications runnable by an active member, including for platform admins."""
+    from apps.applications.models import Application
+
+    if not user.is_authenticated or not user.is_active:
+        return Application.objects.none()
+    memberships = _membership_queryset(user).filter(organization_id__in=organization_ids)
+    return accessible_resources(Application.objects.filter(
+        organization_id__in=memberships.values("organization_id"),
+        slug=slug, kind="custom", is_active=True,
+    ), user, operation="run")
+
+
 def can_access_resource(resource, user, *, operation="discover"):
     if not resource or not user or not user.is_authenticated:
         return False

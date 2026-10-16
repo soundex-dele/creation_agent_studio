@@ -8,4 +8,4 @@ def run_access(user, run):
     return user.is_authenticated and run.owner_id == user.id
 
 
-provider = ApplicationContributions(run_access=run_access)
+provider = ApplicationContributions(run_access=run_access, run_access_input_keys=())

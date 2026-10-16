@@ -45,6 +45,37 @@ def run_access(user, root):
     return all(decisions) if decisions else None
 
 
+def run_access_input_keys():
+    """Project input only when every installed policy declares its needs."""
+    keys = set()
+    for provider in contributions():
+        if provider.run_access or provider.run_access_many:
+            if provider.run_access_input_keys is None:
+                return None
+            keys.update(provider.run_access_input_keys)
+    return tuple(sorted(keys))
+
+
+def run_access_many(user, roots):
+    """Batch contributions may handle a subset; remaining roots use the scalar policy."""
+    decisions = {root.pk: None for root in roots}
+    try:
+        for provider in contributions():
+            bulk = provider.run_access_many
+            resolved = bulk(user, roots) if bulk else {}
+            for root in roots:
+                if root.pk in resolved:
+                    decision = resolved[root.pk]
+                else:
+                    decision = provider.run_access(user, root) if provider.run_access else None
+                if decision is not None:
+                    decisions[root.pk] = decisions[root.pk] is not False and decision is True
+    except Exception:
+        logger.exception('Application batch access policy failed')
+        return dict.fromkeys(decisions, False)
+    return decisions
+
+
 def knowledge_context(document):
     context = {}
     for provider in contributions():

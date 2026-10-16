@@ -1,4 +1,4 @@
-import type { RunResource } from '@/services/applicationRuntime';
+import type { RunSummaryResource as RunResource } from '@/services/applicationRuntime';
 
 export type PrimaryTaskType = 'automation' | 'workflow' | 'conversation';
 
@@ -18,8 +18,8 @@ export const taskConversationId = (run: RunResource): string | null => {
  * its own durable Run. Keep the newest Run as the conversation task's current
  * state so a completed answer resolves the task to `succeeded`.
  */
-export const collapseConversationRuns = (runs: RunResource[]): RunResource[] => {
-  const collapsed: RunResource[] = [];
+export const collapseConversationRuns = <T extends RunResource>(runs: T[]): T[] => {
+  const collapsed: T[] = [];
   const conversationIndexes = new Map<string, number>();
 
   runs.forEach((run) => {

@@ -18,4 +18,4 @@ def run_access(user, run):
     return True
 
 
-provider = ApplicationContributions(run_access=run_access)
+provider = ApplicationContributions(run_access=run_access, run_access_input_keys=('record_id',))

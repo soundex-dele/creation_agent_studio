@@ -37,4 +37,4 @@ def prepare_conversation_message(conversation, user, message, context):
     return prepare_document_message(conversation, user, message, context)
 
 
-provider = ApplicationContributions(run_access=run_access, conversation_access=conversation_access, conversation_queryset=conversation_queryset, prepare_conversation_message=prepare_conversation_message)
+provider = ApplicationContributions(run_access=run_access, conversation_access=conversation_access, conversation_queryset=conversation_queryset, prepare_conversation_message=prepare_conversation_message, run_access_input_keys=('document_id',))

@@ -26,6 +26,36 @@ def test_knowledge_context_never_silently_overwrites_another_application(monkeyp
         extensions.knowledge_context(object())
 
 
+def test_batch_access_preserves_fallback_overlap_and_fail_closed(monkeypatch):
+    from modules.platform_api.extensions import ApplicationContributions
+
+    runs = [SimpleNamespace(pk="one"), SimpleNamespace(pk="two")]
+    fallback = Mock(return_value=False)
+    bulk = ApplicationContributions(run_access=fallback, run_access_many=lambda *_: {"one": True})
+    monkeypatch.setattr(extensions, "contributions", lambda: [bulk])
+    assert extensions.run_access_many(object(), runs) == {"one": True, "two": False}
+    assert fallback.call_count == 1
+    assert fallback.call_args.args[1] is runs[1]
+    other_policy = ApplicationContributions(run_access=lambda *_: False)
+    monkeypatch.setattr(extensions, "contributions", lambda: [bulk, other_policy])
+    assert extensions.run_access_many(object(), runs) == {"one": False, "two": False}
+    broken = ApplicationContributions(run_access_many=Mock(side_effect=RuntimeError("unavailable")))
+    monkeypatch.setattr(extensions, "contributions", lambda: [bulk, broken])
+    assert extensions.run_access_many(object(), runs) == {"one": False, "two": False}
+
+
+def test_history_input_projection_requires_every_policy_to_opt_in(monkeypatch):
+    from modules.platform_api.extensions import ApplicationContributions
+
+    provider = ApplicationContributions(run_access=lambda *_: True, run_access_input_keys=("task_id",))
+    unused = ApplicationContributions(knowledge_context=lambda *_: {})
+    monkeypatch.setattr(extensions, "contributions", lambda: [provider, unused])
+    assert extensions.run_access_input_keys() == ("task_id",)
+    legacy = ApplicationContributions(run_access=lambda *_: None)
+    monkeypatch.setattr(extensions, "contributions", lambda: [provider, legacy])
+    assert extensions.run_access_input_keys() is None
+
+
 def test_conversation_access_failures_do_not_fall_through(monkeypatch):
     from modules.platform_api.extensions import ApplicationContributions
     from rest_framework.exceptions import PermissionDenied

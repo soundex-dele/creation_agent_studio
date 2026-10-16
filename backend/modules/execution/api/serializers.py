@@ -98,7 +98,7 @@ class RunSerializer(serializers.ModelSerializer):
         conversation = self._conversation_metadata(obj)
         if self._conversation_id(obj) and conversation and conversation.get("title"):
             return str(conversation["title"])
-        snapshot = obj.definition_snapshot or {}
+        snapshot = self._snapshot(obj)
         for key in (
             "workflow_name", "application_name", "supervisor_name",
             "conversation_title", "workflow_step_name", "agent_name",
@@ -127,10 +127,16 @@ class RunSerializer(serializers.ModelSerializer):
         return invocation.automation_id if invocation is not None else None
 
     @staticmethod
+    def _snapshot(obj):
+        if "_task_snapshot" in obj.__dict__:
+            return obj._task_snapshot
+        return obj.definition_snapshot or {}
+
+    @staticmethod
     def _conversation_id(obj) -> str | None:
         if obj.source_type == "conversation" and obj.source_id:
             return str(obj.source_id)
-        value = (obj.definition_snapshot or {}).get("conversation_id")
+        value = RunSerializer._snapshot(obj).get("conversation_id")
         return str(value) if value else None
 
     def _conversation_metadata(self, obj):
@@ -150,13 +156,13 @@ class RunSerializer(serializers.ModelSerializer):
     def get_workflow_id(self, obj) -> str | None:
         if obj.source_type == "workflow" and obj.source_id:
             return str(obj.source_id)
-        value = (obj.definition_snapshot or {}).get("workflow_id")
+        value = self._snapshot(obj).get("workflow_id")
         return str(value) if value else None
 
     def get_application_id(self, obj) -> str | None:
         if obj.source_type == "application" and obj.source_id:
             return str(obj.source_id)
-        value = (obj.definition_snapshot or {}).get("application_id")
+        value = self._snapshot(obj).get("application_id")
         if value:
             return str(value)
         conversation = self._conversation_metadata(obj)
@@ -170,6 +176,16 @@ class RunSerializer(serializers.ModelSerializer):
     def get_conversation_scope(self, obj) -> str | None:
         conversation = self._conversation_metadata(obj)
         return conversation.get("scope") if conversation else None
+
+
+class RunSummarySerializer(RunSerializer):
+    """Task history metadata; payloads are fetched from the detail endpoint."""
+
+    class Meta(RunSerializer.Meta):
+        fields = tuple(
+            field for field in RunSerializer.Meta.fields
+            if field not in {"definition_snapshot", "input", "output_summary"}
+        )
 
 
 class RunEventSerializer(serializers.ModelSerializer):

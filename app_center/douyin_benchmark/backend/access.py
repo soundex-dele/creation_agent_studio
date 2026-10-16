@@ -39,6 +39,38 @@ def can_access_run(user, run):
         return False
 
 
+def can_access_runs(user, runs):
+    from uuid import UUID
+    from modules.platform_api.identity import active_member_applications
+
+    allowed_apps = set(active_member_applications(
+        user, {run.organization_id for run in runs}, slug="douyin-benchmark",
+    ).values_list("organization_id", "id"))
+    tasks = {task["run_id"]: task for task in Task.objects.filter(
+        run_id__in=[run.pk for run in runs], owner=user,
+    ).values("id", "run_id", "organization_id", "application_id", "account_id",
+             "account__owner_id", "account__organization_id", "account__application_id")}
+    decisions = {}
+    for run in runs:
+        task = tasks.get(run.pk)
+        try:
+            task_id = UUID(str((run.input or {}).get("task_id")))
+        except (ValueError, TypeError):
+            task_id = None
+        decisions[run.pk] = bool(
+            run.owner_id == user.pk and task and task["id"] == task_id
+            and task["organization_id"] == run.organization_id
+            and str(task["application_id"]) == run.source_id
+            and (run.organization_id, task["application_id"]) in allowed_apps
+            and (not task["account_id"] or (
+                task["account__owner_id"] == user.pk
+                and task["account__organization_id"] == run.organization_id
+                and task["account__application_id"] == task["application_id"]
+            ))
+        )
+    return decisions
+
+
 def can_access_knowledge_index(user, run, document):
     from django.http import Http404
     from rest_framework.exceptions import APIException

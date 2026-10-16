@@ -57,6 +57,26 @@ afterEach(async () => {
 });
 
 describe('task center activity links', () => {
+  it('loads summaries first and fetches full payloads only when details are opened', async () => {
+    const summary = { id: 'summary-run', organization_id: 'org-1', status: 'succeeded',
+      task_title: '摘要任务', task_type: 'conversation', conversation_id: '42' };
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url.endsWith('/runs')) return [summary];
+      if (url.endsWith('/children')) return [];
+      return { ...run(summary.id), ...summary, input: { message: '完整输入' }, output_summary: { result: '完整输出' } };
+    });
+    await render('/tasks');
+    expect(api.get).toHaveBeenCalledWith(expect.stringMatching(/\/runs$/), {
+      collapse_conversations: true, view: 'summary',
+    });
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('摘要任务');
+    await act(async () => container.querySelector<HTMLButtonElement>('.task-title-button')!.click());
+    expect(api.get).toHaveBeenCalledWith(expect.stringMatching(/\/runs\/summary-run$/));
+    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('完整输入');
+    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('完整输出');
+  });
+
   it('shows legacy CoWork tasks as conversations and opens the matching conversation', async () => {
     const cowork: RunResource = {
       ...run('cowork-run'), source_type: 'conversation', task_type: 'conversation',
@@ -66,7 +86,11 @@ describe('task center activity links', () => {
       ...run('normal-run'), source_type: 'conversation', task_type: 'conversation',
       conversation_id: '43', conversation_scope: 'default',
     };
-    vi.mocked(api.get).mockImplementation(async (url) => url.endsWith('/runs') ? [cowork, normal] : []);
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url.endsWith('/runs')) return [cowork, normal];
+      if (url.endsWith('/cowork-run')) return cowork;
+      return [];
+    });
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     await render('/tasks');
     const conversationTab = [...container.querySelectorAll<HTMLElement>('[role="tab"]')]
@@ -89,6 +113,39 @@ describe('task center activity links', () => {
     });
     expect(container.querySelector('[data-row-key="cowork-run"]')).not.toBeNull();
     expect(container.querySelector('[data-row-key="normal-run"]')).toBeNull();
+  });
+
+  it('does not fetch missing parent details until a task is opened', async () => {
+    const child = { ...run('child'), parent_id: 'parent' };
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url.endsWith('/runs')) return [child];
+      if (url.endsWith('/children')) return [];
+      return url.endsWith('/child') ? child : run('parent');
+    });
+    await render('/tasks');
+    expect(api.get).toHaveBeenCalledTimes(1);
+    await act(async () => container.querySelector<HTMLButtonElement>('.task-title-button')!.click());
+    expect(api.get).toHaveBeenCalledWith(expect.stringMatching(/\/parent$/));
+    expect(document.querySelector('.task-detail-drawer')?.textContent).toContain('任务 parent');
+  });
+
+  it('ignores a slow summary detail after closing and allows reopening the same task', async () => {
+    let resolveDetail!: (value: RunResource) => void;
+    const detail = new Promise<RunResource>((resolve) => { resolveDetail = resolve; });
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url.endsWith('/runs')) return [run('slow-summary')];
+      if (url.endsWith('/children')) return [];
+      return detail;
+    });
+    await render('/tasks');
+    const button = container.querySelector<HTMLButtonElement>('.task-title-button')!;
+    await act(async () => button.click());
+    const close = document.querySelector<HTMLButtonElement>('.task-detail-drawer .ant-drawer-close')!;
+    await act(async () => close.click());
+    await act(async () => resolveDetail(run('slow-summary')));
+    expect(document.querySelector('.task-detail-drawer .task-drawer-title')).toBeNull();
+    await act(async () => button.click());
+    expect(document.querySelector('.task-detail-drawer .task-drawer-title')?.textContent).toContain('slow-summary');
   });
 
   it('opens the exact task and selects its table page', async () => {

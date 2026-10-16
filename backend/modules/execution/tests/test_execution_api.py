@@ -270,6 +270,143 @@ def test_run_list_uses_canonical_history_and_source_filter(
     assert invalid.status_code == 400
 
 
+def test_run_summary_omits_payloads_but_preserves_task_metadata(
+    authenticated_client, api_organization, api_run,
+):
+    api_run.definition_snapshot = {"application_name": "Task label", "large": "x" * 10000}
+    api_run.input = {"message": "large input"}
+    api_run.output_summary = {"result": "large output"}
+    api_run.save(update_fields=["definition_snapshot", "input", "output_summary"])
+    url = f"/api/v1/organizations/{api_organization.id}/runs"
+    full = authenticated_client.get(url).data[0]
+    response = authenticated_client.get(url, {"view": "summary", "collapse_conversations": "true"})
+    assert response.status_code == 200
+    payload_fields = {"definition_snapshot", "input", "output_summary"}
+    assert response.data == [{key: value for key, value in full.items() if key not in payload_fields}]
+    assert response.data[0]["task_title"] == "Task label"
+    detail = authenticated_client.get(f"{url}/{api_run.id}")
+    for key in payload_fields:
+        assert detail.data[key] == full[key]
+
+
+def test_run_history_reuses_root_access_only_within_each_request(
+    authenticated_client, api_actor, api_organization, api_run,
+):
+    Run.objects.bulk_create([
+        Run(organization=api_organization, owner=api_actor, parent=api_run,
+            node_key=f"child-{index}", executor_kind=Run.ExecutorKind.AGENT,
+            source_type="application_step")
+        for index in range(30)
+    ])
+    url = f"/api/v1/organizations/{api_organization.id}/runs"
+    with patch("modules.execution.api.run_access.run_access_many", return_value={api_run.pk: True}) as policy:
+        response = authenticated_client.get(url, {"view": "summary"})
+        assert response.status_code == 200
+        assert len(response.data) == 31
+        assert policy.call_count == 1
+        policy.return_value = {api_run.pk: False}
+        assert authenticated_client.get(url, {"view": "summary"}).data == []
+        assert policy.call_count == 2
+
+
+def test_summary_reads_bounded_batches_without_output_or_attempt_payloads(
+    authenticated_client, api_actor, api_organization,
+):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    Run.objects.bulk_create([
+        Run(organization=api_organization, owner=api_actor,
+            executor_kind=Run.ExecutorKind.AGENT, source_type="conversation",
+            source_id=str(900000 + index))
+        for index in range(250)
+    ])
+    with CaptureQueriesContext(connection) as queries, patch.object(Run, "from_db", wraps=Run.from_db) as hydrate:
+        response = authenticated_client.get(
+            f"/api/v1/organizations/{api_organization.id}/runs",
+            {"view": "summary", "collapse_conversations": "true"},
+        )
+    assert response.status_code == 200
+    assert len(response.data) == 100
+    assert hydrate.call_count == 100
+    assert "definition_snapshot" not in hydrate.call_args.args[1]
+    assert "output_summary" not in hydrate.call_args.args[1]
+    assert "input" not in hydrate.call_args.args[1]
+    run_queries = [item["sql"] for item in queries if 'FROM "runs"' in item["sql"]]
+    assert len(run_queries) == 1
+    assert '"output_summary"' not in run_queries[0]
+    assert 'JOIN "run_attempts"' not in run_queries[0]
+    # Missing/deleted conversations must also be cached by the bulk lookup.
+    assert len([item for item in queries if 'FROM "conversations"' in item["sql"]]) == 1
+
+
+@pytest.mark.parametrize("slug", ["douyin-benchmark", "project-promotion", "repo-explainer", "animation-studio"])
+def test_batched_application_access_matches_detail_policy(
+    api_actor, api_organization, authenticated_client, slug, django_assert_max_num_queries,
+):
+    from importlib import import_module
+
+    extension = import_module(f"app_center.{slug.replace('-', '_')}.extensions")
+    category = ApplicationCategory.objects.create(name="History", slug="history")
+    app = Application.objects.create(organization=api_organization, category=category,
+        created_by=api_actor, name=slug, slug=slug, kind="custom", visibility="organization")
+    outsider = get_user_model().objects.create_user(username="history-outsider", is_superuser=True)
+    Membership.objects.create(organization=api_organization, user=outsider, role=Membership.Role.ADMIN)
+    runs = []
+    records = []
+    for index in range(12):
+        run = Run.objects.create(organization=api_organization, owner=api_actor,
+            executor_kind="agent", executor_key=slug, source_type="application", source_id=str(app.pk))
+        if slug == "douyin-benchmark":
+            from app_center.douyin_benchmark.backend.models import Account, Task
+            account = Account.objects.create(organization=api_organization, application=app,
+                owner=api_actor, source_url=f"https://example.com/{index}")
+            record = Task.objects.create(organization=api_organization, application=app,
+                owner=api_actor, account=account, run=run, request_key=str(index))
+            run.input = {"task_id": str(record.pk)}
+        elif slug == "project-promotion":
+            from app_center.project_promotion.backend.models import AITask
+            record = AITask.objects.create(organization=api_organization, application=app,
+                owner=api_actor, run=run, request_key=str(index))
+        elif slug == "repo-explainer":
+            from app_center.repo_explainer.backend.models import Project
+            record = Project.objects.create(organization=api_organization, application=app, owner=api_actor)
+            run.input = {"repo_project_id": str(record.pk)}
+        else:
+            record = None
+        run.save(update_fields=["input"])
+        runs.append(run)
+        records.append(record)
+
+    def check(user, expected):
+        # Query count does not grow with the number of task records.
+        with django_assert_max_num_queries(2):
+            decisions = extension.run_access_many(user, runs)
+        assert set(decisions.values()) == {expected}
+        assert all(extension.run_access(user, run) == expected for run in runs)
+
+    check(api_actor, True)
+    check(outsider, False)
+    url = f"/api/v1/organizations/{api_organization.pk}/runs"
+    assert len(authenticated_client.get(url, {"view": "summary"}).data) == 12
+    app.is_active = False
+    app.save(update_fields=["is_active"])
+    check(api_actor, False)
+    assert authenticated_client.get(url, {"view": "summary"}).data == []
+    app.is_active = True
+    app.save(update_fields=["is_active"])
+    Membership.objects.filter(organization=api_organization, user=api_actor).update(is_active=False)
+    check(api_actor, False)
+    Membership.objects.filter(organization=api_organization, user=api_actor).update(is_active=True)
+    if records[0] is not None:
+        record = records[0]
+        type(record).objects.filter(pk=record.pk).update(owner=outsider)
+        assert extension.run_access_many(api_actor, runs)[runs[0].pk] is False
+        assert extension.run_access(api_actor, runs[0]) is False
+        record.delete()
+        assert extension.run_access_many(api_actor, runs)[runs[0].pk] is False
+
+
 @pytest.mark.parametrize("single_tenant", [False, True])
 def test_run_list_mine_scope_uses_authenticated_owner(
     authenticated_client, api_actor, api_organization, api_run, settings, single_tenant,
@@ -499,6 +636,7 @@ def test_personal_run_history_is_private(
     authenticated_client.force_authenticate(outsider)
     for query in (
         {}, {"scope": "mine"}, {"collapse_conversations": "true"},
+        {"view": "summary", "collapse_conversations": "true"},
         {"source_type": root.source_type},
     ):
         response = authenticated_client.get(url, query)

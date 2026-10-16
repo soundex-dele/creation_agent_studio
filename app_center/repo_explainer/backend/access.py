@@ -24,6 +24,30 @@ def project_for(user, organization_id, application_id, pk, lock=False):
     return get_object_or_404(qs.select_for_update() if lock else qs, pk=pk)
 
 
+def can_access_runs(user, runs):
+    from uuid import UUID
+    from modules.platform_api.identity import active_member_applications
+
+    allowed_apps = set(active_member_applications(
+        user, {run.organization_id for run in runs}, slug="repo-explainer",
+    ).values_list("organization_id", "id"))
+    project_ids = {}
+    for run in runs:
+        try:
+            project_ids[run.pk] = UUID(str((run.input or {}).get('repo_project_id')))
+        except (ValueError, TypeError):
+            project_ids[run.pk] = None
+    projects = {item["id"]: item for item in Project.objects.filter(
+        pk__in=[pk for pk in project_ids.values() if pk], owner=user,
+    ).values("id", "organization_id", "application_id")}
+    return {run.pk: bool(
+        run.owner_id == user.pk and (project := projects.get(project_ids[run.pk]))
+        and project["organization_id"] == run.organization_id
+        and str(project["application_id"]) == run.source_id
+        and (run.organization_id, project["application_id"]) in allowed_apps
+    ) for run in runs}
+
+
 def can_access_run(user, run):
     from django.core.exceptions import ValidationError
     from django.http import Http404

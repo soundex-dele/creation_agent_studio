@@ -15,7 +15,7 @@ import {
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '@/services/api';
-import type { RunResource } from '@/services/applicationRuntime';
+import type { RunResource as FullRunResource, RunSummaryResource as RunResource } from '@/services/applicationRuntime';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import {
@@ -104,7 +104,8 @@ export default function TaskCenterPage() {
   const [runs, setRuns] = useState<RunResource[]>([]);
   const [parents, setParents] = useState<RunResource[]>([]);
   const [children, setChildren] = useState<RunResource[]>([]);
-  const [selected, setSelected] = useState<RunResource | null>(null);
+  const [selected, setSelected] = useState<FullRunResource | null>(null);
+  const [detailRunId, setDetailRunId] = useState<string | null>(linkedRunId);
   const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [treeRoot, setTreeRoot] = useState<RunResource | null>(null);
@@ -124,7 +125,7 @@ export default function TaskCenterPage() {
     try {
       const response = await api.get<RunResource[]>(
         `${tenantApiRoot(organizationId)}/runs`,
-        { collapse_conversations: true },
+        { collapse_conversations: true, view: 'summary' },
       );
       setRuns(response);
     } catch (error: any) {
@@ -137,29 +138,39 @@ export default function TaskCenterPage() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
+    setDetailRunId(linkedRunId);
+    if (linkedRunId) {
+      setTypeFilter('all');
+      setStatusFilter('all');
+      setQuery('');
+    }
+  }, [organizationId, linkedRunId]);
+
+  useEffect(() => {
     setSelected(null);
     setDetailLoading(false);
-    if (!organizationId || !linkedRunId) return;
+    if (!organizationId || !detailRunId) return;
     let cancelled = false;
-    setTypeFilter('all');
-    setStatusFilter('all');
-    setQuery('');
     setDetailLoading(true);
     // Fetch the exact run even if it is outside the latest history window or
     // has been replaced by a newer turn in the collapsed conversation list.
-    void api.get<RunResource>(
-      `${tenantApiRoot(organizationId)}/runs/${encodeURIComponent(linkedRunId)}`,
+    void api.get<FullRunResource>(
+      `${tenantApiRoot(organizationId)}/runs/${encodeURIComponent(detailRunId)}`,
     ).then((run) => {
       if (!cancelled) setSelected(run);
     }).catch(() => {
-      if (!cancelled) message.error('无法打开该任务，任务不存在或你没有访问权限');
+      if (!cancelled) {
+        setDetailRunId(null);
+        message.error('无法打开该任务，任务不存在或你没有访问权限');
+      }
     }).finally(() => {
       if (!cancelled) setDetailLoading(false);
     });
     return () => { cancelled = true; };
-  }, [organizationId, linkedRunId]);
+  }, [organizationId, detailRunId]);
 
   const closeDetail = () => {
+    setDetailRunId(null);
     setSelected(null);
     setDetailLoading(false);
     if (linkedRunId) {
@@ -185,10 +196,10 @@ export default function TaskCenterPage() {
 
   useEffect(() => {
     setParents([]);
-    if (!organizationId) return;
+    if (!organizationId || !selected) return;
     let cancelled = false;
     const known = new Set([...runs, ...children].map((run) => run.id));
-    const missing = [...new Set([...runs, ...children].flatMap((run) => (
+    const missing = [...new Set([selected, ...children].flatMap((run) => (
       run.parent_id && !known.has(run.parent_id) ? [run.parent_id] : []
     )))];
     void Promise.allSettled(missing.map((id) => api.get<RunResource>(
@@ -199,7 +210,7 @@ export default function TaskCenterPage() {
       )));
     });
     return () => { cancelled = true; };
-  }, [organizationId, runs, children]);
+  }, [organizationId, runs, children, selected]);
 
   const relationSource = useMemo(() => {
     const merged = new Map([...parents, ...runs, ...children].map((run) => [run.id, run]));
@@ -300,7 +311,7 @@ export default function TaskCenterPage() {
     {
       title: '任务', dataIndex: 'task_title', render: (_, run) => {
         const meta = taskMeta(run);
-        return <button type="button" className="task-title-button" onClick={() => setSelected(run)}>
+        return <button type="button" className="task-title-button" onClick={() => setDetailRunId(run.id)}>
           <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
           <span><strong>{taskTitle(run)}</strong><small>{meta.label} · {triggerLabel(run.trigger_type)}</small></span>
         </button>;
@@ -320,7 +331,7 @@ export default function TaskCenterPage() {
       title: '操作', width: 260, fixed: 'right', render: (_, run) => {
         const destination = taskDestination(run);
         return <Space size={4}>
-          <Button size="small" onClick={() => setSelected(run)}>详情</Button>
+          <Button size="small" onClick={() => setDetailRunId(run.id)}>详情</Button>
           {runsWithChildren.has(run.id) && <Button size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
           {destination && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>
             打开
@@ -418,7 +429,7 @@ export default function TaskCenterPage() {
         <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
         <button type="button" className="task-tree-title" onClick={() => {
           setTreeRoot(null);
-          setSelected(run);
+          setDetailRunId(run.id);
         }}>
           <strong>{taskTitle(run)}</strong>
           <small>
@@ -431,7 +442,7 @@ export default function TaskCenterPage() {
         <div className="task-tree-actions">
           <Button type="text" size="small" onClick={() => {
             setTreeRoot(null);
-            setSelected(run);
+            setDetailRunId(run.id);
           }}>详情</Button>
           {destination && <Button
             type="link" size="small" icon={<ExportOutlined />}
@@ -542,7 +553,7 @@ export default function TaskCenterPage() {
           return <article className={`task-mobile-card${run.id === selected?.id ? ' task-row-selected' : ''}`} key={run.id}>
             <div className="task-mobile-card-main">
               <span className={`task-type-icon task-type-icon--${meta.tone}`} aria-hidden="true">{meta.icon}</span>
-              <button type="button" className="task-mobile-title" onClick={() => setSelected(run)}>
+              <button type="button" className="task-mobile-title" onClick={() => setDetailRunId(run.id)}>
                 <strong>{taskTitle(run)}</strong>
                 <small>{meta.label} · {triggerLabel(run.trigger_type)}</small>
               </button>
@@ -552,7 +563,7 @@ export default function TaskCenterPage() {
             <footer>
               <span><ClockCircleOutlined aria-hidden="true" />{formatTime(run.created_at)}</span>
               <div>
-                <Button type="text" size="small" onClick={() => setSelected(run)}>查看详情</Button>
+                <Button type="text" size="small" onClick={() => setDetailRunId(run.id)}>查看详情</Button>
                 {runsWithChildren.has(run.id) && <Button type="text" size="small" onClick={() => void openTreeBoard(run)}>树状看板</Button>}
                 {destination && <Button type="link" size="small" icon={<ExportOutlined />} onClick={() => openDestination(run)}>打开</Button>}
               </div>
@@ -616,7 +627,7 @@ export default function TaskCenterPage() {
             { key: 'status', label: '状态', children: <TaskStatusBadge status={selected.status} /> },
             { key: 'trigger', label: '触发方式', children: triggerLabel(selected.trigger_type) },
             ...(selectedParent ? [{
-              key: 'parent', label: '上级任务', children: <Button type="link" onClick={() => setSelected(selectedParent)}>{taskTitle(selectedParent)}</Button>,
+              key: 'parent', label: '上级任务', children: <Button type="link" onClick={() => setDetailRunId(selectedParent.id)}>{taskTitle(selectedParent)}</Button>,
             }] : []),
             ...(selected.automation_id ? [{ key: 'automation', label: '自动化 ID', children: String(selected.automation_id) }] : []),
             ...(taskWorkflowId(selected) ? [{ key: 'workflow', label: '工作流 ID', children: taskWorkflowId(selected) }] : []),
@@ -631,7 +642,7 @@ export default function TaskCenterPage() {
           ]} />
         </section>
         {children.length > 0 && <section className="task-detail-card"><div className="task-section-heading"><h3>下级任务</h3><span>{children.length} 个关联任务</span></div><div className="task-child-list">
-          {children.map((child) => <button type="button" key={child.id} onClick={() => setSelected(child)}>
+          {children.map((child) => <button type="button" key={child.id} onClick={() => setDetailRunId(child.id)}>
             <span className="task-child-icon" aria-hidden="true">{typeMeta[taskType(child)]?.icon || fallbackTypeMeta.icon}</span>
             <span><strong>{taskTitle(child)}</strong><small>{taskMeta(child).label}</small></span>
             <Tag color={statusMeta[child.status]?.color}>{statusMeta[child.status]?.label || child.status}</Tag>

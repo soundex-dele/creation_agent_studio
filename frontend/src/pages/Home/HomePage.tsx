@@ -7,7 +7,7 @@ import { Button, Empty, Spin, Tag } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { api } from '@/services/api';
-import type { RunResource } from '@/services/applicationRuntime';
+import type { RunSummaryResource } from '@/services/applicationRuntime';
 import { tenantApiRoot } from '@/services/tenantContext';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -44,7 +44,7 @@ const formatTime = (value?: string | null) => value
     }).format(new Date(value))
   : '—';
 
-const taskTitle = (run: RunResource) => run.task_title
+const taskTitle = (run: RunSummaryResource) => run.task_title
   || `${taskTypeLabel[taskType(run)] || '任务'} #${run.source_id || run.id.slice(0, 8)}`;
 
 export default function HomePage() {
@@ -58,7 +58,7 @@ export default function HomePage() {
   const userId = useAuthStore((state) => state.user?.id);
   const organizationId = useOrganizationStore((state) => state.currentOrganizationId);
   const loadOrganizations = useOrganizationStore((state) => state.loadOrganizations);
-  const [runs, setRuns] = useState<RunResource[]>([]);
+  const [runs, setRuns] = useState<RunSummaryResource[]>([]);
   const [loading, setLoading] = useState(false);
   const requestVersion = useRef(0);
 
@@ -73,9 +73,9 @@ export default function HomePage() {
     }
     setLoading(true);
     try {
-      const response = await api.get<RunResource[]>(
+      const response = await api.get<RunSummaryResource[]>(
         `${tenantApiRoot(organizationId)}/runs`,
-        { collapse_conversations: true, scope: 'mine' },
+        { collapse_conversations: true, scope: 'mine', view: 'summary' },
       );
       if (version === requestVersion.current) setRuns(collapseConversationRuns(response));
     } catch {

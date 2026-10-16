@@ -17,3 +17,8 @@ class ApplicationContributions:
     brand_reference_fields: Callable[[], dict] | None = None
     resolve_brand_snapshot: Callable[..., dict] | None = None
     compose_brand_snapshot: Callable[..., dict] | None = None
+    # Return {run.pk: bool | None}; omitted runs retain the scalar policy.
+    run_access_many: Callable[[Any, list], dict] | None = None
+    # Opt in to input projection for history. None preserves the full input
+    # for existing/custom policies; () declares that no input keys are read.
+    run_access_input_keys: tuple[str, ...] | None = None

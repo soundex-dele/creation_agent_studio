@@ -1,8 +1,10 @@
 from datetime import timedelta
+from itertools import islice
 
 from django.conf import settings
 from django.core import signing
 from django.db import transaction
+from django.db.models.functions import JSONObject
 from django.db.models.deletion import ProtectedError
 from django.http import FileResponse, StreamingHttpResponse
 from django.urls import reverse
@@ -56,6 +58,7 @@ from .serializers import (
     RunEventSerializer,
     RunEventSnapshotSerializer,
     RunSerializer,
+    RunSummarySerializer,
     StartApplicationRunSerializer,
     StartAgentRunSerializer,
     SubmitRunCommandSerializer,
@@ -73,7 +76,8 @@ def _run_serializer_context(request, runs):
         if value
     }
     organization_ids = {run.organization_id for run in runs}
-    metadata = {
+    metadata = dict.fromkeys(conversation_ids)
+    metadata.update({
         str(item["id"]): {
             "title": item["title"],
             "chat_application_id": item["chat_application_id"],
@@ -83,7 +87,7 @@ def _run_serializer_context(request, runs):
             id__in=conversation_ids,
             organization_id__in=organization_ids,
         ).values("id", "title", "chat_application_id", "scope")
-    }
+    })
     return {"request": request, "run_conversation_metadata": metadata}
 
 
@@ -399,9 +403,35 @@ class OrganizationRunsView(ProblemDetailsAPIView):
     }
 
     def get(self, request, organization_id):
+        from .run_access import can_access_run, prime_run_access
+
+        summary = request.query_params.get("view") == "summary"
         runs = Run.objects.for_organization(organization_id).select_related(
-            "current_attempt", "automation_invocation__automation",
-        ).order_by("-created_at")
+            "automation_invocation__automation",
+        ).order_by("-created_at", "-id")
+        if summary:
+            from apps.applications.app_center.extensions import run_access_input_keys
+
+            input_keys = run_access_input_keys()
+            deferred = {"definition_snapshot", "output_summary"}
+            if input_keys is not None:
+                deferred.add("input")
+                runs = runs.annotate(_access_input=JSONObject(**{
+                    key: f"input__{key}" for key in input_keys
+                }))
+            # Extract labels/links in SQL; do not transfer or decode full agent
+            # definitions, workflow snapshots or automation configurations.
+            runs = runs.only(
+                *(field.attname for field in Run._meta.concrete_fields
+                  if field.name not in deferred),
+                "automation_invocation__source", "automation_invocation__automation__name",
+            ).annotate(_task_snapshot=JSONObject(**{
+                key: f"definition_snapshot__{key}" for key in (
+                    "conversation_id", "application_id", "workflow_id", "workflow_name",
+                    "application_name", "supervisor_name", "conversation_title",
+                    "workflow_step_name", "agent_name",
+                )
+            }))
         scope = request.query_params.get("scope", "visible")
         if scope not in {"visible", "mine"}:
             return _problem(
@@ -435,18 +465,36 @@ class OrganizationRunsView(ProblemDetailsAPIView):
         visible = []
         seen_conversation_ids = set()
         scan_limit = 2000 if collapse_conversations else 200
-        for run in runs[:scan_limit]:
-            if not _can_access_run(request, run):
-                continue
-            conversation_id = RunSerializer._conversation_id(run)
-            if collapse_conversations and conversation_id:
-                if conversation_id in seen_conversation_ids:
+        # Keep caches local to this request/user: permissions may change before
+        # the next refresh. Read bounded batches rather than materializing up
+        # to 2,000 full execution snapshots before returning the first 100 rows.
+        run_cache = {}
+        decision_cache = {}
+        candidates = runs[:scan_limit].iterator(chunk_size=100)
+        while batch := list(islice(candidates, 100)):
+            for run in batch:
+                if "_access_input" in run.__dict__:
+                    run.input = run._access_input
+            run_cache.update(((run.organization_id, run.pk), run) for run in batch)
+            if summary:
+                prime_run_access(request.user, batch, run_cache=run_cache, decision_cache=decision_cache)
+            for run in batch:
+                if not can_access_run(
+                    request.user, run, run_cache=run_cache, decision_cache=decision_cache,
+                ):
                     continue
-                seen_conversation_ids.add(conversation_id)
-            visible.append(run)
-            if len(visible) == 100:
+                conversation_id = RunSerializer._conversation_id(run)
+                if collapse_conversations and conversation_id:
+                    if conversation_id in seen_conversation_ids:
+                        continue
+                    seen_conversation_ids.add(conversation_id)
+                visible.append(run)
+                if len(visible) == 100:
+                    break
+            if len(visible) == 100 or len(batch) < 100:
                 break
-        return Response(RunSerializer(
+        serializer = RunSummarySerializer if summary else RunSerializer
+        return Response(serializer(
             visible, many=True, context=_run_serializer_context(request, visible)
         ).data)
 

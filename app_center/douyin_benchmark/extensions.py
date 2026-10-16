@@ -14,6 +14,12 @@ def run_access(user, run):
     return None
 
 
+def run_access_many(user, roots):
+    from .backend.access import can_access_runs
+    runs = [run for run in roots if run.executor_key == 'douyin-benchmark']
+    return can_access_runs(user, runs) if runs else {}
+
+
 def knowledge_context(document):
     if document.knowledge_base.scope != 'douyin_creation':
         return {}
@@ -43,6 +49,7 @@ def dispatch_scheduled():
     dispatch_due()
 
 
-provider = ApplicationContributions(run_access=run_access, knowledge_context=knowledge_context,
+provider = ApplicationContributions(run_access=run_access, run_access_many=run_access_many, knowledge_context=knowledge_context,
+                           run_access_input_keys=('task_id', 'douyin_knowledge_card_id'),
                            case_navigation=case_navigation, case_targets=case_targets,
                            dispatch_scheduled=dispatch_scheduled)

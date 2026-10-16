@@ -14,4 +14,5 @@ def knowledge_context(document):
     return {'research_project_id': project_id} if project_id else {}
 
 
-provider = ApplicationContributions(run_access=run_access, knowledge_context=knowledge_context)
+provider = ApplicationContributions(run_access=run_access, knowledge_context=knowledge_context,
+                                    run_access_input_keys=('research_project_id',))

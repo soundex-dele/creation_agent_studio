@@ -6,6 +6,7 @@ _EXPORTS = {'Application': ('apps.applications.models', 'Application'),
  'Organization': ('apps.enterprise.models', 'Organization'),
  'QuotaPolicy': ('apps.enterprise.models', 'QuotaPolicy'),
  'accessible_resources': ('core.resource_access', 'accessible_resources'),
+ 'active_member_applications': ('core.resource_access', 'active_member_applications'),
  'can_access_resource': ('core.resource_access', 'can_access_resource'),
  'resolve_organization': ('apps.enterprise.permissions', 'resolve_organization')}
 

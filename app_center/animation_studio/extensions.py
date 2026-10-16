@@ -18,4 +18,16 @@ def run_access(user, run):
     return True
 
 
-provider = ApplicationContributions(run_access=run_access)
+def run_access_many(user, roots):
+    from modules.platform_api.identity import active_member_applications
+    runs = [run for run in roots if run.executor_key == 'animation-studio']
+    if not runs:
+        return {}
+    allowed = {(org, str(pk)) for org, pk in active_member_applications(
+        user, {run.organization_id for run in runs}, slug='animation-studio',
+    ).values_list('organization_id', 'id')}
+    return {run.pk: run.owner_id == user.pk and (run.organization_id, run.source_id) in allowed
+            for run in runs}
+
+
+provider = ApplicationContributions(run_access=run_access, run_access_many=run_access_many, run_access_input_keys=())

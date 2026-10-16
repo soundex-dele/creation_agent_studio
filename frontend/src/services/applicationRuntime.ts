@@ -39,6 +39,9 @@ export interface RunResource {
   conversation_scope?: 'default' | 'cowork' | null;
 }
 
+export type RunSummaryResource = Omit<RunResource, 'definition_snapshot' | 'input' | 'output_summary'>
+  & Partial<Pick<RunResource, 'definition_snapshot' | 'input' | 'output_summary'>>;
+
 export interface RunArtifact {
   id: string;
   run_id: string;

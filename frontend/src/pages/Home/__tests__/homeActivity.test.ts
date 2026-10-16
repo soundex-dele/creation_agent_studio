@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
-import type { RunResource } from '@/services/applicationRuntime';
+import type { RunSummaryResource } from '@/services/applicationRuntime';
 import HomePage from '../HomePage';
 
 const state = vi.hoisted(() => ({
@@ -26,17 +26,23 @@ vi.mock('@/stores/usePreferencesStore', () => ({
 }));
 vi.mock('@/components/Sidebar/HomeApplicationsSidebar', () => ({ default: () => null }));
 
-const run = (id: string, status: RunResource['status'] = 'failed'): RunResource => ({
+const run = (id: string, status: RunSummaryResource['status'] = 'failed'): RunSummaryResource => ({
   id, organization_id: 'org-1', status, version: 1, next_event_sequence: 1,
-  definition_snapshot: {}, input: {}, output_summary: {},
   source_type: 'application', task_title: `任务 ${id}`,
 });
 
 let root: Root;
 let container: HTMLDivElement;
+let destination: string;
+function LocationProbe() {
+  const location = useLocation();
+  destination = location.pathname + location.search;
+  return null;
+}
 const render = () => act(async () => {
   root.render(createElement(MemoryRouter, null,
-    createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(HomePage))));
+    createElement(ConfigProvider, { theme: { token: { motion: false } } },
+      createElement(HomePage), createElement(LocationProbe))));
 });
 const counts = () => [...container.querySelectorAll('.home-overview strong')].map(item => item.textContent);
 
@@ -69,19 +75,31 @@ it.each([false, true])('loads personal activity and counts (single tenant: %s)',
   vi.mocked(api.get).mockResolvedValue([run('my-failed'), run('my-completed', 'succeeded')]);
   await render();
   const url = singleTenant ? '/runs' : '/organizations/org-1/runs';
-  expect(api.get).toHaveBeenCalledWith(url, { collapse_conversations: true, scope: 'mine' });
+  expect(api.get).toHaveBeenCalledWith(url, { collapse_conversations: true, scope: 'mine', view: 'summary' });
   expect(container.querySelector('.home-recent-list')?.textContent).toContain('任务 my-failed');
   expect(counts()).toEqual(['0', '0', '1', '1']);
   await act(async () => {
     [...container.querySelectorAll('button')].find(button => button.textContent === '刷新')!.click();
   });
-  expect(api.get).toHaveBeenLastCalledWith(url, { collapse_conversations: true, scope: 'mine' });
+  expect(api.get).toHaveBeenLastCalledWith(url, { collapse_conversations: true, scope: 'mine', view: 'summary' });
+});
+
+it('renders recent summaries, counts the history window, and opens the exact task without prefetching details', async () => {
+  vi.mocked(api.get).mockResolvedValue(Array.from({ length: 8 }, (_, index) => run(`task-${index}`, 'succeeded')));
+  await render();
+  const buttons = container.querySelectorAll<HTMLButtonElement>('.home-recent-list button');
+  expect(buttons).toHaveLength(5);
+  expect(counts()).toEqual(['0', '0', '8', '0']);
+  expect(api.get).toHaveBeenCalledTimes(1);
+  await act(async () => buttons[0].click());
+  expect(destination).toBe('/tasks?run=task-0');
+  expect(api.get).toHaveBeenCalledTimes(1);
 });
 
 it.each(['resolve', 'reject'])('ignores a previous user request that later %s', async (outcome) => {
-  let resolveOld!: (runs: RunResource[]) => void;
+  let resolveOld!: (runs: RunSummaryResource[]) => void;
   let rejectOld!: (error: Error) => void;
-  const oldRequest = new Promise<RunResource[]>((resolve, reject) => {
+  const oldRequest = new Promise<RunSummaryResource[]>((resolve, reject) => {
     resolveOld = resolve;
     rejectOld = reject;
   });
@@ -110,7 +128,7 @@ it('clears previous activity while changing organization and handles a failed lo
   state.currentOrganizationId = 'org-2';
   await render();
   expect(api.get).toHaveBeenLastCalledWith('/organizations/org-2/runs', {
-    collapse_conversations: true, scope: 'mine',
+    collapse_conversations: true, scope: 'mine', view: 'summary',
   });
   expect(container.textContent).not.toContain('任务 old-org');
   expect(counts()).toEqual(['0', '0', '0', '0']);
