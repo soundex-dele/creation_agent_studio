@@ -18,7 +18,7 @@ and start the frontend, backend, execution workers and connectors on Windows.
 Requires backend\venv, Node.js, and installed frontend dependencies.
 
 Environment variables (same as deploy.sh):
-  BACKEND_HOST                Default: 0.0.0.0
+  BACKEND_HOST                Default: 127.0.0.1
   BACKEND_PORT                Default: 8080
   FRONTEND_PORT               Default: 3030
   FRONTEND_MODE               Default: dev; overridden by -FrontendMode
@@ -97,7 +97,7 @@ try {
         throw 'Frontend preview requires frontend\dist\index.html. Prepare the build output separately; deploy.ps1 does not build it.'
     }
 
-    $backendHost = Get-Setting 'BACKEND_HOST' '0.0.0.0'
+    $backendHost = Get-Setting 'BACKEND_HOST' '127.0.0.1'
     $backendPort = Get-Setting 'BACKEND_PORT' '8080'
     $frontendPort = Get-Setting 'FRONTEND_PORT' '3030'
     foreach ($port in @($backendPort, $frontendPort)) {

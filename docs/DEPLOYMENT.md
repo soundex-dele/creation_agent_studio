@@ -350,7 +350,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 | 环境变量 | 默认值 / 用途 |
 | --- | --- |
-| `BACKEND_HOST` | `0.0.0.0`，后端监听地址 |
+| `BACKEND_HOST` | `127.0.0.1`，后端监听地址 |
 | `BACKEND_PORT` | `8080`，后端端口 |
 | `FRONTEND_PORT` | `3030`，前端端口；端口占用时启动失败 |
 | `VITE_PROXY_TARGET` | `http://127.0.0.1:<BACKEND_PORT>`，前端代理目标 |

@@ -6,7 +6,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="${PROJECT_ROOT}/backend"
 FRONTEND_DIR="${PROJECT_ROOT}/frontend"
 
-BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
+BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-3030}"
 FRONTEND_MODE="${FRONTEND_MODE:-dev}"
@@ -34,7 +34,7 @@ Optional environment variables:
   DJANGO_SUPERUSER_USERNAME  Create this superuser non-interactively
   DJANGO_SUPERUSER_PASSWORD  Password for non-interactive creation
   DJANGO_SUPERUSER_EMAIL     Email for non-interactive creation
-  BACKEND_HOST               Backend listen address (default: 0.0.0.0)
+  BACKEND_HOST               Backend listen address (default: 127.0.0.1)
   BACKEND_PORT               Backend listen port (default: 8080)
   FRONTEND_PORT              Frontend listen port (default: 3030)
   FRONTEND_MODE              dev or preview (default: dev; CLI overrides this)
