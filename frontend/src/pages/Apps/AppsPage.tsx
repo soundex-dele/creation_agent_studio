@@ -17,7 +17,6 @@ import type { AppItem } from '@/types';
 import { CONVERSATION_APP, CONVERSATION_APP_ID, isCoworkApplication } from '@/lib/conversationApplication';
 import './AppsPage.css';
 
-const { Search } = Input;
 type AppView = 'all' | 'favorites';
 type AppSort = 'recommended' | 'recent' | 'popular' | 'name';
 
@@ -112,7 +111,7 @@ const AppsPage: React.FC = () => {
       }}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {favorite ? <StarFilled /> : <StarOutlined />}
+      {favorite ? <StarFilled aria-hidden="true" /> : <StarOutlined aria-hidden="true" />}
     </button>;
   };
 
@@ -139,10 +138,12 @@ const AppsPage: React.FC = () => {
       <div className="app-card-body">
         <div className="app-card-heading">
           <span className="app-card-icon" aria-hidden="true"><ApplicationIcon app={app} /></span>
-          <span className="app-card-category">{categoryName(app.category)}</span>
+          <div className="app-card-identity">
+            <h2 className="app-card-name">{app.name}</h2>
+            <span className="app-card-category">{categoryName(app.category)}</span>
+          </div>
         </div>
         <div className="app-card-content">
-          <h2 className="app-card-name">{app.name}</h2>
           <p className="app-card-desc">{app.description}</p>
           {app.tags.length > 0 && (
             <div className="app-card-tags" aria-label="应用标签">
@@ -153,10 +154,10 @@ const AppsPage: React.FC = () => {
           )}
         </div>
         <div className="app-card-footer">
-          <span className="app-card-hint">
-            {app.usage_count ? `${app.usage_count.toLocaleString()} 次使用` : '立即体验'}
+          <span className="app-card-open">
+            打开应用 <ArrowRightOutlined aria-hidden="true" />
           </span>
-          <span className="app-card-open" aria-hidden="true"><ArrowRightOutlined /></span>
+          {app.usage_count ? <span className="app-card-usage">{app.usage_count.toLocaleString()} 次使用</span> : null}
         </div>
       </div>
     </article>
@@ -167,18 +168,31 @@ const AppsPage: React.FC = () => {
       <div className="apps-heading">
         <div className="page-header">
           <h1 className="page-title">应用</h1>
-          <p className="page-subtitle">选择应用即可开始工作；这里只提供使用入口，不承载接入和开发</p>
+          <p className="page-subtitle">发现并打开你的 AI 工作应用</p>
+        </div>
+        <div className="apps-search-field">
+          <label htmlFor="apps-search">搜索应用</label>
+          <Input
+            id="apps-search"
+            placeholder="搜索名称、描述或标签"
+            prefix={<SearchOutlined aria-hidden="true" />}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            allowClear
+            className="apps-search"
+          />
         </div>
       </div>
 
-      <div className="apps-category-strip" aria-label="应用分类">
-        <button type="button" className={!selectedCategory ? 'active' : ''} onClick={() => selectCategory(null)}>全部</button>
-        <button type="button" className={selectedCategory === 'chat' ? 'active' : ''} onClick={() => selectCategory('chat')}>沟通协作</button>
+      <div className="apps-category-strip" role="group" aria-label="应用分类">
+        <button type="button" aria-pressed={!selectedCategory} className={!selectedCategory ? 'active' : ''} onClick={() => selectCategory(null)}>全部</button>
+        <button type="button" aria-pressed={selectedCategory === 'chat'} className={selectedCategory === 'chat' ? 'active' : ''} onClick={() => selectCategory('chat')}>沟通协作</button>
         {categories.filter((category) => category.slug !== 'chat').map((category) => (
           <button
             type="button"
             key={category.slug}
             className={selectedCategory === category.slug ? 'active' : ''}
+            aria-pressed={selectedCategory === category.slug}
             onClick={() => selectCategory(category.slug)}
           >
             {category.name}
@@ -188,36 +202,39 @@ const AppsPage: React.FC = () => {
 
       <div className="page-toolbar apps-toolbar">
         <div className="apps-view-switch" role="group" aria-label="应用视图">
-          <button type="button" className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>全部应用</button>
-          <button type="button" className={view === 'favorites' ? 'active' : ''} onClick={() => setView('favorites')}>
-            <StarOutlined /> 常用
+          <button type="button" aria-pressed={view === 'all'} className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>全部应用</button>
+          <button type="button" aria-pressed={view === 'favorites'} className={view === 'favorites' ? 'active' : ''} onClick={() => setView('favorites')}>
+            <StarOutlined aria-hidden="true" /> 常用应用
           </button>
         </div>
-        <Search
-          placeholder="搜索名称、描述或标签"
-          prefix={<SearchOutlined className="text-text-dim" />}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          allowClear
-          className="apps-search"
-        />
-        <Select<AppSort>
-          value={sort}
-          onChange={setSort}
-          className="apps-sort"
-          aria-label="应用排序"
-          options={[
-            { value: 'recommended', label: '推荐排序' },
-            { value: 'recent', label: '最近使用' },
-            { value: 'popular', label: '使用最多' },
-            { value: 'name', label: '名称排序' },
-          ]}
-        />
-        <Button
-          icon={<ReloadOutlined />}
-          loading={isLoading}
-          onClick={() => void Promise.all([loadApps(selectedCategory || undefined), loadCategories()])}
-        >刷新</Button>
+        <span className="apps-result-count" role="status">
+          {isLoading ? '正在加载应用…' : error ? '加载失败' : `${resultCount} 个${hasFilters ? '匹配' : '可用'}应用`}
+        </span>
+        <div className="apps-toolbar-actions">
+          <div className="apps-sort-field">
+            <label htmlFor="apps-sort">排序</label>
+            <Select<AppSort>
+              id="apps-sort"
+              value={sort}
+              onChange={setSort}
+              className="apps-sort"
+              aria-label="应用排序"
+              options={[
+                { value: 'recommended', label: '推荐排序' },
+                { value: 'recent', label: '最近使用' },
+                { value: 'popular', label: '使用最多' },
+                { value: 'name', label: '名称排序' },
+              ]}
+            />
+          </div>
+          <Button
+            type="text"
+            className="apps-refresh"
+            icon={<ReloadOutlined aria-hidden="true" />}
+            loading={isLoading}
+            onClick={() => void Promise.all([loadApps(selectedCategory || undefined), loadCategories()])}
+          >刷新</Button>
+        </div>
       </div>
 
       {isLoading && apps.length === 0 ? (
@@ -257,10 +274,12 @@ const AppsPage: React.FC = () => {
               <div className="app-card-body">
                 <div className="app-card-heading">
                   <span className="app-card-icon" aria-hidden="true"><MessageOutlined /></span>
-                  <span className="app-card-category">沟通协作</span>
+                  <div className="app-card-identity">
+                    <h2 className="app-card-name">对话</h2>
+                    <span className="app-card-category">沟通协作</span>
+                  </div>
                 </div>
                 <div className="app-card-content">
-                  <h2 className="app-card-name">对话</h2>
                   <p className="app-card-desc">{CONVERSATION_APP.description}</p>
                   <div className="app-card-tags" aria-label="对话标签">
                     <span className="app-card-tag">AI 助手</span>
@@ -269,8 +288,7 @@ const AppsPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="app-card-footer">
-                  <span className="app-card-hint">打开对话</span>
-                  <span className="app-card-open" aria-hidden="true"><ArrowRightOutlined /></span>
+                  <span className="app-card-open">打开对话 <ArrowRightOutlined aria-hidden="true" /></span>
                 </div>
               </div>
             </article>

@@ -158,3 +158,36 @@ it.each(['文件夹', 'cowork', '对话'])('keeps the unified entry searchable b
   expect(host.querySelectorAll('.app-card')).toHaveLength(1);
   expect(host.querySelector('.app-card-name')?.textContent).toBe('对话');
 });
+
+it('keeps the visible favorite control independent from opening a catalogue card', async () => {
+  state.apps = [drawing];
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="收藏绘图"]')!.click());
+  expect(window.open).not.toHaveBeenCalled();
+  expect(host.querySelector('[aria-label="取消收藏绘图"]')?.getAttribute('aria-pressed')).toBe('true');
+  const favoritesView = host.querySelectorAll<HTMLButtonElement>('.apps-view-switch button')[1];
+  await act(async () => favoritesView.click());
+  expect(favoritesView.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelectorAll('.app-card')).toHaveLength(1);
+  expect(host.querySelector('.apps-result-count')?.textContent).toBe('1 个匹配应用');
+  await act(async () => host.querySelector('.app-card')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(window.open).toHaveBeenCalledWith('/applications/2/ai-drawing?entry=apps&standalone=1', '_blank', 'noopener,noreferrer');
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="取消收藏绘图"]')!.click());
+  expect(host.querySelectorAll('.app-card')).toHaveLength(0);
+  expect(host.textContent).toContain('还没有收藏常用应用');
+});
+
+it('keeps the header search connected to the catalogue query and clear action', async () => {
+  await render();
+  const input = host.querySelector<HTMLInputElement>('#apps-search')!;
+  expect(input.labels?.[0]?.textContent).toBe('搜索应用');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '绘图');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(state.setSearchQuery).toHaveBeenLastCalledWith('绘图');
+  state.searchQuery = '绘图';
+  await render();
+  await act(async () => host.querySelector<HTMLElement>('.ant-input-clear-icon')!.click());
+  expect(state.setSearchQuery).toHaveBeenLastCalledWith('');
+});

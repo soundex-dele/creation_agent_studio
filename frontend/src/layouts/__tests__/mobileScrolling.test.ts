@@ -465,6 +465,45 @@ describe('mobile page scrolling', () => {
     expect(mobileRule).toMatch(/overflow-y:\s*auto/);
   });
 
+  it.each([320, 375, 390, 767, 768, 844, 1440])('keeps catalogue controls, cards and scroll owners usable at %ipx', width => {
+    const css = readSource('../../pages/Apps/AppsPage.css');
+    const source = readSource('../../pages/Apps/AppsPage.tsx');
+    expect(source).toContain('className="apps-page animate-fade-in"');
+    expect(source).toContain('className="app-card-identity"');
+    expect(readSource('../../router/index.tsx')).toMatch(/<MainLayout hideSidebar>\s*\{page\(<AppsPage \/>\)\}\s*<\/MainLayout>/);
+    for (const height of [320, 900]) {
+      const root = declarationsAt([css], ['.apps-page'], width, height);
+      expect(root['min-width']).toBe('0');
+      expect(root.height).toBeUndefined();
+      expect(root['overflow-y']).toBeUndefined();
+      expect(root['padding-bottom']).toContain('safe-area-inset-bottom');
+      expect(declarationsAt([globalStyles], ['.app-main', '.app-main--padded'], width, height)['overflow-y']).toBe('auto');
+      const embedded = declarationsAt([css], ['.apps-page', '.app-main:not(.app-main--padded) > .apps-page'], width, height);
+      expect(embedded.height).toBe('100%');
+      expect(embedded['min-height']).toBe('0');
+      expect(embedded['overflow-y']).toBe('auto');
+      expect(embedded.padding).toContain('safe-area-inset-bottom');
+      expect(declarationsAt([css], ['.apps-category-strip'], width, height)['flex-wrap']).toBe('wrap');
+      expect(declarationsAt([css], ['.app-card-identity'], width, height)['min-width']).toBe('0');
+      expect(declarationsAt([css], ['.app-card-tag'], width, height)['overflow-wrap']).toBe('anywhere');
+      expect(declarationsAt([css], ['.app-card-footer'], width, height)['flex-wrap']).toBe('wrap');
+      const grid = declarationsAt([css], ['.app-grid'], width, height);
+      expect(grid['grid-template-columns']).toBe(width <= 767 ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))');
+      const favorite = declarationsAt([css], ['.app-card-favorite'], width, height);
+      expect(favorite.opacity).not.toBe('0');
+      if (width <= 767) {
+        expect(favorite.width).toBe('44px');
+        expect(favorite.height).toBe('44px');
+        expect(declarationsAt([css], ['.apps-toolbar-actions'], width, height).width).toBe('100%');
+        expect(declarationsAt([css], ['.apps-sort', '.apps-toolbar .apps-sort'], width, height)['min-height']).toBe('44px');
+      }
+      if (width <= 900) {
+        expect(declarationsAt([css], ['.apps-heading'], width, height)['flex-direction']).toBe('column');
+        expect(declarationsAt([css], ['.apps-search-field'], width, height).width).toBe('100%');
+      }
+    }
+  });
+
   it('keeps compact mobile filters and relation controls touch friendly', () => {
     const appStyles = readSource('../../pages/Apps/AppsPage.css');
     const agentStyles = readSource('../../pages/Agents/AgentsPage.css');
