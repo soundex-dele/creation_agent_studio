@@ -170,7 +170,7 @@ def main(argv=None):
     parser.add_argument("--with-creation-master", action="store_true", help="Install optional Windows Creation Master desktop Python packages")
     parser.add_argument("--with-mobile", action="store_true", help="Install mobile npm packages (not Android/iOS SDKs)")
     parser.add_argument("--with-codex", action="store_true", help="Install the pinned Codex CLI globally")
-    parser.add_argument("--skip-submodules", action="store_true", help="Use already initialized submodules or a source archive")
+    parser.add_argument("--skip-submodules", action="store_true", help="Skip Git fetching; use local submodules and skip unavailable source-dependent steps")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without changing files or installing packages")
     parser.add_argument("--app", action="append", default=[], help="Application ID (repeat or comma-separate); default: all. Shared backend/frontend dependencies are always included.")
     parser.add_argument("--list-apps", action="store_true", help="List applications, extra runtimes and external prerequisites without installing anything")
@@ -212,8 +212,13 @@ def main(argv=None):
     if not ((major == 20 and minor >= 19) or (major == 22 and minor >= 12) or major >= 24):
         raise RuntimeError(f"Node {version} is unsupported. Install Node.js 22.12+ LTS or 24 LTS.")
     npm = npm_command(node)
-    git = require_program("git") if not args.skip_submodules else None
     execute = lambda command, **kwargs: run(command, dry_run=args.dry_run, **kwargs)
+    warnings = []
+
+    def warn(message):
+        warnings.append(message)
+        print(f"WARNING: {message}", file=sys.stderr, flush=True)
+
     ffmpeg_missing = "ffmpeg" in runtimes and (not shutil.which("ffmpeg") or not shutil.which("ffprobe"))
     if ffmpeg_missing and not args.system_deps:
         raise RuntimeError("FFmpeg/ffprobe is missing. Re-run with --system-deps (-SystemDeps on Windows), or install FFmpeg and add it to PATH.")
@@ -222,17 +227,35 @@ def main(argv=None):
         if ffmpeg_missing or sys.platform.startswith("linux"):
             for command in system_commands(sys.platform):
                 execute(command)
-    if git:
-        execute([git, "submodule", "update", "--init", "--recursive"])
+    if not args.skip_submodules:
+        try:
+            git = require_program("git")
+        except RuntimeError as error:
+            warn(f"Skipping submodule update: {error}")
+        else:
+            try:
+                execute([git, "submodule", "update", "--init", "--recursive"])
+            except (OSError, subprocess.CalledProcessError) as error:
+                warn(f"Submodule update failed; continuing with available local sources: {error}")
     for required in ("app_center/creation_master/react/package.json", "teaching_data/README.md"):
         if not args.dry_run and not (ROOT / required).is_file():
-            raise RuntimeError(f"Missing submodule file: {required}. Initialize the pinned submodules first.")
+            warn(f"Missing submodule file: {required}. Related features/builds may be unavailable.")
+
+    install_creation_master = args.with_creation_master
+    if install_creation_master and not args.dry_run and not (ROOT / "app_center/creation_master/requirements.txt").is_file():
+        warn("Skipping Creation Master desktop dependencies: submodule requirements.txt is missing.")
+        install_creation_master = False
+    if "dtk" in runtimes and not args.dry_run:
+        lock = json.loads((DTK / "deploy/provider-lock.json").read_text(encoding="utf-8"))
+        if not (ROOT / lock["source_path"] / "src/dtk/__init__.py").is_file():
+            warn("Skipping DTK runtime installation and verification: submodule source is missing. Douyin collection is unavailable.")
+            runtimes.remove("dtk")
 
     pip = [sys.executable, "-m", "pip"]
     execute(pip + ["install", "--upgrade", "pip", "wheel"])
     profile = "development" if args.development else "production"
     execute(pip + ["install", "-r", ROOT / f"backend/requirements/{profile}.txt"])
-    if args.with_creation_master:
+    if install_creation_master:
         execute(pip + ["install", "-r", ROOT / "app_center/creation_master/requirements.txt"])
     execute(pip + ["check"])
     if "dtk" in runtimes:
@@ -255,9 +278,15 @@ def main(argv=None):
         install_png(execute, node, system_deps=args.system_deps)
     if "animation" in runtimes:
         install_animation(execute, node, npm)
-    if args.with_creation_master:
+    if install_creation_master:
         execute([sys.executable, "-m", "playwright", "install", "chromium"])
-    print("\nDependency installation plan complete." if args.dry_run else "\nRepository dependencies installed; selected runtimes verified.")
+    if warnings:
+        print("\nDependency installation completed with submodule warnings:")
+        for message in warnings:
+            print(f"- {message}")
+        print("Restore submodules with 'git submodule update --init --recursive', then rerun the installer.")
+    else:
+        print("\nDependency installation plan complete." if args.dry_run else "\nRepository dependencies installed; selected runtimes verified.")
     if ffmpeg_missing and args.system_deps and sys.platform == "win32":
         print("Open a new terminal so the FFmpeg PATH update takes effect before starting workers.")
     print("Configure backend/.env and service credentials, then run migrations/start services separately.")

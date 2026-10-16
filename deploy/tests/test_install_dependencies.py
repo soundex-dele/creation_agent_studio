@@ -107,11 +107,83 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(commands[0], ["sudo", "apt-get", "install", "ffmpeg"])
         self.assertTrue(any(command[-3:] == ["install", "chromium", "--with-deps"] for command in commands))
 
-    def test_installation_failure_stops_remaining_commands(self):
-        self.run.side_effect = subprocess.CalledProcessError(1, "git")
+    def test_submodule_failure_warns_and_continues_with_local_sources(self):
+        def fail_git(command, **kwargs):
+            if "submodule" in command:
+                raise subprocess.CalledProcessError(128, command)
+
+        self.run.side_effect = fail_git
+        with contextlib.redirect_stderr(io.StringIO()) as errors, contextlib.redirect_stdout(io.StringIO()) as output:
+            installer.main(["--app", "kitchen-assistant"])
+        self.assertIn("Submodule update failed", errors.getvalue())
+        self.assertIn("completed with submodule warnings", output.getvalue())
+        self.assertIn("git submodule update --init --recursive", output.getvalue())
+        self.assertTrue(any("ci" in command for command in self.commands()))
+
+    def test_missing_git_warns_and_continues(self):
+        def require(name):
+            if name == "git":
+                raise RuntimeError("git is missing from PATH")
+            return name
+
+        with patch.object(installer, "require_program", side_effect=require), contextlib.redirect_stderr(io.StringIO()) as errors:
+            installer.main(["--app", "kitchen-assistant"])
+        self.assertIn("Skipping submodule update", errors.getvalue())
+        self.assertTrue(any("ci" in command for command in self.commands()))
+
+    def test_missing_submodules_skip_dependent_steps_after_failed_or_skipped_fetch(self):
+        missing = {
+            installer.ROOT / "app_center/creation_master/react/package.json",
+            installer.ROOT / "app_center/creation_master/requirements.txt",
+            installer.ROOT / "teaching_data/README.md",
+            installer.ROOT / "backend/third_party/Douyin_TikTok_Download_API/src/dtk/__init__.py",
+        }
+        is_file = Path.is_file
+
+        def fail_git(command, **kwargs):
+            if "submodule" in command:
+                raise subprocess.CalledProcessError(128, command)
+
+        for options in ([], ["--skip-submodules"]):
+            with self.subTest(options=options), patch.object(installer.sys, "platform", "win32"), patch.object(
+                Path, "is_file", lambda path: False if path in missing else is_file(path),
+            ), contextlib.redirect_stderr(io.StringIO()) as errors:
+                self.run.reset_mock()
+                self.run.side_effect = fail_git
+                installer.main(["--with-creation-master", *options])
+                commands = self.commands()
+                self.assertIn("Skipping Creation Master", errors.getvalue())
+                self.assertIn("Skipping DTK", errors.getvalue())
+                self.assertIn("teaching_data/README.md", errors.getvalue())
+                self.assertFalse(any(command[-1].endswith("verify_source.py") for command in commands))
+                self.assertFalse(any("--python" in command for command in commands))
+                self.assertFalse(any("creation_master" in command[-1] for command in commands))
+                self.assertTrue(any("ci" in command for command in commands))
+                self.assertTrue(any("openBrowser('chrome'" in command[-1] for command in commands))
+
+    def test_package_installation_failure_stops_remaining_commands(self):
+        for failing in ("pip", "ci"):
+            with self.subTest(failing=failing):
+                self.run.reset_mock()
+
+                def fail_package(command, **kwargs):
+                    if failing in command:
+                        raise subprocess.CalledProcessError(1, command)
+
+                self.run.side_effect = fail_package
+                with self.assertRaises(subprocess.CalledProcessError):
+                    installer.main(["--app", "kitchen-assistant"])
+                self.assertIn(failing, self.commands()[-1])
+
+    def test_existing_dtk_validation_failure_still_stops_installation(self):
+        def fail_validation(command, **kwargs):
+            if str(command[-1]).endswith("verify_source.py"):
+                raise subprocess.CalledProcessError(1, command)
+
+        self.run.side_effect = fail_validation
         with self.assertRaises(subprocess.CalledProcessError):
-            installer.main([])
-        self.assertEqual(self.run.call_count, 1)
+            installer.main(["--app", "douyin-benchmark"])
+        self.assertTrue(self.commands()[-1][-1].endswith("verify_source.py"))
 
     def test_dry_run_never_invokes_subprocess_run(self):
         # Exercise the real command runner rather than the plan recorder.

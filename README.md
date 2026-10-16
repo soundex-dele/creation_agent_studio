@@ -72,20 +72,27 @@ Linux/macOS 优先复用 `backend/.venv`，其次 `backend/venv`，新环境使�
 所有 pip 操作均由项目虚拟环境执行。抖音对标助手的 DTK 依赖单独安装到
 `backend/.venv-dtk`，不会混入 Django 环境。前端构建所需的开发依赖也会安装。
 
+Git 子模块拉取失败（或 Git 不可用）时，脚本会输出警告并继续安装其余依赖。
+缺失的子模块会在结束时列出；DTK 源码缺失时跳过其独立环境安装与校验，
+Creation Master 的 requirements.txt 缺失时跳过其桌面依赖。相关功能或前端构建可能不可用。
+网络恢复后运行 `git submodule update --init --recursive`，再重新执行安装脚本。
+pip/npm 等依赖安装失败仍会终止，不会被忽略。
+
 默认全量安装或指定 `-App douyin-benchmark` / `--app douyin-benchmark` 时，脚本会
 校验固定版本的 DTK Git 子模块，创建或复用独立 Python 3.12/3.13 环境，安装采集依赖，
 并执行依赖检查和离线签名、解析测试。新建环境时优先使用兼容的项目 Python；若主项目使用
 Python 3.11 等不兼容版本，则自动在项目环境安装 uv 并准备 Python 3.13（可能需要下载）。
 已有环境版本不兼容或不完整时会报错，不会覆盖；将旧 `backend/.venv-dtk` 移走后重跑即可。
-DTK 校验需要保留 Git 子模块元数据，使用 `--skip-submodules` 时也需事先准备固定版本的干净检出。
+DTK 源码存在时仍需通过固定版本、干净检出的校验（包括使用 `--skip-submodules` 时），
+并保留 Git 子模块元数据；校验失败仍会终止。源码缺失时按上述规则跳过。
 Web 与 media worker 均需部署此环境；如果设置了 `DOUYIN_DTK_PYTHON`，需自行维护其目标环境，
 或取消覆盖以使用脚本安装的默认路径。个人 Cookie 仍需在应用采集设置中填写。
 
 `-SystemDeps` / `--system-deps` 会通过 Windows winget、macOS Homebrew 或
 Debian/Ubuntu apt 安装 FFmpeg；Linux 同时安装中文字体和 Chromium 系统库，可能需要
 管理员/sudo 权限。其他 Linux 发行版请自行安装 FFmpeg 和 Chromium 系统库后省略该参数。
-Windows 安装 FFmpeg 后需要重新打开终端再启动服务。Python、Node.js、Git 和系统包管理器
-需预先可用；指定 Python 可使用 Windows `-Python C:\Python312\python.exe`，或
+Windows 安装 FFmpeg 后需要重新打开终端再启动服务。Python、Node.js 和所需系统包管理器
+需预先可用；拉取子模块及校验已有 DTK 源码还需要 Git。指定 Python 可使用 Windows `-Python C:\Python312\python.exe`，或
 Linux/macOS 的 `PYTHON_BOOTSTRAP=python3.12`。
 
 可选参数：
@@ -96,7 +103,7 @@ Linux/macOS 的 `PYTHON_BOOTSTRAP=python3.12`。
 | `-WithCreationMaster` | 不支持 | 安装 Creation Master Windows 桌面依赖（含 Torch、Qt 等大包） |
 | `-WithMobile` | `--with-mobile` | 安装移动端 npm 包，Android/iOS SDK 仍需单独配置 |
 | `-WithCodex` | `--with-codex` | 安装与后端 Dockerfile 对齐的 Codex CLI；已有可用执行器时可省略 |
-| `-SkipSubmodules` | `--skip-submodules` | 使用已初始化的子模块或包含完整子模块的源码包 |
+| `-SkipSubmodules` | `--skip-submodules` | 不拉取子模块，使用本地源码；缺失源码的相关安装步骤会跳过并警告 |
 | `-App animation-studio` | `--app animation-studio` | 只安装指定应用的额外运行组件；共享后端与前端依赖仍会安装 |
 | `-ListApps` | `--list-apps` | 只列出支持的应用、运行组件和外部前置条件，不安装或创建虚拟环境 |
 | `-DryRun` | `--dry-run` | 只显示安装计划；虚拟环境不存在时只显示创建提示 |
@@ -202,6 +209,25 @@ Windows 在仓库根目录使用 PowerShell 启动：
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
+
+前端默认使用 `dev`（Vite 热更新），可切换到 `preview` 直接提供已有的 `frontend/dist`：
+
+```bash
+./deploy.sh --frontend-mode preview
+# 只检查前置条件并查看计划
+./deploy.sh --frontend-mode preview --dry-run
+```
+
+```powershell
+.\deploy.ps1 -FrontendMode preview
+.\deploy.ps1 -FrontendMode preview -DryRun
+```
+
+两种模式均不执行前端构建。`preview` 要求事先准备 `frontend/dist/index.html`，缺失时会在
+数据库初始化和服务启动前报错。也可设置环境变量 `FRONTEND_MODE=dev|preview`，命令行参数优先；
+切回开发模式使用 `--frontend-mode dev` / `-FrontendMode dev`。两种模式均使用 `FRONTEND_PORT`
+（默认 3030），并通过 `VITE_PROXY_TARGET` 代理 API、WebSocket 和媒体请求。
+`preview` 用于预览构建产物，正式静态站点部署见部署指南。
 
 该脚本使用 `backend\venv`，同时管理前后端、执行 worker 和连接器。
 端口配置、日志位置及双端远程访问联调命令见 [部署指南](docs/DEPLOYMENT.md)。

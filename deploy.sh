@@ -9,6 +9,8 @@ FRONTEND_DIR="${PROJECT_ROOT}/frontend"
 BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-3030}"
+FRONTEND_MODE="${FRONTEND_MODE:-dev}"
+DRY_RUN=0
 EXECUTION_WORKERS_ENABLED="${EXECUTION_WORKERS_ENABLED:-True}"
 export VITE_PROXY_TARGET="${VITE_PROXY_TARGET:-http://127.0.0.1:${BACKEND_PORT}}"
 export REMOTE_ACCESS_HOST_ENABLED="${REMOTE_ACCESS_HOST_ENABLED:-True}"
@@ -20,7 +22,7 @@ SHUTTING_DOWN=0
 
 usage() {
   cat <<'EOF'
-Usage: ./deploy.sh
+Usage: ./deploy.sh [--frontend-mode dev|preview] [--dry-run]
 
 Bootstrap and start the local Agent Studio stack:
   1. Apply Django migrations
@@ -35,12 +37,15 @@ Optional environment variables:
   BACKEND_HOST               Backend listen address (default: 0.0.0.0)
   BACKEND_PORT               Backend listen port (default: 8080)
   FRONTEND_PORT              Frontend listen port (default: 3030)
+  FRONTEND_MODE              dev or preview (default: dev; CLI overrides this)
   VITE_PROXY_TARGET          Frontend proxy origin (default: local BACKEND_PORT)
   EXECUTION_WORKERS_ENABLED  Set False for a relay-only server (default: True)
   REMOTE_ACCESS_HOST_ENABLED Set False on the relay server (default: True)
 
 If no superuser exists and the credential variables are not set, the script
 runs Django's interactive createsuperuser command when attached to a terminal.
+preview serves existing frontend/dist files; it never builds the frontend.
+--dry-run checks prerequisites and prints the plan without starting services.
 Press Ctrl-C to stop all managed services.
 EOF
 }
@@ -167,17 +172,37 @@ wait_for_services() {
   done
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  usage
-  exit 0
-fi
-[[ $# -eq 0 ]] || fail "Unknown argument: $1 (use --help for usage)."
+while (( $# )); do
+  case "$1" in
+    --help|-h) usage; exit 0 ;;
+    --frontend-mode)
+      [[ $# -ge 2 ]] || fail "--frontend-mode requires dev or preview."
+      FRONTEND_MODE="$2"
+      shift 2
+      ;;
+    --frontend-mode=*) FRONTEND_MODE="${1#*=}"; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    *) fail "Unknown argument: $1 (use --help for usage)." ;;
+  esac
+done
+case "${FRONTEND_MODE}" in
+  dev|preview) ;;
+  *) fail "Invalid frontend mode: ${FRONTEND_MODE} (expected dev or preview)." ;;
+esac
 
 PYTHON_BIN="$(find_python)" || fail \
   "Backend virtual environment not found. Run 'bash install-dependencies.sh --system-deps' first."
 NPM_BIN="$(command -v npm)" || fail "npm is not installed or is not available on PATH."
 [[ -d "${FRONTEND_DIR}/node_modules" ]] || fail \
   "Frontend dependencies are missing. Run 'bash install-dependencies.sh' first."
+if [[ "${FRONTEND_MODE}" == preview && ! -f "${FRONTEND_DIR}/dist/index.html" ]]; then
+  fail "Frontend preview requires frontend/dist/index.html. Prepare the build output separately; deploy.sh does not build it."
+fi
+log "Frontend mode: ${FRONTEND_MODE} (no build); port: ${FRONTEND_PORT}."
+if (( DRY_RUN )); then
+  log "Plan: bootstrap database/admin/apps, then start Vite ${FRONTEND_MODE}, Django and enabled services."
+  exit 0
+fi
 
 trap stop_services EXIT INT TERM
 
@@ -215,8 +240,8 @@ if (( WORKER_STARTED )); then
   touch "${WORKER_GATE}"
 fi
 start_service "frontend" \
-  bash -c 'cd "$1" && exec "$2" run dev -- --host 0.0.0.0 --port "$3" --strictPort' \
-  _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}"
+  bash -c 'cd "$1" && exec "$2" run "$4" -- --host 0.0.0.0 --port "$3" --strictPort' \
+  _ "${FRONTEND_DIR}" "${NPM_BIN}" "${FRONTEND_PORT}" "${FRONTEND_MODE}"
 
 start_service "backend" \
   bash -c 'cd "$1" && exec "$2" manage.py runserver "$3:$4"' \

@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [switch]$Help,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [ValidateSet('dev', 'preview')]
+    [string]$FrontendMode
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +11,7 @@ Set-StrictMode -Version Latest
 
 if ($Help) {
     Write-Host @'
-Usage: powershell -ExecutionPolicy Bypass -File .\deploy.ps1 [-DryRun]
+Usage: powershell -ExecutionPolicy Bypass -File .\deploy.ps1 [-FrontendMode dev|preview] [-DryRun]
 
 Apply migrations, create the initial administrator, synchronize app packages,
 and start the frontend, backend, execution workers and connectors on Windows.
@@ -19,6 +21,7 @@ Environment variables (same as deploy.sh):
   BACKEND_HOST                Default: 0.0.0.0
   BACKEND_PORT                Default: 8080
   FRONTEND_PORT               Default: 3030
+  FRONTEND_MODE               Default: dev; overridden by -FrontendMode
   VITE_PROXY_TARGET           Default: http://127.0.0.1:<BACKEND_PORT>
   EXECUTION_WORKERS_ENABLED   Default: True; False for a relay-only server
   REMOTE_ACCESS_HOST_ENABLED  Default: True; False for a relay-only server
@@ -28,6 +31,7 @@ Environment variables (same as deploy.sh):
 
 Django configuration is read from the environment and backend\.env.
 -DryRun checks prerequisites and prints the plan without changing the database.
+preview serves existing frontend\dist files; it never builds the frontend.
 Service output is written to backend\logs\deploy-<timestamp>-<pid>.
 Keep this terminal open; Ctrl+C stops all managed service process trees.
 This launcher is for local development, not a production Windows service.
@@ -77,12 +81,20 @@ function Start-ManagedService([string]$Name, [string]$Executable, [string[]]$Com
 $savedEnvironment = @{}
 $locationPushed = $false
 try {
+    if (-not $FrontendMode) { $FrontendMode = Get-Setting 'FRONTEND_MODE' 'dev' }
+    if ($FrontendMode -notin @('dev', 'preview')) {
+        throw "Invalid frontend mode: $FrontendMode (expected dev or preview)."
+    }
+    $FrontendMode = $FrontendMode.ToLowerInvariant()
     if (-not (Test-Path -LiteralPath $pythonBin -PathType Leaf)) {
         throw 'Backend virtual environment missing. Run .\install-dependencies.ps1 first.'
     }
     $nodeBin = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
     if (-not (Test-Path -LiteralPath $viteEntry -PathType Leaf)) {
         throw 'Frontend dependencies missing. Run .\install-dependencies.ps1 first.'
+    }
+    if ($FrontendMode -eq 'preview' -and -not (Test-Path -LiteralPath (Join-Path $frontendDir 'dist\index.html') -PathType Leaf)) {
+        throw 'Frontend preview requires frontend\dist\index.html. Prepare the build output separately; deploy.ps1 does not build it.'
     }
 
     $backendHost = Get-Setting 'BACKEND_HOST' '0.0.0.0'
@@ -95,6 +107,9 @@ try {
         }
     }
     if ([int]$backendPort -eq [int]$frontendPort) { throw 'Frontend and backend ports must differ.' }
+    $frontendArguments = @($viteEntry)
+    if ($FrontendMode -eq 'preview') { $frontendArguments += 'preview' }
+    $frontendArguments += @('--host', '0.0.0.0', '--port', $frontendPort, '--strictPort')
 
     $workerEnabled = Test-Enabled (Get-Setting 'EXECUTION_WORKERS_ENABLED' 'True')
     $hostEnabled = Get-Setting 'REMOTE_ACCESS_HOST_ENABLED' 'True'
@@ -106,10 +121,11 @@ try {
     }
 
     Write-Host "Backend: http://${backendHost}:$backendPort; frontend: http://localhost:$frontendPort"
+    Write-Host "Frontend mode: $FrontendMode (no build)."
     Write-Host "Execution workers: $workerEnabled; remote connector: $(Test-Enabled $hostEnabled)"
     if ($DryRun) {
         Write-Host 'Plan: start worker-owned SQLite data service; migrate; ensure administrator; sync study-with-method, my-computer, wechat-assistant; release worker startup gate.'
-        Write-Host 'Then start Vite, Django, enabled workers/remote connector, and the WeChat connector.'
+        Write-Host "Then start Vite $FrontendMode, Django, enabled workers/remote connector, and the WeChat connector."
         return
     }
 
@@ -171,7 +187,7 @@ print('STUDIO_SUPERUSER_EXISTS=' + str(get_user_model().objects.filter(**filters
     if ($workerStarted) { New-Item -ItemType File -Path $workerGate | Out-Null }
 
     # Launch Node directly to avoid npm.cmd/cmd.exe quoting and extra process layers.
-    Start-ManagedService 'frontend' $nodeBin @($viteEntry, '--host', '0.0.0.0', '--port', $frontendPort, '--strictPort') $frontendDir
+    Start-ManagedService 'frontend' $nodeBin $frontendArguments $frontendDir
     Start-ManagedService 'backend' $pythonBin @('manage.py', 'runserver', "${backendHost}:$backendPort", '--noreload') $backendDir
     if ($workerEnabled) {
         if (-not $workerStarted) {

@@ -180,7 +180,7 @@
 }
 
 .app-card:hover,
-.app-card:focus-within {
+.app-card:focus-visible {
   border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border-lit));
   background: var(--color-bg-card);
 }
@@ -312,7 +312,7 @@
 }
 
 .app-card:hover .app-card-open,
-.app-card:focus-within .app-card-open { color: var(--apps-accent-text); }
+.app-card:focus-visible .app-card-open { color: var(--apps-accent-text); }
 .app-card-usage { color: var(--apps-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) {
