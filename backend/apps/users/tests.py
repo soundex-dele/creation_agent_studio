@@ -322,6 +322,126 @@ class AdminAccountManagementTest(TestCase):
         self.assertFalse(User.objects.filter(username='forbidden-import').exists())
 
 
+class AccountDeletionTest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username='delete-admin', role=User.Role.ADMIN)
+        self.target = User.objects.create_user(username='delete-member', password='safe-test-password')
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        self.url = f'/api/v1/auth/admin/users/{self.target.pk}/'
+
+    def test_deletes_new_account_and_empty_personal_workspace(self):
+        from apps.enterprise.models import Organization
+        from .models import UserAPIKey
+        workspace_id = self.target.owned_organizations.get().pk
+        key, _ = UserAPIKey.issue(user=self.target)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, 204, response.data)
+        self.assertFalse(User.objects.filter(pk=self.target.pk).exists())
+        self.assertFalse(Organization.objects.filter(pk=workspace_id).exists())
+        self.assertFalse(UserAPIKey.objects.filter(pk=key.pk).exists())
+        self.assertEqual(self.client.delete(self.url).status_code, 404)
+
+    def test_rejects_anonymous_members_and_auditors(self):
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.delete(self.url).status_code, 401)
+        for role in (User.Role.MEMBER, User.Role.AUDITOR):
+            self.target.role = role
+            self.target.save(update_fields=['role'])
+            self.client.force_authenticate(self.target)
+            self.assertEqual(self.client.delete(self.url).status_code, 403)
+        self.assertTrue(User.objects.filter(pk=self.target.pk).exists())
+
+    def test_rejects_self_system_and_unknown_accounts(self):
+        system, _ = User.objects.get_or_create(username='system')
+        for user, expected in ((self.admin, 400), (system, 404)):
+            response = self.client.delete(f'/api/v1/auth/admin/users/{user.pk}/')
+            self.assertEqual(response.status_code, expected)
+            self.assertTrue(User.objects.filter(pk=user.pk).exists())
+        self.assertEqual(self.client.delete('/api/v1/auth/admin/users/999999999/').status_code, 404)
+
+    def test_superuser_requires_superuser_actor(self):
+        self.target.is_superuser = True
+        self.target.save(update_fields=['is_superuser'])
+        self.assertEqual(self.client.delete(self.url).status_code, 403)
+        self.admin.is_superuser = True
+        self.admin.save(update_fields=['is_superuser'])
+        self.assertEqual(self.client.delete(self.url).status_code, 204)
+
+    def test_preserves_last_active_platform_admin(self):
+        self.admin.is_superuser = True
+        self.admin.role = User.Role.AUDITOR
+        self.admin.save(update_fields=['role', 'is_superuser'])
+        self.target.role = User.Role.ADMIN
+        self.target.save(update_fields=['role'])
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('至少保留', response.data['detail'])
+        self.assertTrue(User.objects.filter(pk=self.target.pk).exists())
+
+    def test_can_delete_another_admin_or_disabled_account(self):
+        self.target.role = User.Role.ADMIN
+        self.target.is_active = False
+        self.target.save(update_fields=['role', 'is_active'])
+        self.assertEqual(self.client.delete(self.url).status_code, 204)
+        another = User.objects.create_user(username='another-admin', role=User.Role.ADMIN)
+        self.assertEqual(self.client.delete(f'/api/v1/auth/admin/users/{another.pk}/').status_code, 204)
+
+    def test_workspace_with_content_or_other_members_is_preserved(self):
+        from apps.conversations.models import Conversation
+        from apps.enterprise.models import Membership, Organization
+        workspace = self.target.owned_organizations.get()
+        conversation = Conversation.objects.create(user=self.target, organization=workspace, title='keep')
+        self.assertEqual(self.client.delete(self.url).status_code, 409)
+        self.assertTrue(Conversation.objects.filter(pk=conversation.pk).exists())
+        conversation.delete()
+        Membership.objects.create(user=self.admin, organization=workspace)
+        self.assertEqual(self.client.delete(self.url).status_code, 409)
+        self.assertTrue(Organization.objects.filter(pk=workspace.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.target.pk).exists())
+
+    def test_protected_resource_rolls_back_empty_workspace_cleanup(self):
+        from apps.enterprise.models import Organization
+        from apps.workflows.models import Workflow
+        workspace_id = self.target.owned_organizations.get().pk
+        workflow = Workflow.objects.create(
+            name='keep workflow', owner=self.target,
+            organization=self.admin.owned_organizations.get(),
+        )
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertTrue(User.objects.filter(pk=self.target.pk).exists())
+        self.assertTrue(Organization.objects.filter(pk=workspace_id).exists())
+        self.assertTrue(Workflow.objects.filter(pk=workflow.pk).exists())
+
+    @override_settings(SINGLE_TENANT_MODE=True, SINGLE_TENANT_ORGANIZATION_SLUG='deletion-tenant')
+    def test_single_tenant_member_deletion_preserves_shared_workspace(self):
+        from apps.enterprise.models import Membership, Organization
+        owner = User.objects.create_user(username='tenant-owner')
+        target = User.objects.create_user(username='tenant-member')
+        workspace = owner.owned_organizations.get()
+        response = self.client.delete(f'/api/v1/auth/admin/users/{target.pk}/')
+        self.assertEqual(response.status_code, 204, response.data)
+        self.assertTrue(Organization.objects.filter(pk=workspace.pk).exists())
+        self.assertFalse(Membership.objects.filter(user_id=target.pk).exists())
+        self.assertEqual(self.client.delete(f'/api/v1/auth/admin/users/{owner.pk}/').status_code, 409)
+
+    def test_deleted_account_tokens_and_keys_no_longer_authenticate(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from .models import UserAPIKey
+        refresh = RefreshToken.for_user(self.target)
+        access = str(refresh.access_token)
+        _, raw_key = UserAPIKey.issue(user=self.target)
+        self.assertEqual(self.client.delete(self.url).status_code, 204)
+        client = APIClient()
+        self.assertEqual(client.get('/api/v1/auth/me/', HTTP_AUTHORIZATION=f'Bearer {access}').status_code, 401)
+        self.assertEqual(client.get('/api/v1/auth/me/', HTTP_X_API_KEY=raw_key).status_code, 401)
+        client.cookies[refresh_cookie_name()] = str(refresh)
+        refreshed = client.post('/api/v1/auth/token/refresh/', {}, format='json')
+        self.assertEqual(refreshed.status_code, 401)
+        self.assertEqual(refreshed.cookies[refresh_cookie_name()]['max-age'], 0)
+
+
 class ProfileAndApiKeyTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(

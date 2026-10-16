@@ -26,6 +26,7 @@ from .serializers import (
 from core.permissions import IsAdmin
 from .models import User
 from .models import UserAPIKey
+from .account_deletion import delete_account
 from .session import clear_refresh_cookie, refresh_cookie_name, set_refresh_cookie
 from .licensing import (
     LicenseError,
@@ -79,12 +80,15 @@ class AdminUserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.exclude(username='system').order_by('-created_at')
 
 
-class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Allow platform administrators to delegate account capabilities."""
 
     serializer_class = AdminUserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset = User.objects.exclude(username='system')
+
+    def perform_destroy(self, instance):
+        delete_account(actor=self.request.user, account_id=instance.pk)
 
 
 def _csv_response(content, filename):
@@ -257,7 +261,15 @@ class BrowserTokenRefreshView(TokenRefreshView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         serializer = self.get_serializer(data={'refresh': refresh_token})
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except User.DoesNotExist:
+            # SimpleJWT looks up the subject directly during refresh. A token
+            # belonging to a deleted account is unauthorized, not a server error.
+            return clear_refresh_cookie(Response(
+                {'detail': '账号已删除，请重新登录。'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            ))
         payload = dict(serializer.validated_data)
         rotated_refresh = payload.pop('refresh', refresh_token)
         response = Response(payload, status=status.HTTP_200_OK)

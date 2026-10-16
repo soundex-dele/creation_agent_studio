@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Switch,
@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  DownloadOutlined, ImportOutlined, InboxOutlined,
+  DeleteOutlined, DownloadOutlined, ImportOutlined, InboxOutlined,
   LockOutlined, ReloadOutlined, TeamOutlined, UserAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -89,6 +89,10 @@ export default function AccountManagementPage() {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deletePending = useRef(false);
 
   const loadAccounts = useCallback(async (nextPage = 1) => {
     setLoading(true);
@@ -158,18 +162,30 @@ export default function AccountManagementPage() {
       width: 156,
       fixed: 'right',
       render: (_, account) => (
-        <Button
-          icon={<LockOutlined aria-hidden="true" />}
-          onClick={() => {
-            setPermissionAccount(account);
-            permissionForm.setFieldsValue({
-              role: account.role,
-              is_active: account.is_active,
-            });
-          }}
-        >
-          权限设置
-        </Button>
+        <Space direction="vertical" className="account-row-actions">
+          <Button
+            icon={<LockOutlined aria-hidden="true" />}
+            onClick={() => {
+              setPermissionAccount(account);
+              permissionForm.setFieldsValue({
+                role: account.role,
+                is_active: account.is_active,
+              });
+            }}
+          >
+            权限设置
+          </Button>
+          <Button
+            danger
+            icon={<DeleteOutlined aria-hidden="true" />}
+            disabled={String(account.id) === String(user?.id)}
+            aria-label={`删除账号 ${account.username}`}
+            onClick={() => {
+              setDeleteError('');
+              setDeleteAccount(account);
+            }}
+          >删除</Button>
+        </Space>
       ),
     },
   ], [permissionForm, user?.id]);
@@ -281,6 +297,34 @@ export default function AccountManagementPage() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteAccount || deletePending.current) return;
+    deletePending.current = true;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      try {
+        await api.delete(`/auth/admin/users/${deleteAccount.id}/`);
+      } catch (error: unknown) {
+        // A prior attempt may have succeeded even if its response was lost.
+        if (!axios.isAxiosError(error) || error.response?.status !== 404) throw error;
+      }
+      setAccounts(items => items.filter(item => item.id !== deleteAccount.id));
+      setTotal(count => Math.max(0, count - 1));
+      setDeleteAccount(null);
+      message.success(`账号 ${deleteAccount.username} 已删除`);
+      await loadAccounts(accounts.length === 1 && page > 1 ? page - 1 : page);
+    } catch (error: unknown) {
+      const detail = axios.isAxiosError(error) && typeof error.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : '删除账号失败，请稍后重试';
+      setDeleteError(detail);
+    } finally {
+      deletePending.current = false;
+      setDeleting(false);
+    }
+  };
+
   if (!canManageAccounts) {
     return (
       <Result
@@ -353,6 +397,33 @@ export default function AccountManagementPage() {
           }}
         />
       </Card>
+
+      <Modal
+        className="account-delete-modal"
+        title="删除账号"
+        open={deleteAccount !== null}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        cancelButtonProps={{ disabled: deleting }}
+        confirmLoading={deleting}
+        closable={!deleting}
+        maskClosable={!deleting}
+        keyboard={!deleting}
+        onOk={() => void confirmDelete()}
+        onCancel={() => !deletePending.current && setDeleteAccount(null)}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          确定永久删除账号 <strong style={{ overflowWrap: 'anywhere' }}>{deleteAccount?.username}</strong> 吗？此操作无法撤销。
+        </Typography.Paragraph>
+        <Typography.Paragraph>
+          删除后该账号无法登录，其 API 密钥、成员关系及按关联规则删除的项目、对话、智能体、应用等数据将一并移除。
+          自动创建的空个人工作区也会清理；有关联的受保护资源时，需先转移或清理资源。
+          如果只是暂时禁止访问，请在权限设置中停用账号。
+        </Typography.Paragraph>
+        {deleteError && <Alert type="error" showIcon message={deleteError} role="alert" />}
+      </Modal>
 
       <Modal
         className="account-create-modal"

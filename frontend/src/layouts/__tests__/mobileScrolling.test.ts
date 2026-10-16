@@ -31,6 +31,22 @@ function declarationsAt(sources: string[], selectors: string[], width: number, h
 describe('mobile page scrolling', () => {
   const globalStyles = readSource('../../styles/global.css');
 
+  it.each([320, 375, 390, 767, 768, 1440])('keeps account deletion controls reachable at %ipx', width => {
+    const css = readSource('../../pages/Settings/AccountManagementPage.css');
+    const source = readSource('../../pages/Settings/AccountManagementPage.tsx');
+    expect(source).toContain('className="account-delete-modal"');
+    expect(source).toContain('direction="vertical" className="account-row-actions"');
+    for (const height of [320, 900]) {
+      const body = declarationsAt([css], ['.account-delete-modal .ant-modal-body'], width, height);
+      expect(body['max-height']).toBe('60dvh');
+      expect(body['overflow-y']).toBe('auto');
+      for (const selector of ['.account-row-actions .ant-btn', '.account-delete-modal .ant-modal-footer .ant-btn']) {
+        expect(declarationsAt([css], [selector], width, height)['min-height']).toBe('44px');
+      }
+      expect(declarationsAt([globalStyles], ['.app-main', '.app-main--padded'], width, height)['overflow-y']).toBe('auto');
+    }
+  });
+
   it.each([320, 375, 390, 767, 768, 1440])('preserves migrated workspace scroll owners at %ipx', width => {
     for (const height of [320, 900]) {
       for (const [packageName, page, selector, overflow] of [
