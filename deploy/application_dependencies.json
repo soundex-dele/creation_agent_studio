@@ -1,5 +1,12 @@
 {
   "applications": {
+    "community-chat": { "name": "社区聊天", "runtimes": [] },
+    "topic-explorer": { "name": "选题探索", "runtimes": [] },
+    "web-fetch": {
+      "name": "网页爬取",
+      "runtimes": ["web-fetch"],
+      "notes": ["需要 Node.js 22.12+；使用执行账号的 Playwright Chromium。仅支持公网页面，不共享浏览器登录态。"]
+    },
     "ai-drawing": {
       "name": "AI 绘图",
       "runtimes": [],

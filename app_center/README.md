@@ -4,6 +4,11 @@ This directory lives at the repository root, alongside `backend` and `frontend`.
 See [the platform/application contract](../docs/APPLICATION_PACKAGES.md) for registration,
 public capabilities, package-local frontend tests and migration guidance.
 
+The **网页爬取** (`web-fetch`) application extracts public webpages and WeChat
+articles into private Markdown/JSON results using an isolated Chromium session.
+See [`web_fetch/README.md`](web_fetch/README.md) for runtime installation, API,
+network restrictions and validation.
+
 Each direct child directory is one trusted, bundled application. It must contain
 an `application.yaml` manifest. Directory names use `snake_case`; the public
 application ID in the manifest uses a lowercase slug.

@@ -61,7 +61,7 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(all(command[0] == sys.executable for command in pip))
         self.assertTrue(pip[1][-1].endswith("production.txt"))
         npm_calls = [call for call in self.run.call_args_list if "ci" in call.args[0]]
-        self.assertEqual([call.kwargs["cwd"] for call in npm_calls], [installer.ROOT / "frontend", installer.PNG, installer.ANIMATION])
+        self.assertEqual([call.kwargs["cwd"] for call in npm_calls], [installer.ROOT / "frontend", installer.PNG, installer.ANIMATION, installer.WEB_FETCH])
         self.assertTrue(all("--include=dev" in call.args[0] for call in npm_calls))
         self.assertTrue(any(command[-2:] == ["install", "chromium"] for command in commands))
         self.assertTrue(any("p.screenshot()" in command[-1] for command in commands))
@@ -252,7 +252,20 @@ class InstallerTests(unittest.TestCase):
         manifests = (installer.ROOT / "app_center").glob("*/application.yaml")
         self.assertEqual(set(catalog), {path.parent.name.replace("_", "-") for path in manifests})
         for app in catalog.values():
-            self.assertTrue(set(app["runtimes"]) <= {"ffmpeg", "png", "animation", "dtk"})
+            self.assertTrue(set(app["runtimes"]) <= {"ffmpeg", "png", "animation", "dtk", "web-fetch"})
+
+    def test_web_fetch_installs_its_locked_engine_and_browser_only(self):
+        installer.main(["--dry-run", "--app", "web-fetch"])
+        folders = [call.kwargs["cwd"] for call in self.run.call_args_list if "ci" in call.args[0]]
+        self.assertEqual(folders, [installer.ROOT / "frontend", installer.WEB_FETCH])
+        self.assertTrue(any("Web fetch Chromium check passed" in command[-1] for command in self.commands()))
+        self.assertFalse(any("openBrowser" in command[-1] for command in self.commands()))
+
+    def test_web_fetch_rejects_node_20_before_installing(self):
+        with patch.object(installer.subprocess, "check_output", return_value="v20.19.0"):
+            with self.assertRaisesRegex(RuntimeError, "Web fetch requires"):
+                installer.main(["--dry-run", "--app", "web-fetch"])
+        self.run.assert_not_called()
 
     def test_full_dry_run_does_not_start_package_managers_or_browsers(self):
         with patch.object(installer, "run", RUN_COMMAND), patch.object(installer.subprocess, "run") as child:

@@ -1,0 +1,45 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: web-fetch
+  version: 1.0.0
+  name: 网页爬取
+  description: 提取公开网页与公众号文章，预览正文并保存 Markdown 和 JSON。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: globe
+  color: '#2563EB'
+  tags: [网页爬取, 公众号, Markdown, 正文提取]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: web-fetch
+    executor_protocol_version: 1
+    renderer_key: web-fetch
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [url]
+      properties:
+        url: {type: string, minLength: 1, maxLength: 8192}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated, timeout_seconds: 120}
+    dependencies: {agents: [], skills: []}
+  backend:
+    extensions: app_center.web_fetch.extensions.provider
+    urlconf: app_center.web_fetch.backend.urls
+    executor_entrypoint: app_center.web_fetch.runtime.execute
+  database: {mode: none}
+  install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: web-fetch
+      platforms: [web]

@@ -126,7 +126,7 @@ export function createApplicationRuntimeClient({
     getArtifactAccess: async (
       runId: string,
       artifactId: string,
-    ): Promise<{ artifact_id: string; url: string; expires_at: string }> =>
+    ): Promise<{ artifact_id: string; url: string; expires_at: string; content_path?: string | null }> =>
       getRunArtifactAccess(organizationId, { run_id: runId, id: artifactId }),
   };
 }

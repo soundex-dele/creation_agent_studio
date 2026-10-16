@@ -13,6 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 PNG = ROOT / "app_center/html_to_png"
 ANIMATION = ROOT / "app_center/animation_studio/engine"
+WEB_FETCH = ROOT / "app_center/web_fetch/engine"
 DTK = ROOT / "app_center/douyin_benchmark"
 DTK_VENV = ROOT / "backend/.venv-dtk"
 CATALOG = ROOT / "deploy/application_dependencies.json"
@@ -126,6 +127,22 @@ def install_png(execute, node, *, system_deps=False):
     execute([node, "-e", smoke], cwd=PNG)
 
 
+def install_web_fetch(execute, node, *, system_deps=False):
+    browser_args = ["install", "chromium"]
+    if system_deps and sys.platform.startswith("linux"):
+        browser_args.append("--with-deps")
+    execute([node, WEB_FETCH / "node_modules/playwright/cli.js", *browser_args], cwd=WEB_FETCH)
+    smoke = (
+        "const {chromium}=require('playwright'); "
+        "(async()=>{const b=await chromium.launch({headless:true}); "
+        "try {const p=await b.newPage(); await p.setContent('<title>Ready</title>'); "
+        "if(await p.title()!=='Ready') throw new Error('Chromium DOM check failed'); "
+        "console.log('Web fetch Chromium check passed');} "
+        "finally {await b.close();}})().catch(e=>{console.error(e);process.exit(1)});"
+    )
+    execute([node, "-e", smoke], cwd=WEB_FETCH)
+
+
 def install_animation(execute, node, npm):
     execute(npm + ["run", "browser"], cwd=ANIMATION)
     smoke = (
@@ -211,6 +228,8 @@ def main(argv=None):
     major, minor = (int(value) for value in version.lstrip("v").split(".")[:2])
     if not ((major == 20 and minor >= 19) or (major == 22 and minor >= 12) or major >= 24):
         raise RuntimeError(f"Node {version} is unsupported. Install Node.js 22.12+ LTS or 24 LTS.")
+    if "web-fetch" in runtimes and major < 22:
+        raise RuntimeError("Web fetch requires Node.js 22.12+ LTS or 24 LTS.")
     npm = npm_command(node)
     execute = lambda command, **kwargs: run(command, dry_run=args.dry_run, **kwargs)
     warnings = []
@@ -267,6 +286,8 @@ def main(argv=None):
         folders.append(PNG)
     if "animation" in runtimes:
         folders.append(ANIMATION)
+    if "web-fetch" in runtimes:
+        folders.append(WEB_FETCH)
     if args.with_mobile:
         folders.append(ROOT / "mobile")
     for folder in folders:
@@ -276,6 +297,8 @@ def main(argv=None):
 
     if "png" in runtimes:
         install_png(execute, node, system_deps=args.system_deps)
+    if "web-fetch" in runtimes:
+        install_web_fetch(execute, node, system_deps=args.system_deps)
     if "animation" in runtimes:
         install_animation(execute, node, npm)
     if install_creation_master:
