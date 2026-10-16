@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DriveTransfers, sha256 } from '../driveTransfers';
 import type { DriveClient, DriveUpload } from '@applications/my_drive/frontend/services/myDrive';
 
@@ -17,22 +18,38 @@ function setup(initial = upload()) {
   const manager = new DriveTransfers(client, changed, completed);
   return { client, manager, changed, completed };
 }
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-describe('resumable drive transfers', () => {
+describe.each(['native', 'missing-subtle', 'throwing-digest', 'missing-crypto'])('resumable drive transfers (%s)', (mode) => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', mode === 'native' ? webcrypto : mode === 'missing-crypto' ? undefined : mode === 'missing-subtle' ? {} : {
+      subtle: { digest: vi.fn().mockRejectedValue(new Error('Secure context required')) },
+    });
+  });
+
+  it.each([
+    new Uint8Array(),
+    new TextEncoder().encode('abc'),
+    new Uint8Array([0, 255, 137, 80, 78, 71, 13, 10]),
+    new Uint8Array(8 * 1024 * 1024).fill(173),
+  ])('matches standard SHA-256 for empty, text and binary chunks (%#)', async (bytes) => {
+    expect(await sha256(new Blob([bytes]))).toBe(createHash('sha256').update(bytes).digest('hex'));
+  });
+
   it('uploads bounded chunks in order and completes', async () => {
     const { client, manager, completed } = setup();
     await manager.add(file(), null);
     await vi.waitFor(() => expect(manager.tasks[0].status).toBe('completed'));
     expect(vi.mocked(client.chunk).mock.calls.map((args) => args[1])).toEqual([0, 4]);
-    expect(client.chunk).toHaveBeenCalledWith('1', 0, await sha256(new Blob(['abcd'])), expect.any(Blob), expect.any(AbortSignal));
+    expect(client.chunk).toHaveBeenCalledWith('1', 0, createHash('sha256').update('abcd').digest('hex'), expect.any(Blob), expect.any(AbortSignal));
+    expect(client.chunk).toHaveBeenCalledWith('1', 4, createHash('sha256').update('efgh').digest('hex'), expect.any(Blob), expect.any(AbortSignal));
     expect(completed).toHaveBeenCalledOnce();
     expect(manager.tasks[0].file).toBeUndefined();
     manager.dispose();
   });
 
   it('restores server sessions, verifies original chunks and resumes confirmed offset', async () => {
-    const initial = { ...upload(), offset: 4, chunks: [{ offset: 0, size: 4, sha256: await sha256(new Blob(['abcd'])) }] };
+    const initial = { ...upload(), offset: 4, chunks: [{ offset: 0, size: 4, sha256: createHash('sha256').update('abcd').digest('hex') }] };
     const { client, manager } = setup(initial);
     await manager.load();
     expect(manager.tasks[0].status).toBe('paused');
@@ -45,7 +62,7 @@ describe('resumable drive transfers', () => {
   });
 
   it('rejects a changed original despite matching file metadata', async () => {
-    const initial = { ...upload(), offset: 4, chunks: [{ offset: 0, size: 4, sha256: await sha256(new Blob(['abcd'])) }] };
+    const initial = { ...upload(), offset: 4, chunks: [{ offset: 0, size: 4, sha256: createHash('sha256').update('abcd').digest('hex') }] };
     const { client, manager } = setup(initial);
     await manager.load(); manager.resume('1', new File(['xxxxefgh'], 'video.mp4', { lastModified: 100 }));
     await vi.waitFor(() => expect(manager.tasks[0].status).toBe('error'));

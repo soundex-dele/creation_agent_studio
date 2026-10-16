@@ -1,11 +1,20 @@
+import { sha256 as softwareSha256 } from '@noble/hashes/sha256';
 import { driveError, type DriveClient, type DriveUpload } from './myDrive';
 
 export type TransferStatus = 'queued' | 'checking' | 'uploading' | 'paused' | 'error' | 'completed' | 'cancelling' | 'cancelled';
 export interface DriveTransfer { upload: DriveUpload; file?: File; status: TransferStatus; error: string; speed: number }
 
 export async function sha256(blob: Blob): Promise<string> {
-  if (!globalThis.crypto?.subtle) throw new Error('文件校验需要安全连接，请通过 HTTPS 或 localhost 打开应用。');
-  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())), (b) => b.toString(16).padStart(2, '0')).join('');
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let digest: Uint8Array;
+  try {
+    digest = new Uint8Array(await globalThis.crypto!.subtle.digest('SHA-256', bytes));
+  } catch {
+    // LAN HTTP pages lack Web Crypto; some browsers expose it but reject calls.
+    // Keep the same SHA-256 contract and only read the current file chunk.
+    digest = softwareSha256(bytes);
+  }
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Files stay in memory only. The server persists sessions and confirmed chunks. */
