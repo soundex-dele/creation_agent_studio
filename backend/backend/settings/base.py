@@ -633,3 +633,12 @@ LOGGING.setdefault('loggers', {})['websockets'] = {'level': 'WARNING', 'propagat
 
 # Optional phone-accessible origin for WeChat conversation links.
 WECHAT_ASSISTANT_PUBLIC_URL = config("WECHAT_ASSISTANT_PUBLIC_URL", default="")
+
+# Community chat is platform-wide; blobs must remain outside public MEDIA_ROOT.
+COMMUNITY_CHAT_ROOT = Path(config('COMMUNITY_CHAT_ROOT', default=str(BASE_DIR / 'community-chat-data')))
+COMMUNITY_CHAT_WORKERS = config('COMMUNITY_CHAT_WORKERS', default=config('WEB_CONCURRENCY', default=1, cast=int), cast=int)
+COMMUNITY_CHAT_ALLOWED_ORIGINS = config(
+    'COMMUNITY_CHAT_ALLOWED_ORIGINS',
+    default=','.join(dict.fromkeys([*CORS_ALLOWED_ORIGINS, 'http://localhost:3030', 'http://127.0.0.1:3030',
+                                  *[host for host in ALLOWED_HOSTS if host != '*']])),
+).split(',')

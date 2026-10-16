@@ -11,7 +11,7 @@ export default function ApplicationIcon({ app }: {
   if (app.rendererKey === 'disk-cleaner' || app.id === 'disk-cleaner') {
     return <HardDrive size="1em" aria-hidden="true" />;
   }
-  if (app.rendererKey === 'cowork' || app.id === 'cowork' || app.id === 'platform-conversation') {
+  if (app.rendererKey === 'community-chat' || app.rendererKey === 'cowork' || app.id === 'cowork' || app.id === 'platform-conversation') {
     return <MessageOutlined aria-hidden="true" />;
   }
   if (app.rendererKey === 'pocket-salvager' || app.id === 'pocket-salvager') {

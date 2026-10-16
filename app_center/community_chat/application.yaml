@@ -1,0 +1,38 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: community-chat
+  version: 1.0.0
+  name: 社区聊天
+  description: 与本站用户实时交流，支持公共大厅、私聊、群聊与图片文件分享。
+  category: {slug: productivity, name: 效率工具, description: 日常协作与任务工具, icon: desktop, order: 30}
+  icon: message
+  color: "#2563EB"
+  tags: [聊天, 社区, 群聊, 文件分享]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: community-chat
+    executor_protocol_version: 1
+    renderer_key: community-chat
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema: {type: object}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  backend:
+    django_app: app_center.community_chat.backend.apps.CommunityChatConfig
+  database: {mode: django-migrations, schema_version: 1, tenant_scoped: false}
+  install: {scope: per-organization, activate: true}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: community-chat
+      platforms: [web]

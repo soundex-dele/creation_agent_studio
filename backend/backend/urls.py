@@ -36,6 +36,7 @@ urlpatterns += [
     # Stable public contract. The project is pre-launch, so every application
     # route uses one versioned surface instead of carrying compatibility aliases.
     path('api/v1/auth/', include('apps.users.urls')),
+    path('api/v1/community-chat/', include('app_center.community_chat.backend.urls')),
     path('api/v1/agents/', include('apps.agents.urls')),
     path('api/v1/apps/', include('apps.applications.urls')),
     path('api/v1/templates/', include('apps.templates.urls')),

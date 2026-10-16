@@ -101,7 +101,7 @@ def protected_roots():
     for name in ("SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"):
         if os.environ.get(name):
             values.append(os.environ[name])
-    for name in ("MY_DRIVE_ROOT", "MEDIA_ROOT", "ARTIFACT_ROOT", "AGENT_WORKSPACE_ROOT", "MEETING_AUDIO_ROOT",
+    for name in ("MY_DRIVE_ROOT", "COMMUNITY_CHAT_ROOT", "MEDIA_ROOT", "ARTIFACT_ROOT", "AGENT_WORKSPACE_ROOT", "MEETING_AUDIO_ROOT",
                  "TEACHING_DATA_ROOT", "DISK_CLEANER_PROTECTED_ROOTS"):
         value = getattr(settings, name, None)
         if value:

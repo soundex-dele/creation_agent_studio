@@ -14,7 +14,10 @@ django_application = get_asgi_application()
 
 async def application(scope, receive, send):
     if scope['type'] == 'websocket':
-        if scope.get('path') == '/ws/remote/connector/':
+        if scope.get('path') == '/ws/community-chat/':
+            from app_center.community_chat.backend.consumer import socket_application
+            await socket_application()(scope, receive, send)
+        elif scope.get('path') == '/ws/remote/connector/':
             from apps.remote_access.consumer import connector_socket
             await connector_socket(scope, receive, send)
         else:
