@@ -48,6 +48,13 @@ backend host and permanently deletes explicitly previewed and confirmed files.
 It is restricted to platform administrators and uses a host-local worker.
 See [`disk_cleaner/README.md`](disk_cleaner/README.md) for setup and file boundaries.
 
+## Song curator
+
+The **歌曲推荐官** (`song-curator`) imports playlist screenshots into reviewable private drafts,
+recommends similar songs or music for a genre, mood and activity, and verifies candidate metadata
+against a public music directory. See [`song_curator/README.md`](song_curator/README.md) for API,
+installation, privacy boundaries and validation.
+
 ## Kitchen assistant
 
 The **厨房助手** (`kitchen-assistant`) workspace ports the Flutter kitchen app

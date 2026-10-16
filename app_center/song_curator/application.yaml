@@ -1,0 +1,56 @@
+api_version: agent-studio/v1
+kind: ApplicationPackage
+metadata:
+  id: song-curator
+  version: 1.0.0
+  name: 歌曲推荐官
+  description: 从歌单截图发现下一首喜欢的歌，按风格、心情和场景探索音乐。
+  category:
+    slug: productivity
+    name: 效率工具
+    description: 日常协作与任务工具
+    icon: desktop
+    order: 30
+  icon: "音"
+  color: "#7060C9"
+  tags: [音乐, 歌单, 图片识别, 推荐]
+  developer: Agent Studio
+spec:
+  application_kind: custom
+  launch_mode: dedicated
+  definition:
+    kind: custom
+    executor_kind: media
+    executor_key: song-curator
+    executor_protocol_version: 1
+    renderer_key: song-curator
+    renderer_schema_version: 1
+    retry_policy: {max_attempts: 1, retry_safe: false}
+    input_schema:
+      type: object
+      required: [task_id]
+      additionalProperties: false
+      properties:
+        task_id: {type: string, format: uuid}
+    output_schema: {type: object}
+    default_config: {launch_mode: dedicated}
+    dependencies: {agents: [], skills: []}
+  frontends:
+    - id: web
+      type: react
+      directory: frontend
+      entrypoint: frontend/index.ts
+      renderer_key: song-curator
+      platforms: [web]
+  backend:
+    extensions: app_center.song_curator.extensions.provider
+    django_app: app_center.song_curator.backend.apps.SongCuratorConfig
+    urlconf: app_center.song_curator.backend.urls
+    executor_entrypoint: app_center.song_curator.runtime.execute
+  database:
+    mode: django-migrations
+    schema_version: 1
+    tenant_scoped: true
+  install:
+    scope: per-organization
+    activate: true
